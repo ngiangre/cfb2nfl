@@ -35,10 +35,18 @@
 #' @param nfl_rosters,nfl_player_stats Cleaned nflverse tables (longevity source).
 #' @param teams Optional cleaned `teams` dimension (display metadata); if
 #'   supplied, the team `mascot` is attached to the identity block.
+#' @param career Optional per-player career summary ([career_summary()],
+#'   decision 0021). If supplied (alone or with `roster_flags`), a `career`
+#'   section is attached.
+#' @param roster_flags Optional roster backbone with eligibility flags
+#'   ([flag_redshirt()], decision 0021). If supplied, the career section also
+#'   reports the redshirt-shaped flags and a per-season flag table is attached.
 #' @param taxonomy Stat-phase taxonomy; defaults to [stat_taxonomy()].
 #'
 #' @return An object of class `cfb_dossier`: a named list with `id`, `identity`,
-#'   `stats` (tidy, phase-labeled), `coaching`, `recruiting`, `outcome`, and
+#'   `stats` (tidy, phase-labeled), `coaching`, `recruiting`, `outcome`,
+#'   optionally `career` (one row: span, gaps, transfers, eligibility flags)
+#'   and `season_flags` (per-season `has_stats` / `redshirt_season`), and
 #'   `provenance`.
 #' @export
 player_dossier <- function(
@@ -51,6 +59,8 @@ player_dossier <- function(
   nfl_rosters,
   nfl_player_stats,
   teams = NULL,
+  career = NULL,
+  roster_flags = NULL,
   taxonomy = stat_taxonomy()
 ) {
   id <- as.character(id)
@@ -151,42 +161,118 @@ player_dossier <- function(
     nfl_player_stats
   )
 
+  # ---- career & eligibility (optional derived tables, decision 0021) ----
+  career_sec <- NULL
+  season_flags <- NULL
+  if (!is.null(career) || !is.null(roster_flags)) {
+    if (!is.null(career)) {
+      career_sec <- dplyr::collect(career) |>
+        dplyr::filter(.data$playerId == id) |>
+        dplyr::select(
+          "seasons",
+          "first_season",
+          "last_season",
+          "gap_seasons",
+          "transfers"
+        )
+    } else {
+      rfs <- roster_flags |>
+        dplyr::filter(.data$playerId == id) |>
+        dplyr::collect()
+      career_sec <- tibble::tibble(
+        seasons = dplyr::n_distinct(rfs$season),
+        first_season = min(rfs$season),
+        last_season = max(rfs$season)
+      ) |>
+        dplyr::mutate(
+          gap_seasons = .data$last_season -
+            .data$first_season +
+            1L -
+            .data$seasons,
+          transfers = dplyr::n_distinct(rfs$team) - 1L
+        )
+    }
+    if (nrow(career_sec) == 0) {
+      career_sec <- NULL
+    }
+    if (!is.null(roster_flags)) {
+      rfs <- roster_flags |>
+        dplyr::filter(.data$playerId == id) |>
+        dplyr::collect() |>
+        dplyr::arrange(.data$season)
+      career_sec$redshirt_career <- any(rfs$redshirt_season)
+      career_sec$fifth_year_career <- any(rfs$class_year == 5L, na.rm = TRUE)
+      season_flags <- rfs |>
+        dplyr::select(
+          "season",
+          "team",
+          "class_year",
+          "has_stats",
+          "redshirt_season"
+        )
+    }
+  }
+
   # ---- provenance / caveats ----
   n_no_coach <- sum(!coaching$coach_available)
-  provenance <- tibble::tibble(
-    section = c("stats", "coaching", "recruiting", "outcome"),
-    source = c(
-      "CFBD /stats/player/season (long) + stat_taxonomy phase labels",
-      "CFBD /coaches (FBS head coaches only; no FCS, no coordinators)",
-      "CFBD /recruiting/players (name-guarded, decision 0013)",
-      "CFBD picks (draft slot) + nflverse rosters/stats (name-guarded UDFA)"
-    ),
-    note = c(
-      "Phase/label from (category, statType); values as reported by CFBD.",
-      if (n_no_coach > 0) {
-        paste0(
-          n_no_coach,
-          " of ",
-          nrow(coaching),
-          " team-seasons have no CFBD head coach (non-FBS or missing)."
+  provenance_sections <- c("stats", "coaching", "recruiting", "outcome")
+  provenance_sources <- c(
+    "CFBD /stats/player/season (long) + stat_taxonomy phase labels",
+    "CFBD /coaches (FBS head coaches only; no FCS, no coordinators)",
+    "CFBD /recruiting/players (name-guarded, decision 0013)",
+    "CFBD picks (draft slot) + nflverse rosters/stats (name-guarded UDFA)"
+  )
+  provenance_notes <- c(
+    "Phase/label from (category, statType); values as reported by CFBD.",
+    if (n_no_coach > 0) {
+      paste0(
+        n_no_coach,
+        " of ",
+        nrow(coaching),
+        " team-seasons have no CFBD head coach (non-FBS or missing)."
+      )
+    } else {
+      "Head coach resolved for every team-season."
+    },
+    if (isTRUE(recruiting_row$recruit_matched)) {
+      "HS rating matched by name."
+    } else {
+      "No name-matched HS rating; treat as unrated (not imputed)."
+    },
+    paste0(
+      outcome$note,
+      if (isTRUE(outcome$right_censored)) {
+        " Longevity is right-censored (player may still be active)."
+      } else {
+        ""
+      }
+    )
+  )
+  if (!is.null(career_sec)) {
+    provenance_sections <- c(provenance_sections, "career")
+    provenance_sources <- c(
+      provenance_sources,
+      "career_summary(roster) + flag_redshirt(roster, player_stats)"
+    )
+    provenance_notes <- c(
+      provenance_notes,
+      if (
+        isTRUE(career_sec$redshirt_career) ||
+          isTRUE(career_sec$fifth_year_career)
+      ) {
+        paste(
+          "Eligibility flags are redshirt-SHAPED, not certified: a no-stat",
+          "season may end early, and a fifth class may be a grad transfer."
         )
       } else {
-        "Head coach resolved for every team-season."
-      },
-      if (isTRUE(recruiting_row$recruit_matched)) {
-        "HS rating matched by name."
-      } else {
-        "No name-matched HS rating; treat as unrated (not imputed)."
-      },
-      paste0(
-        outcome$note,
-        if (isTRUE(outcome$right_censored)) {
-          " Longevity is right-censored (player may still be active)."
-        } else {
-          ""
-        }
-      )
+        "No redshirt-shaped season or fifth-year class flagged."
+      }
     )
+  }
+  provenance <- tibble::tibble(
+    section = provenance_sections,
+    source = provenance_sources,
+    note = provenance_notes
   )
 
   structure(
@@ -197,6 +283,8 @@ player_dossier <- function(
       coaching = coaching,
       recruiting = recruiting_row,
       outcome = outcome,
+      career = career_sec,
+      season_flags = season_flags,
       provenance = provenance
     ),
     class = "cfb_dossier"
@@ -281,6 +369,33 @@ print.cfb_dossier <- function(x, ...) {
         r$season,
         r$team
       ))
+    }
+  }
+
+  # Career & eligibility (only present when derived tables were supplied).
+  if (!is.null(x$career)) {
+    c <- x$career
+    cat("\n-- Career & eligibility --\n")
+    cat(sprintf(
+      "  %d roster season(s), %d-%d; %d gap season(s), %d transfer(s).\n",
+      c$seasons,
+      c$first_season,
+      c$last_season,
+      c$gap_seasons,
+      c$transfers
+    ))
+    if (!is.null(x$season_flags)) {
+      gaps <- x$season_flags$season[x$season_flags$redshirt_season]
+      if (length(gaps)) {
+        cat(
+          "  Redshirt-shaped (no stats, returned):",
+          paste(gaps, collapse = ", "),
+          "\n"
+        )
+      }
+      if (isTRUE(c$fifth_year_career)) {
+        cat("  Observed a fifth eligibility class (class_year 5).\n")
+      }
     }
   }
 

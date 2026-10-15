@@ -14,6 +14,8 @@ player_dossier(
   nfl_rosters,
   nfl_player_stats,
   teams = NULL,
+  career = NULL,
+  roster_flags = NULL,
   taxonomy = stat_taxonomy()
 )
 }
@@ -35,11 +37,21 @@ player_dossier(
 \item{teams}{Optional cleaned \code{teams} dimension (display metadata); if
 supplied, the team \code{mascot} is attached to the identity block.}
 
+\item{career}{Optional per-player career summary (\code{\link[=career_summary]{career_summary()}},
+decision 0021). If supplied (alone or with \code{roster_flags}), a \code{career}
+section is attached.}
+
+\item{roster_flags}{Optional roster backbone with eligibility flags
+(\code{\link[=flag_redshirt]{flag_redshirt()}}, decision 0021). If supplied, the career section also
+reports the redshirt-shaped flags and a per-season flag table is attached.}
+
 \item{taxonomy}{Stat-phase taxonomy; defaults to \code{\link[=stat_taxonomy]{stat_taxonomy()}}.}
 }
 \value{
 An object of class \code{cfb_dossier}: a named list with \code{id}, \code{identity},
-\code{stats} (tidy, phase-labeled), \code{coaching}, \code{recruiting}, \code{outcome}, and
+\code{stats} (tidy, phase-labeled), \code{coaching}, \code{recruiting}, \code{outcome},
+optionally \code{career} (one row: span, gaps, transfers, eligibility flags)
+and \code{season_flags} (per-season \code{has_stats} / \code{redshirt_season}), and
 \code{provenance}.
 }
 \description{
