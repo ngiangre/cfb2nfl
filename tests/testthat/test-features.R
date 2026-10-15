@@ -104,3 +104,41 @@ test_that("transfer_rate computes the share of careers with a transfer", {
   expect_equal(out$transferred, 2L)
   expect_equal(out$share, 0.5)
 })
+
+test_that("flag_redshirt marks no-stat seasons that the player returned from", {
+  roster <- tibble::tibble(
+    playerId = c("1", "1", "1", "2", "2"),
+    season = c(2021L, 2022L, 2023L, 2022L, 2023L),
+    class_year = c(1L, 2L, 3L, 4L, 5L)
+  )
+  stats <- tibble::tibble(
+    playerId = c("1", "1", "2"),
+    season = c(2022L, 2023L, 2022L)
+  )
+  out <- flag_redshirt(roster, stats)
+  # Player 1: 2021 has no stats and a later season -> redshirt-shaped;
+  # 2023 (final season) has no stats but is NOT flagged.
+  p1 <- out[out$playerId == "1", ]
+  expect_equal(p1$redshirt_season[p1$season == 2021L], TRUE)
+  expect_equal(p1$redshirt_season[p1$season == 2023L], FALSE)
+  expect_true(all(p1$redshirt_career))
+  # Player 2: every roster season has stats.
+  p2 <- out[out$playerId == "2", ]
+  expect_false(any(p2$redshirt_season))
+  expect_false(any(p2$redshirt_career))
+  # Fifth-year signal: player 2 reached class_year 5.
+  expect_true(all(p2$fifth_year_career))
+  expect_false(any(p1$fifth_year_career))
+})
+
+test_that("flag_redshirt tolerates missing class_year", {
+  roster <- tibble::tibble(
+    playerId = c("1", "1"),
+    season = c(2021L, 2022L),
+    class_year = c(NA_integer_, 2L)
+  )
+  stats <- tibble::tibble(playerId = "1", season = 2022L)
+  out <- flag_redshirt(roster, stats)
+  expect_equal(out$redshirt_season[out$season == 2021L], TRUE)
+  expect_equal(out$fifth_year_career[1], FALSE)
+})

@@ -6,6 +6,16 @@ layer, and the documentation site, all under version control.
 
 ## Pipeline & data
 
+- Added the third Explore question-answer pair (question 12): **redshirts,
+  defined approximately**. `flag_redshirt()` derives two redshirt-*shaped*
+  signals from the roster backbone — a no-stat season the player returned from
+  (stat-gap rule) and an observed fifth eligibility class — `contract_redshirt()`
+  sanity-checks the flags, and `viz_redshirt_by_career_length()` /
+  `viz_redshirt_seasonality()` plot them. The seasonality chart exposes the
+  built-in confound: stat coverage runs ~75% pre-2016 vs ~90% after, so
+  no-stat seasons in low-coverage years are mostly missing data, not
+  redshirts. `explore.qmd` gains a "Redshirts" section; `scales` joins Imports.
+
 - Added the second Explore question-answer pair (question 5): **transfers —
   how many, and in which direction**. `transfer_counts()` aggregates the
   existing `add_change_features()` team changes into season × tier-direction

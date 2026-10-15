@@ -75,6 +75,55 @@ transfer_rate <- function(career) {
     )
 }
 
+#' Flag approximate redshirt seasons and careers
+#'
+#' Formalizes the Explore plan's redshirt definition (question 12) with two
+#' signals, both **approximate**:
+#'
+#' 1. **Stat-gap rule** — a roster season with no stat line that is followed by
+#'   another observed season. This is the classic redshirt shape (sat a year,
+#'   returned); the "followed by another season" guard excludes a final-year
+#'   absence, which is just as likely an injury or an early departure.
+#' 2. **Fifth-year signal** — the player was ever observed at `class_year` 5,
+#'   the endpoint's eligibility class beyond the nominal four-year window.
+#'
+#' Per-season: `redshirt_season` (rule 1). Per-career: `redshirt_career`
+#' (any rule-1 season) and `fifth_year_career` (rule 2). A `class_year` 5
+#' player may be a grad transfer rather than a redshirt, and a no-stat season
+#' may be a season ending early — the flags are redshirt-*shaped*, not
+#' certified.
+#'
+#' @param roster Cleaned roster (see [clean_roster()]) with `playerId`,
+#'   `season`, `class_year`.
+#' @param player_stats Cleaned long stats (see [clean_player_stats()]) with
+#'   `playerId`, `season`.
+#'
+#' @return `roster` with `has_stats`, `redshirt_season`, `redshirt_career`,
+#'   and `fifth_year_career` columns added.
+#' @export
+flag_redshirt <- function(roster, player_stats) {
+  stat_seasons <- player_stats |>
+    dplyr::distinct(.data$playerId, .data$season) |>
+    dplyr::mutate(has_stats = TRUE)
+
+  career_bounds <- roster |>
+    dplyr::group_by(.data$playerId) |>
+    dplyr::summarise(last_season = max(.data$season), .groups = "drop")
+
+  roster |>
+    dplyr::left_join(stat_seasons, by = c("playerId", "season")) |>
+    dplyr::mutate(has_stats = dplyr::coalesce(.data$has_stats, FALSE)) |>
+    dplyr::left_join(career_bounds, by = "playerId") |>
+    dplyr::group_by(.data$playerId) |>
+    dplyr::mutate(
+      redshirt_season = !.data$has_stats & .data$season < .data$last_season,
+      redshirt_career = any(.data$redshirt_season),
+      fifth_year_career = any(.data$class_year == 5L, na.rm = TRUE)
+    ) |>
+    dplyr::ungroup() |>
+    dplyr::select(-dplyr::all_of("last_season"))
+}
+
 #' Add between-season change features
 #'
 #' Sorts each athlete's seasons chronologically and derives:

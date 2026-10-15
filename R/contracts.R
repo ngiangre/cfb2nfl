@@ -216,6 +216,40 @@ contract_roster <- function(roster, stop_on_fail = TRUE) {
   enforce_contract(agent, "roster", stop_on_fail)
 }
 
+#' Data contract for redshirt flags
+#'
+#' Sanity-checks the redshirt flags ([flag_redshirt()], Explore question 12):
+#' flag columns exist and are never null, and a redshirt-shaped season always
+#' lacks a stat line (the flag's definition). The flags are approximate by
+#' design — see the function docs — so no stronger bound is asserted here.
+#'
+#' @param roster_flagged Roster with redshirt flags (see [flag_redshirt()]).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_redshirt <- function(roster_flagged, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  agent <- pointblank::create_agent(
+    roster_flagged,
+    label = "redshirt"
+  ) |>
+    pointblank::col_exists(c(
+      "has_stats",
+      "redshirt_season",
+      "redshirt_career",
+      "fifth_year_career"
+    )) |>
+    pointblank::col_vals_not_null(
+      pointblank::vars(has_stats, redshirt_season, redshirt_career)
+    ) |>
+    # A redshirt-shaped season must lack a stat line.
+    pointblank::col_vals_expr(
+      rlang::expr(!.data$has_stats | !.data$redshirt_season)
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "redshirt", stop_on_fail)
+}
+
 #' Data contract for career summaries
 #'
 #' Validates the per-player career table ([career_summary()]) against the

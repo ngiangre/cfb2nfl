@@ -459,6 +459,136 @@ viz_transfers_by_season <- function(ps_change) {
   ggiraph::girafe(ggobj = p)
 }
 
+#' Redshirting by career length (interactive)
+#'
+#' Explore question 12 made visual: careers by number of roster seasons,
+#' stacked by whether the career contains a redshirt-*shaped* season — a roster
+#' year with no stat line that the player returned from (see
+#' [flag_redshirt()]). If redshirting works as intended, flagged careers should
+#' concentrate in the longer end of the distribution. Hover a segment for the
+#' player count.
+#'
+#' @param roster Redshirt-flagged roster (see [flag_redshirt()]).
+#' @return A `ggiraph` (girafe) htmlwidget.
+#' @export
+viz_redshirt_by_career_length <- function(roster) {
+  rlang::check_installed(c("ggplot2", "ggiraph"))
+  d <- roster |>
+    dplyr::group_by(.data$playerId) |>
+    dplyr::summarise(
+      seasons = dplyr::n_distinct(.data$season),
+      redshirt_career = any(.data$redshirt_career),
+      .groups = "drop"
+    ) |>
+    dplyr::count(.data$seasons, .data$redshirt_career, name = "n_players") |>
+    dplyr::mutate(
+      group = dplyr::if_else(
+        .data$redshirt_career,
+        "Career has a redshirt-shaped season",
+        "No redshirt-shaped season"
+      ),
+      tooltip = sprintf(
+        "%d season%s: %s player%s (%s)",
+        .data$seasons,
+        dplyr::if_else(.data$seasons == 1L, "", "s"),
+        format(.data$n_players, big.mark = ","),
+        dplyr::if_else(.data$n_players == 1L, "", "s"),
+        .data$group
+      )
+    )
+  p <- ggplot2::ggplot(
+    d,
+    ggplot2::aes(
+      x = factor(.data$seasons),
+      y = .data$n_players,
+      fill = .data$group,
+      tooltip = .data$tooltip,
+      data_id = .data$seasons
+    )
+  ) +
+    ggiraph::geom_col_interactive(position = "stack") +
+    ggplot2::scale_fill_manual(
+      values = c(
+        "Career has a redshirt-shaped season" = "#2a9d8f",
+        "No redshirt-shaped season" = "#b0b7c0"
+      ),
+      name = NULL
+    ) +
+    ggplot2::labs(
+      x = "Seasons on a college roster",
+      y = "Players",
+      title = "Redshirt-shaped seasons across career lengths",
+      subtitle = paste0(
+        "Roster season with no stat line, returned from; inflated by stat ",
+        "coverage gaps (see seasonality chart)"
+      )
+    ) +
+    theme_cfbstats()
+  ggiraph::girafe(ggobj = p)
+}
+
+#' Redshirt-shaped seasons vs. stat coverage, by season (interactive)
+#'
+#' The honest companion to [viz_redshirt_by_career_length()]: the no-stat proxy
+#' is confounded by how completely the source records stats at all. This plots,
+#' per season, the **share of roster seasons flagged redshirt-shaped** (bars)
+#' against the **share of roster seasons with any stat line** (dashed line).
+#' Where coverage dips — notably before ~2016 — flagged seasons are mostly
+#' missing data, not redshirts, so the flag is only interpretable in seasons
+#' with high coverage. Hover a bar for both values.
+#'
+#' @param roster Redshirt-flagged roster (see [flag_redshirt()]).
+#' @return A `ggiraph` (girafe) htmlwidget.
+#' @export
+viz_redshirt_seasonality <- function(roster) {
+  rlang::check_installed(c("ggplot2", "ggiraph"))
+  d <- roster |>
+    dplyr::group_by(.data$season) |>
+    dplyr::summarise(
+      n = dplyr::n(),
+      flagged = mean(.data$redshirt_season),
+      coverage = mean(.data$has_stats),
+      .groups = "drop"
+    ) |>
+    dplyr::mutate(
+      tooltip = sprintf(
+        "%d: %.0f%% flagged, %.0f%% stat coverage (%s roster seasons)",
+        .data$season,
+        100 * .data$flagged,
+        100 * .data$coverage,
+        format(.data$n, big.mark = ",")
+      )
+    )
+  p <- ggplot2::ggplot(
+    d,
+    ggplot2::aes(
+      x = .data$season,
+      tooltip = .data$tooltip,
+      data_id = .data$season
+    )
+  ) +
+    ggiraph::geom_col_interactive(
+      ggplot2::aes(y = .data$flagged),
+      fill = "#2a9d8f",
+      alpha = 0.8
+    ) +
+    ggplot2::geom_line(
+      ggplot2::aes(y = .data$coverage, group = 1),
+      colour = "grey30",
+      linewidth = 0.9,
+      linetype = "dashed"
+    ) +
+    ggplot2::scale_y_continuous(labels = scales::percent) +
+    ggplot2::labs(
+      x = "Season",
+      y = "Share of roster seasons",
+      title = "Redshirt-shaped seasons track stat coverage",
+      subtitle = "Bars: flagged no-stat seasons. Dashed: seasons with any stat line"
+    ) +
+    theme_cfbstats()
+  ggiraph::girafe(ggobj = p)
+}
+
 #' 3D interactive scatter via plotly
 #'
 #' @param data A data frame.
