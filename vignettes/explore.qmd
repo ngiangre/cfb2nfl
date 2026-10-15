@@ -142,11 +142,13 @@ flagged <- tar_read(roster_flags)
 
 ```{r}
 #| label: fig-redshirt-career
+#| fig-width: 9
 viz_redshirt_by_career_length(flagged)
 ```
 
 ```{r}
 #| label: fig-redshirt-seasonality
+#| fig-width: 9
 viz_redshirt_seasonality(flagged)
 ```
 

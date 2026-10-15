@@ -512,7 +512,8 @@ viz_redshirt_by_career_length <- function(roster) {
         "Career has a redshirt-shaped season" = "#2a9d8f",
         "No redshirt-shaped season" = "#b0b7c0"
       ),
-      name = NULL
+      name = NULL,
+      guide = ggplot2::guide_legend(ncol = 1)
     ) +
     ggplot2::labs(
       x = "Seasons on a college roster",
@@ -608,7 +609,8 @@ viz_redshirt_seasonality <- function(roster) {
         "No stats, returned later (redshirt-shaped)" = "#2a9d8f",
         "No stats, final season (can't tell)" = "#e9c46a"
       ),
-      name = NULL
+      name = NULL,
+      guide = ggplot2::guide_legend(ncol = 1)
     ) +
     ggplot2::scale_y_continuous(labels = scales::percent) +
     ggplot2::scale_x_continuous(breaks = seq(2010, 2026, by = 2)) +
