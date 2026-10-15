@@ -11,7 +11,7 @@ scale_fill_team(teams, na.value = "#6b7280", ...)
 
 \item{na.value}{Fill for teams without a brand color (default neutral grey).}
 
-\item{...}{Passed to \code{\link[ggplot2:scale_manual]{ggplot2::scale_fill_manual()}}.}
+\item{...}{Passed to \code{\link[ggplot2:scale_fill_manual]{ggplot2::scale_fill_manual()}}.}
 }
 \value{
 A ggplot2 scale.

@@ -35,6 +35,34 @@ test_that("followed_coach is TRUE when a transfer keeps the same head coach", {
   expect_true(row$followed_coach)
 })
 
+test_that("career_summary counts seasons, gaps, and transfers per player", {
+  roster <- tibble::tibble(
+    playerId = c("1", "1", "1", "2", "2", "3"),
+    season = c(2018L, 2019L, 2021L, 2019L, 2020L, 2022L),
+    team = c("IU", "IU", "Miami", "IU", "IU", "IU")
+  )
+  out <- career_summary(roster)
+  expect_equal(nrow(out), 3L)
+  p1 <- out[out$playerId == "1", ]
+  expect_equal(p1$seasons, 3L)
+  expect_equal(p1$first_season, 2018L)
+  expect_equal(p1$last_season, 2021L)
+  expect_equal(p1$gap_seasons, 1L)
+  expect_equal(p1$transfers, 1L)
+  expect_equal(out$transfers[out$playerId == "2"], 0L)
+})
+
+test_that("career_summary handles duplicate player-season rows", {
+  roster <- tibble::tibble(
+    playerId = rep("1", 3),
+    season = rep(2020L, 3),
+    team = rep("IU", 3)
+  )
+  out <- career_summary(roster)
+  expect_equal(out$seasons, 1L)
+  expect_equal(out$transfers, 0L)
+})
+
 test_that("add_roster_weight attaches roster weight by player-season", {
   ps <- tibble::tibble(
     playerId = c("1", "1", "2"),

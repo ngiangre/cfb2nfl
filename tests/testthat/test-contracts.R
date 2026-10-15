@@ -113,3 +113,23 @@ test_that("contract_conference_tiers flags an unmapped conference", {
   agents <- contract_conference_tiers(tiers, stats, stop_on_fail = FALSE)
   expect_false(pointblank::all_passed(agents$coverage))
 })
+
+test_that("contract_career_summary passes a valid summary and flags bounds", {
+  skip_if_not_installed("pointblank")
+  good <- tibble::tibble(
+    playerId = c("1", "2"),
+    seasons = c(4L, 1L),
+    first_season = c(2018L, 2022L),
+    last_season = c(2021L, 2022L),
+    teams = c(2L, 1L),
+    gap_seasons = c(0L, 0L),
+    transfers = c(1L, 0L)
+  )
+  expect_true(pointblank::all_passed(
+    contract_career_summary(good, stop_on_fail = FALSE)
+  ))
+  bad <- good |> dplyr::mutate(seasons = c(9L, 1L), gap_seasons = c(-1L, 0L))
+  expect_false(pointblank::all_passed(
+    contract_career_summary(bad, stop_on_fail = FALSE)
+  ))
+})

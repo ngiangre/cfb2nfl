@@ -13,7 +13,7 @@ library(cfbstats)
 library(dplyr)
 library(reactable)
 library(targets)
-root <- Sys.getenv("CFBSTATS_ROOT")
+root <- cfbstats_root()
 if (nzchar(root)) knitr::opts_knit$set(root.dir = root)
 ```
 

@@ -22,7 +22,7 @@ library(ggpath)
 library(knitr)
 # altdoc renders in a temp dir; point the knit wd at the project root so
 # data/*.parquet and tar_read() resolve (CFBSTATS_ROOT is set in the site build).
-root <- Sys.getenv("CFBSTATS_ROOT")
+root <- cfbstats_root()
 if (nzchar(root)) {
   knitr::opts_knit$set(root.dir = root)
 }
