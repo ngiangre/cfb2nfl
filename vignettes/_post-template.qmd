@@ -21,7 +21,7 @@ library(dplyr)
 library(targets)
 # altdoc renders in a temp dir; point the knit wd at the project root so
 # tar_read() and system.file() resolve (set by CFBSTATS_ROOT in CI/site build).
-root <- Sys.getenv("CFBSTATS_ROOT")
+root <- cfbstats_root()
 if (nzchar(root)) knitr::opts_knit$set(root.dir = root)
 ```
 
