@@ -2,7 +2,7 @@
 % Please edit documentation in R/viz.R
 \name{viz_redshirt_seasonality}
 \alias{viz_redshirt_seasonality}
-\title{Redshirt-shaped seasons vs. stat coverage, by season (interactive)}
+\title{What each season's roster seasons look like to the redshirt flag}
 \usage{
 viz_redshirt_seasonality(roster)
 }
@@ -13,11 +13,25 @@ viz_redshirt_seasonality(roster)
 A \code{ggiraph} (girafe) htmlwidget.
 }
 \description{
-The honest companion to \code{\link[=viz_redshirt_by_career_length]{viz_redshirt_by_career_length()}}: the no-stat proxy
-is confounded by how completely the source records stats at all. This plots,
-per season, the \strong{share of roster seasons flagged redshirt-shaped} (bars)
-against the \strong{share of roster seasons with any stat line} (dashed line).
-Where coverage dips — notably before ~2016 — flagged seasons are mostly
-missing data, not redshirts, so the flag is only interpretable in seasons
-with high coverage. Hover a bar for both values.
+The intuitive companion to \code{\link[=viz_redshirt_by_career_length]{viz_redshirt_by_career_length()}}: each season is
+one bar, and the bar is split into exactly what the data can and cannot say
+about its roster seasons:
+}
+\details{
+\itemize{
+\item \strong{Stat line recorded} — the player-season has at least one statistic, so
+the player demonstrably competed (grey, the bulk of each bar).
+\item \strong{No stats, returned later} — the redshirt-\emph{shaped} season the flag
+catches (teal). This mixes true redshirts with players the source simply
+has no stats for.
+\item \strong{No stats, final season} — a gap we deliberately never flag, because a
+last-season absence is just as likely an injury or an early departure
+(amber, uninformative by construction).
+}
+
+Every bar sums to 100\%, so the teal share is an \strong{upper bound} on
+redshirting in that season, and how large it can be depends on how much of
+the bar is grey: when the source records stats for only a fraction of
+roster seasons, most "no stat line" seasons are missing data. Hover a
+segment for exact percentages.
 }

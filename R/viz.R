@@ -527,35 +527,67 @@ viz_redshirt_by_career_length <- function(roster) {
   ggiraph::girafe(ggobj = p)
 }
 
-#' Redshirt-shaped seasons vs. stat coverage, by season (interactive)
+#' What each season's roster seasons look like to the redshirt flag
 #'
-#' The honest companion to [viz_redshirt_by_career_length()]: the no-stat proxy
-#' is confounded by how completely the source records stats at all. This plots,
-#' per season, the **share of roster seasons flagged redshirt-shaped** (bars)
-#' against the **share of roster seasons with any stat line** (dashed line).
-#' Where coverage dips — notably before ~2016 — flagged seasons are mostly
-#' missing data, not redshirts, so the flag is only interpretable in seasons
-#' with high coverage. Hover a bar for both values.
+#' The intuitive companion to [viz_redshirt_by_career_length()]: each season is
+#' one bar, and the bar is split into exactly what the data can and cannot say
+#' about its roster seasons:
+#'
+#' - **Stat line recorded** — the player-season has at least one statistic, so
+#'   the player demonstrably competed (grey, the bulk of each bar).
+#' - **No stats, returned later** — the redshirt-*shaped* season the flag
+#'   catches (teal). This mixes true redshirts with players the source simply
+#'   has no stats for.
+#' - **No stats, final season** — a gap we deliberately never flag, because a
+#'   last-season absence is just as likely an injury or an early departure
+#'   (amber, uninformative by construction).
+#'
+#' Every bar sums to 100%, so the teal share is an **upper bound** on
+#' redshirting in that season, and how large it can be depends on how much of
+#' the bar is grey: when the source records stats for only a fraction of
+#' roster seasons, most "no stat line" seasons are missing data. Hover a
+#' segment for exact percentages.
 #'
 #' @param roster Redshirt-flagged roster (see [flag_redshirt()]).
 #' @return A `ggiraph` (girafe) htmlwidget.
 #' @export
 viz_redshirt_seasonality <- function(roster) {
-  rlang::check_installed(c("ggplot2", "ggiraph"))
+  rlang::check_installed(c("ggplot2", "ggiraph", "scales", "tidyr"))
+  season_n <- roster |>
+    dplyr::count(.data$season, name = "n")
   d <- roster |>
     dplyr::group_by(.data$season) |>
     dplyr::summarise(
-      n = dplyr::n(),
-      flagged = mean(.data$redshirt_season),
-      coverage = mean(.data$has_stats),
+      stats = mean(.data$has_stats),
+      redshirt = mean(.data$redshirt_season),
+      unknown = 1 - .data$stats - .data$redshirt,
       .groups = "drop"
     ) |>
+    tidyr::pivot_longer(
+      c("stats", "redshirt", "unknown"),
+      names_to = "category",
+      values_to = "share"
+    ) |>
+    dplyr::left_join(season_n, by = "season") |>
     dplyr::mutate(
+      category = factor(
+        dplyr::case_when(
+          .data$category == "stats" ~ "Stat line recorded",
+          .data$category == "redshirt" ~
+            "No stats, returned later (redshirt-shaped)",
+          TRUE ~ "No stats, final season (can't tell)"
+        ),
+        levels = c(
+          "Stat line recorded",
+          "No stats, returned later (redshirt-shaped)",
+          "No stats, final season (can't tell)"
+        )
+      ),
       tooltip = sprintf(
-        "%d: %.0f%% flagged, %.0f%% stat coverage (%s roster seasons)",
+        "%d: %.0f%% %s (%s roster seasons)",
         .data$season,
-        100 * .data$flagged,
-        100 * .data$coverage,
+        100 * .data$share,
+        tolower(as.character(.data$category)),
         format(.data$n, big.mark = ",")
       )
     )
@@ -563,27 +595,31 @@ viz_redshirt_seasonality <- function(roster) {
     d,
     ggplot2::aes(
       x = .data$season,
+      y = .data$share,
+      fill = .data$category,
       tooltip = .data$tooltip,
       data_id = .data$season
     )
   ) +
-    ggiraph::geom_col_interactive(
-      ggplot2::aes(y = .data$flagged),
-      fill = "#2a9d8f",
-      alpha = 0.8
-    ) +
-    ggplot2::geom_line(
-      ggplot2::aes(y = .data$coverage, group = 1),
-      colour = "grey30",
-      linewidth = 0.9,
-      linetype = "dashed"
+    ggiraph::geom_col_interactive(position = "stack", width = 0.8) +
+    ggplot2::scale_fill_manual(
+      values = c(
+        "Stat line recorded" = "#b0b7c0",
+        "No stats, returned later (redshirt-shaped)" = "#2a9d8f",
+        "No stats, final season (can't tell)" = "#e9c46a"
+      ),
+      name = NULL
     ) +
     ggplot2::scale_y_continuous(labels = scales::percent) +
+    ggplot2::scale_x_continuous(breaks = seq(2010, 2026, by = 2)) +
     ggplot2::labs(
       x = "Season",
       y = "Share of roster seasons",
-      title = "Redshirt-shaped seasons track stat coverage",
-      subtitle = "Bars: flagged no-stat seasons. Dashed: seasons with any stat line"
+      title = "What we can and cannot see in each season",
+      subtitle = paste0(
+        "Teal is an upper bound on redshirting; how much of the bar is grey ",
+        "bounds how much of the teal is real"
+      )
     ) +
     theme_cfbstats()
   ggiraph::girafe(ggobj = p)

@@ -129,10 +129,9 @@ injury, and (pre-2018 rules) even four appearances disqualify a redshirt while
 still producing a thin stat line. Second, a class-5 player may be a grad
 transfer or junior-college arrival rather than a redshirt. Third — and most
 consequential here — whether a stat line exists at all depends on how
-completely the source records statistics. Coverage runs ~75% in the early
-2010s and ~90% from 2016 on, so flagged seasons in low-coverage years are
-mostly **missing data, not redshirts**; the stat-gap flag is only interpretable
-against that coverage line, which the second chart below makes explicit.
+completely the source records statistics, and it records them for well under
+half of roster seasons in the early years. The second chart below is built to
+make exactly that visible.
 
 ```{r}
 #| label: redshirt-setup
@@ -152,13 +151,20 @@ viz_redshirt_by_career_length(flagged)
 viz_redshirt_seasonality(flagged)
 ```
 
-The pattern to read from the seasonality chart: before 2016 the flagged share
-moves with the coverage line — that movement is missing data, not redshirting
-behavior. From 2016 on, coverage is stable near 90%, so residual variation in
-the flagged share is more likely real (2020's dip, for instance, reflects
-COVID-era free eligibility and a shortened stat season, not more redshirts).
-Career-length splits above should be read the same way: descriptive of the
-flag, not a certified redshirt rate.
+The seasonality chart reads like a ledger for each season: grey is what we
+*know* (a stat line exists, so the player competed), teal is what the flag
+claims (no stats, came back), and amber is what we deliberately refuse to
+judge (no stats in a final season). Two things stand out. First, grey grows
+from about a quarter of roster seasons in 2010–2015 to around 60% by 2021 —
+the source did not record stats for most players in the early years at all,
+which is why the teal share there (45–48%) is dominated by missing data rather
+than redshirts. Second, even in the best-covered seasons teal runs ~25%:
+that is an **upper bound** on redshirting, mixing true redshirts with bench
+players who never recorded a statistic. The teal share only becomes
+meaningfully comparable *across* seasons with similar grey shares, which is
+roughly 2016 onward (2020's bump reflects COVID-era eligibility rules and a
+shortened stat season). The career-length split above should be read the same
+way: descriptive of the flag, never a certified redshirt rate.
 
 ## Movement — transfers
 

@@ -11,10 +11,13 @@ layer, and the documentation site, all under version control.
   signals from the roster backbone — a no-stat season the player returned from
   (stat-gap rule) and an observed fifth eligibility class — `contract_redshirt()`
   sanity-checks the flags, and `viz_redshirt_by_career_length()` /
-  `viz_redshirt_seasonality()` plot them. The seasonality chart exposes the
-  built-in confound: stat coverage runs ~75% pre-2016 vs ~90% after, so
-  no-stat seasons in low-coverage years are mostly missing data, not
-  redshirts. `explore.qmd` gains a "Redshirts" section; `scales` joins Imports.
+  `viz_redshirt_seasonality()` plot them. The seasonality chart is a 100%
+  stacked ledger per season — stat line recorded / redshirt-shaped gap /
+  uninformative final-season gap — making the confound explicit: the source
+  records stats for only ~26% of roster seasons in 2010 rising to ~60% by
+  2021, so the redshirt-shaped share is an upper bound dominated by missing
+  data in the early years. `explore.qmd` gains a "Redshirts" section; `scales`
+  joins Imports.
 
 - Added the second Explore question-answer pair (question 5): **transfers —
   how many, and in which direction**. `transfer_counts()` aggregates the
