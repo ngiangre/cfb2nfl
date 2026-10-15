@@ -17,7 +17,13 @@
       "*": "allow"
     },
     "bash": {
-      "*": "allow"
+      "*": "allow",
+      "cat *": "allow",
+      "echo *": "allow",
+      "git add *": "allow",
+      "git status *": "allow",
+      "git commit *": "allow",
+      "git log *": "allow"
     },
     "webfetch": {
       "https://posit-dev.github.io/*": "allow",

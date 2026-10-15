@@ -216,6 +216,37 @@ contract_roster <- function(roster, stop_on_fail = TRUE) {
   enforce_contract(agent, "roster", stop_on_fail)
 }
 
+#' Data contract for career summaries
+#'
+#' Validates the per-player career table ([career_summary()]) against the
+#' Explore plan's career-length bounds: 1-7 seasons on a roster (CFBD
+#' rosters cover 2010-2026, so a longer span implies duplicate identities),
+#' and no negative gaps or transfers.
+#'
+#' @param career Per-player career summary (see [career_summary()]).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_career_summary <- function(career, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  agent <- pointblank::create_agent(career, label = "career_summary") |>
+    pointblank::col_exists(c(
+      "playerId",
+      "seasons",
+      "first_season",
+      "last_season",
+      "gap_seasons",
+      "transfers"
+    )) |>
+    pointblank::col_vals_not_null(pointblank::vars(playerId, seasons)) |>
+    pointblank::rows_distinct(pointblank::vars(playerId)) |>
+    pointblank::col_vals_between("seasons", 1L, 7L) |>
+    pointblank::col_vals_gte("gap_seasons", 0L) |>
+    pointblank::col_vals_between("transfers", 0L, 6L) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "career_summary", stop_on_fail)
+}
+
 #' Data contract for cleaned recruiting ratings
 #'
 #' Validates the per-athlete recruiting-rating table ([clean_recruiting()]):

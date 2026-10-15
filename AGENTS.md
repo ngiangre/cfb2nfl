@@ -93,6 +93,9 @@ wrapper (`CFBSTATS_REFRESH=true` + `tar_make()`). Years 2010–2026.
 - **Contracts + TDD:** test logic (`testthat`) and data (`pointblank`: expected
   coverage, schema stability, value ranges, no silent join loss); run in the
   pipeline, fail fast. Add/update a contract with any data-touching code.
+- **Plans:** multi-session work plans live in `plans/*.md` (e.g.
+  `plans/explore-questions.md` — the question-driven Explore revision).
+  `decisions/` is for ratified choices only.
 - **Decision log:** record substantive decisions in `decisions/` (copy
   `TEMPLATE.md`, next number); distill spike-branch findings into an entry.
   Decisions 0004–0006 cover `targets`, the lineage/audit layer, and the site.

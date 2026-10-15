@@ -4,6 +4,37 @@
 # data (no leakage from the predicted draft class); the model stage enforces the
 # out-of-time split.
 
+#' Summarize each player's college career from the roster backbone
+#'
+#' Collapses the roster player-season grain (question 4 of the Explore plan) to
+#' one row per player: seasons on a roster, first/last season, gap seasons
+#' (years absent between first and last — an injury- or redshirt-shaped gap),
+#' and transfer count (distinct teams minus one). Built on the **roster**
+#' backbone so it includes no-stat seasons, unlike `player_stats`.
+#'
+#' @param roster Cleaned roster from [clean_roster()] with `playerId`, `season`,
+#'   `team`.
+#'
+#' @return One row per `playerId` with `seasons`, `first_season`,
+#'   `last_season`, `gap_seasons`, `teams`, `transfers`.
+#' @export
+career_summary <- function(roster) {
+  roster |>
+    dplyr::group_by(.data$playerId) |>
+    dplyr::summarise(
+      seasons = dplyr::n_distinct(.data$season),
+      first_season = min(.data$season),
+      last_season = max(.data$season),
+      teams = dplyr::n_distinct(.data$team),
+      .groups = "drop"
+    ) |>
+    dplyr::mutate(
+      gap_seasons = .data$last_season - .data$first_season + 1L - .data$seasons,
+      transfers = .data$teams - 1L,
+      .after = .data$teams
+    )
+}
+
 #' Add between-season change features
 #'
 #' Sorts each athlete's seasons chronologically and derives:

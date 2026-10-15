@@ -356,6 +356,50 @@ viz_nfl_roster_seasons_by_round <- function(picks_nfl, nfl_rosters) {
   ggiraph::girafe(ggobj = p)
 }
 
+#' College career length distribution (interactive)
+#'
+#' Question 4 of the Explore plan: how long is a college career? Plots the
+#' distribution of distinct roster seasons per player (the full roster backbone,
+#' including no-stat seasons) as a bar chart. A player with many gap seasons or
+#' a long career may be a redshirt, an injury-shaped gap, or a sixth-year
+#' athlete — caveats belong in the narrative, not the chart.
+#'
+#' @param roster Cleaned roster from [clean_roster()] with `playerId`, `season`.
+#' @return A `ggiraph` (girafe) htmlwidget.
+#' @export
+viz_career_length <- function(roster) {
+  rlang::check_installed(c("ggplot2", "ggiraph"))
+  d <- career_summary(roster) |>
+    dplyr::count(.data$seasons, name = "n_players") |>
+    dplyr::mutate(
+      tooltip = sprintf(
+        "%d season%s on a roster: %s player%s",
+        .data$seasons,
+        dplyr::if_else(.data$seasons == 1L, "", "s"),
+        format(.data$n_players, big.mark = ","),
+        dplyr::if_else(.data$n_players == 1L, "", "s")
+      )
+    )
+  p <- ggplot2::ggplot(
+    d,
+    ggplot2::aes(
+      x = factor(.data$seasons),
+      y = .data$n_players,
+      tooltip = .data$tooltip,
+      data_id = .data$seasons
+    )
+  ) +
+    ggiraph::geom_col_interactive(fill = "#4c78a8") +
+    ggplot2::labs(
+      x = "Seasons on a college roster",
+      y = "Players",
+      title = "How long is a college football career?",
+      subtitle = "Distinct roster seasons per player, 2010\u20132026"
+    ) +
+    theme_cfbstats()
+  ggiraph::girafe(ggobj = p)
+}
+
 #' 3D interactive scatter via plotly
 #'
 #' @param data A data frame.

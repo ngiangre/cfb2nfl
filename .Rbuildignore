@@ -25,3 +25,4 @@
 ^\.quarto$
 ^_quarto$
 ^\.githooks$
+^plans$

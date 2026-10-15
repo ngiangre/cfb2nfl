@@ -78,6 +78,26 @@ counts are **right-censored** lower bounds.
 viz_nfl_roster_seasons_by_round(tar_read(picks_nfl), tar_read(nfl_rosters))
 ```
 
+## Career length — how long is a college career?
+
+Each player's career is summarized from the **roster backbone** — distinct
+seasons on a roster per athlete id, including seasons with no stat line. This
+answers Explore question 4 directly; gap seasons (years absent between first
+and last appearance) are the later injury-shaped-gap analysis's raw material.
+Hover a bar for the player count.
+
+```{r}
+#| label: fig-career-length
+viz_career_length(tar_read(roster))
+```
+
+::: {.callout-note}
+A long career is not always continuous: a fifth or sixth season can be a
+redshirt year, a medical hardship, or a COVID-era extension, and the roster
+grain cannot separate them. That disambiguation is the redshirt question,
+handled separately.
+:::
+
 ## Player dossier
 
 `player_dossier()` resolves a player's scattered rows into one **interpreted**
