@@ -6,6 +6,20 @@ layer, and the documentation site, all under version control.
 
 ## Pipeline & data
 
+- Added the first Explore question-answer pair (Explore plan, question 4):
+  **college career length**. `career_summary()` collapses the roster backbone
+  to one row per player — seasons on a roster, first/last season, gap seasons,
+  and transfer count — `contract_career_summary()` enforces the career-length
+  bounds (1–7 seasons, non-negative gaps/transfers), and `viz_career_length()`
+  plots the seasons-per-player distribution. `vignettes/explore.qmd` gains a
+  "Career length" section with the roster-grain caveats (redshirt / medical /
+  COVID years are not separable at this grain; that disambiguation is the
+  later redshirt question).
+- Fixed vignette rendering outside altdoc: vignettes now resolve the project
+  root via `cfbstats_root()`, which falls back to walking up to the nearest
+  `_targets` store when `CFBSTATS_ROOT` is unset, so a direct `quarto preview`
+  no longer fails with "targets data store _targets not found".
+
 - Added a **stat-phase taxonomy** and an **interpretable player dossier** so a
   reviewer gets *interpretation*, not a raw extract (decision 0019). The long
   `player_stats` already tags each stat with a `category`, but a flattened
