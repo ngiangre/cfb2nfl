@@ -35,6 +35,46 @@ career_summary <- function(roster) {
     )
 }
 
+#' Count transfers by season and tier direction
+#'
+#' Aggregates the per-season change features ([add_change_features()]) into
+#' season × direction counts for the Explore question-5 viz. Direction is the
+#' season-aware tier move (decision 0003): `up` (to a higher tier), `down`,
+#' `lateral`. A transfer between seasons separated by a gap is still caught
+#' (lag compares to the prior observed season), but a transfer to/from a season
+#' with no roster row is invisible at this grain.
+#'
+#' @param ps_change Player-season table with `season`, `transferred`,
+#'   `transfer_direction` (see [add_change_features()]).
+#'
+#' @return One row per `season` × `transfer_direction` with `n_transfers`.
+#' @export
+transfer_counts <- function(ps_change) {
+  ps_change |>
+    dplyr::filter(.data$transferred) |>
+    dplyr::count(.data$season, .data$transfer_direction, name = "n_transfers")
+}
+
+#' Share of careers with at least one transfer
+#'
+#' Career-grain transfer rate from [career_summary()] — the full roster
+#' backbone, so it includes players with no stat line (the `ps_change`-based
+#' per-season counts do not). A player changing teams is a transfer; a gap
+#' season (e.g. sitting out) between two schools still counts once.
+#'
+#' @param career Per-player career summary (see [career_summary()]).
+#'
+#' @return A one-row tibble with `players`, `transferred`, and `share`.
+#' @export
+transfer_rate <- function(career) {
+  career |>
+    dplyr::summarise(
+      players = dplyr::n(),
+      transferred = sum(.data$transfers > 0L),
+      share = .data$transferred / .data$players
+    )
+}
+
 #' Add between-season change features
 #'
 #' Sorts each athlete's seasons chronologically and derives:

@@ -81,10 +81,13 @@ viz_nfl_roster_seasons_by_round(tar_read(picks_nfl), tar_read(nfl_rosters))
 ## Career length — how long is a college career?
 
 Each player's career is summarized from the **roster backbone** — distinct
-seasons on a roster per athlete id, including seasons with no stat line. This
-answers Explore question 4 directly; gap seasons (years absent between first
-and last appearance) are the later injury-shaped-gap analysis's raw material.
-Hover a bar for the player count.
+seasons on a roster per athlete id, including seasons with no stat line. The
+shape of this distribution is the baseline every other career question is read
+against: most careers are short, so a fifth or sixth season is already a
+distinct population, and how long a player stayed in college plausibly shapes
+both their development and their draft odds. Gap seasons (years absent between
+first and last appearance) are also recorded here — they are the raw material
+for the injury-shaped-gap analysis below. Hover a bar for the player count.
 
 ```{r}
 #| label: fig-career-length
@@ -96,6 +99,45 @@ A long career is not always continuous: a fifth or sixth season can be a
 redshirt year, a medical hardship, or a COVID-era extension, and the roster
 grain cannot separate them. That disambiguation is the redshirt question,
 handled separately.
+:::
+
+## Movement — transfers
+
+College players change schools more than they used to — the transfer portal has
+made it routine — and *where* a player moves matters as much as *that* they
+move: a jump from a Group-of-Five program to a Power-Five roster is a different
+bet than a lateral move within the same tier. This section counts team changes
+by season and splits each move by **tier direction**: `up` means the move went
+to a higher conference tier (e.g. G5 → Power), where direction is evaluated
+against the season-aware tier of each school, so conference realignment is read
+against the season of the move rather than a fixed conference list. Hover a
+segment for the count.
+
+Counts come from the player-season change features (stat-line players). The
+career-grain rate below — computed on the full roster backbone — is the share
+of players whose career included **at least one** transfer; together the two
+views answer how common movement is, when it clusters (rule changes, portal
+eras), and whether it tends to be upward.
+
+```{r}
+#| label: fig-transfers
+viz_transfers_by_season(tar_read(ps_change))
+```
+
+```{r}
+#| label: transfer-rate
+rate <- transfer_rate(career_summary(tar_read(roster)))
+```
+
+Of the `r format(rate$players, big.mark = ",")` players on rosters,
+`r format(rate$transferred, big.mark = ",")`
+(`r sprintf("%.1f%%", 100 * rate$share)`) changed teams at least once.
+
+::: {.callout-note}
+Both views undercount subtly: the per-season counts only cover players with a
+stat line, and neither view sees a transfer whose origin season has no roster
+row. A gap-season move (sit out, then appear elsewhere) still counts, because
+the direction compares to the prior *observed* season.
 :::
 
 ## Player dossier

@@ -60,6 +60,8 @@ export(schema_hash)
 export(stat_taxonomy)
 export(team_color_values)
 export(theme_cfbstats)
+export(transfer_counts)
+export(transfer_rate)
 export(verify_wikipedia_ratings)
 export(viz_career_length)
 export(viz_drafts_by_season)
@@ -69,6 +71,7 @@ export(viz_scatter_2d)
 export(viz_scatter_3d)
 export(viz_team_logos)
 export(viz_theme)
+export(viz_transfers_by_season)
 importFrom(rlang,
   "%||%",
   .data

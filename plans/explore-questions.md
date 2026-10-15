@@ -65,7 +65,8 @@ track-mode CI/site build breaks (see AGENTS.md gotchas).
   `team_color_values()`, `scale_fill_team()`, `scale_color_team()` already in
   place; `viz_career_length()` added on top of them.
 - [x] `career_summary()` + career-length section
-- [ ] Transfers section
+- [x] Transfers section — `transfer_counts()`, `transfer_rate()`,
+  `viz_transfers_by_season()`; explore.qmd "Movement" section.
 - [ ] Redshirt definition + section
 - [ ] Performance arcs (+ opponent-quality context)
 - [ ] Position-flow (HS→college→NFL)

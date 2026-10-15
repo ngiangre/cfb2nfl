@@ -77,3 +77,30 @@ test_that("add_roster_weight attaches roster weight by player-season", {
   expect_equal(out$weight[out$playerId == "1" & out$season == 2021L], 225L)
   expect_true(is.na(out$weight[out$playerId == "2"]))
 })
+
+test_that("transfer_counts aggregates by season and direction", {
+  ps <- tibble::tibble(
+    playerId = c("1", "1", "2", "2"),
+    season = c(2021L, 2022L, 2021L, 2022L),
+    team = c("IU", "Miami", "IU", "OSU"),
+    tier = c(2L, 3L, 3L, 3L),
+    coach_id = c(1L, 2L, 1L, 3L)
+  )
+  out <- add_change_features(ps) |> transfer_counts()
+  expect_equal(nrow(out), 2L)
+  up <- out[out$season == 2022L & out$transfer_direction == "up", ]
+  expect_equal(up$n_transfers, 1L)
+  lateral <- out[out$season == 2022L & out$transfer_direction == "lateral", ]
+  expect_equal(lateral$n_transfers, 1L)
+})
+
+test_that("transfer_rate computes the share of careers with a transfer", {
+  career <- tibble::tibble(
+    playerId = c("1", "2", "3", "4"),
+    transfers = c(1L, 0L, 2L, 0L)
+  )
+  out <- transfer_rate(career)
+  expect_equal(out$players, 4L)
+  expect_equal(out$transferred, 2L)
+  expect_equal(out$share, 0.5)
+})
