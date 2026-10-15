@@ -104,24 +104,35 @@ confound.
 
 ## Redshirts — what the data can and cannot say
 
-A true redshirt is a season a player sits out and gets back — roster presence,
-no game participation, career continues. No feed labels it, so it must be
-**inferred** from two signals:
+A **redshirt** is an NCAA eligibility designation: a player spends a season on
+a roster **without competing in it**, and that season does not count against
+their four seasons of eligibility — they effectively gain a fifth (sometimes
+sixth) year. Since 2018 a redshirted player may still appear in up to four
+games without burning the redshirt, so "played a little" and "redshirted" are
+no longer mutually exclusive. No feed in this project labels who redshirted,
+so it must be **inferred** — approximately — from two signals:
 
 1. **Stat-gap shape** — a roster season with **no stat line that the player
-   returned from**. The "returned from" guard matters: a final-year absence is
-   just as likely an injury or an early departure, so it is never flagged.
+   returned from**. Here a *stat line* means any recorded season statistic for
+   that player-season in the `player_stats` table — a pass attempt, a tackle,
+   a reception, anything. Having **no** stat line is our best available proxy
+   for "did not compete". The "returned from" guard matters: a final-year
+   absence is just as likely an injury or an early departure as a redshirt,
+   so it is never flagged.
 2. **Fifth-year class** — appearing at eligibility class 5, one year beyond
    the nominal four-year window.
 
-Both are *redshirt-shaped*, not certified: a no-stat season may also be a
-season that ended early, and a class-5 player may be a grad transfer rather
-than a redshirt. And there is a confound the second chart makes explicit:
-whether a season has a stat line at all depends on how completely the source
-records statistics. Coverage runs ~75% in the early 2010s and ~90% from 2016
-on, so flagged seasons in low-coverage years are mostly **missing data, not
-redshirts** — the stat-gap flag is only interpretable against that coverage
-line.
+Both flags are *redshirt-shaped*, not certified, for three reasons. First, a
+no-stat season is not proof of non-participation: a deep-bench player can
+appear in games without recording a statistic, a season can end early to
+injury, and (pre-2018 rules) even four appearances disqualify a redshirt while
+still producing a thin stat line. Second, a class-5 player may be a grad
+transfer or junior-college arrival rather than a redshirt. Third — and most
+consequential here — whether a stat line exists at all depends on how
+completely the source records statistics. Coverage runs ~75% in the early
+2010s and ~90% from 2016 on, so flagged seasons in low-coverage years are
+mostly **missing data, not redshirts**; the stat-gap flag is only interpretable
+against that coverage line, which the second chart below makes explicit.
 
 ```{r}
 #| label: redshirt-setup
@@ -148,6 +159,7 @@ the flagged share is more likely real (2020's dip, for instance, reflects
 COVID-era free eligibility and a shortened stat season, not more redshirts).
 Career-length splits above should be read the same way: descriptive of the
 flag, not a certified redshirt rate.
+
 ## Movement — transfers
 
 College players change schools more than they used to — the transfer portal has
