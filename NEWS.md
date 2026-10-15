@@ -6,6 +6,15 @@ layer, and the documentation site, all under version control.
 
 ## Pipeline & data
 
+- Added the second Explore question-answer pair (question 5): **transfers —
+  how many, and in which direction**. `transfer_counts()` aggregates the
+  existing `add_change_features()` team changes into season × tier-direction
+  counts, `transfer_rate()` gives the career-grain share of players with at
+  least one transfer (13.7% of 135,356 roster players), and
+  `viz_transfers_by_season()` plots the stacked counts. `explore.qmd` gains a
+  "Movement — transfers" section with undercount caveats (stat-line players
+  only; moves to/from seasons with no roster row are invisible).
+
 - Added the first Explore question-answer pair (Explore plan, question 4):
   **college career length**. `career_summary()` collapses the roster backbone
   to one row per player — seasons on a roster, first/last season, gap seasons,

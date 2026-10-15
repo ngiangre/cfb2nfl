@@ -400,6 +400,65 @@ viz_career_length <- function(roster) {
   ggiraph::girafe(ggobj = p)
 }
 
+#' Transfers by season and tier direction (interactive)
+#'
+#' Explore question 5: how many transfers, and in which direction? Stacked bar
+#' of team changes by season, split by the season-aware tier direction
+#' (`up` = to a higher tier, `down`, `lateral`). Hover a segment for the count.
+#' Counts come from the player-season change features, so they cover players
+#' with a stat line; the career-grain share is [transfer_rate()].
+#'
+#' @param ps_change Player-season table with `season`, `transferred`,
+#'   `transfer_direction` (see [add_change_features()]).
+#' @return A `ggiraph` (girafe) htmlwidget.
+#' @export
+viz_transfers_by_season <- function(ps_change) {
+  rlang::check_installed(c("ggplot2", "ggiraph"))
+  d <- transfer_counts(ps_change) |>
+    dplyr::mutate(
+      direction = dplyr::case_when(
+        .data$transfer_direction == "up" ~ "Up a tier",
+        .data$transfer_direction == "down" ~ "Down a tier",
+        .data$transfer_direction == "lateral" ~ "Lateral",
+        TRUE ~ "Unknown"
+      ),
+      tooltip = sprintf(
+        "%d: %s transfer%s",
+        .data$season,
+        .data$direction,
+        .data$n_transfers
+      )
+    )
+  p <- ggplot2::ggplot(
+    d,
+    ggplot2::aes(
+      x = .data$season,
+      y = .data$n_transfers,
+      fill = .data$direction,
+      tooltip = .data$tooltip,
+      data_id = .data$season
+    )
+  ) +
+    ggiraph::geom_col_interactive(position = "stack") +
+    ggplot2::scale_fill_manual(
+      values = c(
+        "Up a tier" = "#2a9d8f",
+        "Lateral" = "#b0b7c0",
+        "Down a tier" = "#d1495b",
+        "Unknown" = "#6b7280"
+      ),
+      name = NULL
+    ) +
+    ggplot2::labs(
+      x = "Season",
+      y = "Transfers",
+      title = "Team changes by season and tier direction",
+      subtitle = "Up = transfer to a higher conference tier (season-aware)"
+    ) +
+    theme_cfbstats()
+  ggiraph::girafe(ggobj = p)
+}
+
 #' 3D interactive scatter via plotly
 #'
 #' @param data A data frame.

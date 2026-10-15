@@ -98,6 +98,39 @@ grain cannot separate them. That disambiguation is the redshirt question,
 handled separately.
 :::
 
+## Movement — transfers
+
+Explore question 5: how many players change teams, and in which direction?
+Each bar segment is a team change in that season, split by the **season-aware
+tier direction** — `up` means the move went to a higher conference tier (e.g.
+G5 → Power), so conference realignment is read against the season of the move,
+not a fixed conference list. Hover a segment for the count.
+
+Counts come from the player-season change features (stat-line players). The
+career-grain rate below — computed on the full roster backbone — is the share
+of players whose career included **at least one** transfer.
+
+```{r}
+#| label: fig-transfers
+viz_transfers_by_season(tar_read(ps_change))
+```
+
+```{r}
+#| label: transfer-rate
+rate <- transfer_rate(career_summary(tar_read(roster)))
+```
+
+Of the `r format(rate$players, big.mark = ",")` players on rosters,
+`r format(rate$transferred, big.mark = ",")`
+(`r sprintf("%.1f%%", 100 * rate$share)`) changed teams at least once.
+
+::: {.callout-note}
+Both views undercount subtly: the per-season counts only cover players with a
+stat line, and neither view sees a transfer whose origin season has no roster
+row. A gap-season move (sit out, then appear elsewhere) still counts, because
+the direction compares to the prior *observed* season.
+:::
+
 ## Player dossier
 
 `player_dossier()` resolves a player's scattered rows into one **interpreted**
