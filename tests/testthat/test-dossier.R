@@ -151,3 +151,53 @@ test_that("a drafted player resolves via the draft slot", {
   expect_equal(d$outcome$nfl_status, "drafted")
   expect_equal(d$outcome$draft_overall, 3L)
 })
+
+test_that("career derived tables attach a career & eligibility section", {
+  f <- fixture()
+  # P1 spans 2015-2016 with one team change; add a no-stat 2014 that the
+  # player returned from, the classic redshirt shape.
+  f$roster <- rbind(
+    f$roster[1, ] |> dplyr::mutate(season = 2014L, class_year = 1L),
+    f$roster |> dplyr::mutate(class_year = class_year + 1L)
+  )
+  d <- player_dossier(
+    "P1",
+    f$player_stats,
+    f$roster,
+    f$coaches,
+    f$picks_nfl,
+    f$recruiting,
+    f$nfl_rosters,
+    f$nfl_player_stats,
+    career = career_summary(f$roster),
+    roster_flags = flag_redshirt(f$roster, f$player_stats)
+  )
+  expect_equal(d$career$seasons, 3L)
+  expect_equal(d$career$transfers, 1L)
+  expect_true(d$career$redshirt_career)
+  expect_setequal(
+    names(d$season_flags),
+    c("season", "team", "class_year", "has_stats", "redshirt_season")
+  )
+  expect_true(d$season_flags$redshirt_season[d$season_flags$season == 2014L])
+  # The career section is reported and caveated in the provenance block.
+  expect_setequal(
+    d$provenance$section,
+    c("stats", "coaching", "recruiting", "outcome", "career")
+  )
+  expect_match(
+    d$provenance$note[d$provenance$section == "career"],
+    "redshirt-SHAPED"
+  )
+  expect_output(print(d), "Career & eligibility")
+})
+
+test_that("without derived tables the dossier is unchanged", {
+  d <- build(fixture())
+  expect_null(d$career)
+  expect_null(d$season_flags)
+  expect_setequal(
+    d$provenance$section,
+    c("stats", "coaching", "recruiting", "outcome")
+  )
+})

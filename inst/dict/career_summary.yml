@@ -1,0 +1,47 @@
+dataset: career_summary
+source: derived in-pipeline (career_summary(roster))
+grain: one player's college career
+key: playerId (string)
+description: >
+  Per-player career summary collapsed from the roster backbone (decision 0021):
+  seasons on a roster, first/last season observed, gap seasons (years absent
+  between first and last — injury-, redshirt- or sitting-out-shaped), and
+  transfer count (distinct teams minus one). Built on `roster`, so it includes
+  players with no qualifying stat line. A DERIVED table: materialized into the
+  DuckDB bundle and documented here, but not published as a standalone parquet —
+  it rebuilds from the cleaned roster in any pipeline mode (stat_taxonomy
+  precedent). Contract: `contract_career_summary()` (1-7 seasons, non-negative
+  gaps/transfers).
+columns:
+  - name: playerId
+    type: string
+    description: Athlete id (the shared college-athlete namespace).
+    provenance: derived (roster.id)
+  - name: seasons
+    type: int32
+    description: Distinct roster seasons observed for the player.
+    provenance: derived
+  - name: first_season
+    type: int32
+    description: First season the player appears on a roster.
+    provenance: derived
+  - name: last_season
+    type: int32
+    description: Last season the player appears on a roster.
+    provenance: derived
+  - name: teams
+    type: int32
+    description: Distinct teams across the player's roster seasons.
+    provenance: derived
+  - name: gap_seasons
+    type: int32
+    description: >
+      Seasons absent between first and last (span minus observed seasons).
+      Contract: non-negative.
+    provenance: derived
+  - name: transfers
+    type: int32
+    description: >
+      Team changes (teams - 1). A gap between two schools still counts once.
+      Contract: 0-6.
+    provenance: derived

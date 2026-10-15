@@ -21,6 +21,21 @@ dictionaries next to this file, one YAML per table:
 | `nfl_rosters` | one player-season on an NFL roster | [`dict/nfl_rosters.yml`](dict/nfl_rosters.yml) |
 | `nfl_player_stats` | one NFL player-season (regular season) | [`dict/nfl_player_stats.yml`](dict/nfl_player_stats.yml) |
 | `stat_taxonomy` | one (category, statType) pair | [`dict/stat_taxonomy.yml`](dict/stat_taxonomy.yml) |
+| `ps_change` | one player-season (stat-line grain) + change features | [`dict/ps_change.yml`](dict/ps_change.yml) |
+| `roster_flags` | roster player-season + eligibility flags | [`dict/roster_flags.yml`](dict/roster_flags.yml) |
+| `career_summary` | one player's college career | [`dict/career_summary.yml`](dict/career_summary.yml) |
+
+**Derived tables.** Three tables in the bundle are **derived in-pipeline**
+(decision 0021), like `stat_taxonomy`: they are built from other cleaned tables
+(`ps_change` from the link chain, `roster_flags` from roster + player_stats,
+`career_summary` from roster), so they are materialized into the DuckDB bundle
+and documented with dictionaries but are **not published as standalone
+parquet** — they rebuild from the cleaned tables in any pipeline mode, and no
+release asset has to exist before a track-mode build. `ps_change` carries the
+`drafted` label (it sits downstream of `link_drafted`); `roster_flags` /
+`career_summary` are leakage-free roster-derived features. All feature targets
+carry contracts (`contract_redshirt()`, `contract_career_summary()`) and audit
+rows like the cleaned tables.
 
 `stat_taxonomy` is **package data**, not a published parquet: it is hand-authored
 in `inst/extdata/stat_taxonomy.csv`, read via `stat_taxonomy()`, and materialized
@@ -68,6 +83,9 @@ erDiagram
     picks ||--o| nfl_draft_picks : "draft slot (year,round,overall=season,round,pick)"
     nfl_draft_picks ||--o{ nfl_rosters : "gsis_id, season"
     nfl_draft_picks ||--o{ nfl_player_stats : "gsis_id, season"
+    ps_change }o--|| roster_flags : "playerId, season (flags/weights attach here)"
+    roster |o--o{ career_summary : "playerId (collapsed)"
+}
 ```
 
 Solid lines are trustworthy joins; the dotted `recruiting` line is a
@@ -171,3 +189,14 @@ ORDER BY nfl_seasons DESC;
 
 The slot bridge should be name-guarded in analysis (use `link_nfl_draft()` in R
 rather than the raw SQL join) to drop the rare wrong-person slot match.
+
+Redshirt-shaped seasons per season, with the coverage caveat visible:
+
+```sql
+SELECT season,
+       SUM(has_stats::INT)                                    AS with_stats,
+       SUM((NOT has_stats AND redshirt_season)::INT)          AS redshirt_shaped
+FROM roster_flags
+GROUP BY season
+ORDER BY season;
+```

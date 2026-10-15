@@ -1,0 +1,131 @@
+dataset: ps_change
+source: derived in-pipeline (add_change_features(ps_draft))
+grain: one player-season with a qualifying stat line (+ change features)
+key: playerId (string) + season
+description: >
+  The player-season feature backbone (build_player_season -> link_coaches ->
+  link_tiers -> link_drafted) with longitudinal between-season change features
+  attached (decision 0021): team/tier/coach lags and the transfer and coaching
+  flags derived from them. Lags only use prior-season data (no leakage from the
+  predicted draft class). NOTE: rows can INFLATE at the coach link where a
+  school had >1 head coach in a season (intentional many-to-many), and this
+  table carries the `drafted` label — filter it out before using as a model
+  input. A DERIVED table: materialized into the DuckDB bundle and documented
+  here, but not published as a standalone parquet (stat_taxonomy precedent).
+columns:
+  - name: playerId
+    type: string
+    description: Athlete id (the shared college-athlete namespace).
+    provenance: derived (player_stats.playerId)
+  - name: player
+    type: string
+    description: Player name as reported by CFBD.
+    provenance: raw (player_stats)
+  - name: season
+    type: int32
+    description: Season year.
+    provenance: raw (player_stats)
+  - name: team
+    type: string
+    description: Team (joins coaches.school by name).
+    provenance: raw (player_stats)
+  - name: conference
+    type: string
+    description: Conference of the team-season.
+    provenance: raw (player_stats)
+  - name: position
+    type: string
+    description: Position as reported on the stat line.
+    provenance: raw (player_stats)
+  - name: coach_id
+    type: int32
+    description: CFBD head-coach id for (team, season); NA when not in the FBS-only feed.
+    provenance: derived (link_coaches)
+  - name: coach_name
+    type: string
+    description: Head coach name; NA when not in the CFBD feed.
+    provenance: derived (link_coaches)
+  - name: conference_coach
+    type: string
+    description: Conference reported by the coaches endpoint.
+    provenance: derived (link_coaches)
+  - name: games
+    type: int32
+    description: Team-season games under the head coach.
+    provenance: derived (link_coaches)
+  - name: wins
+    type: int32
+    description: Team-season wins under the head coach.
+    provenance: derived (link_coaches)
+  - name: losses
+    type: int32
+    description: Team-season losses under the head coach.
+    provenance: derived (link_coaches)
+  - name: srs
+    type: double
+    description: Team-season SRS (Simple Rating System).
+    provenance: derived (link_coaches)
+  - name: sp_overall
+    type: double
+    description: Team-season SP+ overall rating.
+    provenance: derived (link_coaches)
+  - name: sp_offense
+    type: double
+    description: Team-season SP+ offense rating.
+    provenance: derived (link_coaches)
+  - name: sp_defense
+    type: double
+    description: Team-season SP+ defense rating.
+    provenance: derived (link_coaches)
+  - name: tier
+    type: int32
+    description: Season-aware conference tier (3 Power / 2 G5 / 1 FCS-and-below).
+    provenance: derived (link_tiers)
+  - name: tier_label
+    type: string
+    description: Human-readable tier label.
+    provenance: derived (link_tiers)
+  - name: draft_year
+    type: int32
+    description: NFL draft year if drafted (from picks); NA otherwise.
+    provenance: derived (link_drafted)
+  - name: draft_round
+    type: int32
+    description: Draft round if drafted; NA otherwise.
+    provenance: derived (link_drafted)
+  - name: draft_overall
+    type: int32
+    description: Overall draft slot if drafted; NA otherwise.
+    provenance: derived (link_drafted)
+  - name: drafted
+    type: logical
+    description: Outcome label — TRUE if the player was ever drafted.
+    provenance: derived (link_drafted)
+  - name: prev_team
+    type: string
+    description: Team in the player's prior observed season (lag).
+    provenance: derived (add_change_features)
+  - name: prev_tier
+    type: int32
+    description: Tier in the player's prior observed season (lag).
+    provenance: derived (add_change_features)
+  - name: prev_coach_id
+    type: int32
+    description: Head coach id in the player's prior observed season (lag).
+    provenance: derived (add_change_features)
+  - name: transferred
+    type: logical
+    description: TRUE if the team differs from the prior observed season.
+    provenance: derived (add_change_features)
+  - name: transfer_direction
+    type: string
+    description: Tier move vs prior season — up / lateral / down; NA when either tier is missing.
+    provenance: derived (add_change_features)
+  - name: hc_changed
+    type: logical
+    description: TRUE if the head coach differs from the prior observed season.
+    provenance: derived (add_change_features)
+  - name: followed_coach
+    type: logical
+    description: TRUE if transferred AND the new head coach is the prior season's head coach.
+    provenance: derived (add_change_features)

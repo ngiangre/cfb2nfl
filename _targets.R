@@ -250,6 +250,18 @@ list(
     )
   ),
   tar_target(
+    ok_career,
+    pointblank::all_passed(
+      contract_career_summary(career, stop_on_fail = FALSE)
+    )
+  ),
+  tar_target(
+    ok_roster_flags,
+    pointblank::all_passed(
+      contract_redshirt(roster_flags, stop_on_fail = FALSE)
+    )
+  ),
+  tar_target(
     ok_stat_taxonomy,
     pointblank::all_passed(
       contract_stat_taxonomy(
@@ -274,6 +286,13 @@ list(
   # ---- features -------------------------------------------------------------
   tar_target(ps_change, add_change_features(ps_draft)),
   tar_target(model_table, add_roster_weight(ps_change, roster)),
+  # Career-grain and roster-grain derived features (Explore questions 4/5/12).
+  # These are in-pipeline DERIVED tables: bundled into the DuckDB asset and
+  # documented in inst/dict like stat_taxonomy, but not published as parquet —
+  # they rebuild from other cleaned tables in any mode, so track mode needs no
+  # release asset for them (decision 0021).
+  tar_target(career, career_summary(roster)),
+  tar_target(roster_flags, flag_redshirt(roster, player_stats)),
 
   # ---- model + report (placeholders) ----------------------------------------
   tar_target(model_fit, fit_draft_model(model_table)),
@@ -296,7 +315,10 @@ list(
         nfl_draft_picks = nfl_draft_picks,
         nfl_rosters = nfl_rosters,
         nfl_player_stats = nfl_player_stats,
-        stat_taxonomy = stat_taxonomy
+        stat_taxonomy = stat_taxonomy,
+        ps_change = ps_change,
+        roster_flags = roster_flags,
+        career_summary = career
       ),
       "data/cfbstats.duckdb"
     ),
@@ -384,7 +406,29 @@ list(
         keys = c("playerId", "season"),
         contract_passed = ok_drafted
       ),
-      audit_step(ps_change, "add_change_features", "features", ps_draft),
+      audit_step(
+        ps_change,
+        "add_change_features",
+        "features",
+        ps_draft,
+        keys = c("playerId", "season")
+      ),
+      audit_step(
+        roster_flags,
+        "flag_redshirt",
+        "features",
+        roster,
+        keys = c("playerId", "season"),
+        contract_passed = ok_roster_flags
+      ),
+      audit_step(
+        career,
+        "career_summary",
+        "features",
+        roster,
+        keys = "playerId",
+        contract_passed = ok_career
+      ),
       audit_step(
         model_table,
         "add_roster_weight",

@@ -6,6 +6,19 @@ layer, and the documentation site, all under version control.
 
 ## Pipeline & data
 
+- Derived feature tables are now **first-class pipeline targets** bundled into
+  the DuckDB asset and documented in the data model ([decision 0021](
+  https://github.com/ngiangre/cfbstats/blob/main/decisions/0021-derived-feature-tables-in-pipeline.md)).
+  `career_summary(roster)` (`career` target), `flag_redshirt(roster,
+  player_stats)` (`roster_flags` target), and the existing `ps_change` backbone
+  carry contracts and audit rows like the cleaned tables, ship in
+  `data/cfbstats.duckdb` with new dictionaries (`inst/dict/*.yml`) and ERD
+  entries, and are **not** published as standalone parquet (they rebuild from
+  other cleaned tables in any mode, so no release asset is needed before a
+  track-mode build). `player_dossier()` gains optional `career` /
+  `roster_flags` arguments attaching a "Career & eligibility" section, and
+  `explore.qmd` reads the targets instead of recomputing features per figure.
+
 - Added the third Explore question-answer pair (question 12): **redshirts,
   defined approximately**. `flag_redshirt()` derives two redshirt-*shaped*
   signals from the roster backbone — a no-stat season the player returned from

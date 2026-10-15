@@ -1,0 +1,79 @@
+dataset: roster_flags
+source: derived in-pipeline (flag_redshirt(roster, player_stats))
+grain: one player-season on a team roster (roster grain + eligibility flags)
+key: playerId (string) + season
+description: >
+  The full roster backbone with per-season and per-career eligibility flags
+  attached (decision 0021). `has_stats` marks whether the player recorded any
+  season statistic; `redshirt_season` flags the APPROXIMATE redshirt shape
+  (a no-stat season the player returned from — final-year absences are never
+  flagged, being as likely an injury or early departure); the career flags
+  collapse the per-season signal. All flags are redshirt-SHAPED, not certified:
+  a no-stat season may be an early exit, and a fifth-year class may be a grad
+  transfer. A DERIVED table: materialized into the DuckDB bundle and documented
+  here, but not published as a standalone parquet (stat_taxonomy precedent).
+  Contract: `contract_redshirt()`.
+columns:
+  - name: playerId
+    type: string
+    description: Athlete id (from roster `id` coerced to string).
+    provenance: derived (clean_roster)
+  - name: season
+    type: int32
+    description: Season year (stamped from the queried year).
+    provenance: derived (clean_roster)
+  - name: class_year
+    type: int32
+    description: Player eligibility class (1-5); not the season.
+    provenance: derived (clean_roster)
+  - name: team
+    type: string
+    description: Team.
+    provenance: derived (clean_roster)
+  - name: position
+    type: string
+    description: Roster position.
+    provenance: derived (clean_roster)
+  - name: height
+    type: int32
+    description: Height (inches).
+    provenance: derived (clean_roster)
+  - name: weight
+    type: int32
+    description: Weight (lbs); static per player, 0-placeholder coerced to NA (decision 0009).
+    provenance: derived (clean_roster)
+  - name: jersey
+    type: int32
+    description: Jersey number.
+    provenance: derived (clean_roster)
+  - name: home_state
+    type: string
+    description: Hometown state.
+    provenance: derived (clean_roster)
+  - name: home_city
+    type: string
+    description: Hometown city.
+    provenance: derived (clean_roster)
+  - name: has_stats
+    type: logical
+    description: >
+      TRUE if the player recorded any season statistic in player_stats for this
+      season. Coverage is partial and improving (~26% of roster seasons in 2010
+      to ~60% by 2021), so FALSE conflates redshirt with missing data.
+    provenance: derived (flag_redshirt)
+  - name: redshirt_season
+    type: logical
+    description: >
+      TRUE for a no-stat season followed by another observed season (stat-gap
+      rule). A final-year absence is never flagged.
+    provenance: derived (flag_redshirt)
+  - name: redshirt_career
+    type: logical
+    description: TRUE if any season of the career is redshirt_season.
+    provenance: derived (flag_redshirt)
+  - name: fifth_year_career
+    type: logical
+    description: >
+      TRUE if the player was ever observed at class_year 5 (fifth eligibility
+      class; may be a grad transfer rather than a redshirt).
+    provenance: derived (flag_redshirt)

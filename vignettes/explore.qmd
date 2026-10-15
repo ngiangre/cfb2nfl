@@ -136,9 +136,8 @@ make exactly that visible.
 ```{r}
 #| label: redshirt-setup
 #| include: false
-# Approximate redshirt flags; the caveats below describe the confounds.
-ps_full <- tar_read(player_stats)
-flagged <- flag_redshirt(tar_read(roster), ps_full)
+# Redshirt flags are pipeline targets (decision 0021) — no recomputation here.
+flagged <- tar_read(roster_flags)
 ```
 
 ```{r}
@@ -191,7 +190,7 @@ viz_transfers_by_season(tar_read(ps_change))
 
 ```{r}
 #| label: transfer-rate
-rate <- transfer_rate(career_summary(tar_read(roster)))
+rate <- transfer_rate(tar_read(career))
 ```
 
 Of the `r format(rate$players, big.mark = ",")` players on rosters,
