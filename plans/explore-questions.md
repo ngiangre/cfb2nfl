@@ -38,41 +38,63 @@ question.
 
 ## Shared R functions to create
 
-- `career_summary(player_season)` — seasons played, first/last season, gap
-  seasons, transfer count. Feeds questions 1, 4, 5, 12.
-- `flag_redshirt(player_season, roster)` — redshirt logic in one tested place.
-- `season_arc(player_stats, stat_pair)` — pivot one stat to a per-player
-  per-season arc for plotting.
-- **Shared ggplot theme + team-color scale in `R/viz.R`** (existing flagged
-  TODO — do first, every new figure needs it).
-- New ingest: venue lat/lon table (dict + DuckDB bundle entry +
-  `inst/data-model.md`, per decisions 0017/0018).
+- [x] `career_summary(roster)` — seasons played, first/last season, gap
+  seasons, transfer count (roster backbone grain). Feeds questions 1, 4, 5, 12.
+  Now a pipeline target (`career`) bundled in the DuckDB (decision 0021).
+- [x] `flag_redshirt(roster, player_stats)` — redshirt logic in one tested
+  place (stat-gap rule + fifth-year signal). Pipeline target `roster_flags`
+  (decision 0021).
+- [ ] `season_arc(player_stats, stat_pair)` — pivot one stat to a per-player
+  per-season arc for plotting (question 6).
+- [x] **Shared ggplot theme + team-color scale in `R/viz.R`** —
+  `theme_cfbstats()`, `team_color_values()`, `scale_fill_team()`,
+  `scale_color_team()`.
+- [ ] New ingest: venue lat/lon table (dict + DuckDB bundle entry +
+  `inst/data-model.md`, per decisions 0017/0018). NOTE: this is an *ingested*
+  table, so unlike the derived tables of decision 0021 it must be published to
+  the `data-latest` release before merge (constraint below).
 
 ## New contracts
 
-- Redshirt-rule sanity.
-- Career-length bounds (≤ ~7 seasons).
-- Transfer-count bounds.
+- [x] Redshirt-rule sanity (`contract_redshirt()`).
+- [x] Career-length bounds, ≤ ~7 seasons (`contract_career_summary()`).
+- [x] Transfer-count bounds (inside `contract_career_summary()`).
 
 ## Release/CI constraint
 
-Any new table must be published to the `data-latest` release before merge, or
-track-mode CI/site build breaks (see AGENTS.md gotchas).
+Any new **ingested** table must be published to the `data-latest` release
+before merge, or track-mode CI/site build breaks (see AGENTS.md gotchas).
+**Derived** tables (built from other cleaned tables, per decision 0021) do NOT
+need publication — they ship in the DuckDB bundle + dict and rebuild in any
+mode.
 
 ## Status
 
 - [x] Viz theme + team-color scale (`R/viz.R`) — `theme_cfbstats()`,
-  `team_color_values()`, `scale_fill_team()`, `scale_color_team()` already in
-  place; `viz_career_length()` added on top of them.
+  `team_color_values()`, `scale_fill_team()`, `scale_color_team()`.
 - [x] `career_summary()` + career-length section
 - [x] Transfers section — `transfer_counts()`, `transfer_rate()`,
   `viz_transfers_by_season()`; explore.qmd "Movement" section.
 - [x] Redshirt definition + section — `flag_redshirt()` (stat-gap + fifth-year
   signals), `contract_redshirt()`, `viz_redshirt_by_career_length()` +
   `viz_redshirt_seasonality()` exposing the stat-coverage confound.
-- [ ] Performance arcs (+ opponent-quality context)
-- [ ] Position-flow (HS→college→NFL)
-- [ ] Drafts by school × position
-- [ ] Venues ingest + spatial map
-- [ ] Limitations section
-- [ ] Restructure explore.qmd into question sections
+- [x] Derived feature tables in the pipeline (decision 0021) — `career`,
+  `roster_flags`, `ps_change` as contracted targets with audit rows; bundled
+  into the 14-table `cfbstats.duckdb` with dicts + ERD entries;
+  `player_dossier()` gains a Career & eligibility section; `explore.qmd` reads
+  the targets instead of recomputing.
+- [ ] Performance arcs (+ opponent-quality context). Design constraint
+  (question 6): arcs come from pivoting the long `player_stats`; opponent
+  adjustment is season-level only (SRS / SP+ already on `ps_change` via the
+  coach link) — per-game opponent quality needs a `/games` ingest, out of
+  scope for v1. Build as a derived table target under the decision-0021 recipe
+  (function + contract + dict + DuckDB + ERD + reader-facing section).
+- [ ] Position-flow (HS→college→NFL) — name-guarded chain
+  `recruiting.recruit_position` → `roster.position` → slot-bridged NFL
+  position; transition matrix / alluvial.
+- [ ] Drafts by school × position — `picks` alone; extends
+  `viz_drafts_by_team`.
+- [ ] Venues ingest + spatial map — needs the ingested venues table published
+  to `data-latest` BEFORE merge (release/CI constraint above).
+- [ ] Limitations section (injuries, entered-not-selected, injured-vs-benched).
+- [ ] Restructure explore.qmd into the question sections above.
