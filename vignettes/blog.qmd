@@ -1,0 +1,57 @@
+---
+title: "Blog"
+vignette: >
+  %\VignetteIndexEntry{Blog}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(cfbstats)
+library(dplyr)
+library(purrr)
+library(htmltools)
+library(reactable)
+
+# Blog posts are dated vignettes (decision 0015); the table is built from the
+# files themselves so a new post appears just by adding YYYY-MM-DD-slug.qmd.
+root <- cfbstats_root()
+post_files <- sort(list.files(file.path(root, "vignettes"),
+  pattern = "^\\d{4}-\\d{2}-\\d{2}-.+\\.qmd$", full.names = TRUE
+), decreasing = TRUE)
+
+posts <- map_dfr(post_files, function(f) {
+  meta <- rmarkdown::yaml_front_matter(f)
+  slug <- tools::file_path_sans_ext(basename(f))
+  tibble(
+    date = meta$date,
+    title = meta$title,
+    author = paste(meta$author, collapse = ", "),
+    href = paste0(slug, ".html")
+  )
+})
+```
+
+```{r}
+#| label: table
+#| echo: false
+reactable(
+  posts,
+  columns = list(
+    date = colDef(name = "Date", width = 110),
+    title = colDef(
+      name = "Post",
+      cell = function(value, index) {
+        tags$a(href = posts$href[index], value, class = "fs-5")
+      }
+    ),
+    author = colDef(name = "Author", width = 160),
+    href = colDef(show = FALSE)
+  ),
+  sortable = FALSE,
+  pagination = FALSE,
+  theme = reactable::reactableTheme(cellPadding = "12px 10px")
+)
+```

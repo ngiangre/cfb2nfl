@@ -1,0 +1,65 @@
+---
+title: "Reference"
+vignette: >
+  %\VignetteIndexEntry{Reference}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+---
+
+A table of every documented function. Click a name to open its full
+documentation page.
+
+```{r}
+#| label: setup
+#| include: false
+library(cfbstats)
+library(dplyr)
+library(purrr)
+library(htmltools)
+library(reactable)
+
+root <- cfbstats_root()
+rd_files <- sort(list.files(file.path(root, "man"), pattern = "\\.Rd$", full.names = TRUE))
+
+# Title from the \title{} section; internal functions (altdoc skips them) omitted.
+fn_meta <- map_dfr(rd_files, function(f) {
+  raw <- readLines(f, warn = FALSE)
+  if (any(grepl("\\\\internal", raw))) {
+    return(NULL)
+  }
+  name <- tools::file_path_sans_ext(basename(f))
+  title <- tryCatch(
+    paste(unlist(tools:::.Rd_get_metadata(raw, "title")), collapse = " "),
+    error = function(e) name
+  )
+  tibble(
+    fn = name,
+    title = ifelse(nzchar(title), title, name),
+    link = paste0("../man/", name, ".html")
+  )
+})
+```
+
+```{r}
+#| label: table
+#| echo: false
+reactable(
+  fn_meta,
+  columns = list(
+    fn = colDef(
+      name = "Function",
+      cell = function(value, index) {
+        tags$a(href = fn_meta$link[index], value, class = "fs-5")
+      }
+    ),
+    title = colDef(name = "Title"),
+    link = colDef(show = FALSE)
+  ),
+  searchable = TRUE,
+  paginationType = "jump",
+  showPageSizeOptions = TRUE,
+  pageSizeOptions = c(10, 25, 50),
+  defaultPageSize = 25,
+  theme = reactable::reactableTheme(cellPadding = "10px 10px")
+)
+```

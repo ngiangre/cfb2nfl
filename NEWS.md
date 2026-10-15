@@ -19,6 +19,15 @@ layer, and the documentation site, all under version control.
   `roster_flags` arguments attaching a "Career & eligibility" section, and
   `explore.qmd` reads the targets instead of recomputing features per figure.
 
+- The documentation site now navigates entirely through the top navbar
+  (Home, Explore, Blog, Reference on the left; News/License/Citation + GitHub
+  on the right) instead of a sidebar. New hand-wired pages: `explore.qmd` is a
+  hub of value-card tiles linking to About, Analysis, Data & provenance,
+  Visualizations, and Pipeline; `blog.qmd` lists dated posts in a table built
+  from their YAML; `reference.qmd` lists every non-internal function with links
+  to its man page. The interactive-charts page formerly called `explore.qmd`
+  is renamed `visualizations.qmd`.
+
 - Added the third Explore question-answer pair (question 12): **redshirts,
   defined approximately**. `flag_redshirt()` derives two redshirt-*shaped*
   signals from the roster backbone — a no-stat season the player returned from

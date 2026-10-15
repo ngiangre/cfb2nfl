@@ -122,15 +122,24 @@ wrapper (`CFBSTATS_REFRESH=true` + `tar_make()`). Years 2010–2026.
   had >1 head coach in a season (intentional many-to-many).
 - **Site** (decision 0006): **`altdoc` owns the site** (`quarto_website`),
   configured in `altdoc/quarto_website.yml`, built to `docs/` via
-  `altdoc::render_docs()`. Home = `README.md`; content pages are **vignettes**
-  (`vignettes/{about,data,pipeline,analysis,explore}.qmd`, surfaced via
-  `$ALTDOC_VIGNETTE_BLOCK`); Reference is auto-generated per-function from
-  `man/*.Rd` (`$ALTDOC_MAN_BLOCK`). Vignettes read the pipeline via `tar_read()`
-  and set the knit wd to the project root from the `CFBSTATS_ROOT` env var
+  `altdoc::render_docs()`. Navigation lives entirely in the top **navbar**
+  (no sidebar): Home, Explore, Blog, Reference on the left; News/License/
+  Citation + GitHub on the right (`$ALTDOC_*` placeholders substitute fine in
+  navbar, but `$ALTDOC_VIGNETTE_BLOCK`/`$ALTDOC_MAN_BLOCK` only expand in the
+  sidebar in altdoc 0.7.3, so the pages are hand-wired instead). Content pages
+  are vignettes: `explore.qmd` is a hub of bslib value-card tiles linking to
+  `about`, `analysis`, `data`, `visualizations` (the interactive charts,
+  renamed from the old explore page), and `pipeline`; `blog.qmd` builds a
+  reactable table of all dated posts (`YYYY-MM-DD-*.qmd`) from their YAML at
+  render time; `reference.qmd` builds a searchable reactable of every
+  non-internal function linking to `../man/<fn>.html` (75 rendered man pages).
+  Vignettes read the pipeline via `tar_read()` and set the knit wd to the
+  project root from the `CFBSTATS_ROOT` env var
   (altdoc renders in a temp dir); they use `library(cfbstats)` and
-  `system.file("dict", ...)`, so the package must be installed to render. Viz is
-  hybrid: R htmlwidgets default (`plotly`/`ggiraph`/`reactable`), OJS later.
-  `vignettes/` is `.Rbuildignore`d (they need the pipeline/data, not CRAN).
+  `system.file("dict", ...)`, so the package must be installed to render.
+  Viz is hybrid: R htmlwidgets default (`plotly`/`ggiraph`/`reactable`),
+  OJS later. `vignettes/` is `.Rbuildignore`d (they need the pipeline/data,
+  not CRAN).
 - **Figure styling standard.** Leverage **team colors consistently** across
   figures (source them from `data/teams.parquet`, which carries logos/colors —
   DISPLAY only, decision 0008 — via a shared team → color mapping, not

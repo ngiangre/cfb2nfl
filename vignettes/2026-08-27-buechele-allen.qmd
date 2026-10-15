@@ -1,11 +1,11 @@
 ---
-title: "Welcome to the NFL Preseason! Let's look at key players fighting to to start"
+title: "Welcome to the NFL Preseason! Let's look at key players fighting to start"
 date: "2026-08-27"
 author:
   - "Nick Giangreco"
 freeze: true
 vignette: >
-  %\VignetteIndexEntry{Welcome to the NFL Preseason! Let's look at key players fighting to to start}
+  %\VignetteIndexEntry{Welcome to the NFL Preseason! Let's look at key players fighting to start}
   %\VignetteEngine{quarto::html}
   %\VignetteEncoding{UTF-8}
 ---

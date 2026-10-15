@@ -6,306 +6,35 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
+The project at a glance, one card per topic. Pick a tile to dig in.
+
 ```{r}
-#| label: setup
+#| label: cards
 #| include: false
-library(cfbstats)
-library(dplyr)
-library(targets)
-root <- cfbstats_root()
-if (nzchar(root)) {
-  knitr::opts_knit$set(root.dir = root)
+library(bslib)
+library(htmltools)
+
+tile <- function(title, desc, href) {
+  bslib::card(
+    bslib::card_header(
+      tags$h3(class = "mb-0", tags$a(href = href, title))
+    ),
+    tags$p(class = "fs-5 mb-0", desc),
+    fillable = FALSE,
+    style = css(min_height = "9rem")
+  )
 }
 ```
 
-Interactive exemplars for the three chart families the project uses: **time
-series**, **2D**, and **3D**. Each reads a pipeline target, so the input → chart
-lineage is explicit. The default stack is R htmlwidgets (`plotly`, `ggiraph`);
-Observable JS is reserved for bespoke explorables (a later addition).
-
 ```{r}
-#| label: data
-picks <- tar_read(picks) |>
-  filter(year >= 2013, !is.na(height), !is.na(weight), !is.na(overall))
-```
-
-## Time series — drafts per year
-
-```{r}
-#| label: fig-timeseries
-viz_drafts_by_season(tar_read(model_table))
-```
-
-## 2D — draft capital vs. physicals (hover for player)
-
-Each point is a drafted player; hover for the name. Color encodes draft round.
-
-```{r}
-#| label: fig-2d
-viz_scatter_2d(
-  dplyr::slice_sample(picks, n = min(1500, nrow(picks))),
-  x = weight,
-  y = height,
-  tooltip = name,
-  color = round
+#| label: grid
+#| echo: false
+bslib::layout_columns(
+  tile("About", "The project in brief.", "about.html"),
+  tile("Analysis", "Write-ups: who gets drafted, associations, forecasts.", "analysis.html"),
+  tile("Data & provenance", "Sources, grains, and how each table is built.", "data.html"),
+  tile("Visualizations", "Interactive exemplars of the project's chart families.", "visualizations.html"),
+  tile("Pipeline", "The targets DAG from ingest to report.", "pipeline.html"),
+  col_widths = c(12, 6, 6, 6, 6, 12)
 )
 ```
-
-## 3D — height × weight × overall pick
-
-```{r}
-#| label: fig-3d
-viz_scatter_3d(
-  picks,
-  x = "height",
-  y = "weight",
-  z = "overall",
-  color = "round"
-)
-```
-
-## NFL outcomes — how long drafted players last
-
-Each point is a drafted player bridged to nflverse (decision 0014), placed by
-draft round against the number of distinct **seasons they spent on an NFL
-roster** — the project's primary longevity measure. The **#1 overall picks** are
-highlighted against the rest of the field; the grey bar marks each round's
-median. Hover for the player. Recent draft classes are still active, so their
-counts are **right-censored** lower bounds.
-
-```{r}
-#| label: fig-nfl-longevity
-viz_nfl_roster_seasons_by_round(tar_read(picks_nfl), tar_read(nfl_rosters))
-```
-
-## Career length — how long is a college career?
-
-Each player's career is summarized from the **roster backbone** — distinct
-seasons on a roster per athlete id, including seasons with no stat line. The
-shape of this distribution is the baseline every other career question is read
-against: most careers are short, so a fifth or sixth season is already a
-distinct population, and how long a player stayed in college plausibly shapes
-both their development and their draft odds. Gap seasons (years absent between
-first and last appearance) are also recorded here — they are the raw material
-for the injury-shaped-gap analysis below. Hover a bar for the player count.
-
-```{r}
-#| label: fig-career-length
-viz_career_length(tar_read(roster))
-```
-
-::: {.callout-note}
-A long career is not always continuous: a fifth or sixth season can be a
-redshirt year, a medical hardship, or a COVID-era extension, and the roster
-grain cannot separate them. The next section formalizes what *can* be inferred
-about redshirts from this data — approximately, and with an explicit
-confound.
-:::
-
-## Redshirts — what the data can and cannot say
-
-A **redshirt** is an NCAA eligibility designation: a player spends a season on
-a roster **without competing in it**, and that season does not count against
-their four seasons of eligibility — they effectively gain a fifth (sometimes
-sixth) year. Since 2018 a redshirted player may still appear in up to four
-games without burning the redshirt, so "played a little" and "redshirted" are
-no longer mutually exclusive. No feed in this project labels who redshirted,
-so it must be **inferred** — approximately — from two signals:
-
-1. **Stat-gap shape** — a roster season with **no stat line that the player
-   returned from**. Here a *stat line* means any recorded season statistic for
-   that player-season in the `player_stats` table — a pass attempt, a tackle,
-   a reception, anything. Having **no** stat line is our best available proxy
-   for "did not compete". The "returned from" guard matters: a final-year
-   absence is just as likely an injury or an early departure as a redshirt,
-   so it is never flagged.
-2. **Fifth-year class** — appearing at eligibility class 5, one year beyond
-   the nominal four-year window.
-
-Both flags are *redshirt-shaped*, not certified, for three reasons. First, a
-no-stat season is not proof of non-participation: a deep-bench player can
-appear in games without recording a statistic, a season can end early to
-injury, and (pre-2018 rules) even four appearances disqualify a redshirt while
-still producing a thin stat line. Second, a class-5 player may be a grad
-transfer or junior-college arrival rather than a redshirt. Third — and most
-consequential here — whether a stat line exists at all depends on how
-completely the source records statistics, and it records them for well under
-half of roster seasons in the early years. The second chart below is built to
-make exactly that visible.
-
-```{r}
-#| label: redshirt-setup
-#| include: false
-# Redshirt flags are pipeline targets (decision 0021) — no recomputation here.
-flagged <- tar_read(roster_flags)
-```
-
-```{r}
-#| label: fig-redshirt-career
-#| fig-width: 9
-viz_redshirt_by_career_length(flagged)
-```
-
-```{r}
-#| label: fig-redshirt-seasonality
-#| fig-width: 9
-viz_redshirt_seasonality(flagged)
-```
-
-The seasonality chart reads like a ledger for each season: grey is what we
-*know* (a stat line exists, so the player competed), teal is what the flag
-claims (no stats, came back), and amber is what we deliberately refuse to
-judge (no stats in a final season). Two things stand out. First, grey grows
-from about a quarter of roster seasons in 2010–2015 to around 60% by 2021 —
-the source did not record stats for most players in the early years at all,
-which is why the teal share there (45–48%) is dominated by missing data rather
-than redshirts. Second, even in the best-covered seasons teal runs ~25%:
-that is an **upper bound** on redshirting, mixing true redshirts with bench
-players who never recorded a statistic. The teal share only becomes
-meaningfully comparable *across* seasons with similar grey shares, which is
-roughly 2016 onward (2020's bump reflects COVID-era eligibility rules and a
-shortened stat season). The career-length split above should be read the same
-way: descriptive of the flag, never a certified redshirt rate.
-
-## Movement — transfers
-
-College players change schools more than they used to — the transfer portal has
-made it routine — and *where* a player moves matters as much as *that* they
-move: a jump from a Group-of-Five program to a Power-Five roster is a different
-bet than a lateral move within the same tier. This section counts team changes
-by season and splits each move by **tier direction**: `up` means the move went
-to a higher conference tier (e.g. G5 → Power), where direction is evaluated
-against the season-aware tier of each school, so conference realignment is read
-against the season of the move rather than a fixed conference list. Hover a
-segment for the count.
-
-Counts come from the player-season change features (stat-line players). The
-career-grain rate below — computed on the full roster backbone — is the share
-of players whose career included **at least one** transfer; together the two
-views answer how common movement is, when it clusters (rule changes, portal
-eras), and whether it tends to be upward.
-
-```{r}
-#| label: fig-transfers
-viz_transfers_by_season(tar_read(ps_change))
-```
-
-```{r}
-#| label: transfer-rate
-rate <- transfer_rate(tar_read(career))
-```
-
-Of the `r format(rate$players, big.mark = ",")` players on rosters,
-`r format(rate$transferred, big.mark = ",")`
-(`r sprintf("%.1f%%", 100 * rate$share)`) changed teams at least once.
-
-::: {.callout-note}
-Both views undercount subtly: the per-season counts only cover players with a
-stat line, and neither view sees a transfer whose origin season has no roster
-row. A gap-season move (sit out, then appear elsewhere) still counts, because
-the direction compares to the prior *observed* season.
-:::
-
-## Player dossier
-
-`player_dossier()` resolves a player's scattered rows into one **interpreted**
-record (decision 0019) rather than a raw extract that is easy to misread. Each
-dossier shows: identity and physicals; college statistics grouped and labeled by
-game **phase** (offense / defense / special teams); per-season coaching context;
-name-guarded high-school recruiting; the NFL outcome (drafted or
-undrafted-signed) with longevity; and a provenance / caveats block.
-
-Below are the **#1 overall picks of the past five NFL drafts**, each rendered as
-an interpreted dossier.
-
-Notes:
-
-- A bare `TD` in the long `player_stats` is ambiguous, so stats are relabelled
-  by phase (e.g. "Passing touchdowns" vs "Defensive touchdowns").
-- A blank coach cell is shown as "head coach not available" — the CFBD coaches
-  feed is FBS head coaches only, so a non-FBS season (e.g. Cam Ward's 2021 FCS
-  year at Incarnate Word) is flagged, not silently dropped.
-- Recruiting is name-guarded (decision 0013); a genuinely unrated player stays
-  unrated, never imputed.
-- NFL longevity is **right-censored** for these recent picks — all are still
-  active, so seasons/games are lower bounds.
-
-```{r}
-#| label: dossier-setup
-#| include: false
-# Read the shared inputs once; `dossier()` keys a player by CFBD athlete id.
-ps <- tar_read(player_stats)
-ros <- tar_read(roster)
-co <- tar_read(coaches)
-picks_nfl <- tar_read(picks_nfl)
-rec <- tar_read(recruiting)
-nrs <- tar_read(nfl_rosters)
-nps <- tar_read(nfl_player_stats)
-dossier <- function(id) {
-  player_dossier(id, ps, ros, co, picks_nfl, rec, nrs, nps)
-}
-```
-
-### Fernando Mendoza — 2026 #1, Indiana
-
-```{r}
-#| label: dossier-mendoza
-#| comment: ""
-dossier("4837248")
-```
-
-### Cam Ward — 2025 #1, Miami
-
-```{r}
-#| label: dossier-ward
-#| comment: ""
-dossier("4688380")
-```
-
-### Caleb Williams — 2024 #1, USC
-
-```{r}
-#| label: dossier-williams
-#| comment: ""
-dossier("4431611")
-```
-
-### Bryce Young — 2023 #1, Alabama
-
-```{r}
-#| label: dossier-young
-#| comment: ""
-dossier("4685720")
-```
-
-### Travon Walker — 2022 #1, Georgia
-
-```{r}
-#| label: dossier-walker
-#| comment: ""
-dossier("4426349")
-```
-
-## Branding — team logos
-
-The `teams` dimension carries each program's logo and colors, joined by school
-name via `link_team_meta()` and kept off the model path (display only, decision
-0008). Two rendering paths: a `reactable` table with logo thumbnails and color
-swatches, and a `ggiraph` bar filled with each team's brand color that shows its
-logo on hover.
-
-```{r}
-#| label: tbl-team-logos
-viz_team_logos(tar_read(teams))
-```
-
-```{r}
-#| label: fig-drafts-by-team
-viz_drafts_by_team(tar_read(model_table), tar_read(teams))
-```
-
-::: {.callout-tip}
-These are templates, not findings — they demonstrate the wiring from a pipeline
-target to an interactive widget. Real analyses will pair model inputs with model
-results on the same page.
-:::
