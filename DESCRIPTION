@@ -18,6 +18,7 @@ Imports:
     dplyr (>= 1.2.0),
     purrr,
     rlang,
+    scales,
     stats,
     tibble,
     tidyr,

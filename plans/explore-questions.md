@@ -67,7 +67,9 @@ track-mode CI/site build breaks (see AGENTS.md gotchas).
 - [x] `career_summary()` + career-length section
 - [x] Transfers section — `transfer_counts()`, `transfer_rate()`,
   `viz_transfers_by_season()`; explore.qmd "Movement" section.
-- [ ] Redshirt definition + section
+- [x] Redshirt definition + section — `flag_redshirt()` (stat-gap + fifth-year
+  signals), `contract_redshirt()`, `viz_redshirt_by_career_length()` +
+  `viz_redshirt_seasonality()` exposing the stat-coverage confound.
 - [ ] Performance arcs (+ opponent-quality context)
 - [ ] Position-flow (HS→college→NFL)
 - [ ] Drafts by school × position

@@ -133,3 +133,21 @@ test_that("contract_career_summary passes a valid summary and flags bounds", {
     contract_career_summary(bad, stop_on_fail = FALSE)
   ))
 })
+
+test_that("contract_redshirt passes valid flags and catches violations", {
+  skip_if_not_installed("pointblank")
+  good <- tibble::tibble(
+    playerId = c("1", "1"),
+    has_stats = c(FALSE, TRUE),
+    redshirt_season = c(TRUE, FALSE),
+    redshirt_career = c(TRUE, TRUE),
+    fifth_year_career = c(FALSE, FALSE)
+  )
+  expect_true(pointblank::all_passed(
+    contract_redshirt(good, stop_on_fail = FALSE)
+  ))
+  bad <- good |> dplyr::mutate(redshirt_season = c(TRUE, TRUE))
+  expect_false(pointblank::all_passed(
+    contract_redshirt(bad, stop_on_fail = FALSE)
+  ))
+})
