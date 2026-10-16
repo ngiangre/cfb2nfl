@@ -9,32 +9,67 @@ vignette: >
 The project at a glance, one card per topic. Pick a tile to dig in.
 
 ```{r}
-#| label: cards
-#| include: false
-library(bslib)
-library(htmltools)
-
-tile <- function(title, desc, href) {
-  bslib::card(
-    bslib::card_header(
-      tags$h3(class = "mb-0", tags$a(href = href, title))
-    ),
-    tags$p(class = "fs-5 mb-0", desc),
-    fillable = FALSE,
-    style = css(min_height = "9rem")
-  )
-}
-```
-
-```{r}
-#| label: grid
+#| label: tile-css
 #| echo: false
-bslib::layout_columns(
-  tile("About", "The project in brief.", "about.html"),
-  tile("Analysis", "Write-ups: who gets drafted, associations, forecasts.", "analysis.html"),
-  tile("Data & provenance", "Sources, grains, and how each table is built.", "data.html"),
-  tile("Visualizations", "Interactive exemplars of the project's chart families.", "visualizations.html"),
-  tile("Pipeline", "The targets DAG from ingest to report.", "pipeline.html"),
-  col_widths = c(12, 6, 6, 6, 6, 12)
-)
+#| output: asis
+# Quarto's bundled Bootstrap is pruned (no grid utilities), so the grid,
+# tile, and stretched-link styles are all defined here.
+htmltools::tags$style(htmltools::HTML(
+  "
+  .explore-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.25rem;
+    margin: 1.5rem 0;
+  }
+  .explore-tile {
+    position: relative;
+    padding: 1.25rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+  }
+  .explore-tile:hover { border-color: var(--bs-primary, #0d6efd); }
+  .explore-tile h3 { margin: 0 0 0.5rem 0; font-size: 1.25rem; }
+  .explore-tile h3 a { text-decoration: none; color: var(--bs-primary, #0d6efd); }
+  .explore-tile p { margin: 0; font-size: 1.05rem; color: #495057; }
+  .explore-tile .stretched-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+"
+))
 ```
+
+::: {.explore-grid}
+::: {.explore-tile}
+### [About](about.html){.stretched-link}
+
+The project in brief.
+:::
+
+::: {.explore-tile}
+### [Analysis](analysis.html){.stretched-link}
+
+Write-ups: who gets drafted, associations, forecasts.
+:::
+
+::: {.explore-tile}
+### [Data & provenance](data.html){.stretched-link}
+
+Sources, grains, and how each table is built.
+:::
+
+::: {.explore-tile}
+### [Visualizations](visualizations.html){.stretched-link}
+
+Interactive exemplars of the project's chart families.
+:::
+
+::: {.explore-tile}
+### [Pipeline](pipeline.html){.stretched-link}
+
+The targets DAG from ingest to report.
+:::
+:::
