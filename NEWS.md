@@ -4,6 +4,12 @@ First tracked release of the project scaffolding. The repo now carries the full
 ingest → clean → link → features → model → report pipeline, its lineage/audit
 layer, and the documentation site, all under version control.
 
+- The Data & provenance page now embeds the entity-relationship diagram as a
+  pre-rendered image (`vignettes/images/erd.png`) instead of a raw mermaid
+  block, so it renders identically without client-side mermaid. The diagram's
+  source of truth remains the hand-authored mermaid block in
+  `inst/data-model.md`.
+
 - The Explore hub page tiles now use a responsive fenced-div card grid
   (equal-width, whole-tile links) instead of `bslib::layout_columns()`, whose
   Bootstrap grid classes are absent from Quarto's pruned Bootstrap build and
