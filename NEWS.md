@@ -4,6 +4,11 @@ First tracked release of the project scaffolding. The repo now carries the full
 ingest → clean → link → features → model → report pipeline, its lineage/audit
 layer, and the documentation site, all under version control.
 
+- The Explore hub page tiles now use a responsive fenced-div card grid
+  (equal-width, whole-tile links) instead of `bslib::layout_columns()`, whose
+  Bootstrap grid classes are absent from Quarto's pruned Bootstrap build and
+  previously collapsed the tiles.
+
 ## Pipeline & data
 
 - Derived feature tables are now **first-class pipeline targets** bundled into
