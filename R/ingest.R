@@ -50,18 +50,21 @@ parquet_asset <- function(path, build) {
   path
 }
 
-#' Perform an authenticated CFBD API request
+#' Build an authenticated CFBD API request
 #'
-#' Thin wrapper over `httr2` that attaches the bearer token from the
-#' `CFBD_API_KEY` environment variable and returns the parsed body as a tibble.
+#' Thin request builder over `httr2`: attaches the bearer token from the
+#' `CFBD_API_KEY` environment variable and a retry policy (decision 0028) so
+#' transient CFBD failures (rate limiting, 503 outages) are retried with
+#' exponential backoff instead of failing the whole refresh — the weekly CI
+#' refresh makes ~60 back-to-back calls and CFBD sheds load with 503s.
 #'
 #' @param endpoint API path, e.g. `"/draft/picks"`.
 #' @param query Named list of query parameters (optional).
 #'
-#' @return A tibble of the (vector-simplified) JSON response.
+#' @return An `httr2` request.
 #' @keywords internal
-cfbd_get <- function(endpoint, query = list()) {
-  rlang::check_installed(c("httr2", "tibble"), reason = "to call the CFBD API.")
+cfbd_request <- function(endpoint, query = list()) {
+  rlang::check_installed("httr2", reason = "to call the CFBD API.")
   key <- Sys.getenv("CFBD_API_KEY")
   if (!nzchar(key)) {
     cli::cli_abort(
@@ -71,11 +74,36 @@ cfbd_get <- function(endpoint, query = list()) {
   req <- httr2::request(cfbd_base_url()) |>
     httr2::req_url_path_append(endpoint) |>
     httr2::req_headers(Authorization = paste("Bearer", key)) |>
-    httr2::req_user_agent("cfbstats (https://github.com)")
+    httr2::req_user_agent("cfbstats (https://github.com)") |>
+    # 429/503 are transient by default; broaden to all server-side 5xx. 5
+    # tries with exponential backoff (~1s..16s) rides out short outages
+    # without dragging a refresh for minutes per call.
+    httr2::req_retry(
+      max_tries = 5,
+      max_seconds = 120,
+      is_transient = \(resp) {
+        httr2::resp_status(resp) %in% c(429, 500, 502, 503, 504)
+      }
+    )
   if (length(query)) {
     req <- httr2::req_url_query(req, !!!query)
   }
-  req |>
+  req
+}
+
+#' Perform an authenticated CFBD API request
+#'
+#' Performs the request from [cfbd_request()] and returns the parsed body as a
+#' tibble.
+#'
+#' @param endpoint API path, e.g. `"/draft/picks"`.
+#' @param query Named list of query parameters (optional).
+#'
+#' @return A tibble of the (vector-simplified) JSON response.
+#' @keywords internal
+cfbd_get <- function(endpoint, query = list()) {
+  rlang::check_installed(c("httr2", "tibble"), reason = "to call the CFBD API.")
+  cfbd_request(endpoint, query) |>
     httr2::req_perform() |>
     httr2::resp_body_json(simplifyVector = TRUE) |>
     tibble::as_tibble()

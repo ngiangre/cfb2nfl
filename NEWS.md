@@ -19,6 +19,10 @@ layer, and the documentation site, all under version control.
   and a leakage-safe `player_season_inputs` view.
 - Out-of-range roster heights (outside 60-85 inches) are coerced to NA and the
   roster contract now covers height, mirroring the weight precedent.
+- CFBD ingest requests retry transient failures (429/5xx) with exponential
+  backoff, so a temporary API outage or rate-limit window no longer fails the
+  whole weekly refresh
+  ([decision 0028](https://github.com/ngiangre/cfbstats/blob/main/decisions/0028-cfbd-retry-backoff.md)).
 
 - The expectation-check blog post is revised into a research-article structure
   (Introduction, Data, Results, Summary, Discussion) with neutral scientific

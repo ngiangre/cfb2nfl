@@ -15,7 +15,7 @@ cfbd_get(endpoint, query = list())
 A tibble of the (vector-simplified) JSON response.
 }
 \description{
-Thin wrapper over \code{httr2} that attaches the bearer token from the
-\code{CFBD_API_KEY} environment variable and returns the parsed body as a tibble.
+Performs the request from \code{\link[=cfbd_request]{cfbd_request()}} and returns the parsed body as a
+tibble.
 }
 \keyword{internal}
