@@ -40,7 +40,7 @@ test_that("audit_step coverage is NA without keys or input", {
 })
 
 test_that("update_schema_history appends across runs without duplicating", {
-  path <- file.path(testthat::local_tempdir(), "history.csv")
+  path <- file.path(withr::local_tempdir(), "history.csv")
   run1 <- tibble::tibble(
     step = c("a", "b"),
     n_cols_out = c(5L, 6L),
