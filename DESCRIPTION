@@ -16,7 +16,10 @@ Depends:
 Imports: 
     cli,
     dplyr (>= 1.2.0),
+    DT,
+    ellmer,
     purrr,
+    querychat,
     rlang,
     scales,
     stats,
