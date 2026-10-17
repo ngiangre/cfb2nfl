@@ -531,6 +531,12 @@ contract_recruit_link <- function(
 
 #' Data contract for cleaned rosters
 #'
+#' Guards the roster backbone: the `(playerId, season, team)` key is unique
+#' (a player-team-season may appear once; a player legitimately appears on
+#' multiple teams within a season, so the team is part of the key), and
+#' `class_year` is a plausible eligibility class (1-5 or NA — `clean_roster()`
+#' coerces CFBD's year-valued contamination to NA, decision 0009 precedent).
+#'
 #' @param roster Cleaned roster (see [clean_roster()]).
 #' @param stop_on_fail Abort on failure (default `TRUE`)?
 #' @return The interrogated pointblank agent, invisibly.
@@ -541,6 +547,8 @@ contract_roster <- function(roster, stop_on_fail = TRUE) {
     pointblank::col_exists(c("playerId", "season", "weight")) |>
     pointblank::col_vals_not_null(pointblank::vars(playerId, season)) |>
     pointblank::col_vals_between("weight", 100, 500, na_pass = TRUE) |>
+    pointblank::rows_distinct(pointblank::vars(playerId, season, team)) |>
+    pointblank::col_vals_between("class_year", 1L, 5L, na_pass = TRUE) |>
     pointblank::interrogate()
   enforce_contract(agent, "roster", stop_on_fail)
 }
