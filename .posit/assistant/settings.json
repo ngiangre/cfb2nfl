@@ -11,7 +11,10 @@
     },
     "bash": {
       "*": "allow",
-      "git *": "allow"
+      "git *": "allow",
+      "grep *": "allow",
+      "head *": "allow",
+      "python3 *": "allow"
     },
     "webfetch": {
       "*": "allow"
