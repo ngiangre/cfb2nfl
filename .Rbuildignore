@@ -26,3 +26,4 @@
 ^_quarto$
 ^\.githooks$
 ^plans$
+^app\.R$
