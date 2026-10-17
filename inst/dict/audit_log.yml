@@ -1,0 +1,76 @@
+dataset: audit_log
+source: derived in-pipeline (audit_step rows bound into the audit_log target)
+grain: one row per audited pipeline step
+key: step (unique per run)
+description: >
+  The lineage/audit layer (decision 0005), slimmed for the DuckDB bundle
+  (decision 0027 — the nested `na_by_col` list column is dropped; the full log
+  lives in the pipeline). Lets SQL users verify row counts, join coverage and
+  schema hashes for every table in this bundle — the built-in defense against
+  silent row loss on joins. Known signals: `build_player_season` collapses the
+  long stats (~1.5M -> ~160k rows); `link_coaches` inflates rows where a school
+  had >1 head coach in a season (intentional many-to-many); `link_nfl_draft`
+  nulls the nflverse ids that fail the name guard. One row per (step, run);
+  historical schema hashes across runs are in the `audit_history.csv` release
+  asset, not here.
+columns:
+  - name: step
+    type: string
+    description: Pipeline step name (e.g. clean_picks, link_coaches).
+    provenance: derived (audit_step)
+  - name: stage
+    type: string
+    description: Pipeline stage — ingest / clean / link / features.
+    provenance: derived (audit_step)
+  - name: n_rows_in
+    type: int32
+    description: Rows of the step's input (NA when no input is tracked).
+    provenance: derived (audit_step)
+  - name: n_rows_out
+    type: int32
+    description: Rows produced by the step.
+    provenance: derived (audit_step)
+  - name: rows_delta
+    type: int32
+    description: n_rows_out - n_rows_in (conflates joins and filters — check pct_keys_matched to tell them apart).
+    provenance: derived (audit_step)
+  - name: keys_dropped
+    type: int32
+    description: Input key combos missing from the output (0 = pure fan-out/addition).
+    provenance: derived (audit_step)
+  - name: pct_keys_matched
+    type: int32
+    description: Share of input key combos surviving into the output (0-1).
+    provenance: derived (audit_step)
+  - name: n_cols_out
+    type: int32
+    description: Columns of the output.
+    provenance: derived (audit_step)
+  - name: n_keys_out
+    type: int32
+    description: Distinct key combos in the output.
+    provenance: derived (audit_step)
+  - name: n_na_cells
+    type: int32
+    description: Total NA cells in the output.
+    provenance: derived (audit_step)
+  - name: n_cols_with_na
+    type: int32
+    description: Columns containing at least one NA.
+    provenance: derived (audit_step)
+  - name: schema_hash
+    type: string
+    description: Hash of the output schema (column names + types); drift detector.
+    provenance: derived (audit_step)
+  - name: contract_passed
+    type: logical
+    description: Whether the step's data contract passed (NA when the step has no contract yet).
+    provenance: derived (audit_step)
+  - name: timestamp
+    type: double
+    description: POSIXct time the step ran.
+    provenance: derived (audit_step)
+  - name: git_sha
+    type: string
+    description: Git commit SHA the step ran under.
+    provenance: derived (audit_step)

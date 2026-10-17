@@ -277,6 +277,12 @@ list(
       )$coverage
     )
   ),
+  tar_target(
+    ok_player_season_stats,
+    pointblank::all_passed(
+      contract_player_season_stats(player_season_stats, stop_on_fail = FALSE)
+    )
+  ),
   # Contract gate (decision 0023): a FALSE anywhere stops tar_make() (the
   # default error = "stop" aborts the run, so CI never publishes a failing
   # build). NA (steps without a contract yet) is not a failure.
@@ -304,7 +310,8 @@ list(
       nfl_link = ok_nfl_link,
       career_summary = ok_career,
       redshirt = ok_roster_flags,
-      stat_taxonomy = ok_stat_taxonomy
+      stat_taxonomy = ok_stat_taxonomy,
+      player_season_stats = ok_player_season_stats
     ))
   ),
   # ---- link-step contracts (audit-hygiene workstream C) ----------------------
@@ -375,6 +382,9 @@ list(
   # release asset for them (decision 0021).
   tar_target(career, career_summary(roster)),
   tar_target(roster_flags, flag_redshirt(roster, player_stats)),
+  # Wide player-season stats for the DuckDB bundle (decision 0026): a derived
+  # convenience table, like career/roster_flags above.
+  tar_target(player_season_stats, build_player_season_stats(player_stats)),
 
   # ---- model + report (placeholders) ----------------------------------------
   tar_target(model_fit, fit_draft_model(model_table)),
@@ -400,7 +410,10 @@ list(
         stat_taxonomy = stat_taxonomy,
         ps_change = ps_change,
         roster_flags = roster_flags,
-        career_summary = career
+        career_summary = career,
+        player_season_stats = player_season_stats,
+        nfl_pick_link = picks_nfl,
+        audit_log = db_audit_log
       ),
       "data/cfbstats.duckdb"
     ),
@@ -580,6 +593,9 @@ list(
       )
     )
   ),
+  # Slimmed lineage log bundled into the DuckDB asset (decision 0027): drops
+  # the nested na_by_col list column so it is flat SQL.
+  tar_target(db_audit_log, slim_audit_log(audit_log)),
 
   # ---- schema history: schema_hash across refreshes (audit-hygiene D) -------
   # Refresh mode appends this run's hashes to data/audit_history.csv (seeded

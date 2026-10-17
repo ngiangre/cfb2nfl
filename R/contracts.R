@@ -544,9 +544,10 @@ contract_recruit_link <- function(
 contract_roster <- function(roster, stop_on_fail = TRUE) {
   rlang::check_installed("pointblank")
   agent <- pointblank::create_agent(roster, label = "roster") |>
-    pointblank::col_exists(c("playerId", "season", "weight")) |>
+    pointblank::col_exists(c("playerId", "season", "weight", "height")) |>
     pointblank::col_vals_not_null(pointblank::vars(playerId, season)) |>
     pointblank::col_vals_between("weight", 100, 500, na_pass = TRUE) |>
+    pointblank::col_vals_between("height", 60, 85, na_pass = TRUE) |>
     pointblank::rows_distinct(pointblank::vars(playerId, season, team)) |>
     pointblank::col_vals_between("class_year", 1L, 5L, na_pass = TRUE) |>
     pointblank::interrogate()
@@ -888,4 +889,53 @@ contract_stat_taxonomy <- function(
   }
 
   invisible(list(lookup = agent_lookup, coverage = agent_coverage))
+}
+
+#' Data contract for the wide player-season stat table
+#'
+#' Validates the DuckDB-bundled wide stat table ([build_player_season_stats()]):
+#' keyed 1:1 on `(playerId, season, team)`, key columns non-null, seasons in the
+#' ingested window, and every stat column finite (the pivot casts `stat` to
+#' double; Inf would mean a bad value in the feed). NOTE: stat columns may be
+#' NEGATIVE (sack-adjusted rushing yards, return averages on negative plays),
+#' so non-negativity is NOT asserted.
+#'
+#' @param player_season_stats Wide stat table (see [build_player_season_stats()]).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_player_season_stats <- function(
+  player_season_stats,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  key_cols <- c(
+    "playerId",
+    "player",
+    "season",
+    "team",
+    "conference",
+    "position"
+  )
+  stat_cols <- setdiff(names(player_season_stats), key_cols)
+  agent <- pointblank::create_agent(
+    player_season_stats,
+    label = "player_season_stats"
+  ) |>
+    pointblank::col_exists(pointblank::vars(!!!rlang::syms(key_cols))) |>
+    pointblank::col_vals_not_null(pointblank::vars(playerId, season, team)) |>
+    pointblank::rows_distinct(pointblank::vars(playerId, season, team)) |>
+    pointblank::col_vals_between("season", 2010L, 2026L)
+  # Finiteness for every stat column; NA (pair not logged) is skipped.
+  # (pointblank has no col_vals_finite; expr form: is.na(.) | is.finite(.)).
+  for (col in stat_cols) {
+    agent <- pointblank::col_vals_expr(
+      agent,
+      expr = rlang::expr(
+        is.na(!!rlang::sym(col)) | is.finite(!!rlang::sym(col))
+      )
+    )
+  }
+  agent <- pointblank::interrogate(agent)
+  enforce_contract(agent, "player_season_stats", stop_on_fail)
 }

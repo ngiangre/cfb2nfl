@@ -144,6 +144,13 @@ clean_roster <- function(roster) {
         dplyr::any_of("weight"),
         \(w) dplyr::if_else(w >= 100 & w <= 500, as.integer(w), NA_integer_)
       ),
+      # Height (inches): same precedent as the weight/class_year coercions
+      # (decision 0009) — a handful of data-entry errors (9, 50, 57 in) sit
+      # outside the plausible 60-85 range and are coerced to NA.
+      dplyr::across(
+        dplyr::any_of("height"),
+        \(h) dplyr::if_else(h >= 60 & h <= 85, as.integer(h), NA_integer_)
+      ),
       # Older CFBD seasons return the queried YEAR in the eligibility-class
       # field (~124k rows with class_year == season). Anything outside the
       # plausible 1-5 class range is unmeasurable, so coerce to NA (same
