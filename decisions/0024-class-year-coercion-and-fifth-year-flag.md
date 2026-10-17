@@ -1,6 +1,6 @@
 # 0024 — Coerce out-of-range `class_year` to NA; `fifth_year_career` becomes coverage-honest
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-16
 
 ## Context
