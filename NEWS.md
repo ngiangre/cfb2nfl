@@ -4,6 +4,12 @@ First tracked release of the project scaffolding. The repo now carries the full
 ingest → clean → link → features → model → report pipeline, its lineage/audit
 layer, and the documentation site, all under version control.
 
+- The expectation-check blog post is revised into a research-article structure
+  (Introduction, Data, Results, Summary, Discussion) with neutral scientific
+  phrasing and corrected observations re-verified against the published data;
+  the class-year audit section was removed in favor of the fix recorded in
+  [decision 0024](https://github.com/ngiangre/cfbstats/blob/main/decisions/0024-class-year-coercion-and-fifth-year-flag.md).
+
 - The roster backbone is now guarded against two defects surfaced by the
   expectation-check blog post
   ([decision 0024](https://github.com/ngiangre/cfbstats/blob/main/decisions/0024-class-year-coercion-and-fifth-year-flag.md)).
