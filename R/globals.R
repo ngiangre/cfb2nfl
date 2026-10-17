@@ -34,5 +34,12 @@ utils::globalVariables(c(
   "statType",
   "phase",
   "label",
-  "kind"
+  "kind",
+  # pointblank::vars() targets in later contracts/audit helpers
+  ".env",
+  "followed_coach",
+  "hc_changed",
+  "n_na",
+  "recruit_matched",
+  "transferred"
 ))

@@ -12,7 +12,15 @@ their career — pursuing both explanatory (inference) and predictive answers
 
 CFBD API (`https://api.collegefootballdata.com`); key in `CFBD_API_KEY`
 (configured in the local environment and as a GitHub Actions repo secret, so
-refresh runs both locally and in CI).
+refresh runs both locally and in CI). All CFBD calls funnel through
+`cfbd_get()`/`cfbd_request()` in `R/ingest.R`, which retries transient
+failures (429/5xx) with exponential backoff — 5 tries, max 2 min per call
+(decision 0028). CFBD 503s are common under the refresh's ~60-call burst,
+especially from shared GitHub-runner IPs; if CI refresh still fails, the
+fallback is running `Rscript data-raw/refresh.R` locally (~10 min, works
+because the local IP isn't throttled) and publishing with the same
+`piggyback::pb_upload(..., tag="data-latest", overwrite = TRUE)` the CI job
+runs, then re-dispatching `site.yaml`.
 The **pipeline owns ingest → process → assets** (decision 0017): a single
 `tar_make()` in **refresh mode** (`CFBSTATS_REFRESH=true`) ingests every source
 (incl. `conference_tiers`, derived in-pipeline from `player_stats` by

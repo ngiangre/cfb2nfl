@@ -24,3 +24,13 @@ dropped or renamed table never lingers. Intended to run as the \code{duckdb_file
 target: it bundles the cleaned tables whose schemas are documented in
 \verb{inst/dict/*.yml}.
 }
+\details{
+Two generated metadata structures are added on every build (decision 0027):
+a \verb{_schema_manifest} table — grain, key and dictionary path per table, read
+from \verb{inst/dict/*.yml} at build time — and a \verb{_meta} table with the refresh
+timestamp and the last COMPLETE college season / NFL draft (later seasons
+may be partial; see \code{\link[=last_complete_cfb_season]{last_complete_cfb_season()}}). If \code{ps_change} is among
+the tables, a \code{player_season_inputs} view is also created: \code{ps_change} with
+the draft-outcome columns excluded, i.e. the leakage-safe model input
+surface.
+}

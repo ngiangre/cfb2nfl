@@ -4,6 +4,26 @@ First tracked release of the project scaffolding. The repo now carries the full
 ingest → clean → link → features → model → report pipeline, its lineage/audit
 layer, and the documentation site, all under version control.
 
+- The DuckDB bundle now carries a wide `player_season_stats` table (one row per
+  player-season-team, one numeric column per `(category, statType)` pair) so
+  SQL users no longer pivot the 1.5M-row long `player_stats` by hand
+  ([decision 0026](https://github.com/ngiangre/cfbstats/blob/main/decisions/0026-wide-player-season-stats-duckdb.md)).
+- The drafted-rate-by-tier example query in `inst/data-model.md` is corrected to
+  aggregate the long stats to player-season grain before joining (the old query
+  counted stat lines, not players).
+- The DuckDB bundle is now self-documenting and self-checking
+  ([decision 0027](https://github.com/ngiangre/cfbstats/blob/main/decisions/0027-duckdb-queryability-batch.md)):
+  a name-guarded `nfl_pick_link` bridge to the NFL tables, a queryable slimmed
+  `audit_log`, a generated `_schema_manifest` (grain/key from the
+  dictionaries), a `_meta` row recording the last complete season/draft class,
+  and a leakage-safe `player_season_inputs` view.
+- Out-of-range roster heights (outside 60-85 inches) are coerced to NA and the
+  roster contract now covers height, mirroring the weight precedent.
+- CFBD ingest requests retry transient failures (429/5xx) with exponential
+  backoff, so a temporary API outage or rate-limit window no longer fails the
+  whole weekly refresh
+  ([decision 0028](https://github.com/ngiangre/cfbstats/blob/main/decisions/0028-cfbd-retry-backoff.md)).
+
 - The expectation-check blog post is revised into a research-article structure
   (Introduction, Data, Results, Summary, Discussion) with neutral scientific
   phrasing and corrected observations re-verified against the published data;

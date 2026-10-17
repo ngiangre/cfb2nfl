@@ -38,7 +38,7 @@ columns:
     provenance: raw
   - name: height
     type: int32
-    description: Height (inches).
+    description: Height in INCHES (e.g. 74 = 6'2"); values outside the plausible 60-85 range are coerced to NA by clean_roster (decision 0009 precedent, decision 0027).
     provenance: raw
   - name: weight
     type: int32

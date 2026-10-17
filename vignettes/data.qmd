@@ -81,6 +81,29 @@ purrr::map_dfr(dict_files, function(f) {
   )
 ```
 
+## Querying the DuckDB bundle
+
+Every cleaned and derived table ships in one SQL-queryable file,
+`data/cfbstats.duckdb` (published on the `data-latest` GitHub release):
+
+```r
+con <- DBI::dbConnect(duckdb::duckdb(), "data/cfbstats.duckdb", read_only = TRUE)
+DBI::dbGetQuery(con, "SELECT * FROM _schema_manifest")  # grain + key per table
+DBI::dbGetQuery(con, "SELECT * FROM _meta")             # refresh time + last COMPLETE season/draft
+```
+
+Besides the documented tables, the bundle carries generated metadata: a
+`_schema_manifest` (grain/key read from the dictionaries at build time —
+`documented = FALSE` would flag a schema-drift bug), a `_meta` row with
+`last_complete_cfb_season` / `last_complete_nfl_draft` (later seasons may be
+partial; out-of-time logic should stop at these), a slimmed `audit_log`
+(lineage, queryable in SQL), and a `player_season_inputs` VIEW =
+`ps_change` minus the draft-outcome columns — the leakage-safe model input
+surface. Join-namespace rules and worked SQL examples are in
+[`inst/data-model.md`](https://github.com/ngiangre/cfbstats/blob/main/inst/data-model.md);
+the wide `player_season_stats` table (one column per stat) means most
+statistical questions need no pivoting at all.
+
 ## Provenance / audit log
 
 Every tracked pipeline step records a uniform row: input/output row and column
