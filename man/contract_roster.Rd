@@ -15,5 +15,9 @@ contract_roster(roster, stop_on_fail = TRUE)
 The interrogated pointblank agent, invisibly.
 }
 \description{
-Data contract for cleaned rosters
+Guards the roster backbone: the \verb{(playerId, season, team)} key is unique
+(a player-team-season may appear once; a player legitimately appears on
+multiple teams within a season, so the team is part of the key), and
+\code{class_year} is a plausible eligibility class (1-5 or NA — \code{clean_roster()}
+coerces CFBD's year-valued contamination to NA, decision 0009 precedent).
 }

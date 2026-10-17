@@ -325,6 +325,34 @@ test_that("contract_change_features verifies flag definitions and row count", {
   ))
 })
 
+test_that("contract_roster guards key uniqueness and class_year range", {
+  skip_if_not_installed("pointblank")
+  good <- tibble::tibble(
+    # Two teams in one season is legitimate (mid-season transfer); the key
+    # includes team, so this passes.
+    playerId = c("1", "1", "2"),
+    season = c(2021L, 2021L, 2021L),
+    team = c("Florida State", "Louisville", "USC"),
+    weight = c(210L, 210L, NA_integer_),
+    class_year = c(4L, 4L, NA_integer_)
+  )
+  expect_true(pointblank::all_passed(
+    contract_roster(good, stop_on_fail = FALSE)
+  ))
+  # Exact duplicate row (same player-team-season twice) fails the key check.
+  bad_key <- good |>
+    dplyr::add_row(playerId = "2", season = 2021L, team = "USC")
+  expect_false(pointblank::all_passed(
+    contract_roster(bad_key, stop_on_fail = FALSE)
+  ))
+  # Season-valued class_year contamination (CFBD older seasons) fails the
+  # range check; NA passes.
+  bad_class <- good |> dplyr::mutate(class_year = c(2018L, 4L, NA_integer_))
+  expect_false(pointblank::all_passed(
+    contract_roster(bad_class, stop_on_fail = FALSE)
+  ))
+})
+
 test_that("contract_roster_weight asserts row preservation and range", {
   skip_if_not_installed("pointblank")
   ps_change <- tibble::tibble(

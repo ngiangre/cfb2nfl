@@ -4,6 +4,20 @@ First tracked release of the project scaffolding. The repo now carries the full
 ingest → clean → link → features → model → report pipeline, its lineage/audit
 layer, and the documentation site, all under version control.
 
+- The roster backbone is now guarded against two defects surfaced by the
+  expectation-check blog post
+  ([decision 0024](https://github.com/ngiangre/cfbstats/blob/main/decisions/0024-class-year-coercion-and-fifth-year-flag.md)).
+  `clean_roster()` coerces `class_year` outside the plausible 1-5 eligibility
+  range to `NA` — older CFBD seasons return the queried *year* in the
+  eligibility-class field (~124k rows, pre-2020) — so the derived
+  `fifth_year_career` flag now measures *observed* fifth-year classes instead
+  of a year-value coincidence. `contract_roster()` adds two checks:
+  `(playerId, season, team)` key uniqueness (a player on two teams within one
+  season stays allowed) and the `class_year` range, so future contamination
+  blocks the build via the contract gate rather than publishing. The data
+  was refreshed and re-published on the `data-latest` release to satisfy the
+  new contract.
+
 - The audit log is now interpretable and enforced. `audit_step()` records
   **join coverage** (`pct_keys_matched`, `keys_dropped` — distinct key
   combinations from the input that vanish, separating filtering from join

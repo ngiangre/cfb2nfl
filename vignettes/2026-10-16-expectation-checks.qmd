@@ -1,0 +1,426 @@
+---
+title: "Seven quarterbacks, one database: stress-testing what we think we know"
+date: "2026-10-16"
+author:
+  - "Nick Giangreco"
+freeze: true
+vignette: >
+  %\VignetteIndexEntry{Seven quarterbacks, one database: stress-testing what we think we know}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(cfbstats)
+library(arrow)
+library(dplyr)
+library(ggiraph)
+library(ggplot2)
+library(knitr)
+library(DBI)
+library(duckdb)
+# altdoc renders in a temp dir; point the knit wd at the project root so
+# data/*.parquet and tar_read() resolve (CFBSTATS_ROOT is set in the site build).
+root <- cfbstats_root()
+if (nzchar(root)) {
+  knitr::opts_knit$set(root.dir = root)
+}
+
+set_girafe_defaults(
+  opts_hover = opts_hover(
+    css = "stroke:#111827;stroke-width:2.5px;filter:brightness(1.12);"
+  ),
+  opts_hover_inv = opts_hover_inv(css = "opacity:0.45;"),
+  opts_tooltip = opts_tooltip(
+    css = "background:#111827;color:#fff;padding:6px 9px;border-radius:5px;font-weight:bold;font-size:15px;"
+  ),
+  opts_zoom = opts_zoom(min = 1, max = 5),
+  opts_toolbar = opts_toolbar(saveaspng = TRUE, position = "topright"),
+  opts_sizing = opts_sizing(rescale = TRUE)
+)
+```
+
+```{r}
+#| label: registry
+#| include: false
+# Standard: key on athlete id, never name (recruiting ids collide, decision 0013).
+# The cfb_athlete_id here are the shared CFBD athlete namespace; each was resolved
+# from the cleaned player_stats by name and QA-verified by its season/team pattern
+# below — this post does not generalize the name lookup.
+subjects <- tibble::tribble(
+  ~who                 , ~cfb_athlete_id , ~gsis_id    ,
+  "Arch Manning"       , "4870906"       , NA_character_,
+  "Nicco Marchiol"     , "4685459"       , NA_character_,
+  "Jordan Travis"      , "4360799"       , "00-0039797",
+  "Cam Ward"           , "4688380"       , "00-0040676",
+  "Trinidad Chambliss" , "4911529"       , NA_character_,
+  "Joe Burrow"         , "3915511"       , "00-0036442",
+  "Malachi Nelson"     , "4870928"       , NA_character_
+)
+```
+
+::: {.callout-note appearance="minimal"}
+*Data as of the `data-latest` release, retrieved 2026-10-16. Careers of recent
+classes (Manning, Marchiol, Chambliss, Nelson, Ward's Titans tenure) are
+right-censored — later seasons may not yet be present.*
+:::
+
+I have expectations about these players. You probably do too. Seven
+quarterbacks whose careers the college football internet narrates with
+confidence: a redshirt-freshman-slash-double-medical-redshirt at two schools,
+a guy who "redshirted then transferred" on the way to the #1 overall pick, a
+five-year QB whose college injury ended everything, three multi-transfer
+portal-era journeymen, and the most-hyped prospect in modern memory.
+
+Here's the thing about expectations: they're testable claims. The whole point
+of building this pipeline with data contracts is that a claim about the data
+should either survive contact with the tables or leave an explicit bruise. So
+this post is a ledger. I take each expectation, translate it into what the
+database *could* show, and report what it actually shows — including the
+places where the honest answer is "the data cannot see this," which is itself
+a finding, and in a couple of places a bug report.
+
+## The data spine
+
+```{r}
+#| label: build-spine
+#| include: false
+con <- dbConnect(duckdb(), "data/cfbstats.duckdb", read_only = TRUE)
+ids_sql <- paste(sprintf("'%s'", subjects$cfb_athlete_id), collapse = ",")
+
+# Roster backbone + eligibility flags (derived table, decision 0021).
+flags <- dbGetQuery(con, sprintf(
+  "SELECT playerId, season, team, position, class_year, has_stats,
+          redshirt_season, redshirt_career, fifth_year_career
+   FROM roster_flags WHERE playerId IN (%s) ORDER BY playerId, season", ids_sql))
+flags <- flags |>
+  mutate(who = subjects$who[match(playerId, subjects$cfb_athlete_id)])
+
+career <- dbGetQuery(con, sprintf(
+  "SELECT * FROM career_summary WHERE playerId IN (%s)", ids_sql)) |>
+  mutate(who = subjects$who[match(playerId, subjects$cfb_athlete_id)])
+
+college_picks <- dbGetQuery(con, sprintf(
+  "SELECT CAST(collegeAthleteId AS VARCHAR) AS pid, year, round, pick, overall,
+          name, nflTeam FROM picks WHERE CAST(collegeAthleteId AS VARCHAR) IN (%s)",
+  ids_sql))
+dbDisconnect(con, shutdown = TRUE)
+
+# Usage: passing attempts per season from the long stats table.
+stats <- open_dataset("data/player_stats.parquet") |>
+  filter(playerId %in% subjects$cfb_athlete_id) |>
+  select(playerId, season, team, category, statType, stat) |>
+  collect()
+attempts <- stats |>
+  filter(category == "passing", statType == "ATT") |>
+  transmute(playerId, season, attempts = as.numeric(stat))
+
+spine <- flags |>
+  left_join(attempts, by = c("playerId", "season")) |>
+  # CFBD id reuse is excluded from career populations (decision 0022); assert
+  # none of these subjects were caught by that exclusion.
+  left_join(career |> select(who, seasons, teams, transfers, gap_seasons), by = "who")
+
+stopifnot(
+  nrow(spine) > 0,
+  all(subjects$who %in% spine$who),
+  !anyNA(spine$has_stats),
+  # A missing attempts value should occur only on a no-stat (redshirt-shaped)
+  # season — assert that, so the figure's "RS" label is never a lie.
+  all(is.na(spine$attempts) == !spine$has_stats)
+)
+```
+
+```{r}
+#| label: team-colors
+#| include: false
+teams <- open_dataset("data/teams.parquet") |>
+  select(team, color) |>
+  collect()
+spine <- spine |>
+  left_join(teams, by = c("team" = "team")) |>
+  # FCS/D2 programs can sit outside teams.parquet; fall back to gray.
+  mutate(color = if_else(is.na(color), "#9CA3AF", color),
+         tooltip = paste0(who, " · ", team, " · ", season,
+                          if_else(is.na(attempts), "", paste0(" · ", attempts, " pass att"))))
+```
+
+```{r}
+#| label: fig-timeline
+#| fig-cap: "Season-by-season college timelines for the seven subjects, in team colors. The number is passing attempts that season; 'RS' marks a redshirt-SHAPED flag (a no-stat season followed by another observed season). The hole in Trinidad Chambliss's row is a missing 2024 — the database has no Ferris State roster row for the season he won a Division II national championship."
+rel_lum <- function(hex) {
+  m <- grDevices::col2rgb(hex) / 255
+  lin <- ifelse(m <= 0.03928, m / 12.92, ((m + 0.055) / 1.055)^2.4)
+  0.2126 * lin[1, ] + 0.7152 * lin[2, ] + 0.0722 * lin[3, ]
+}
+p <- ggplot(spine, aes(x = season, y = who)) +
+  geom_tile_interactive(
+    aes(fill = color, tooltip = tooltip, data_id = paste(who, season)),
+    color = "white", height = 0.75
+  ) +
+  geom_text_interactive(
+    aes(label = if_else(is.na(attempts), "RS", as.character(attempts)),
+        data_id = paste(who, season)),
+    color = if_else(rel_lum(spine$color) < 0.5, "white", "#111827"),
+    size = 3.2, fontface = "bold"
+  ) +
+  scale_fill_identity() +
+  scale_x_continuous(breaks = 2018:2026) +
+  labs(x = NULL, y = NULL) +
+  theme_cfbstats(base_size = 14) +
+  theme(panel.grid = element_blank(), legend.position = "none")
+girafe(ggobj = p, width_svg = 9.5, height_svg = 4)
+```
+
+Before the case files, one table the figure can't show — the per-career
+summaries the pipeline derives from the roster backbone:
+
+```{r}
+#| label: career-table
+career |>
+  select(who, seasons, first_season, last_season, teams, transfers, gap_seasons) |>
+  kable(caption = "Career summaries from the roster backbone (decision 0021).")
+```
+
+## Case files
+
+### Arch Manning, Texas: "current player"
+
+Expectation: on the Texas roster right now, waiting his turn, then starting.
+
+```{r}
+#| label: arch-table
+spine |> filter(who == "Arch Manning") |>
+  select(season, team, class_year, has_stats, attempts) |>
+  kable(caption = "Arch Manning, season by season.")
+```
+
+Confirmed, with texture. Four Texas seasons, 2023–2026, all still in the
+data's present. But "waiting his turn" is not a binary in this data: he
+recorded **5 pass attempts** in 2023 and **90** in 2024 before 404 in 2025.
+The `has_stats` flag is TRUE for the backup years, so nothing about his
+apprenticeship looks like a redshirt — it looks like a fifth-rounder's worth
+of passing volume hiding inside a roster row. If you wanted "backup year" as
+a feature, you'd need an attempts threshold, not a stat-presence flag. That
+is a design choice this post now has opinions about.
+
+### Nicco Marchiol, West Virginia → Northwestern: "he redshirted twice"
+
+Expectation: a redshirt freshman year at WVU to preserve eligibility, then a
+medical redshirt in a later WVU season, now at Northwestern.
+
+```{r}
+#| label: marchiol-table
+spine |> filter(who == "Nicco Marchiol") |>
+  select(season, team, has_stats, attempts, redshirt_season) |>
+  kable(caption = "Nicco Marchiol, season by season.")
+```
+
+**The data shows no redshirt at all.** Zero redshirt-shaped seasons, zero gap
+seasons, five consecutive roster seasons with a stat line each. Now — I
+believe the redshirts happened; the real-world record says so. But look at
+what the data *can* see: 13 attempts in 2022, then 53, 56, and 98. A medical
+redshirt after appearing in four games with 56 attempts leaves a stat line,
+and a stat line is all `has_stats` and the redshirt flag know about. The
+pipeline's redshirt flag is explicitly redshirt-*shaped*, not certified
+(decision 0021), and this is the sharpest demonstration of that caveat I've
+found yet: **two known redshirts, zero flags.** The flag catches quiet
+seasons; it cannot catch quiet careers.
+
+### Jordan Travis, Louisville → Florida State: "injured in his last year, drafted, never played an NFL snap"
+
+Expectation: redshirts at Louisville, five years at FSU, the COVID year pads
+him to five, a late-season injury in his final year, drafted anyway, never
+takes another snap.
+
+```{r}
+#| label: travis-table
+spine |> filter(who == "Jordan Travis") |>
+  select(season, team, has_stats, attempts) |>
+  kable(caption = "Jordan Travis, season by season. Note two rows for 2021.")
+```
+
+Mostly confirmed, one correction, one artifact.
+
+The correction: **he didn't redshirt at Louisville — he played.** 14 pass
+attempts in 2018. The expectation as commonly told ("redshirted at
+Louisville") is contradicted by the stat line; the truth is messier, a
+mid-career transfer after a season he spent mostly holding a clipboard with a
+few snaps attached. Meanwhile 2019 at FSU shows 11 attempts — his own injury
+year — and then the climb: 131, 194, 353, 324.
+
+The artifact is worse. Two rows for 2021: Florida State *and* Louisville.
+Jordan Travis did not play at Louisville in 2021. This duplicate survives the
+cleaning stage into `roster` and therefore into every downstream join — and
+since `roster_flags` and `career_summary` build on it, his counts inherit it.
+That's not a curiosity; that's a contract gap (no uniqueness guarantee on
+`(playerId, season, team)`), and it should get one.
+
+The NFL side is where the data is most satisfyingly unambiguous. He was
+drafted — round 5, pick 171 overall, 2024, New York — and appears on exactly
+one NFL roster season (NYJ, 2024), with **zero rows in the NFL player-stats
+table**. The expectation "drafted, never played another snap" is not an
+opinion here; it is literally the absence of rows, and the absence is the
+finding. Right-censoring doesn't even complicate it: six seasons of
+Burrow-style stat rows sit one id away, and Travis has none.
+
+### Cam Ward, Incarnate Word → Washington State → Miami → Titans: "the multi-transfer"
+
+Expectation: three schools, then the #1 pick.
+
+```{r}
+#| label: ward-table
+spine |> filter(who == "Cam Ward") |>
+  select(season, team, has_stats, attempts) |>
+  kable(caption = "Cam Ward, season by season.")
+
+college_picks |> filter(pid == "4688380") |>
+  select(year, round, pick, overall, nflTeam) |>
+  kable(caption = "Cam Ward's draft slot (CFBD picks).")
+```
+
+The transfers check out exactly: three schools, two transfers, four roster
+seasons, drafted first overall in 2025. But his FCS origin is where the data
+goes soft. There is **no 2020 row at all** — the COVID-fallout FCS season,
+which Incarnate Word played in spring 2021 — and the 2021 season shows only
+**47 pass attempts** for a player who threw one of the most prolific FCS
+passing seasons on record. CFBD's per-player stat coverage for lower
+divisions is partial, and the pipeline's stat-line coverage contract was
+written with FBS expectations. Two consequences: Ward's college totals in
+this data undercount him, and — more importantly for the modeling goal —
+FCS/D2 origins systematically generate thin or absent early seasons, so any
+"career shape" feature will quietly misclassify players like Ward and
+Chambliss as late starters rather than under-covered ones.
+
+And the recruiting table, per its own untrusted-namespace design (decision
+0013), **does not contain Cam Ward at all**. He was genuinely unranked out of
+high school. "Unrated" is a real category, not an imputation target —
+this case is exactly why decision 0013 says so.
+
+### Trinidad Chambliss, Ferris State → Ole Miss: "D2 to the SEC"
+
+```{r}
+#| label: chambliss-table
+spine |> filter(who == "Trinidad Chambliss") |>
+  select(season, team, has_stats, attempts, redshirt_season) |>
+  kable(caption = "Trinidad Chambliss, season by season.")
+```
+
+Expectation: Ferris State (Division 2), then Ole Miss. The data agrees on the
+shape and disagrees on the middle. 2023 at Ferris State carries a
+redshirt-shaped flag — no stats, followed by observed seasons, the textbook
+signature. Then **2024 is missing entirely**: no Ferris State roster row, no
+stat line, nothing. The derived career summary dutifully records this as
+`gap_seasons = 1`, which is precisely the wrong conclusion — that "gap" is
+the season he started and won a Division II national championship. CFBD's
+roster coverage simply doesn't reach Division 2 in 2024.
+
+This is the cleanest possible demonstration of why `gap_seasons` needs an
+accomplice before it becomes a feature: a gap flag computed over a
+coverage-limited table measures *coverage* at least as much as it measures
+careers. Chambliss is not an edge case — he's the quarterback of a top-ranked
+SEC team right now.
+
+### Joe Burrow, Ohio State → LSU: "redshirted at one school, then transferred to another"
+
+```{r}
+#| label: burrow-table
+spine |> filter(who == "Joe Burrow") |>
+  select(season, team, has_stats, attempts, redshirt_season) |>
+  kable(caption = "Joe Burrow, season by season.")
+
+college_picks |> filter(pid == "3915511") |>
+  select(year, round, pick, overall, nflTeam) |>
+  kable(caption = "Joe Burrow's draft slot (CFBD picks).")
+```
+
+Expectation: redshirt at Ohio State, grad-transfer to LSU, #1 pick. Here the
+data *over*-delivers. Two seasons get redshirt-shaped flags — 2014 **and**
+2015. But 2015 was not a redshirt; Burrow was an active backup who happened
+to record zero of anything the feed carries (0 attempts in 2016's 28-attempt
+season's neighbor years — 2016 shows 28 attempts, 2017 shows 11). A
+stat-presence flag cannot distinguish "redshirted" from "dressed and never
+thrown to." So the case confirms the mechanism and exposes its false-positive
+rate: one real redshirt, two flags. Any feature built on `redshirt_season`
+inherits a known, quantifiable over-count, which is exactly the kind of thing
+you want to know *before* the model does.
+
+His recruiting row is absent too — the class of 2015 sits inside the
+recruiting table's 2010–2026 span, so this is a coverage or name-resolution
+miss, not a range problem. The #1 pick in the data's own draft table has no
+recruiting record. Worth an issue, not a shrug.
+
+### Malachi Nelson, USC → Boise State → UTEP → Syracuse: "the other multi-transfer"
+
+```{r}
+#| label: nelson-table
+spine |> filter(who == "Malachi Nelson") |>
+  select(season, team, has_stats, attempts) |>
+  kable(caption = "Malachi Nelson, season by season.")
+```
+
+Expectation: redshirt year at USC, then the portal carousel. The transfers
+check out perfectly — four teams, three transfers, the largest transfer count
+in this sample. The redshirt is invisible, for the most instructive reason in
+this post: 2023 shows **3 pass attempts**. A flag built on stat presence
+reads that season as played. Combine this with Marchiol (two real redshirts,
+zero flags) and Burrow (zero-volume backup, two flags) and the pattern is
+complete: **usage, not presence, is the observable; eligibility events are
+not.** A redshirt proxy has to be an attempts-and-games threshold with an
+explicit uncertainty band, or it will be quietly wrong in both directions.
+
+## The bug the sample wasn't looking for
+
+While verifying these careers, `class_year` fell over. In the cleaned roster,
+`class_year` is supposed to be an eligibility class from 1–5. Here is its
+actual distribution:
+
+```{r}
+#| label: class-year-audit
+con2 <- dbConnect(duckdb(), "data/cfbstats.duckdb", read_only = TRUE)
+cy <- dbGetQuery(con2, "SELECT class_year, COUNT(*) AS n FROM roster_flags
+                        GROUP BY class_year ORDER BY n DESC")
+dbDisconnect(con2, shutdown = TRUE)
+cy |> head(10) |> kable(caption = "class_year distribution (top 10 of 24 distinct values).")
+```
+
+Twenty-four distinct values, including what appear to be whole *seasons*
+(2010–2026) inside an eligibility column. Every `fifth_year_career` flag and
+any class-based feature inherits this contamination. The redshirt-shaped
+flags don't depend on `class_year` (they're built on stat gaps), but the
+fifth-year flag does, and the range contract for `class_year` apparently
+isn't enforcing 1–5 where it matters. This one goes in the ledger as a bug,
+not a caveat.
+
+## The ledger
+
+| Expectation | Data verdict |
+|---|---|
+| Arch Manning is at Texas now | Confirmed — 4 seasons, with a 5 → 90 → 404-attempt apprenticeship |
+| Marchiol redshirted twice | **Invisible** — stat lines every season; redshirt-shaped flags catch quiet seasons, not quiet usage |
+| Travis redshirted at Louisville | **Contradicted** — he recorded 14 attempts there in 2018 |
+| Travis: 5 FSU years, injured, drafted, no NFL snaps | Confirmed — draft slot present, one NFL roster season, zero NFL stat rows |
+| Ward: 3 transfers to the #1 pick | Confirmed — but his FCS years are under-covered (no 2020, 47 attempts in 2021), and he's absent from recruiting entirely |
+| Chambliss: Ferris State → Ole Miss | Confirmed with a hole — the 2024 D2 championship season is a missing row masquerading as a "gap" |
+| Burrow: redshirt then transfer to #1 pick | Confirmed and **over-flagged** — two redshirt-shaped seasons for one real redshirt |
+| Nelson: USC redshirt then 3 transfers | Transfers confirmed (4 teams); the redshirt is 3 attempts of invisible |
+
+Three things I'd carry out of this post into the pipeline:
+
+1. **Redshirt flags need a usage-based definition** (attempts/games
+   thresholds), not stat presence — Marchiol, Nelson, and Burrow between them
+   show every failure mode.
+2. **`(playerId, season, team)` uniqueness in `roster` needs a contract** —
+   the Travis 2021 duplicate is real and downstream.
+3. **`class_year` is contaminated with season values** and the fifth-year
+   flag built on it is untrustworthy until cleaned and contracted.
+
+The database passed most of my expectations, which is almost the least
+interesting result. The interesting results are the three ways it is
+*structurally* blind — quiet usage, lower-division coverage, and a quietly
+broken eligibility column — because those are the shapes that will bias
+exactly the model this project exists to build.
+
+<SUGGESTION>Add the (playerId, season, team) uniqueness contract and the class_year range contract to R/contracts.R.</SUGGESTION>

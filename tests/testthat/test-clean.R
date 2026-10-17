@@ -74,6 +74,22 @@ test_that("clean_roster keys on a string playerId", {
   expect_true("weight" %in% names(out))
 })
 
+test_that("clean_roster coerces out-of-range class_year values to NA", {
+  # Older CFBD seasons return the queried YEAR in the eligibility-class field
+  # instead of a class (1-5); anything outside 1-5 is unmeasurable.
+  raw <- tibble::tibble(
+    id = c(1L, 2L, 3L, 4L),
+    season = c(2011L, 2011L, 2021L, 2021L),
+    # A year, a true class 3, an implausible 0, and a true class 5
+    class_year = c(2011L, 3L, 0L, 5L)
+  )
+  out <- clean_roster(raw)
+  expect_true(is.na(out$class_year[out$playerId == "1"]))
+  expect_equal(out$class_year[out$playerId == "2"], 3L)
+  expect_true(is.na(out$class_year[out$playerId == "3"]))
+  expect_equal(out$class_year[out$playerId == "4"], 5L)
+})
+
 test_that("clean_roster coerces out-of-range placeholder weights to NA", {
   raw <- tibble::tibble(
     id = c(1L, 2L, 3L),

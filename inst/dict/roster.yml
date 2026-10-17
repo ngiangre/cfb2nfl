@@ -23,8 +23,11 @@ columns:
     type: int32
     description: >
       Player eligibility class (1-5) — the endpoint's own `year` field, renamed.
-      NOT the season.
-    provenance: raw (year)
+      NOT the season. Older CFBD seasons return the queried YEAR here instead of
+      a class (~124k rows before cleaning); values outside 1-5 are coerced to NA
+      by `clean_roster()` (weight-coercion precedent, decision 0009) and enforced
+      by `contract_roster()`.
+    provenance: raw (year), cleaned (out-of-range -> NA)
   - name: team
     type: string
     description: Team.

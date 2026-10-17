@@ -143,6 +143,14 @@ clean_roster <- function(roster) {
       dplyr::across(
         dplyr::any_of("weight"),
         \(w) dplyr::if_else(w >= 100 & w <= 500, as.integer(w), NA_integer_)
+      ),
+      # Older CFBD seasons return the queried YEAR in the eligibility-class
+      # field (~124k rows with class_year == season). Anything outside the
+      # plausible 1-5 class range is unmeasurable, so coerce to NA (same
+      # precedent as the weight coercion, decision 0009).
+      dplyr::across(
+        dplyr::any_of("class_year"),
+        \(cy) dplyr::if_else(cy >= 1 & cy <= 5, as.integer(cy), NA_integer_)
       )
     )
 }
