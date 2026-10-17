@@ -62,7 +62,7 @@ subjects <- tibble::tribble(
 ```
 
 ::: {.callout-note appearance="minimal"}
-*Data as of the `data-latest` release, retrieved 2026-10-16. Careers of recent
+*Data as of the `data-latest` release, retrieved 2026-10-17. Careers of recent
 classes (Manning, Marchiol, Chambliss, Nelson, Ward's Titans tenure) are
 right-censored — later seasons may not yet be present.*
 :::
@@ -259,12 +259,13 @@ That's not a curiosity; that's a contract gap (no uniqueness guarantee on
 `(playerId, season, team)`), and it should get one.
 
 The NFL side is where the data is most satisfyingly unambiguous. He was
-drafted — round 5, pick 171 overall, 2024, New York — and appears on exactly
-one NFL roster season (NYJ, 2024), with **zero rows in the NFL player-stats
-table**. The expectation "drafted, never played another snap" is not an
-opinion here; it is literally the absence of rows, and the absence is the
-finding. Right-censoring doesn't even complicate it: six seasons of
-Burrow-style stat rows sit one id away, and Travis has none.
+drafted — round 5, pick 171 overall, 2024, New York — and appears on Jets
+rosters in 2024 and 2025 with **zero rows in the NFL player-stats table**. The
+expectation "drafted, never played another snap" is not an opinion here; it is
+literally the absence of rows, and the absence is the finding (a roster
+presence is not a snap — injured reserve lives on rosters too). Right-censoring
+doesn't even complicate it: six seasons of Burrow-style stat rows sit one id
+away, and Travis has none.
 
 ### Cam Ward, Incarnate Word → Washington State → Miami → Titans: "the multi-transfer"
 
@@ -374,8 +375,19 @@ explicit uncertainty band, or it will be quietly wrong in both directions.
 ## The bug the sample wasn't looking for
 
 While verifying these careers, `class_year` fell over. In the cleaned roster,
-`class_year` is supposed to be an eligibility class from 1–5. Here is its
-actual distribution:
+`class_year` is supposed to be an eligibility class from 1–5. When this post
+was first drafted, the column held **twenty-four distinct values**, including
+what appeared to be whole *seasons* (2010–2026) inside an eligibility column —
+about 124k of 337k rows, concentrated in pre-2020 seasons. The source is CFBD
+itself: in older seasons the endpoint's eligibility-class field returns the
+queried year instead of a class, so those rows never carried a measurable
+class at all.
+
+That got fixed while this post was in flight
+([decision 0024](https://github.com/ngiangre/cfbstats/blob/main/decisions/0024-class-year-coercion-and-fifth-year-flag.md)):
+`clean_roster()` now coerces anything outside 1–5 to NA, and `contract_roster()`
+enforces the range so re-contamination blocks the build. Here is the column as
+the data now stands:
 
 ```{r}
 #| label: class-year-audit
@@ -383,16 +395,15 @@ con2 <- dbConnect(duckdb(), "data/cfbstats.duckdb", read_only = TRUE)
 cy <- dbGetQuery(con2, "SELECT class_year, COUNT(*) AS n FROM roster_flags
                         GROUP BY class_year ORDER BY n DESC")
 dbDisconnect(con2, shutdown = TRUE)
-cy |> head(10) |> kable(caption = "class_year distribution (top 10 of 24 distinct values).")
+cy |> kable(caption = "class_year distribution after the decision 0024 fix.")
 ```
 
-Twenty-four distinct values, including what appear to be whole *seasons*
-(2010–2026) inside an eligibility column. Every `fifth_year_career` flag and
-any class-based feature inherits this contamination. The redshirt-shaped
-flags don't depend on `class_year` (they're built on stat gaps), but the
-fifth-year flag does, and the range contract for `class_year` apparently
-isn't enforcing 1–5 where it matters. This one goes in the ledger as a bug,
-not a caveat.
+The semantic consequence is worth saying out loud: `fifth_year_career` now
+measures *observed* fifth-year classes, so it is structurally FALSE for
+pre-2020 players — coverage-honest, era-limited. Anything downstream has to
+model the era boundary explicitly rather than assume the flag away. The
+redshirt-shaped flags are untouched; they are built on stat gaps, not this
+column.
 
 ## The ledger
 
@@ -401,21 +412,26 @@ not a caveat.
 | Arch Manning is at Texas now | Confirmed — 4 seasons, with a 5 → 90 → 404-attempt apprenticeship |
 | Marchiol redshirted twice | **Invisible** — stat lines every season; redshirt-shaped flags catch quiet seasons, not quiet usage |
 | Travis redshirted at Louisville | **Contradicted** — he recorded 14 attempts there in 2018 |
-| Travis: 5 FSU years, injured, drafted, no NFL snaps | Confirmed — draft slot present, one NFL roster season, zero NFL stat rows |
+| Travis: 5 FSU years, injured, drafted, no NFL snaps | Confirmed — draft slot present, Jets rosters 2024-2025, zero NFL stat rows |
 | Ward: 3 transfers to the #1 pick | Confirmed — but his FCS years are under-covered (no 2020, 47 attempts in 2021), and he's absent from recruiting entirely |
 | Chambliss: Ferris State → Ole Miss | Confirmed with a hole — the 2024 D2 championship season is a missing row masquerading as a "gap" |
 | Burrow: redshirt then transfer to #1 pick | Confirmed and **over-flagged** — two redshirt-shaped seasons for one real redshirt |
 | Nelson: USC redshirt then 3 transfers | Transfers confirmed (4 teams); the redshirt is 3 attempts of invisible |
 
-Three things I'd carry out of this post into the pipeline:
+Three things I'd carry out of this post into the pipeline — two of which
+landed (decision 0024) between drafting and freezing this post:
 
 1. **Redshirt flags need a usage-based definition** (attempts/games
    thresholds), not stat presence — Marchiol, Nelson, and Burrow between them
-   show every failure mode.
-2. **`(playerId, season, team)` uniqueness in `roster` needs a contract** —
-   the Travis 2021 duplicate is real and downstream.
-3. **`class_year` is contaminated with season values** and the fifth-year
-   flag built on it is untrustworthy until cleaned and contracted.
+   show every failure mode. *Still open.*
+2. **`(playerId, season, team)` uniqueness in `roster` needed a contract** —
+   done; the key now includes team, so the Travis 2021 two-teams-in-one-season
+   shape stays legal while exact duplicates would block the build. (The two
+   2021 rows themselves are a CFBD artifact and remain — the contract guards
+   future corruption, it doesn't adjudicate history.)
+3. **`class_year` was contaminated with season values** — done; coerced to NA
+   and contracted (decision 0024), with the fifth-year flag semantics
+   documented above.
 
 The database passed most of my expectations, which is almost the least
 interesting result. The interesting results are the three ways it is
