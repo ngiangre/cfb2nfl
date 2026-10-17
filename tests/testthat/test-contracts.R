@@ -333,6 +333,7 @@ test_that("contract_roster guards key uniqueness and class_year range", {
     playerId = c("1", "1", "2"),
     season = c(2021L, 2021L, 2021L),
     team = c("Florida State", "Louisville", "USC"),
+    height = c(74L, 74L, NA_integer_),
     weight = c(210L, 210L, NA_integer_),
     class_year = c(4L, 4L, NA_integer_)
   )
@@ -392,5 +393,30 @@ test_that("contract_recruit_link asserts the name guard leaves no HS values", {
   bad <- good |> dplyr::mutate(hs_stars = c(4L, 3L))
   expect_false(pointblank::all_passed(
     contract_recruit_link(bad, player_season, stop_on_fail = FALSE)
+  ))
+})
+
+test_that("contract_player_season_stats passes a valid wide table and flags violations", {
+  skip_if_not_installed("pointblank")
+  good <- tibble::tibble(
+    playerId = c("1", "2"),
+    player = c("A", "B"),
+    season = c(2015L, 2015L),
+    team = c("Alpha", "Alpha"),
+    conference = c("SEC", "SEC"),
+    position = c("QB", "RB"),
+    passing_completions = c(300, NA),
+    rushing_yds = c(0, 500)
+  )
+  expect_true(pointblank::all_passed(
+    contract_player_season_stats(good, stop_on_fail = FALSE)
+  ))
+  bad_dup <- good |> dplyr::add_row(good[1, ])
+  expect_false(pointblank::all_passed(
+    contract_player_season_stats(bad_dup, stop_on_fail = FALSE)
+  ))
+  bad_inf <- good |> dplyr::mutate(rushing_yds = c(0, Inf))
+  expect_false(pointblank::all_passed(
+    contract_player_season_stats(bad_inf, stop_on_fail = FALSE)
   ))
 })

@@ -28,19 +28,19 @@ columns:
     provenance: raw (seasons_year)
   - name: srs
     type: double
-    description: Simple Rating System.
+    description: Team-season Simple Rating System (points above/below average, where 0 is average; typically roughly -25 to +30).
     provenance: raw (seasons_srs)
   - name: sp_overall
     type: double
-    description: SP+ overall rating.
+    description: Team-season SP+ overall rating (points per game vs average, typically roughly -25 to +30).
     provenance: raw (seasons_spOverall)
   - name: sp_offense
     type: double
-    description: SP+ offense rating.
+    description: Team-season SP+ offense rating (same scale as sp_overall).
     provenance: raw (seasons_spOffense)
   - name: sp_defense
     type: double
-    description: SP+ defense rating.
+    description: Team-season SP+ defense rating (same scale as sp_overall; sign convention follows the feed).
     provenance: raw (seasons_spDefense)
   - name: games
     type: int32

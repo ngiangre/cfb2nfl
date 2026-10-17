@@ -1,0 +1,140 @@
+dataset: nfl_pick_link
+source: derived in-pipeline (link_nfl_draft from picks + nfl_draft_picks)
+grain: one row per NFL draft pick (CFBD side)
+key: (year, round, overall) — the CFBD draft slot
+description: >
+  The name-guarded bridge between CFBD picks and nflverse NFL data (decision
+  0014, materialized into the DuckDB bundle per decision 0027). CFBD
+  `nflAthleteId` shares nothing with nflverse ids, so picks are bridged by
+  draft slot — `(year, round, overall)` == `(season, round, pick)` — and the
+  match is then NAME-GUARDED: when the CFBD and nflverse/PFR player names
+  disagree at the same slot, the nflverse id and downstream columns are nulled
+  rather than guessed. Use `gsis_id` (NOT `nflAthleteId`) to continue into
+  `nfl_rosters`/`nfl_player_stats`. This is an OUTCOME/LABEL table — keep it
+  off the model input path (leakage). NFL outcome columns are RIGHT-CENSORED
+  for recent classes still active; treat longevity as a ">=" outcome.
+columns:
+  - name: collegeAthleteId
+    type: int32
+    description: Raw CFBD college athlete id (int); not unique before ~2004 and recycled over long spans (decision 0022) — use `playerId` for joins.
+    provenance: raw (picks)
+  - name: nflAthleteId
+    type: int32
+    description: CFBD's own NFL id; NOT joinable to nflverse (decision 0014). Display/QA only.
+    provenance: raw (picks)
+  - name: collegeId
+    type: int32
+    description: CFBD team id of the player's college.
+    provenance: raw (picks)
+  - name: collegeTeam
+    type: string
+    description: College name as reported by CFBD.
+    provenance: raw (picks)
+  - name: collegeConference
+    type: string
+    description: College conference at draft time (display only — tiers are season-aware, use conference_tiers).
+    provenance: raw (picks)
+  - name: nflTeamId
+    type: int32
+    description: CFBD NFL team id.
+    provenance: raw (picks)
+  - name: nflTeam
+    type: string
+    description: NFL team that drafted the player.
+    provenance: raw (picks)
+  - name: year
+    type: int32
+    description: NFL draft year; joins nfl_draft_picks.season.
+    provenance: raw (picks)
+  - name: overall
+    type: int32
+    description: Overall draft slot (1–262ish); the bridge key with year+round.
+    provenance: raw (picks)
+  - name: round
+    type: int32
+    description: Draft round (1–7).
+    provenance: raw (picks)
+  - name: pick
+    type: int32
+    description: Pick number within the round; the bridge key with year+overall.
+    provenance: raw (picks)
+  - name: name
+    type: string
+    description: Player name as reported by CFBD (display only — do not join on name).
+    provenance: raw (picks)
+  - name: position
+    type: string
+    description: Position at draft time.
+    provenance: raw (picks)
+  - name: height
+    type: string
+    description: Height as reported by CFBD (display only).
+    provenance: raw (picks)
+  - name: weight
+    type: string
+    description: Weight (lbs) as reported by CFBD (display only).
+    provenance: raw (picks)
+  - name: preDraftRanking
+    type: int32
+    description: CFBD pre-draft overall ranking (1 = top prospect); NA when unranked.
+    provenance: raw (picks)
+  - name: preDraftPositionRanking
+    type: int32
+    description: CFBD pre-draft ranking within position.
+    provenance: raw (picks)
+  - name: preDraftGrade
+    type: int32
+    description: CFBD pre-draft grade (scout-style 0-100 scale).
+    provenance: raw (picks)
+  - name: hometownInfo_city
+    type: string
+    description: Hometown city.
+    provenance: raw (picks)
+  - name: hometownInfo_state
+    type: string
+    description: Hometown state/province.
+    provenance: raw (picks)
+  - name: hometownInfo_country
+    type: string
+    description: Hometown country.
+    provenance: raw (picks)
+  - name: hometownInfo_latitude
+    type: int32
+    description: Hometown latitude (decimal degrees).
+    provenance: raw (picks)
+  - name: hometownInfo_longitude
+    type: int32
+    description: Hometown longitude (decimal degrees).
+    provenance: raw (picks)
+  - name: hometownInfo_countyFips
+    type: string
+    description: Hometown county FIPS code (US counties; zero-padded string semantics).
+    provenance: raw (picks)
+  - name: playerId
+    type: string
+    description: CFBD athlete id as a string — the shared college-athlete namespace (joins player_stats/roster).
+    provenance: derived (clean_picks)
+  - name: drafted
+    type: logical
+    description: Always TRUE in this table (every row is a draft pick).
+    provenance: derived (clean_picks)
+  - name: gsis_id
+    type: string
+    description: nflverse id, NULL when the slot match failed the name guard — the key into nfl_rosters/nfl_player_stats when present.
+    provenance: derived (link_nfl_draft)
+  - name: pfr_player_id
+    type: string
+    description: Pro-Football-Reference player id, name-guarded like gsis_id.
+    provenance: derived (link_nfl_draft)
+  - name: nfl_to
+    type: int32
+    description: PFR "to" — last season the player appeared in the NFL (right-censored for active players).
+    provenance: derived (link_nfl_draft)
+  - name: nfl_games
+    type: int32
+    description: PFR career NFL games played (right-censored for active players).
+    provenance: derived (link_nfl_draft)
+  - name: nfl_seasons_started
+    type: int32
+    description: PFR seasons as a starter.
+    provenance: derived (link_nfl_draft)

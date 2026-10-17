@@ -181,3 +181,18 @@ update_schema_history <- function(audit_log, path) {
   utils::write.csv(history, path, row.names = FALSE, na = "")
   invisible(history)
 }
+
+#' Slim the audit log for the DuckDB bundle
+#'
+#' Drops the per-column NA profile (a nested list column DuckDB users don't
+#' need) so the lineage log can be bundled as a flat SQL-queryable table
+#' (decision 0027). Keeps everything else: rows in/out, deltas, key coverage,
+#' schema hash, contract outcome, timestamp, git SHA.
+#'
+#' @param audit_log The `audit_log` target (rows from [audit_step()]).
+#'
+#' @return A tibble, one row per audited step.
+#' @export
+slim_audit_log <- function(audit_log) {
+  dplyr::select(audit_log, -dplyr::any_of("na_by_col"))
+}

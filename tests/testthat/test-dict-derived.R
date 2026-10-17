@@ -95,3 +95,48 @@ test_that("ps_change dict matches add_change_features() output schema", {
   )
   check_dict("ps_change", add_change_features(ps_draft))
 })
+
+test_that("player_season_stats dict matches build_player_season_stats() output schema", {
+  skip_if_not_installed("yaml")
+  # The wide table's stat columns are dynamic (one per observed (category,
+  # statType) pair), so the dict documents them with a <category>_<statType>
+  # placeholder: check the identity columns exactly, and the pattern for the rest.
+  dict_dir <- system.file("dict", package = "cfbstats")
+  skip_if(identical(dict_dir, ""), "installed dict/ not found")
+  dict <- yaml::read_yaml(file.path(dict_dir, "player_season_stats.yml"))
+  documented <- vapply(dict$columns, function(col) col$name, character(1))
+  identity <- documented[documented != "<category>_<statType>"]
+
+  player_stats <- tibble::tibble(
+    playerId = c("1", "1", "2"),
+    player = "Test Player",
+    season = c(2015L, 2015L, 2015L),
+    team = "Alpha",
+    conference = "SEC",
+    position = "QB",
+    category = c("passing", "rushing", "rushing"),
+    statType = c("COMPLETIONS", "YDS", "TD"),
+    stat = c("300", "500", "8")
+  )
+  wide <- build_player_season_stats(player_stats)
+  expect_setequal(
+    identity,
+    c("playerId", "player", "season", "team", "conference", "position")
+  )
+  expect_setequal(
+    setdiff(names(wide), identity),
+    c("passing_completions", "rushing_yds", "rushing_td")
+  )
+  expect_equal(
+    vapply(wide[identity], typeof, character(1)),
+    c(
+      playerId = "character",
+      player = "character",
+      season = "integer",
+      team = "character",
+      conference = "character",
+      position = "character"
+    )
+  )
+  expect_equal(typeof(wide$passing_completions), "double")
+})
