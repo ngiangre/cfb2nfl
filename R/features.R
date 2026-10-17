@@ -63,7 +63,7 @@ career_summary <- function(roster, max_span = 7L) {
     dplyr::mutate(
       gap_seasons = .data$last_season - .data$first_season + 1L - .data$seasons,
       transfers = .data$teams - 1L,
-      .after = .data$teams
+      .after = "teams"
     )
 }
 
