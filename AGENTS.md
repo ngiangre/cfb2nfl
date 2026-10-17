@@ -105,6 +105,12 @@ wrapper (`CFBSTATS_REFRESH=true` + `tar_make()`). Years 2010–2026.
 - **Plans:** multi-session work plans live in `plans/*.md` (e.g.
   `plans/explore-questions.md` — the question-driven Explore revision).
   `decisions/` is for ratified choices only.
+- **Blog style (decision 0025):** posts are written in a research-article
+  register — numbered Introduction / Data / Results / Summary / Discussion,
+  italicized gerund-phrased expectations, no em dashes anywhere, no
+  rhetorical framing phrases, and no pipeline internals (decision records,
+  cleaning mechanics) in the narrative. Reference implementation:
+  `vignettes/2026-10-16-expectation-checks.qmd`.
 - **Decision log:** record substantive decisions in `decisions/` (copy
   `TEMPLATE.md`, next number); distill spike-branch findings into an entry.
   Decisions 0004–0006 cover `targets`, the lineage/audit layer, and the site.
