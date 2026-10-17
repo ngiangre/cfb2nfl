@@ -4,11 +4,14 @@
 \alias{career_summary}
 \title{Summarize each player's college career from the roster backbone}
 \usage{
-career_summary(roster)
+career_summary(roster, max_span = 7L)
 }
 \arguments{
 \item{roster}{Cleaned roster from \code{\link[=clean_roster]{clean_roster()}} with \code{playerId}, \code{season},
 \code{team}.}
+
+\item{max_span}{Maximum plausible career span in seasons (see
+\code{\link[=reused_ids]{reused_ids()}}).}
 }
 \value{
 One row per \code{playerId} with \code{seasons}, \code{first_season},
@@ -20,4 +23,8 @@ one row per player: seasons on a roster, first/last season, gap seasons
 (years absent between first and last — an injury- or redshirt-shaped gap),
 and transfer count (distinct teams minus one). Built on the \strong{roster}
 backbone so it includes no-stat seasons, unlike \code{player_stats}.
+}
+\details{
+Ids whose roster span exceeds \code{max_span} are excluded: a span that long is
+CFBD id reuse across distinct individuals, not one career (decision 0022).
 }

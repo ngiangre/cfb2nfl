@@ -4,6 +4,29 @@ First tracked release of the project scaffolding. The repo now carries the full
 ingest → clean → link → features → model → report pipeline, its lineage/audit
 layer, and the documentation site, all under version control.
 
+- The audit log is now interpretable and enforced. `audit_step()` records
+  **join coverage** (`pct_keys_matched`, `keys_dropped` — distinct key
+  combinations from the input that vanish, separating filtering from join
+  fan-out), **per-column NA accounting** (`n_cols_with_na` plus a `na_by_col`
+  profile attributing sparsity to columns), and a **schema history**:
+  `update_schema_history()` appends each run's per-step hashes to
+  `data/audit_history.csv`, carried across refreshes as a `data-latest` release
+  asset, so `schema_hash` drift between refreshes is detectable. The Data &
+  provenance page renders the new columns and the history. Data contracts now
+  **block the build**: a new `contract_gate` target aborts `tar_make()` when
+  any `ok_*` check fails, so failing data never publishes ([decision 0023](
+  https://github.com/ngiangre/cfbstats/blob/main/decisions/0023-contract-gate-blocks-build.md)).
+  New contracts cover every model-path link/features step (coach link fan-out,
+  tier link, reused-id filter, change features, roster weight, recruiting
+  link, player-season uniqueness), and the audit's key declarations were
+  corrected (`clean_picks` keys on the draft slot; mid-season transfers are
+  distinct rows at `(playerId, season, team)`). CFBD athlete-id reuse is
+  handled explicitly ([decision 0022](
+  https://github.com/ngiangre/cfbstats/blob/main/decisions/0022-cfbd-athlete-id-reuse.md)):
+  `reused_ids()` flags ids spanning implausible career windows (> 7 seasons),
+  `career_summary(max_span = 7L)` drops them, and a `ps_pop` target filters the
+  model population.
+
 - The Data & provenance page now embeds the entity-relationship diagram as a
   pre-rendered image (`vignettes/images/erd.png`) instead of a raw mermaid
   block, so it renders identically without client-side mermaid. The diagram's

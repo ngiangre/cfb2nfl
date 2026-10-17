@@ -63,6 +63,17 @@ test_that("career_summary handles duplicate player-season rows", {
   expect_equal(out$transfers, 0L)
 })
 
+test_that("reused_ids flags spans beyond a plausible career and career_summary drops them", {
+  roster <- tibble::tibble(
+    playerId = c("1", "1", "2"),
+    season = c(2010L, 2020L, 2020L),
+    team = c("Cal", "Cal", "IU")
+  )
+  expect_equal(reused_ids(roster), "1")
+  out <- career_summary(roster)
+  expect_equal(out$playerId, "2")
+})
+
 test_that("add_roster_weight attaches roster weight by player-season", {
   ps <- tibble::tibble(
     playerId = c("1", "1", "2"),

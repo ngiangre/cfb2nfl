@@ -17,6 +17,8 @@ Standardizes roster physicals to the athlete-id key. Column names may vary by
 CFBD version; this selects defensively via \code{\link[dplyr:any_of]{dplyr::any_of()}}.
 }
 \details{
-A listed \code{weight} of \code{0} is an impossible value used as a missing-data
-placeholder in \verb{/roster}, so it is coerced to \code{NA} (decision 0009 Outcome).
+A listed \code{weight} outside the plausible 100-500 lb range is an impossible
+value — \code{0} is a missing-data placeholder in \verb{/roster}, and other out-of-range
+entries (e.g. \code{23}) are data-entry errors — so all are coerced to \code{NA}
+(decision 0009 Outcome; matches the roster contract's 100-500 lb range).
 }

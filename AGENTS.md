@@ -23,7 +23,7 @@ wrapper (`CFBSTATS_REFRESH=true` + `tar_make()`). Years 2010–2026.
 
 | File | Grain | Key / notes |
 |------|-------|-------------|
-| `data/picks.parquet` | one drafted player | `collegeAthleteId` (int); position, height, weight, pre-draft ranking, hometown |
+| `data/picks.parquet` | one NFL draft pick | key `(year, round, pick)`; `collegeAthleteId` (int) is **not** unique (id reuse, decision 0022) and is absent before ~2004; position, height, weight, pre-draft ranking, hometown |
 | `data/player_stats.parquet` | **long**: player-season-stat | `playerId` (string); pivot `category`/`statType`/`stat` |
 | `data/coaches.parquet` | one head-coach-season | head coaches only |
 | `data/roster.parquet` | one player-season on a roster | `id`→`playerId` (string) + `season`; physicals/position/hometown. Weight is **static** per player (decision 0009) |
@@ -59,8 +59,15 @@ wrapper (`CFBSTATS_REFRESH=true` + `tar_make()`). Years 2010–2026.
   seasons chronologically by athlete id. **No between-season `weight_delta`:**
   CFBD `/roster` reports a *static* weight per player (0 of 64,350 multi-season
   players vary), so only the static `weight` is attached (decision 0009).
-  `clean_roster` coerces a placeholder `weight` of `0` to `NA`; the roster
-  contract enforces a 100–500 lb range (decision 0009).
+  `clean_roster` coerces any `weight` outside the plausible 100–500 lb range
+  to `NA` (0 placeholder + data-entry errors like 23 lb); the roster contract
+  enforces the same range (decision 0009).
+- **CFBD athlete ids are recycled across individuals over long spans**
+  (decision 0022): ~131 roster ids (0.1%) have a first-to-last-season span
+  > 7 — one id, one name, two-plus real people. `reused_ids()` flags them;
+  `career_summary(max_span = 7L)` and the `ps_pop` target exclude them from
+  the career/model populations. The id remains a stable key within a
+  plausible career window.
 - **Conference tiers are season-aware** (Pac-12 collapse, Big East → AAC, WAC
   dropping FBS football); use the lookup, don't hard-code. Built in-pipeline by
   `build_conference_tiers(player_stats)` (decision 0017) — a pure function of the
@@ -92,7 +99,9 @@ wrapper (`CFBSTATS_REFRESH=true` + `tar_make()`). Years 2010–2026.
   the draft class it predicts. Guard against leakage.
 - **Contracts + TDD:** test logic (`testthat`) and data (`pointblank`: expected
   coverage, schema stability, value ranges, no silent join loss); run in the
-  pipeline, fail fast. Add/update a contract with any data-touching code.
+  pipeline, fail fast — enforced by the `contract_gate` target (decision 0023):
+  any `ok_* = FALSE` aborts `tar_make()`. Add/update a contract with any
+  data-touching code.
 - **Plans:** multi-session work plans live in `plans/*.md` (e.g.
   `plans/explore-questions.md` — the question-driven Explore revision).
   `decisions/` is for ratified choices only.

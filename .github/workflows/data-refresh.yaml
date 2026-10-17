@@ -33,6 +33,22 @@ jobs:
             any::piggyback
             any::duckdb
 
+      # Carry the schema history across refreshes: CI checkouts start empty,
+      # so the prior history must come from the last published release asset.
+      - name: Download prior schema history
+        run: |
+          Rscript -e '
+            try(
+              piggyback::pb_download(
+                "audit_history.csv",
+                repo = Sys.getenv("GITHUB_REPOSITORY"),
+                tag = "data-latest",
+                dest = "data"
+              ),
+              silent = TRUE
+            )
+          '
+
       # One pass: ingest (incl. conference_tiers) -> process -> write every raw
       # parquet and the DuckDB bundle, all as targets (decision 0017).
       - name: Ingest, process, and bundle all data
@@ -48,4 +64,8 @@ jobs:
             if (!"data-latest" %in% tags) piggyback::pb_release_create(repo, tag = "data-latest")
             # Publish the parquet tables and the bundled DuckDB file (decision 0016).
             piggyback::pb_upload(list.files("data", pattern = "\\.(parquet|duckdb)$", full.names = TRUE), repo = repo, tag = "data-latest")
+            # Append-only history of per-step schema hashes for drift detection.
+            if (file.exists("data/audit_history.csv")) {
+              piggyback::pb_upload("data/audit_history.csv", repo = repo, tag = "data-latest")
+            }
           '

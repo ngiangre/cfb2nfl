@@ -74,13 +74,15 @@ test_that("clean_roster keys on a string playerId", {
   expect_true("weight" %in% names(out))
 })
 
-test_that("clean_roster coerces a placeholder weight of 0 to NA", {
+test_that("clean_roster coerces out-of-range placeholder weights to NA", {
   raw <- tibble::tibble(
-    id = c(1L, 2L),
-    season = c(2019L, 2019L),
-    weight = c(0L, 240L)
+    id = c(1L, 2L, 3L),
+    season = c(2019L, 2019L, 2019L),
+    # 0 is the /roster placeholder; 23 is a data-entry error (decision 0009)
+    weight = c(0L, 240L, 23L)
   )
   out <- clean_roster(raw)
   expect_true(is.na(out$weight[out$playerId == "1"]))
   expect_equal(out$weight[out$playerId == "2"], 240L)
+  expect_true(is.na(out$weight[out$playerId == "3"]))
 })

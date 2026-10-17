@@ -23,16 +23,20 @@ audit_step(
 
 \item{input}{Optional input data frame, to compute deltas.}
 
-\item{keys}{Optional character vector of key columns to summarize coverage on.}
+\item{keys}{Optional character vector of key columns to summarize coverage
+on. When present in both \code{input} and \code{output}, \code{pct_keys_matched} and
+\code{keys_dropped} are computed; otherwise they are \code{NA}.}
 
 \item{contract_passed}{Optional logical: did the step's data contract pass?}
 }
 \value{
-A one-row tibble of audit fields.
+A one-row tibble of audit fields. \code{na_by_col} is a list column
+holding a per-column NA profile (\code{col}, \code{n_na}, \code{na_rate}) for columns
+with at least one NA, sorted by NA count descending.
 }
 \description{
 Captures a uniform lineage record (decision 0005): input/output row & column
-counts, rows dropped, key coverage, total NA cells, a schema hash, the
-governing contract's pass/fail, timestamp, and git SHA. Row-bind the records
-from every step into the pipeline's audit target.
+counts, rows dropped, key coverage, join coverage, total and per-column NA
+cells, a schema hash, the governing contract's pass/fail, timestamp, and git
+SHA. Row-bind the records from every step into the pipeline's audit target.
 }
