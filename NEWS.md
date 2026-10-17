@@ -4,6 +4,14 @@ First tracked release of the project scaffolding. The repo now carries the full
 ingest → clean → link → features → model → report pipeline, its lineage/audit
 layer, and the documentation site, all under version control.
 
+- New `app.R`: a Shiny app powered by
+  [querychat](https://posit-dev.github.io/querychat/) for natural-language
+  querying of the DuckDB bundle. All tables (plus the `player_season_inputs`
+  view) are registered for cross-table SQL joins, the `inst/dict/*.yml` data
+  dictionaries and the join-key rules from `inst/data-model.md` are provided as
+  LLM context, and an explicit greeting avoids the single-table auto-greeting
+  pitfall.
+
 - The DuckDB bundle now carries a wide `player_season_stats` table (one row per
   player-season-team, one numeric column per `(category, statType)` pair) so
   SQL users no longer pivot the 1.5M-row long `player_stats` by hand
