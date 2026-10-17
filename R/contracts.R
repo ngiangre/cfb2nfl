@@ -18,6 +18,33 @@ enforce_contract <- function(agent, label, stop_on_fail) {
   invisible(agent)
 }
 
+#' Enforce contract results in the pipeline
+#'
+#' Stops the build when any contract's pass/fail record is `FALSE` (decision
+#' 0023): the `ok_*` targets record per-table outcomes for the audit log, and
+#' this gate is the enforcement point that makes a failing contract block
+#' `tar_make()`. Steps without a contract (`NA`) are not failures — they are
+#' tracked separately in audit-hygiene workstream C.
+#'
+#' @param results A named list or vector of contract outcomes (`TRUE`/`FALSE`/
+#'   `NA`), e.g. `list(picks = ok_picks, roster = ok_roster)`.
+#'
+#' @return `TRUE` invisibly when every non-`NA` result passed.
+#' @export
+assert_contracts_pass <- function(results) {
+  failed <- names(results)[!is.na(results) & !unlist(results)]
+  if (length(failed) > 0) {
+    cli::cli_abort(
+      c(
+        "{length(failed)} data contract{?s} failed: {.val {failed}}.",
+        "i" = "Inspect the audit log and the failing contracts before rebuilding."
+      ),
+      call = rlang::caller_env()
+    )
+  }
+  invisible(TRUE)
+}
+
 #' Data contract for cleaned picks
 #'
 #' @param picks Cleaned picks (see [clean_picks()]).
@@ -49,8 +76,35 @@ contract_picks <- function(picks, stop_on_fail = TRUE) {
     )) |>
     pointblank::col_vals_between("year", 1936, 2027) |>
     pointblank::col_vals_between("round", 1, 30, na_pass = TRUE) |>
+    # Grain: one draft pick, keyed by slot (year, round, pick). `collegeAthleteId`
+    # is NOT unique — CFBD recycles ids across people (decision 0022), even
+    # within a draft year (two different Derrick Johnsons at Texas in 2005
+    # share one id) — so the slot, not the id, is the asserted key.
+    pointblank::rows_distinct(pointblank::vars(year, round, pick)) |>
     pointblank::interrogate()
   enforce_contract(agent, "picks", stop_on_fail)
+}
+
+#' Data contract for the player-season backbone
+#'
+#' Asserts the grain of [build_player_season()]: one row per
+#' `(playerId, season, team)` — a player who switched schools mid-season
+#' legitimately has two rows for one season — with non-null keys.
+#'
+#' @param player_season Player-season backbone (see [build_player_season()]).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_player_season <- function(player_season, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  agent <- pointblank::create_agent(player_season, label = "player_season") |>
+    pointblank::col_exists(c("playerId", "season", "team")) |>
+    pointblank::col_vals_not_null(pointblank::vars(playerId, season, team)) |>
+    pointblank::rows_distinct(pointblank::vars(playerId, season, team)) |>
+    # Seasons stay inside the data window.
+    pointblank::col_vals_between("season", 2010, 2026) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "player_season", stop_on_fail)
 }
 
 #' Data contract for cleaned long player stats
@@ -198,6 +252,281 @@ contract_drafted <- function(ps_draft, ps_pre, stop_on_fail = TRUE) {
     ) |>
     pointblank::interrogate()
   enforce_contract(agent, "drafted", stop_on_fail)
+}
+
+#' Data contract for the coach link
+#'
+#' Asserts the sanctioned fan-out of [link_coaches()]: every
+#' `(playerId, season, team)` key from the backbone appears exactly once when
+#' its school-season has no recorded head coach, else once per recorded coach —
+#' so the row count is pinned to the coaches table, not merely "bigger."
+#'
+#' @param ps_coach Player-seasons with coach context (see [link_coaches()]).
+#' @param player_season Player-season backbone (see [build_player_season()]).
+#' @param coaches Cleaned coaches (see [clean_coaches()]).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_coach_link <- function(
+  ps_coach,
+  player_season,
+  coaches,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  expected <- player_season |>
+    dplyr::count(.data$team, .data$season, name = "n_keys") |>
+    dplyr::left_join(
+      dplyr::count(coaches, school, season, name = "n_coaches"),
+      by = c("team" = "school", "season")
+    ) |>
+    dplyr::mutate(n_coaches = dplyr::coalesce(.data$n_coaches, 0L)) |>
+    dplyr::summarise(
+      expected = sum(.data$n_keys * pmax(1L, .data$n_coaches))
+    ) |>
+    dplyr::pull(.data$expected)
+  agent <- pointblank::create_agent(ps_coach, label = "coach_link") |>
+    pointblank::col_exists(c(
+      "coach_id",
+      "coach_name",
+      "games",
+      "wins",
+      "losses",
+      "srs",
+      "sp_overall",
+      "sp_defense"
+    )) |>
+    pointblank::col_vals_not_null(
+      pointblank::vars(playerId, season, team)
+    ) |>
+    pointblank::col_vals_equal("n", expected, preconditions = function(x) {
+      dplyr::mutate(x, n = nrow(x))
+    }) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "coach_link", stop_on_fail)
+}
+
+#' Data contract for the tier link
+#'
+#' Asserts [link_tiers()] preserved the backbone row count and attached a
+#' valid season-aware tier to every row (coverage of the lookup itself is
+#' guaranteed by [contract_conference_tiers()]).
+#'
+#' @param ps_tier Player-seasons with tiers (see [link_tiers()]).
+#' @param ps_coach Player-seasons with coach context (see [link_coaches()]).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_tier_link <- function(ps_tier, ps_coach, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  agent <- pointblank::create_agent(ps_tier, label = "tier_link") |>
+    pointblank::col_exists(c("tier", "tier_label")) |>
+    pointblank::col_vals_not_null(pointblank::vars(tier, tier_label)) |>
+    pointblank::col_vals_between("tier", 1, 3) |>
+    pointblank::col_vals_in_set(
+      pointblank::vars(tier_label),
+      c("Power", "Group of 5", "FCS and below")
+    ) |>
+    pointblank::col_vals_equal(
+      "n",
+      nrow(ps_coach),
+      preconditions = function(x) {
+        dplyr::mutate(x, n = nrow(x))
+      }
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "tier_link", stop_on_fail)
+}
+
+#' Data contract for the reused-id filter
+#'
+#' Asserts the model population ([reused_ids()], decision 0022) is exactly the
+#' drafted link minus rows whose `playerId` is a reused id — the filter drops
+#' rows, never adds or mutates them.
+#'
+#' @param ps_pop Filtered model population (the `ps_pop` target).
+#' @param ps_draft Player-seasons with draft flags (see [link_drafted()]).
+#' @param reused Character vector of reused ids (see [reused_ids()]).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_reused_filter <- function(
+  ps_pop,
+  ps_draft,
+  reused,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  expected <- sum(!ps_draft$playerId %in% reused)
+  agent <- pointblank::create_agent(ps_pop, label = "reused_filter") |>
+    pointblank::col_vals_not_null(
+      pointblank::vars(playerId, season, team)
+    ) |>
+    pointblank::col_vals_expr(
+      rlang::expr(!.data$reused_flag),
+      preconditions = function(x) {
+        dplyr::mutate(x, reused_flag = .data$playerId %in% reused)
+      }
+    ) |>
+    pointblank::col_vals_equal("n", expected, preconditions = function(x) {
+      dplyr::mutate(x, n = nrow(x))
+    }) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "reused_filter", stop_on_fail)
+}
+
+#' Data contract for change features
+#'
+#' Asserts [add_change_features()] is row-preserving and that the lag-derived
+#' flags equal their definitions (no drift between formula and data):
+#' `transferred` / `hc_changed` compare the previous observed season, and
+#' `followed_coach` combines both. `hc_changed` / `followed_coach` may be `NA`
+#' when a coach record is missing on either side (the comparison is then
+#' unknowable, not FALSE) — the contract compares both sides `NA`-coalesced
+#' to `FALSE` so the flag always agrees with its definition.
+#'
+#' @param ps_change Player-seasons with change features
+#'   (see [add_change_features()]).
+#' @param ps_pop Model population (the `ps_pop` target).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_change_features <- function(ps_change, ps_pop, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  agent <- pointblank::create_agent(ps_change, label = "change_features") |>
+    pointblank::col_exists(c(
+      "prev_team",
+      "prev_tier",
+      "prev_coach_id",
+      "transferred",
+      "transfer_direction",
+      "hc_changed",
+      "followed_coach"
+    )) |>
+    pointblank::col_is_logical(
+      pointblank::vars(transferred, hc_changed, followed_coach)
+    ) |>
+    pointblank::col_vals_expr(
+      rlang::expr(
+        is.na(.data$transfer_direction) |
+          .data$transfer_direction %in% c("up", "down", "lateral")
+      )
+    ) |>
+    pointblank::col_vals_expr(
+      rlang::expr(
+        .data$transferred ==
+          (!is.na(.data$prev_team) &
+            .data$team != .data$prev_team)
+      )
+    ) |>
+    pointblank::col_vals_expr(
+      rlang::expr(
+        dplyr::coalesce(.data$hc_changed, FALSE) ==
+          dplyr::coalesce(
+            !is.na(.data$prev_coach_id) &
+              !is.na(.data$coach_id) &
+              (.data$coach_id != .data$prev_coach_id),
+            FALSE
+          )
+      )
+    ) |>
+    pointblank::col_vals_expr(
+      rlang::expr(
+        dplyr::coalesce(.data$followed_coach, FALSE) ==
+          dplyr::coalesce(
+            .data$transferred &
+              !is.na(.data$prev_coach_id) &
+              !is.na(.data$coach_id) &
+              (.data$coach_id == .data$prev_coach_id),
+            FALSE
+          )
+      )
+    ) |>
+    pointblank::col_vals_equal("n", nrow(ps_pop), preconditions = function(x) {
+      dplyr::mutate(x, n = nrow(x))
+    }) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "change_features", stop_on_fail)
+}
+
+#' Data contract for the roster-weight attachment
+#'
+#' Asserts [add_roster_weight()] is row-preserving and the attached static
+#' weight stays in the plausible 100-500 lb range (NA where the roster has no
+#' weight — ~19% of player-seasons, decision 0009).
+#'
+#' @param model_table Model table with weight (see [add_roster_weight()]).
+#' @param ps_change Player-seasons with change features
+#'   (see [add_change_features()]).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_roster_weight <- function(
+  model_table,
+  ps_change,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  agent <- pointblank::create_agent(model_table, label = "roster_weight") |>
+    pointblank::col_exists("weight") |>
+    pointblank::col_vals_between("weight", 100, 500, na_pass = TRUE) |>
+    pointblank::col_vals_equal(
+      "n",
+      nrow(ps_change),
+      preconditions = function(x) {
+        dplyr::mutate(x, n = nrow(x))
+      }
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "roster_weight", stop_on_fail)
+}
+
+#' Data contract for the recruiting link
+#'
+#' Asserts [link_recruiting()] is row-preserving, the HS rating columns stay
+#' in their documented ranges, and the name guard is honored: unmatched rows
+#' carry no HS values (matched rows may still lack `stars`/`rating` when the
+#' feed omits them).
+#'
+#' @param ps_recruit Player-seasons with HS recruiting ratings
+#'   (see [link_recruiting()]).
+#' @param player_season Player-season backbone (see [build_player_season()]).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_recruit_link <- function(
+  ps_recruit,
+  player_season,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  agent <- pointblank::create_agent(ps_recruit, label = "recruit_link") |>
+    pointblank::col_exists(c(
+      "recruit_matched",
+      "hs_stars",
+      "hs_rating",
+      "hs_national_rank",
+      "hs_class"
+    )) |>
+    pointblank::col_is_logical(pointblank::vars(recruit_matched)) |>
+    pointblank::col_vals_between("hs_stars", 0, 5, na_pass = TRUE) |>
+    pointblank::col_vals_between("hs_rating", 0, 1, na_pass = TRUE) |>
+    # Unmatched rows carry no HS values; matched rows may or may not.
+    pointblank::col_vals_expr(
+      rlang::expr(
+        .data$recruit_matched |
+          (is.na(.data$hs_stars) & is.na(.data$hs_rating))
+      )
+    ) |>
+    pointblank::col_vals_equal(
+      "n",
+      nrow(player_season),
+      preconditions = function(x) {
+        dplyr::mutate(x, n = nrow(x))
+      }
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "recruit_link", stop_on_fail)
 }
 
 #' Data contract for cleaned rosters

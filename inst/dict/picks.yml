@@ -1,7 +1,7 @@
 dataset: picks
 source: CFBD /draft/picks
-grain: one drafted player (NFL draft pick)
-key: collegeAthleteId (int) → playerId (string, coerced; decision 0003)
+grain: one NFL draft pick (draft slot)
+key: "(year, round, pick) — the pick slot. collegeAthleteId (int → string playerId, decision 0003) is the player join key but is NOT unique: CFBD recycles ids across people (decision 0022), even within one draft year, and ids are absent for most pre-2004 picks."
 description: >
   Historical NFL draft picks. The modeling outcome (drafted). Joins to player
   stats and roster on the shared athlete-id namespace once coerced to string.
@@ -10,7 +10,7 @@ description: >
 columns:
   - name: collegeAthleteId
     type: int32
-    description: CFBD college athlete id; the canonical player key (decision 0003).
+    description: CFBD college athlete id; the canonical player key (decision 0003). Not unique — id reuse (decision 0022) — and missing for most pre-2004 picks.
     provenance: raw
   - name: nflAthleteId
     type: int32

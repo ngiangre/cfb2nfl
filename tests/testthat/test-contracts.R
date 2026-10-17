@@ -151,3 +151,218 @@ test_that("contract_redshirt passes valid flags and catches violations", {
     contract_redshirt(bad, stop_on_fail = FALSE)
   ))
 })
+
+test_that("assert_contracts_pass stops listing failures and passes clean results", {
+  expect_true(assert_contracts_pass(list(picks = TRUE, roster = NA)))
+  expect_error(
+    assert_contracts_pass(list(picks = TRUE, roster = FALSE, tiers = NA)),
+    "roster"
+  )
+  expect_error(
+    assert_contracts_pass(list(roster = FALSE, career = FALSE)),
+    "2 data contracts failed"
+  )
+})
+
+test_that("contract_player_season asserts grain uniqueness at (playerId, season, team)", {
+  skip_if_not_installed("pointblank")
+  good <- tibble::tibble(
+    playerId = c("1", "1", "2"),
+    season = c(2013L, 2013L, 2013L),
+    team = c("IU", "Miami", "IU")
+  )
+  expect_true(pointblank::all_passed(
+    contract_player_season(good, stop_on_fail = FALSE)
+  ))
+  # A true duplicate at the grain fails.
+  bad <- good |> dplyr::add_row(playerId = "1", season = 2013L, team = "IU")
+  expect_false(pointblank::all_passed(
+    contract_player_season(bad, stop_on_fail = FALSE)
+  ))
+  # Out-of-window season fails.
+  bad_year <- good |> dplyr::mutate(season = 2009L)
+  expect_false(pointblank::all_passed(
+    contract_player_season(bad_year, stop_on_fail = FALSE)
+  ))
+})
+
+test_that("contract_picks keys on draft slot; id reuse is tolerated", {
+  skip_if_not_installed("pointblank")
+  make_picks <- function() {
+    tibble::tibble(
+      collegeAthleteId = c("1", "1", "2", NA_character_),
+      year = c(1978L, 2009L, 2015L, 2015L),
+      round = c(1L, 1L, 3L, 3L),
+      overall = c(12L, 26L, 90L, 91L),
+      pick = c(1L, 1L, 2L, 3L),
+      nflAthleteId = NA_character_,
+      collegeId = 1L,
+      collegeConference = "B1G",
+      nflTeamId = 1L,
+      nflTeam = "X",
+      name = c("a", "a", "b", "c"),
+      preDraftPositionRanking = NA_integer_,
+      preDraftGrade = NA_real_,
+      hometownInfo_city = NA_character_,
+      hometownInfo_country = "USA",
+      hometownInfo_latitude = NA_real_,
+      hometownInfo_longitude = NA_real_,
+      hometownInfo_countyFips = NA_character_
+    )
+  }
+  expect_true(pointblank::all_passed(
+    contract_picks(make_picks(), stop_on_fail = FALSE)
+  ))
+  # Even an id repeated within one draft year (real case: two Derrick
+  # Johnsons, Texas, 2005 — rounds 1 and 6) passes when the slot is unique.
+  same_year <- make_picks() |>
+    dplyr::mutate(
+      year = c(2005L, 2005L, 2015L, 2015L),
+      round = c(1L, 6L, 3L, 3L)
+    )
+  expect_true(pointblank::all_passed(
+    contract_picks(same_year, stop_on_fail = FALSE)
+  ))
+  # A duplicated slot fails.
+  bad_slot <- make_picks() |>
+    dplyr::mutate(year = 2015L, round = 3L, pick = 2L)
+  expect_false(pointblank::all_passed(
+    contract_picks(bad_slot, stop_on_fail = FALSE)
+  ))
+})
+
+test_that("contract_coach_link pins the sanctioned coach fan-out", {
+  skip_if_not_installed("pointblank")
+  backbone <- tibble::tibble(
+    playerId = c("1", "2", "3"),
+    season = c(2020L, 2020L, 2020L),
+    team = c("IU", "IU", "Miami")
+  )
+  coaches <- tibble::tibble(
+    school = c("IU", "IU", "Miami"),
+    season = c(2020L, 2020L, 2020L),
+    coach_id = c(10L, 11L, 20L)
+  )
+  # IU had 2 coaches in 2020 -> keys 1 and 2 fan out to 2 rows each.
+  ps <- tibble::tibble(
+    playerId = c("1", "1", "2", "2", "3"),
+    season = 2020L,
+    team = c("IU", "IU", "IU", "IU", "Miami"),
+    coach_id = c(10L, 11L, 10L, 11L, 20L),
+    coach_name = "x",
+    games = 12L,
+    wins = 6L,
+    losses = 6L,
+    srs = 1.0,
+    sp_overall = 1.0,
+    sp_defense = 1.0
+  )
+  expect_true(pointblank::all_passed(
+    contract_coach_link(ps, backbone, coaches, stop_on_fail = FALSE)
+  ))
+  # Dropping a fanned-out row breaks the pinned row count.
+  bad <- ps[-1, ]
+  expect_false(pointblank::all_passed(
+    contract_coach_link(bad, backbone, coaches, stop_on_fail = FALSE)
+  ))
+})
+
+test_that("contract_tier_link asserts tiers preserved rows and are valid", {
+  skip_if_not_installed("pointblank")
+  ps_coach <- tibble::tibble(playerId = "1", season = 2020L, team = "IU")
+  good <- ps_coach |> dplyr::mutate(tier = 3L, tier_label = "Power")
+  expect_true(pointblank::all_passed(
+    contract_tier_link(good, ps_coach, stop_on_fail = FALSE)
+  ))
+  bad <- good |> dplyr::mutate(tier = 4L)
+  expect_false(pointblank::all_passed(
+    contract_tier_link(bad, ps_coach, stop_on_fail = FALSE)
+  ))
+})
+
+test_that("contract_reused_filter pins rows dropped to the reused ids", {
+  skip_if_not_installed("pointblank")
+  ps_draft <- tibble::tibble(
+    playerId = c("1", "2"),
+    season = c(2020L, 2020L),
+    team = c("IU", "IU")
+  )
+  good <- ps_draft |> dplyr::filter(playerId == "2")
+  expect_true(pointblank::all_passed(
+    contract_reused_filter(good, ps_draft, "1", stop_on_fail = FALSE)
+  ))
+  bad <- good |> dplyr::add_row(playerId = "3", season = 2020L, team = "IU")
+  expect_false(pointblank::all_passed(
+    contract_reused_filter(bad, ps_draft, "1", stop_on_fail = FALSE)
+  ))
+})
+
+test_that("contract_change_features verifies flag definitions and row count", {
+  skip_if_not_installed("pointblank")
+  ps_pop <- tibble::tibble(
+    playerId = c("1", "1"),
+    season = c(2019L, 2020L),
+    team = c("IU", "Miami"),
+    coach_id = c(10L, 20L)
+  )
+  good <- ps_pop |>
+    dplyr::mutate(
+      prev_team = c(NA_character_, "IU"),
+      prev_tier = c(NA_real_, 3),
+      prev_coach_id = c(NA_real_, 10),
+      transferred = c(FALSE, TRUE),
+      transfer_direction = c(NA_character_, "up"),
+      hc_changed = c(NA, TRUE),
+      followed_coach = c(NA, FALSE)
+    )
+  expect_true(pointblank::all_passed(
+    contract_change_features(good, ps_pop, stop_on_fail = FALSE)
+  ))
+  # Inconsistent flag fails (transferred says TRUE but teams match).
+  bad <- good |> dplyr::mutate(team = c("IU", "IU"))
+  expect_false(pointblank::all_passed(
+    contract_change_features(bad, ps_pop, stop_on_fail = FALSE)
+  ))
+})
+
+test_that("contract_roster_weight asserts row preservation and range", {
+  skip_if_not_installed("pointblank")
+  ps_change <- tibble::tibble(
+    playerId = c("1", "2"),
+    season = 2020L,
+    team = "IU"
+  )
+  good <- ps_change |> dplyr::mutate(weight = c(210L, NA_integer_))
+  expect_true(pointblank::all_passed(
+    contract_roster_weight(good, ps_change, stop_on_fail = FALSE)
+  ))
+  bad <- good |> dplyr::mutate(weight = c(23L, NA_integer_))
+  expect_false(pointblank::all_passed(
+    contract_roster_weight(bad, ps_change, stop_on_fail = FALSE)
+  ))
+})
+
+test_that("contract_recruit_link asserts the name guard leaves no HS values", {
+  skip_if_not_installed("pointblank")
+  player_season <- tibble::tibble(
+    playerId = c("1", "2"),
+    season = 2020L,
+    team = "IU"
+  )
+  good <- player_season |>
+    dplyr::mutate(
+      recruit_matched = c(TRUE, FALSE),
+      hs_class = c(2019L, NA_integer_),
+      hs_stars = c(4L, NA_integer_),
+      hs_rating = c(0.9, NA_real_),
+      hs_national_rank = c(50L, NA_integer_)
+    )
+  expect_true(pointblank::all_passed(
+    contract_recruit_link(good, player_season, stop_on_fail = FALSE)
+  ))
+  # An unmatched row carrying HS values violates the name guard.
+  bad <- good |> dplyr::mutate(hs_stars = c(4L, 3L))
+  expect_false(pointblank::all_passed(
+    contract_recruit_link(bad, player_season, stop_on_fail = FALSE)
+  ))
+})

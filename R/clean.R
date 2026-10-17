@@ -112,8 +112,10 @@ clean_teams <- function(teams) {
 #' Standardizes roster physicals to the athlete-id key. Column names may vary by
 #' CFBD version; this selects defensively via [dplyr::any_of()].
 #'
-#' A listed `weight` of `0` is an impossible value used as a missing-data
-#' placeholder in `/roster`, so it is coerced to `NA` (decision 0009 Outcome).
+#' A listed `weight` outside the plausible 100-500 lb range is an impossible
+#' value — `0` is a missing-data placeholder in `/roster`, and other out-of-range
+#' entries (e.g. `23`) are data-entry errors — so all are coerced to `NA`
+#' (decision 0009 Outcome; matches the roster contract's 100-500 lb range).
 #'
 #' @param roster Raw roster tibble from [ingest_roster()].
 #'
@@ -140,7 +142,7 @@ clean_roster <- function(roster) {
       season = as.integer(.data$season),
       dplyr::across(
         dplyr::any_of("weight"),
-        \(w) dplyr::if_else(w == 0, NA_integer_, as.integer(w))
+        \(w) dplyr::if_else(w >= 100 & w <= 500, as.integer(w), NA_integer_)
       )
     )
 }

@@ -84,30 +84,59 @@ purrr::map_dfr(dict_files, function(f) {
 ## Provenance / audit log
 
 Every tracked pipeline step records a uniform row: input/output row and column
-counts, rows dropped, key coverage, NA cells, a schema hash, and the governing
-data contract's pass/fail (decision 0005). This is where **silent join loss and
+counts, key coverage, join coverage (`pct_keys_matched` / `keys_dropped`),
+total and per-column NA cells, a schema hash, and the governing data
+contract's pass/fail (decision 0005). This is where **silent join loss and
 schema drift become visible**.
+
+::: {.callout-note}
+## Column meanings
+
+- `step`, `stage` — the transform and its pipeline stage (ingest → clean → link → features → model → report).
+- `n_rows_in` / `n_rows_out` — rows entering and leaving the step (`NA` for the first step of a branch, which has no tracked input).
+- `rows_delta` — output rows minus input rows; negative means rows collapsed or filtered, positive means the join fanned out.
+- `keys_dropped` — distinct key combinations from the input that no longer appear in the output (`NA` when the step has no tracked input). `0` under a pure fan-out or column addition; positive means rows were filtered away, distinguishing filtering from fan-out.
+- `pct_keys_matched` — share of the input's distinct key combinations that survive into the output (join/filter coverage).
+- `n_cols_out` — columns in the step's output.
+- `n_keys_out` — number of distinct values across the step's declared key columns (key coverage).
+- `n_na_cells` — total missing cells in the output; the "top NA columns" column attributes them, since each added column raises this ceiling mechanically.
+- `n_cols_with_na` — how many output columns carry at least one missing value.
+- `contract_passed` — whether the step's data contract (pointblank validation) passed; `NA` means no contract governs the step.
+- `schema_hash` — 12-character digest of the output's column names and types; changes signal schema drift (see the history below).
+:::
 
 ```{r}
 #| label: audit-log
+tip <- function(label, title) {
+  htmltools::tags$span(label, title = title, style = "cursor: help;")
+}
 tar_read(audit_log) |>
-  select(
-    step,
-    stage,
-    n_rows_in,
-    n_rows_out,
-    rows_delta,
-    n_cols_out,
-    n_keys_out,
-    n_na_cells,
-    contract_passed,
-    schema_hash
-  ) |>
+  select(step, stage, n_rows_in, n_rows_out, rows_delta, keys_dropped,
+         pct_keys_matched, n_cols_out, n_keys_out, n_na_cells,
+         n_cols_with_na, na_by_col, contract_passed, schema_hash) |>
   reactable(
     striped = TRUE,
     defaultPageSize = 12,
     columns = list(
+      step = colDef(header = tip("step", "Transform name, e.g. link_coaches")),
+      stage = colDef(
+        header = tip(
+          "stage",
+          "Pipeline stage: ingest, clean, link, features, model, or report"
+        )
+      ),
+      n_rows_in = colDef(
+        header = tip(
+          "n_rows_in",
+          "Rows entering the step; NA when the step has no tracked input"
+        )
+      ),
+      n_rows_out = colDef(header = tip("n_rows_out", "Rows leaving the step")),
       rows_delta = colDef(
+        header = tip(
+          "rows_delta",
+          "Output rows minus input rows; negative = rows collapsed or filtered, positive = join fanned out"
+        ),
         style = function(value) {
           if (is.na(value)) {
             return(NULL)
@@ -121,16 +150,119 @@ tar_read(audit_log) |>
           }
         }
       ),
-      contract_passed = colDef(name = "contract")
+      keys_dropped = colDef(
+        header = tip(
+          "keys dropped",
+          "Distinct key combinations from the input absent from the output; 0 = pure fan-out/addition"
+        ),
+        style = function(value) {
+          if (isTRUE(value > 0)) list(color = "#b00020") else NULL
+        }
+      ),
+      pct_keys_matched = colDef(
+        header = tip(
+          "keys matched",
+          "Share of the input's distinct key combinations surviving into the output"
+        ),
+        format = colFormat(percent = TRUE, digits = 1)
+      ),
+      n_cols_out = colDef(header = tip("n_cols_out", "Columns in the output")),
+      n_keys_out = colDef(
+        header = tip(
+          "n_keys_out",
+          "Distinct values across the step's key columns (key coverage)"
+        )
+      ),
+      n_na_cells = colDef(
+        header = tip("n_na_cells", "Total missing cells in the output")
+      ),
+      n_cols_with_na = colDef(
+        header = tip(
+          "cols w/ NA",
+          "Output columns carrying at least one missing value"
+        )
+      ),
+      na_by_col = colDef(
+        name = "top NA columns",
+        header = tip(
+          "top NA columns",
+          "Columns with the most missing values, with their NA rate"
+        ),
+        sortable = FALSE,
+        cell = function(value) {
+          if (is.null(value) || nrow(value) == 0) {
+            return("")
+          }
+          paste0(
+            head(value$col, 3), " (", round(head(value$na_rate, 3) * 100), "%)",
+            collapse = ", "
+          )
+        }
+      ),
+      contract_passed = colDef(
+        name = "contract",
+        header = tip(
+          "contract",
+          "Did the step's data contract (pointblank validation) pass?"
+        )
+      ),
+      schema_hash = colDef(
+        header = tip(
+          "schema_hash",
+          "Digest of output column names and types; a change signals schema drift"
+        )
+      )
     )
   )
 ```
 
 ::: {.callout-note}
 ## Reading the log
-`build_player_season` shows the large negative `rows_delta` where the **long**
-stats collapse to one identity row per player-season. `link_coaches` shows a
-positive delta: some schools carry more than one head coach in a season
-(midseason changes), which fans the join out — exactly the kind of row change
-we want surfaced rather than hidden.
+
+- `build_player_season` shows the large negative `rows_delta` where the **long** stats collapse to one identity row per player-season, but `keys_dropped = 0`: every input key survives; the collapse happens within keys.
+- `link_coaches` shows a positive `rows_delta` with `keys_dropped = 0`: some schools carry more than one head coach in a season (midseason changes), which fans the join out — row change with no lost keys.
+- `filter_reused_ids` drops 462 key combos (coverage ~99.7%): CFBD recycles a few hundred athlete ids across different people over long spans (decision 0022), and these are removed from the model population rather than silently misjoined.
+- `career_summary` drops 131 player keys for the same reason — impossible career spans from id reuse.
 :::
+
+## Schema history
+
+Each refresh appends one row per step (hash, timestamp, git SHA) to a history
+file published on the `data-latest` release, so a change in `schema_hash`
+between refreshes — schema drift — is detectable rather than only visible as
+an unfamiliar hash in the current log.
+
+```{r}
+#| label: schema-history
+history <- tar_read(schema_history)
+if (is.null(history)) {
+  cat("No history yet (track mode with no history file); drift is compared across refreshes.\n")
+} else {
+  drifted <- history |>
+    group_by(step) |>
+    filter(n_distinct(schema_hash) > 1) |>
+    ungroup()
+  if (nrow(drifted) == 0) {
+    cat("No schema drift detected across recorded refreshes.\n")
+  }
+  history |>
+    select(step, n_cols_out, schema_hash, timestamp, git_sha) |>
+    reactable(
+      searchable = TRUE,
+      striped = TRUE,
+      defaultPageSize = 12,
+      columns = list(
+        step = colDef(header = tip("step", "Transform name")),
+        n_cols_out = colDef(header = tip("n_cols_out", "Columns in the output at that run")),
+        schema_hash = colDef(
+          header = tip("schema_hash", "Digest of column names and types"),
+          style = function(value) {
+            if (value %in% drifted$schema_hash) list(background = "#fff3cd") else NULL
+          }
+        ),
+        timestamp = colDef(header = tip("timestamp", "When the refresh ran")),
+        git_sha = colDef(header = tip("git_sha", "Code commit that produced the run"))
+      )
+    )
+}
+```

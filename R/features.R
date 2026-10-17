@@ -4,6 +4,32 @@
 # data (no leakage from the predicted draft class); the model stage enforces the
 # out-of-time split.
 
+#' Flag athlete ids whose roster span exceeds a plausible single career
+#'
+#' CFBD athlete ids are occasionally **reused across distinct individuals**: the
+#' same id (one name, one team) appears on rosters across an impossible span —
+#' e.g. a Cal DB listed 2010-2023. These are almost certainly multiple real
+#' players sharing a recycled id, not one career (decision 0022). Returns the
+#' suspect ids so downstream steps can exclude them from the career/model
+#' population.
+#'
+#' @param roster Cleaned roster from [clean_roster()].
+#' @param max_span Maximum plausible span in seasons (default 7; NCAA eligibility
+#'   allows at most ~5-6 seasons even with the COVID year and medical hardship).
+#'
+#' @return A character vector of suspect `playerId`s.
+#' @export
+reused_ids <- function(roster, max_span = 7L) {
+  roster |>
+    dplyr::group_by(.data$playerId) |>
+    dplyr::summarise(
+      span = max(.data$season) - min(.data$season) + 1L,
+      .groups = "drop"
+    ) |>
+    dplyr::filter(.data$span > .env$max_span) |>
+    dplyr::pull(.data$playerId)
+}
+
 #' Summarize each player's college career from the roster backbone
 #'
 #' Collapses the roster player-season grain (question 4 of the Explore plan) to
@@ -12,14 +38,20 @@
 #' and transfer count (distinct teams minus one). Built on the **roster**
 #' backbone so it includes no-stat seasons, unlike `player_stats`.
 #'
+#' Ids whose roster span exceeds `max_span` are excluded: a span that long is
+#' CFBD id reuse across distinct individuals, not one career (decision 0022).
+#'
 #' @param roster Cleaned roster from [clean_roster()] with `playerId`, `season`,
 #'   `team`.
+#' @param max_span Maximum plausible career span in seasons (see
+#'   [reused_ids()]).
 #'
 #' @return One row per `playerId` with `seasons`, `first_season`,
 #'   `last_season`, `gap_seasons`, `teams`, `transfers`.
 #' @export
-career_summary <- function(roster) {
+career_summary <- function(roster, max_span = 7L) {
   roster |>
+    dplyr::filter(!.data$playerId %in% reused_ids(roster, max_span)) |>
     dplyr::group_by(.data$playerId) |>
     dplyr::summarise(
       seasons = dplyr::n_distinct(.data$season),
@@ -31,7 +63,7 @@ career_summary <- function(roster) {
     dplyr::mutate(
       gap_seasons = .data$last_season - .data$first_season + 1L - .data$seasons,
       transfers = .data$teams - 1L,
-      .after = .data$teams
+      .after = "teams"
     )
 }
 

@@ -186,6 +186,12 @@ list(
     )
   ),
   tar_target(
+    ok_player_season,
+    pointblank::all_passed(
+      contract_player_season(player_season, stop_on_fail = FALSE)
+    )
+  ),
+  tar_target(
     ok_coaches,
     pointblank::all_passed(
       contract_coaches(coaches, stop_on_fail = FALSE)
@@ -271,12 +277,88 @@ list(
       )$coverage
     )
   ),
+  # Contract gate (decision 0023): a FALSE anywhere stops tar_make() (the
+  # default error = "stop" aborts the run, so CI never publishes a failing
+  # build). NA (steps without a contract yet) is not a failure.
+  tar_target(
+    contract_gate,
+    assert_contracts_pass(list(
+      picks = ok_picks,
+      player_stats = ok_player_stats,
+      player_season = ok_player_season,
+      coaches = ok_coaches,
+      roster = ok_roster,
+      recruiting = ok_recruiting,
+      teams = ok_teams,
+      tiers = ok_tiers,
+      drafted = ok_drafted,
+      coach_link = ok_coach_link,
+      tier_link = ok_tier_link,
+      reused_filter = ok_reused_filter,
+      change_features = ok_change,
+      roster_weight = ok_weight,
+      recruit_link = ok_recruit_link,
+      nfl_draft_picks = ok_nfl_draft_picks,
+      nfl_rosters = ok_nfl_rosters,
+      nfl_player_stats = ok_nfl_player_stats,
+      nfl_link = ok_nfl_link,
+      career_summary = ok_career,
+      redshirt = ok_roster_flags,
+      stat_taxonomy = ok_stat_taxonomy
+    ))
+  ),
+  # ---- link-step contracts (audit-hygiene workstream C) ----------------------
+  tar_target(
+    ok_coach_link,
+    pointblank::all_passed(
+      contract_coach_link(
+        ps_coach,
+        player_season,
+        coaches,
+        stop_on_fail = FALSE
+      )
+    )
+  ),
+  tar_target(
+    ok_tier_link,
+    pointblank::all_passed(
+      contract_tier_link(ps_tier, ps_coach, stop_on_fail = FALSE)
+    )
+  ),
+  tar_target(
+    ok_reused_filter,
+    pointblank::all_passed(
+      contract_reused_filter(ps_pop, ps_draft, reused, stop_on_fail = FALSE)
+    )
+  ),
+  tar_target(
+    ok_change,
+    pointblank::all_passed(
+      contract_change_features(ps_change, ps_pop, stop_on_fail = FALSE)
+    )
+  ),
+  tar_target(
+    ok_weight,
+    pointblank::all_passed(
+      contract_roster_weight(model_table, ps_change, stop_on_fail = FALSE)
+    )
+  ),
+  tar_target(
+    ok_recruit_link,
+    pointblank::all_passed(
+      contract_recruit_link(ps_recruit, player_season, stop_on_fail = FALSE)
+    )
+  ),
 
   # ---- link -----------------------------------------------------------------
   tar_target(player_season, build_player_season(player_stats)),
   tar_target(ps_coach, link_coaches(player_season, coaches)),
   tar_target(ps_tier, link_tiers(ps_coach, tiers)),
   tar_target(ps_draft, link_drafted(ps_tier, picks)),
+  # Exclude CFBD-reused athlete ids (one id spanning >7 roster seasons = multiple
+  # real people, decision 0022) from the model population.
+  tar_target(reused, reused_ids(roster)),
+  tar_target(ps_pop, dplyr::filter(ps_draft, !.data$playerId %in% reused)),
   # HS recruiting ratings, name-guarded (decision 0013); kept off the model path.
   tar_target(ps_recruit, link_recruiting(player_season, recruiting)),
   # NFL outcomes bridged to CFBD picks by draft slot (decision 0014); an
@@ -284,7 +366,7 @@ list(
   tar_target(picks_nfl, link_nfl_draft(picks, nfl_draft_picks)),
 
   # ---- features -------------------------------------------------------------
-  tar_target(ps_change, add_change_features(ps_draft)),
+  tar_target(ps_change, add_change_features(ps_pop)),
   tar_target(model_table, add_roster_weight(ps_change, roster)),
   # Career-grain and roster-grain derived features (Explore questions 4/5/12).
   # These are in-pipeline DERIVED tables: bundled into the DuckDB asset and
@@ -334,7 +416,7 @@ list(
         "clean_picks",
         "clean",
         raw_picks,
-        keys = "playerId",
+        keys = c("year", "round", "pick"),
         contract_passed = ok_picks
       ),
       audit_step(
@@ -382,36 +464,48 @@ list(
         "build_player_season",
         "link",
         player_stats,
-        keys = c("playerId", "season")
+        keys = c("playerId", "season", "team"),
+        contract_passed = ok_player_season
       ),
       audit_step(
         ps_coach,
         "link_coaches",
         "link",
         player_season,
-        keys = c("playerId", "season")
+        keys = c("playerId", "season", "team"),
+        contract_passed = ok_coach_link
       ),
       audit_step(
         ps_tier,
         "link_tiers",
         "link",
         ps_coach,
-        contract_passed = ok_tiers
+        keys = c("playerId", "season", "team"),
+        contract_passed = ok_tier_link
       ),
       audit_step(
         ps_draft,
         "link_drafted",
         "link",
         ps_tier,
-        keys = c("playerId", "season"),
+        keys = c("playerId", "season", "team"),
         contract_passed = ok_drafted
+      ),
+      audit_step(
+        ps_pop,
+        "filter_reused_ids",
+        "link",
+        ps_draft,
+        keys = c("playerId", "season", "team"),
+        contract_passed = ok_reused_filter
       ),
       audit_step(
         ps_change,
         "add_change_features",
         "features",
-        ps_draft,
-        keys = c("playerId", "season")
+        ps_pop,
+        keys = c("playerId", "season", "team"),
+        contract_passed = ok_change
       ),
       audit_step(
         roster_flags,
@@ -434,14 +528,16 @@ list(
         "add_roster_weight",
         "features",
         ps_change,
-        keys = c("playerId", "season")
+        keys = c("playerId", "season", "team"),
+        contract_passed = ok_weight
       ),
       audit_step(
         ps_recruit,
         "link_recruiting",
         "link",
         player_season,
-        keys = c("playerId", "season")
+        keys = c("playerId", "season", "team"),
+        contract_passed = ok_recruit_link
       ),
       audit_step(
         nfl_draft_picks,
@@ -483,5 +579,22 @@ list(
         contract_passed = ok_stat_taxonomy
       )
     )
+  ),
+
+  # ---- schema history: schema_hash across refreshes (audit-hygiene D) -------
+  # Refresh mode appends this run's hashes to data/audit_history.csv (seeded
+  # from the data-latest release asset by data-refresh.yaml); track mode just
+  # reads the file if it's present.
+  tar_target(
+    schema_history,
+    {
+      path <- "data/audit_history.csv"
+      if (refresh_enabled()) {
+        update_schema_history(audit_log, path)
+      } else if (file.exists(path)) {
+        tibble::as_tibble(utils::read.csv(path))
+      }
+    },
+    cue = targets::tar_cue("always")
   )
 )
