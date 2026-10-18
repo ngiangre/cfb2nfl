@@ -1,0 +1,54 @@
+dataset: game_team_stats
+source: CFBD /games/teams (per year × week × seasonType, 2010–2026)
+grain: LONG — one row per team-game-category-stat
+key: gameId + team + category
+description: >
+  Team-level box-score statistics per game, in long format. Pairs with
+  games (gameId == id) for period/context and game_player_stats for the
+  player-level view. Pivot category/stat into features; same long-grain
+  convention as player_stats.
+columns:
+  - name: gameId
+    type: int32
+    description: CFBD game id; joins to games.id.
+    provenance: raw
+  - name: season
+    type: int32
+    description: Season year (attached at ingest from the pull loop).
+    provenance: raw
+  - name: week
+    type: int32
+    description: Week number (per seasonType).
+    provenance: raw
+  - name: seasonType
+    type: string
+    description: regular or postseason.
+    provenance: raw
+  - name: teamId
+    type: int32
+    description: CFBD team id (a different namespace from athlete ids).
+    provenance: raw
+  - name: team
+    type: string
+    description: School name (teams.team namespace, display).
+    provenance: raw
+  - name: conference
+    type: string
+    description: Conference of the team this season.
+    provenance: raw
+  - name: homeAway
+    type: string
+    description: home or away.
+    provenance: raw
+  - name: points
+    type: int32
+    description: Points scored by this team in the game.
+    provenance: raw
+  - name: category
+    type: string
+    description: Team stat category (e.g. rushingTDs, totalYards).
+    provenance: raw
+  - name: stat
+    type: string
+    description: Stat value (stored as string in the raw feed).
+    provenance: raw

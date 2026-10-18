@@ -41,5 +41,9 @@ utils::globalVariables(c(
   "hc_changed",
   "n_na",
   "recruit_matched",
-  "transferred"
+  "transferred",
+  # pointblank::vars() targets in the game-statistics contracts
+  "id",
+  "week",
+  "gameId"
 ))

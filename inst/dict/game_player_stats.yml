@@ -1,0 +1,62 @@
+dataset: game_player_stats
+source: CFBD /games/players (per year × week × seasonType, 2010–2026)
+grain: LONG — one row per player-game-category-statType-stat
+key: gameId + playerId + category + statType
+description: >
+  Player-level box-score statistics per game, in long format. playerId is the
+  SHARED CFBD athlete id (decision 0003 namespace) — joins player_stats /
+  roster / picks directly, no name guard. The bridge to game-level features
+  (per-game usage, consistency, games played).
+columns:
+  - name: gameId
+    type: int32
+    description: CFBD game id; joins to games.id.
+    provenance: raw
+  - name: season
+    type: int32
+    description: Season year (attached at ingest from the pull loop).
+    provenance: raw
+  - name: week
+    type: int32
+    description: Week number (per seasonType).
+    provenance: raw
+  - name: seasonType
+    type: string
+    description: regular or postseason.
+    provenance: raw
+  - name: team
+    type: string
+    description: School name (teams.team namespace, display).
+    provenance: raw
+  - name: conference
+    type: string
+    description: Conference of the team this season.
+    provenance: raw
+  - name: homeAway
+    type: string
+    description: home or away.
+    provenance: raw
+  - name: points
+    type: int32
+    description: Points scored by the player's team in the game.
+    provenance: raw
+  - name: category
+    type: string
+    description: Stat category (passing, rushing, ...). Pivot dimension.
+    provenance: raw
+  - name: statType
+    type: string
+    description: Stat type within category. Pivot dimension.
+    provenance: raw
+  - name: playerId
+    type: string
+    description: CFBD athlete id (string); canonical player key.
+    provenance: raw
+  - name: player
+    type: string
+    description: Player display name (QA / display only — do not join on name).
+    provenance: raw
+  - name: stat
+    type: string
+    description: Stat value (stored as string in the raw feed).
+    provenance: raw

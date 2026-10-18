@@ -20,7 +20,13 @@ especially from shared GitHub-runner IPs; if CI refresh still fails, the
 fallback is running `Rscript data-raw/refresh.R` locally (~10 min, works
 because the local IP isn't throttled) and publishing with the same
 `piggyback::pb_upload(..., tag="data-latest", overwrite = TRUE)` the CI job
-runs, then re-dispatching `site.yaml`.
+runs, then re-dispatching `site.yaml`. **Quota:** the key is tier-limited
+(5000 calls/month as of 2026-10-17; the free 1000/month tier was exhausted by
+the game-stats sweep — see `plans/game-stats.md`). A full refresh costs ~780 calls
+calls: the `/games` family ingests (`games`, `game_team_stats`,
+`game_player_stats`) pace themselves at 1 call/2 s with a 10-try/600 s retry
+budget (`cfbd_game_get()`); don't re-run a failed refresh without first
+working out what it would re-pull.
 The **pipeline owns ingest → process → assets** (decision 0017): a single
 `tar_make()` in **refresh mode** (`CFBSTATS_REFRESH=true`) ingests every source
 (incl. `conference_tiers`, derived in-pipeline from `player_stats` by

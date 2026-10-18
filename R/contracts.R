@@ -939,3 +939,105 @@ contract_player_season_stats <- function(
   agent <- pointblank::interrogate(agent)
   enforce_contract(agent, "player_season_stats", stop_on_fail)
 }
+
+#' Data contract for game metadata
+#'
+#' Validates one-row-per-game uniqueness (`id`), period bounds matching the
+#' 2010–2026 ingest window, and required join columns.
+#'
+#' @param games Cleaned games (see [clean_games()]).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_games <- function(games, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  agent <- pointblank::create_agent(games, label = "games") |>
+    pointblank::col_exists(c(
+      "id",
+      "season",
+      "week",
+      "seasonType",
+      "homeTeam",
+      "awayTeam",
+      "homePoints",
+      "awayPoints",
+      "startDate",
+      "completed"
+    )) |>
+    pointblank::col_vals_not_null(pointblank::vars(id, season, week)) |>
+    pointblank::col_vals_between("season", 2010L, 2026L) |>
+    pointblank::rows_distinct(pointblank::vars(id)) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "games", stop_on_fail)
+}
+
+#' Data contract for team game statistics
+#'
+#' One row per team-game-category-stat; keys and period bounds enforced.
+#'
+#' @param game_team_stats Cleaned team game stats (see [clean_game_team_stats()]).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_game_team_stats <- function(game_team_stats, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  agent <- pointblank::create_agent(
+    game_team_stats,
+    label = "game_team_stats"
+  ) |>
+    pointblank::col_exists(c(
+      "gameId",
+      "season",
+      "week",
+      "seasonType",
+      "team",
+      "category",
+      "stat"
+    )) |>
+    pointblank::col_vals_not_null(pointblank::vars(gameId, team, category)) |>
+    pointblank::col_vals_between("season", 2010L, 2026L) |>
+    pointblank::rows_distinct(pointblank::vars(gameId, team, category)) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "game_team_stats", stop_on_fail)
+}
+
+#' Data contract for player game statistics
+#'
+#' One row per player-game-category-statType-stat; `playerId` must be present
+#' (the shared athlete-id namespace) and period bounds enforced.
+#'
+#' @param game_player_stats Cleaned player game stats (see
+#'   [clean_game_player_stats()]).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_game_player_stats <- function(
+  game_player_stats,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  agent <- pointblank::create_agent(
+    game_player_stats,
+    label = "game_player_stats"
+  ) |>
+    pointblank::col_exists(c(
+      "gameId",
+      "season",
+      "week",
+      "seasonType",
+      "team",
+      "category",
+      "statType",
+      "playerId",
+      "stat"
+    )) |>
+    pointblank::col_vals_not_null(
+      pointblank::vars(gameId, playerId, category, statType)
+    ) |>
+    pointblank::col_vals_between("season", 2010L, 2026L) |>
+    pointblank::rows_distinct(
+      pointblank::vars(gameId, playerId, category, statType)
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "game_player_stats", stop_on_fail)
+}

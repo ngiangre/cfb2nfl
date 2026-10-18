@@ -4,6 +4,18 @@ First tracked release of the project scaffolding. The repo now carries the full
 ingest → clean → link → features → model → report pipeline, its lineage/audit
 layer, and the documentation site, all under version control.
 
+- New game-statistics tables from the CFBD `/games` family: `games` (one row
+  per game), `game_team_stats` (team-game-category-stat), and
+  `game_player_stats` (player-game-category-statType-stat). All long-grain;
+  `game_player_stats.playerId` joins the shared athlete-id namespace directly.
+  Ships with contracts, dictionaries (`inst/dict/games*.yml`), DuckDB bundle
+  membership, and data-model documentation.
+- The pipeline no longer re-ingests on every run: ingest and parquet-asset
+  targets track normally, and `data-raw/refresh.R` invalidates all targets
+  before an explicit full refresh. New `data-raw/pull-data.R` downloads the
+  latest cleaned data from the `data-latest` release so local track-mode work
+  needs no CFBD API key or quota.
+
 - New `app.R`: a Shiny app powered by
   [querychat](https://posit-dev.github.io/querychat/) for natural-language
   querying of the DuckDB bundle. All tables (plus the `player_season_inputs`

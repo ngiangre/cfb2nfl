@@ -1,0 +1,129 @@
+dataset: games
+source: CFBD /games (per year × seasonType, 2010–2026)
+grain: one row per game
+key: id (CFBD game id)
+description: >
+  Game metadata and final results: kickoff, venue, home/away points, Elo,
+  postgame win probability. The period dimension (season/week/seasonType) for
+  the game_*_stats tables; join them by gameId == id.
+columns:
+  - name: id
+    type: int32
+    description: CFBD game id; the gameId key in game_team_stats / game_player_stats.
+    provenance: raw
+  - name: season
+    type: int32
+    description: Season year.
+    provenance: raw
+  - name: week
+    type: int32
+    description: Week number (per seasonType — postseason weeks renumber from 1).
+    provenance: raw
+  - name: seasonType
+    type: string
+    description: regular or postseason.
+    provenance: raw
+  - name: startDate
+    type: string
+    description: Kickoff timestamp (ISO string).
+    provenance: raw
+  - name: startTimeTBD
+    type: logical
+    description: Kickoff time not yet announced.
+    provenance: raw
+  - name: completed
+    type: logical
+    description: Game finished (FALSE for scheduled future games, e.g. 2026).
+    provenance: raw
+  - name: neutralSite
+    type: logical
+    description: Neutral-site game?
+    provenance: raw
+  - name: conferenceGame
+    type: logical
+    description: Conference game?
+    provenance: raw
+  - name: attendance
+    type: double
+    description: Announced attendance (may be NA).
+    provenance: raw
+  - name: venueId
+    type: int32
+    description: CFBD venue id.
+    provenance: raw
+  - name: venue_name
+    type: string
+    description: Venue display name.
+    provenance: raw
+  - name: homeId
+    type: int32
+    description: CFBD team id, home side.
+    provenance: raw
+  - name: homeTeam
+    type: string
+    description: School name, home side (teams.team namespace, display).
+    provenance: raw
+  - name: homeClassification
+    type: string
+    description: fbs / fcs / ii / iii, home side.
+    provenance: raw
+  - name: homeConference
+    type: string
+    description: Conference, home side.
+    provenance: raw
+  - name: homePoints
+    type: int32
+    description: Final points, home side (NA before completion).
+    provenance: raw
+  - name: homePregameElo
+    type: double
+    description: CFBD pregame Elo, home side.
+    provenance: raw
+  - name: homePostgameElo
+    type: double
+    description: CFBD postgame Elo, home side.
+    provenance: raw
+  - name: homePostgameWinProbability
+    type: double
+    description: Postgame win probability (model fit), home side.
+    provenance: raw
+  - name: awayId
+    type: int32
+    description: CFBD team id, away side.
+    provenance: raw
+  - name: awayTeam
+    type: string
+    description: School name, away side (teams.team namespace, display).
+    provenance: raw
+  - name: awayClassification
+    type: string
+    description: fbs / fcs / ii / iii, away side.
+    provenance: raw
+  - name: awayConference
+    type: string
+    description: Conference, away side.
+    provenance: raw
+  - name: awayPoints
+    type: int32
+    description: Final points, away side (NA before completion).
+    provenance: raw
+  - name: awayPregameElo
+    type: double
+    description: CFBD pregame Elo, away side.
+    provenance: raw
+  - name: awayPostgameElo
+    type: double
+    description: CFBD postgame Elo, away side.
+    provenance: raw
+  - name: awayPostgameWinProbability
+    type: double
+    description: Postgame win probability (model fit), away side.
+    provenance: raw
+  - name: excitementIndex
+    type: double
+    description: CFBD excitement index (NA for many games).
+    provenance: raw
+  - name: notes
+    type: string
+    description: Free-text game notes (bowl names etc.); often empty.
+    provenance: raw

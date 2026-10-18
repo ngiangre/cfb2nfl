@@ -17,6 +17,9 @@ dictionaries next to this file, one YAML per table:
 | `teams` | one team (program) — DISPLAY only | [`dict/teams.yml`](dict/teams.yml) |
 | `conference_tiers` | season × conference | [`dict/conference_tiers.yml`](dict/conference_tiers.yml) |
 | `recruiting` | one HS recruit | [`dict/recruiting.yml`](dict/recruiting.yml) |
+| `games` | one game (metadata + result) | [`dict/games.yml`](dict/games.yml) |
+| `game_team_stats` | **long**: team-game-category-stat | [`dict/game_team_stats.yml`](dict/game_team_stats.yml) |
+| `game_player_stats` | **long**: player-game-category-statType-stat | [`dict/game_player_stats.yml`](dict/game_player_stats.yml) |
 | `nfl_draft_picks` | one NFL draft pick | [`dict/nfl_draft_picks.yml`](dict/nfl_draft_picks.yml) |
 | `nfl_rosters` | one player-season on an NFL roster | [`dict/nfl_rosters.yml`](dict/nfl_rosters.yml) |
 | `nfl_player_stats` | one NFL player-season (regular season) | [`dict/nfl_player_stats.yml`](dict/nfl_player_stats.yml) |
@@ -103,6 +106,9 @@ erDiagram
     player_stats }o--|| conference_tiers : "conference, season"
     player_stats }o--|| teams : "team (display)"
     recruiting |o..o| player_stats : "playerId (name-guarded)"
+    games ||--o{ game_team_stats : "gameId == id"
+    games ||--o{ game_player_stats : "gameId == id"
+    game_player_stats }o--|| player_stats : "playerId (shared athlete id)"
     picks ||--o| nfl_pick_link : "same slot join, name-guarded"
     nfl_pick_link ||--o| nfl_draft_picks : "draft slot"
     nfl_draft_picks ||--o{ nfl_rosters : "gsis_id, season"
@@ -143,6 +149,15 @@ wrong rows, so they are called out explicitly.
    `(season, round, pick)` — **not** by `nflAthleteId` (a different namespace).
    From `nfl_draft_picks`, `gsis_id` is the key into `nfl_rosters` and
    `nfl_player_stats` (both keyed `(gsis_id, season)`).
+
+6. **CFBD game id (`games.id` == `game_*_stats.gameId`, integer).** The
+   game-level namespace. Both game-stat tables also carry `season`/`week`/
+   `seasonType` attached at ingest, so period filters need no join to `games`
+   (note postseason weeks renumber from 1 — filter by `seasonType` too).
+   `game_player_stats.playerId` is the **shared** college athlete id
+   (namespace 1), so game-level features join the career backbone directly;
+   `game_team_stats.teamId` is CFBD's team-id namespace (distinct from athlete
+   ids — join teams by name).
 
 ### Two namespaces that look joinable but are not
 
@@ -207,6 +222,21 @@ SELECT season, SUM(passing_yds) AS passing_yards
 FROM player_season_stats
 GROUP BY season
 ORDER BY season;
+```
+
+Per-season games played (offensive snaps proxy) from the game-level long
+table — `game_player_stats` carries `season`/`week`/`seasonType` itself, and
+`playerId` is the shared athlete id, so no join is needed to count games:
+
+```sql
+SELECT playerId,
+       season,
+       COUNT(DISTINCT gameId) AS games_played
+FROM game_player_stats
+WHERE seasonType = 'regular' AND category IN ('passing', 'rushing', 'receiving')
+GROUP BY playerId, season
+ORDER BY games_played DESC
+LIMIT 20;
 ```
 
 NFL longevity (distinct roster seasons) for drafted players, via the

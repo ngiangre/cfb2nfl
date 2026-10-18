@@ -363,3 +363,107 @@ clean_nfl_player_stats <- function(nfl_player_stats) {
       def_ints = as.integer(.data$def_ints)
     )
 }
+
+# ---- game statistics (see R/ingest.R for the /games family) -----------------
+
+#' Clean game metadata
+#'
+#' Coerces period/identifier columns to integer and flag columns to logical so
+#' the parquet schema matches inst/dict/games.yml. `stat`-like columns are not
+#' present here; Elo, win probability, and excitement remain double.
+#'
+#' @param games Raw games tibble from [ingest_games()].
+#'
+#' @return A cleaned games tibble, one row per game, keyed by integer `id`.
+#' @export
+clean_games <- function(games) {
+  games |>
+    dplyr::transmute(
+      id = as.integer(.data$id),
+      season = as.integer(.data$season),
+      week = as.integer(.data$week),
+      seasonType = as.character(.data$seasonType),
+      startDate = as.character(.data$startDate),
+      startTimeTBD = as.logical(.data$startTimeTBD),
+      completed = as.logical(.data$completed),
+      neutralSite = as.logical(.data$neutralSite),
+      conferenceGame = as.logical(.data$conferenceGame),
+      attendance = as.numeric(.data$attendance),
+      venueId = as.integer(.data$venueId),
+      venue_name = as.character(.data$venue_name),
+      homeId = as.integer(.data$homeId),
+      homeTeam = as.character(.data$homeTeam),
+      homeClassification = as.character(.data$homeClassification),
+      homeConference = as.character(.data$homeConference),
+      homePoints = as.integer(.data$homePoints),
+      homePregameElo = as.numeric(.data$homePregameElo),
+      homePostgameElo = as.numeric(.data$homePostgameElo),
+      homePostgameWinProbability = as.numeric(.data$homePostgameWinProbability),
+      awayId = as.integer(.data$awayId),
+      awayTeam = as.character(.data$awayTeam),
+      awayClassification = as.character(.data$awayClassification),
+      awayConference = as.character(.data$awayConference),
+      awayPoints = as.integer(.data$awayPoints),
+      awayPregameElo = as.numeric(.data$awayPregameElo),
+      awayPostgameElo = as.numeric(.data$awayPostgameElo),
+      awayPostgameWinProbability = as.numeric(.data$awayPostgameWinProbability),
+      excitementIndex = as.numeric(.data$excitementIndex),
+      notes = as.character(.data$notes)
+    )
+}
+
+#' Clean team game statistics
+#'
+#' Coerces keys/counts to integer; `stat` stays string (same convention as
+#' `player_stats`, whose values also arrive as strings from CFBD).
+#'
+#' @param game_team_stats Raw flattened team game stats from
+#'   [ingest_game_team_stats()].
+#'
+#' @return A cleaned tibble, one row per team-game-category-stat.
+#' @export
+clean_game_team_stats <- function(game_team_stats) {
+  game_team_stats |>
+    dplyr::transmute(
+      gameId = as.integer(.data$gameId),
+      season = as.integer(.data$season),
+      week = as.integer(.data$week),
+      seasonType = as.character(.data$seasonType),
+      teamId = as.integer(.data$teamId),
+      team = as.character(.data$team),
+      conference = as.character(.data$conference),
+      homeAway = as.character(.data$homeAway),
+      points = as.integer(.data$points),
+      category = as.character(.data$category),
+      stat = as.character(.data$stat)
+    )
+}
+
+#' Clean player game statistics
+#'
+#' Coerces keys/counts to integer; `playerId` is already the string athlete id
+#' (the shared namespace, decision 0003) from the flatten step.
+#'
+#' @param game_player_stats Raw flattened player game stats from
+#'   [ingest_game_player_stats()].
+#'
+#' @return A cleaned tibble, one row per player-game-category-statType-stat.
+#' @export
+clean_game_player_stats <- function(game_player_stats) {
+  game_player_stats |>
+    dplyr::transmute(
+      gameId = as.integer(.data$gameId),
+      season = as.integer(.data$season),
+      week = as.integer(.data$week),
+      seasonType = as.character(.data$seasonType),
+      team = as.character(.data$team),
+      conference = as.character(.data$conference),
+      homeAway = as.character(.data$homeAway),
+      points = as.integer(.data$points),
+      category = as.character(.data$category),
+      statType = as.character(.data$statType),
+      playerId = as.character(.data$playerId),
+      player = as.character(.data$player),
+      stat = as.character(.data$stat)
+    )
+}

@@ -63,7 +63,13 @@ parquet_asset <- function(path, build) {
 #'
 #' @return An `httr2` request.
 #' @keywords internal
-cfbd_request <- function(endpoint, query = list()) {
+cfbd_request <- function(
+  endpoint,
+  query = list(),
+  throttle = NULL,
+  retry_max_tries = 5,
+  retry_max_seconds = 120
+) {
   rlang::check_installed("httr2", reason = "to call the CFBD API.")
   key <- Sys.getenv("CFBD_API_KEY")
   if (!nzchar(key)) {
@@ -77,14 +83,24 @@ cfbd_request <- function(endpoint, query = list()) {
     httr2::req_user_agent("cfbstats (https://github.com)") |>
     # 429/503 are transient by default; broaden to all server-side 5xx. 5
     # tries with exponential backoff (~1s..16s) rides out short outages
-    # without dragging a refresh for minutes per call.
+    # without dragging a refresh for minutes per call. High-volume pulls
+    # (the /games family) pass a longer retry budget instead of relying on
+    # backoff alone.
     httr2::req_retry(
-      max_tries = 5,
-      max_seconds = 120,
+      max_tries = retry_max_tries,
+      max_seconds = retry_max_seconds,
       is_transient = \(resp) {
-        httr2::resp_status(resp) %in% c(429, 500, 502, 503, 504)
+        # Any 5xx (CFBD has thrown 525 Cloudflare errors alongside the usual
+        # 500/502/503/504) plus the 429 rate limit.
+        httr2::resp_status(resp) == 429 || httr2::resp_status(resp) >= 500
       }
     )
+  # Paced cadence (requests per second) for high-volume endpoints; requests
+  # without `throttle` are unaffected. All throttled requests share httr2's
+  # realm, so the pacing holds across the whole refresh process.
+  if (!is.null(throttle)) {
+    req <- req |> httr2::req_throttle(rate = throttle)
+  }
   if (length(query)) {
     req <- httr2::req_url_query(req, !!!query)
   }
@@ -98,12 +114,28 @@ cfbd_request <- function(endpoint, query = list()) {
 #'
 #' @param endpoint API path, e.g. `"/draft/picks"`.
 #' @param query Named list of query parameters (optional).
+#' @param throttle Optional pacing in requests per second (e.g. `0.5` = one
+#'   call every 2 s) for high-volume endpoints; `NULL` (default) paces nothing.
+#' @param retry_max_tries,retry_max_seconds Retry policy passed through to
+#'   [cfbd_request()].
 #'
 #' @return A tibble of the (vector-simplified) JSON response.
 #' @keywords internal
-cfbd_get <- function(endpoint, query = list()) {
+cfbd_get <- function(
+  endpoint,
+  query = list(),
+  throttle = NULL,
+  retry_max_tries = 5,
+  retry_max_seconds = 120
+) {
   rlang::check_installed(c("httr2", "tibble"), reason = "to call the CFBD API.")
-  cfbd_request(endpoint, query) |>
+  cfbd_request(
+    endpoint,
+    query,
+    throttle = throttle,
+    retry_max_tries = retry_max_tries,
+    retry_max_seconds = retry_max_seconds
+  ) |>
     httr2::req_perform() |>
     httr2::resp_body_json(simplifyVector = TRUE) |>
     tibble::as_tibble()
@@ -311,4 +343,269 @@ ingest_nfl_player_stats <- function(seasons = 2010:2026) {
   # Drop seasons that haven't been played yet (no stats to pull).
   seasons <- seasons[seasons <= nflreadr::most_recent_season()]
   nflreadr::load_player_stats(seasons = seasons)
+}
+
+# ---- game statistics (CFBD /games family) ----------------------------------
+#
+# Three endpoints, three grains (see inst/dict/games*.yml):
+#   /games         -> `games`: one row per game (metadata: date, venue, points)
+#   /games/teams   -> `game_team_stats`: one team-game-category-stat row
+#   /games/players -> `game_player_stats`: one player-game-category-stat row
+# /games/players carries the athlete `id`, so it joins the shared playerId
+# namespace directly (decision 0003); the flattened rows attach `season`,
+# `week`, `seasonType` from the loop so each table is self-describing.
+#
+# These pulls make ~700 week-level calls per season sweep, far more than the
+# rest of the refresh combined, so they are paced (1 call / 1 s, shared httr2
+# realm) and carry a longer retry budget: CFBD sheds load with 429/503 under
+# sustained bursts, and the base 5-try/2-min policy (decision 0028) exhausts
+# before the limit window resets.
+cfbd_game_throttle <- 1
+cfbd_game_retry_tries <- 10L
+cfbd_game_retry_seconds <- 600
+
+cfbd_game_get <- function(endpoint, query = list()) {
+  cfbd_get(
+    endpoint,
+    query,
+    throttle = cfbd_game_throttle,
+    retry_max_tries = cfbd_game_retry_tries,
+    retry_max_seconds = cfbd_game_retry_seconds
+  )
+}
+
+#' Season weeks actually played, by season type
+#'
+#' Bowl/postseason weeks reuse low week numbers (CFBP rounds are week 1+ under
+#' `seasonType = "postseason"`), so weeks must be discovered per season type
+#' from the `/games` listing rather than assumed.
+#'
+#' @param year Season year.
+#' @return Integer vector of weeks with at least one game.
+#' @keywords internal
+cfbd_season_weeks <- function(year) {
+  purrr::map(c("regular", "postseason"), \(st) {
+    games <- cfbd_game_get("/games", list(year = year, seasonType = st))
+    # An unplayed season type returns an empty body (no columns at all).
+    if (!nrow(games) || !"week" %in% names(games)) {
+      return(integer(0))
+    }
+    dplyr::pull(games, .data$week) |>
+      unique() |>
+      sort()
+  }) |>
+    purrr::set_names(c("regular", "postseason"))
+}
+
+#' Played weeks for one season, from the ingested games table when available
+#'
+#' Same contract as [cfbd_season_weeks()], but derives the weeks from the
+#' already-ingested `games` tibble (columns `season`, `seasonType`, `week`) so
+#' the stats ingests don't re-pull `/games` — 34 calls saved per refresh.
+#'
+#' @param year Season year.
+#' @param games Ingested `/games` tibble, or `NULL` to fall back to
+#'   [cfbd_season_weeks()].
+#' @return Named list of integer week vectors by season type.
+#' @keywords internal
+weeks_for_year <- function(year, games) {
+  if (is.null(games)) {
+    return(cfbd_season_weeks(year))
+  }
+  g <- games[games$season == year, ]
+  purrr::map(c("regular", "postseason"), \(st) {
+    sort(unique(dplyr::pull(g[g$seasonType == st, ], .data$week)))
+  }) |>
+    purrr::set_names(c("regular", "postseason"))
+}
+
+#' Flatten one /games/players response to player-game-stat rows
+#'
+#' The raw response nests teams -> categories -> types -> athletes; each athlete
+#' entry carries the shared CFBD athlete id. Unnested rows are tagged with the
+#' season/week/seasonType of the pull so the table needs no join to `games` for
+#' basic period filters.
+#'
+#' @param raw One `/games/players` tibble (list-column grain: one row per game).
+#' @param season Season year of the pull.
+#' @param week Week number of the pull.
+#' @param season_type `regular` or `postseason`.
+#' @return A flat tibble, one row per player-game-category-statType-stat.
+#' @keywords internal
+flatten_game_player_stats <- function(raw, season, week, season_type) {
+  purrr::map_dfr(seq_len(nrow(raw)), \(i) {
+    game_id <- raw$id[[i]]
+    teams <- raw$teams[[i]]
+    purrr::map_dfr(seq_len(nrow(teams)), \(j) {
+      t <- teams[j, ]
+      cats <- t$categories[[1]]
+      purrr::map_dfr(seq_len(nrow(cats)), \(k) {
+        ty <- cats$types[[k]]
+        purrr::map_dfr(seq_len(nrow(ty)), \(m) {
+          athlete <- ty$athletes[[m]]
+          tibble::tibble(
+            gameId = game_id,
+            season = season,
+            week = week,
+            seasonType = season_type,
+            team = t$team,
+            conference = t$conference,
+            homeAway = t$homeAway,
+            points = t$points,
+            category = cats$name[[k]],
+            statType = ty$name[[m]],
+            playerId = as.character(athlete$id[[1]]),
+            player = athlete$name[[1]],
+            stat = athlete$stat[[1]]
+          )
+        })
+      })
+    })
+  })
+}
+
+#' Flatten one /games/teams response to team-game-stat rows
+#'
+#' Same nesting as the player endpoint, but `types` is a plain category/stat
+#' frame per team (no per-player block).
+#'
+#' @inheritParams flatten_game_player_stats
+#' @return A flat tibble, one row per team-game-category-stat.
+#' @keywords internal
+flatten_game_team_stats <- function(raw, season, week, season_type) {
+  purrr::map_dfr(seq_len(nrow(raw)), \(i) {
+    game_id <- raw$id[[i]]
+    teams <- raw$teams[[i]]
+    purrr::map_dfr(seq_len(nrow(teams)), \(j) {
+      t <- teams[j, ]
+      stats <- t$stats[[1]]
+      tibble::tibble(
+        gameId = game_id,
+        season = season,
+        week = week,
+        seasonType = season_type,
+        teamId = t$teamId,
+        team = t$team,
+        conference = t$conference,
+        homeAway = t$homeAway,
+        points = t$points,
+        category = stats$category,
+        stat = stats$stat
+      )
+    })
+  })
+}
+
+#' Ingest game metadata
+#'
+#' Pulls `/games` for the given seasons, both season types (regular +
+#' postseason). One row per game with venue, kickoff, points, Elo, and win
+#' probability. List columns (`homeLineScores`/`awayLineScores` quarter scores,
+#' `highlights`, `playoff`) are dropped so the parquet stays flat.
+#'
+#' @param years Integer vector of seasons (default 2010:2026).
+#'
+#' @return A flat tibble, one row per game, keyed by `id`.
+#' @export
+ingest_games <- function(years = 2010:2026) {
+  as.integer(years) |>
+    purrr::map(\(y) {
+      purrr::map(c("regular", "postseason"), \(st) {
+        raw <- cfbd_game_get("/games", list(year = y, seasonType = st))
+        # Unplayed season types return an empty body (no columns at all);
+        # contributing NULL keeps downstream list_rbind() happy.
+        if (!nrow(raw)) {
+          return(NULL)
+        }
+        raw |>
+          # `venue` is a flat venue-name string (venueId is top-level already).
+          dplyr::mutate(venue_name = as.character(.data$venue)) |>
+          dplyr::select(-dplyr::any_of("venue"))
+      }) |>
+        purrr::list_rbind()
+    }) |>
+    purrr::list_rbind() |>
+    dplyr::select(
+      -dplyr::any_of(c(
+        "homeLineScores",
+        "awayLineScores",
+        "highlights",
+        "playoff"
+      ))
+    )
+}
+
+#' Ingest team game statistics
+#'
+#' Pulls `/games/teams` week by week (weeks derived from the ingested `games`
+#' table when supplied, otherwise re-discovered from `/games`) and flattens to
+#' one row per team-game-category-stat. A season with no played weeks yet
+#' (e.g. a future season) contributes no rows.
+#'
+#' @param years Integer vector of seasons (default 2010:2026).
+#' @param games Optional ingested `games` tibble (the `raw_games` target) used
+#'   to derive played weeks without re-pulling `/games`.
+#'
+#' @return A flat tibble, one row per team-game-category-stat.
+#' @export
+ingest_game_team_stats <- function(years = 2010:2026, games = NULL) {
+  as.integer(years) |>
+    purrr::map(\(y) {
+      weeks <- weeks_for_year(y, games)
+      purrr::imap(weeks, \(wks, st) {
+        purrr::map(wks, \(w) {
+          # Pacing comes from cfbd_game_get()'s req_throttle (1 call / 1 s);
+          # no extra sleep here or the ingest doubles its wall time.
+          raw <- cfbd_game_get(
+            "/games/teams",
+            list(
+              year = y,
+              week = w,
+              seasonType = st
+            )
+          )
+          flatten_game_team_stats(raw, y, w, st)
+        })
+      }) |>
+        purrr::list_flatten() |>
+        purrr::list_rbind()
+    }) |>
+    purrr::list_rbind()
+}
+
+#' Ingest player game statistics
+#'
+#' Pulls `/games/players` week by week (weeks derived from the ingested `games`
+#' table when supplied, otherwise re-discovered from `/games`) and flattens to
+#' one row per player-game-category-stat. The
+#' athlete `id` becomes the string `playerId` key (decision 0003 namespace), so
+#' this table joins `player_stats`/`roster` directly — no name guard needed.
+#'
+#' @param years Integer vector of seasons (default 2010:2026).
+#' @param games Optional ingested `games` tibble (the `raw_games` target) used
+#'   to derive played weeks without re-pulling `/games`.
+#'
+#' @return A flat tibble, one row per player-game-category-statType-stat.
+#' @export
+ingest_game_player_stats <- function(years = 2010:2026, games = NULL) {
+  as.integer(years) |>
+    purrr::map(\(y) {
+      weeks <- weeks_for_year(y, games)
+      purrr::imap(weeks, \(wks, st) {
+        purrr::map(wks, \(w) {
+          raw <- cfbd_game_get(
+            "/games/players",
+            list(
+              year = y,
+              week = w,
+              seasonType = st
+            )
+          )
+          flatten_game_player_stats(raw, y, w, st)
+        })
+      }) |>
+        purrr::list_flatten() |>
+        purrr::list_rbind()
+    }) |>
+    purrr::list_rbind()
 }

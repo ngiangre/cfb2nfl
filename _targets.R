@@ -21,53 +21,60 @@ list(
   # ---- ingest (decisions 0017-0018) -----------------------------------------
   # Refresh mode (CFBSTATS_REFRESH=true) pulls each source from CFBD/nflverse in
   # memory; track mode (default, no key) leaves them NULL because the cleaned
-  # parquet below is read directly. `cue = always` so a local re-refresh always
-  # re-ingests.
+  # parquet below is read directly. Targets are NOT cued "always": a re-refresh
+  # is explicit, via data-raw/refresh.R, which invalidates the ingest targets
+  # before running.
   tar_target(
     raw_picks,
-    if (refresh_enabled()) ingest_picks(),
-    cue = tar_cue(mode = "always")
+    if (refresh_enabled()) ingest_picks()
   ),
   tar_target(
     raw_player_stats,
-    if (refresh_enabled()) ingest_player_stats(),
-    cue = tar_cue(mode = "always")
+    if (refresh_enabled()) ingest_player_stats()
   ),
   tar_target(
     raw_coaches,
-    if (refresh_enabled()) ingest_coaches(),
-    cue = tar_cue(mode = "always")
+    if (refresh_enabled()) ingest_coaches()
   ),
   tar_target(
     raw_teams,
-    if (refresh_enabled()) ingest_teams(),
-    cue = tar_cue(mode = "always")
+    if (refresh_enabled()) ingest_teams()
   ),
   tar_target(
     raw_roster,
-    if (refresh_enabled()) ingest_roster(),
-    cue = tar_cue(mode = "always")
+    if (refresh_enabled()) ingest_roster()
   ),
   tar_target(
     raw_recruiting,
-    if (refresh_enabled()) ingest_recruiting(),
-    cue = tar_cue(mode = "always")
+    if (refresh_enabled()) ingest_recruiting()
+  ),
+  # Game statistics (CFBD /games family). /games/players carries the shared
+  # athlete id, so game_player_stats joins the playerId namespace directly.
+  tar_target(
+    raw_games,
+    if (refresh_enabled()) ingest_games()
+  ),
+  tar_target(
+    raw_game_team_stats,
+    # raw_games feeds week discovery, so the stats ingests don't re-pull /games.
+    if (refresh_enabled()) ingest_game_team_stats(games = raw_games)
+  ),
+  tar_target(
+    raw_game_player_stats,
+    if (refresh_enabled()) ingest_game_player_stats(games = raw_games)
   ),
   # NFL outcomes via nflverse (decision 0014); no CFBD key required to ingest.
   tar_target(
     raw_nfl_draft_picks,
-    if (refresh_enabled()) ingest_nfl_draft_picks(),
-    cue = tar_cue(mode = "always")
+    if (refresh_enabled()) ingest_nfl_draft_picks()
   ),
   tar_target(
     raw_nfl_rosters,
-    if (refresh_enabled()) ingest_nfl_rosters(),
-    cue = tar_cue(mode = "always")
+    if (refresh_enabled()) ingest_nfl_rosters()
   ),
   tar_target(
     raw_nfl_player_stats,
-    if (refresh_enabled()) ingest_nfl_player_stats(),
-    cue = tar_cue(mode = "always")
+    if (refresh_enabled()) ingest_nfl_player_stats()
   ),
 
   # ---- clean -> published parquet assets (decision 0018) --------------------
@@ -79,8 +86,7 @@ list(
   tar_target(
     picks_file,
     parquet_asset("data/picks.parquet", function() clean_picks(raw_picks)),
-    format = "file",
-    cue = tar_cue(mode = "always")
+    format = "file"
   ),
   tar_target(picks, arrow::read_parquet(picks_file)),
   tar_target(
@@ -89,8 +95,7 @@ list(
       "data/player_stats.parquet",
       function() clean_player_stats(raw_player_stats)
     ),
-    format = "file",
-    cue = tar_cue(mode = "always")
+    format = "file"
   ),
   tar_target(player_stats, arrow::read_parquet(player_stats_file)),
   tar_target(
@@ -98,22 +103,19 @@ list(
     parquet_asset("data/coaches.parquet", function() {
       clean_coaches(raw_coaches)
     }),
-    format = "file",
-    cue = tar_cue(mode = "always")
+    format = "file"
   ),
   tar_target(coaches, arrow::read_parquet(coaches_file)),
   tar_target(
     teams_file,
     parquet_asset("data/teams.parquet", function() clean_teams(raw_teams)),
-    format = "file",
-    cue = tar_cue(mode = "always")
+    format = "file"
   ),
   tar_target(teams, arrow::read_parquet(teams_file)),
   tar_target(
     roster_file,
     parquet_asset("data/roster.parquet", function() clean_roster(raw_roster)),
-    format = "file",
-    cue = tar_cue(mode = "always")
+    format = "file"
   ),
   tar_target(roster, arrow::read_parquet(roster_file)),
   tar_target(
@@ -122,18 +124,40 @@ list(
       "data/recruiting.parquet",
       function() clean_recruiting(raw_recruiting)
     ),
-    format = "file",
-    cue = tar_cue(mode = "always")
+    format = "file"
   ),
   tar_target(recruiting, arrow::read_parquet(recruiting_file)),
+  tar_target(
+    games_file,
+    parquet_asset("data/games.parquet", function() clean_games(raw_games)),
+    format = "file"
+  ),
+  tar_target(games, arrow::read_parquet(games_file)),
+  tar_target(
+    game_team_stats_file,
+    parquet_asset(
+      "data/game_team_stats.parquet",
+      function() clean_game_team_stats(raw_game_team_stats)
+    ),
+    format = "file"
+  ),
+  tar_target(game_team_stats, arrow::read_parquet(game_team_stats_file)),
+  tar_target(
+    game_player_stats_file,
+    parquet_asset(
+      "data/game_player_stats.parquet",
+      function() clean_game_player_stats(raw_game_player_stats)
+    ),
+    format = "file"
+  ),
+  tar_target(game_player_stats, arrow::read_parquet(game_player_stats_file)),
   tar_target(
     nfl_draft_picks_file,
     parquet_asset(
       "data/nfl_draft_picks.parquet",
       function() clean_nfl_draft_picks(raw_nfl_draft_picks)
     ),
-    format = "file",
-    cue = tar_cue(mode = "always")
+    format = "file"
   ),
   tar_target(nfl_draft_picks, arrow::read_parquet(nfl_draft_picks_file)),
   tar_target(
@@ -142,8 +166,7 @@ list(
       "data/nfl_rosters.parquet",
       function() clean_nfl_rosters(raw_nfl_rosters)
     ),
-    format = "file",
-    cue = tar_cue(mode = "always")
+    format = "file"
   ),
   tar_target(nfl_rosters, arrow::read_parquet(nfl_rosters_file)),
   tar_target(
@@ -152,8 +175,7 @@ list(
       "data/nfl_player_stats.parquet",
       function() clean_nfl_player_stats(raw_nfl_player_stats)
     ),
-    format = "file",
-    cue = tar_cue(mode = "always")
+    format = "file"
   ),
   tar_target(nfl_player_stats, arrow::read_parquet(nfl_player_stats_file)),
   # conference_tiers derived from the cleaned player_stats (decision 0017),
@@ -164,13 +186,14 @@ list(
       "data/conference_tiers.parquet",
       function() build_conference_tiers(player_stats)
     ),
-    format = "file",
-    cue = tar_cue(mode = "always")
+    format = "file"
   ),
   tar_target(tiers, arrow::read_parquet(tiers_file)),
   # Stat-phase taxonomy: hand-authored package data (inst/extdata), read via
   # stat_taxonomy(); makes the long player_stats interpretable (phase + labels).
-  tar_target(stat_taxonomy, stat_taxonomy()),
+  # Target is suffixed _tbl to avoid colliding with the stat_taxonomy()
+  # function from tar_source() (targets warns on the name clash).
+  tar_target(stat_taxonomy_tbl, stat_taxonomy()),
 
   # ---- contracts (decision 0005): pass/fail feeds the audit log -------------
   tar_target(
@@ -213,6 +236,22 @@ list(
     ok_teams,
     pointblank::all_passed(
       contract_teams(teams, player_season, stop_on_fail = FALSE)$coverage
+    )
+  ),
+  tar_target(
+    ok_games,
+    pointblank::all_passed(contract_games(games, stop_on_fail = FALSE))
+  ),
+  tar_target(
+    ok_game_team_stats,
+    pointblank::all_passed(
+      contract_game_team_stats(game_team_stats, stop_on_fail = FALSE)
+    )
+  ),
+  tar_target(
+    ok_game_player_stats,
+    pointblank::all_passed(
+      contract_game_player_stats(game_player_stats, stop_on_fail = FALSE)
     )
   ),
   tar_target(
@@ -272,7 +311,7 @@ list(
     pointblank::all_passed(
       contract_stat_taxonomy(
         player_stats,
-        stat_taxonomy,
+        stat_taxonomy_tbl,
         stop_on_fail = FALSE
       )$coverage
     )
@@ -296,6 +335,9 @@ list(
       roster = ok_roster,
       recruiting = ok_recruiting,
       teams = ok_teams,
+      games = ok_games,
+      game_team_stats = ok_game_team_stats,
+      game_player_stats = ok_game_player_stats,
       tiers = ok_tiers,
       drafted = ok_drafted,
       coach_link = ok_coach_link,
@@ -404,10 +446,13 @@ list(
         conference_tiers = tiers,
         roster = roster,
         recruiting = recruiting,
+        games = games,
+        game_team_stats = game_team_stats,
+        game_player_stats = game_player_stats,
         nfl_draft_picks = nfl_draft_picks,
         nfl_rosters = nfl_rosters,
         nfl_player_stats = nfl_player_stats,
-        stat_taxonomy = stat_taxonomy,
+        stat_taxonomy = stat_taxonomy_tbl,
         ps_change = ps_change,
         roster_flags = roster_flags,
         career_summary = career,
@@ -471,6 +516,30 @@ list(
         raw_teams,
         keys = "team",
         contract_passed = ok_teams
+      ),
+      audit_step(
+        games,
+        "clean_games",
+        "clean",
+        raw_games,
+        keys = "id",
+        contract_passed = ok_games
+      ),
+      audit_step(
+        game_team_stats,
+        "clean_game_team_stats",
+        "clean",
+        raw_game_team_stats,
+        keys = c("gameId", "team", "category"),
+        contract_passed = ok_game_team_stats
+      ),
+      audit_step(
+        game_player_stats,
+        "clean_game_player_stats",
+        "clean",
+        raw_game_player_stats,
+        keys = c("gameId", "playerId", "category", "statType"),
+        contract_passed = ok_game_player_stats
       ),
       audit_step(
         player_season,
@@ -585,7 +654,7 @@ list(
         contract_passed = ok_nfl_link
       ),
       audit_step(
-        stat_taxonomy,
+        stat_taxonomy_tbl,
         "stat_taxonomy",
         "clean",
         keys = c("category", "statType"),
@@ -610,7 +679,6 @@ list(
       } else if (file.exists(path)) {
         tibble::as_tibble(utils::read.csv(path))
       }
-    },
-    cue = targets::tar_cue("always")
+    }
   )
 )
