@@ -4,16 +4,20 @@
 \alias{ingest_game_team_stats}
 \title{Ingest team game statistics}
 \usage{
-ingest_game_team_stats(years = 2010:2026)
+ingest_game_team_stats(years = 2010:2026, games = NULL)
 }
 \arguments{
 \item{years}{Integer vector of seasons (default 2010:2026).}
+
+\item{games}{Optional ingested \code{games} tibble (the \code{raw_games} target) used
+to derive played weeks without re-pulling \verb{/games}.}
 }
 \value{
 A flat tibble, one row per team-game-category-stat.
 }
 \description{
-Pulls \verb{/games/teams} week by week (weeks discovered from \verb{/games}, both
-season types) and flattens to one row per team-game-category-stat. A season
-with no played weeks yet (e.g. a future season) contributes no rows.
+Pulls \verb{/games/teams} week by week (weeks derived from the ingested \code{games}
+table when supplied, otherwise re-discovered from \verb{/games}) and flattens to
+one row per team-game-category-stat. A season with no played weeks yet
+(e.g. a future season) contributes no rows.
 }

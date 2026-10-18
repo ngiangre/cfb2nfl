@@ -4,12 +4,24 @@
 \alias{cfbd_get}
 \title{Perform an authenticated CFBD API request}
 \usage{
-cfbd_get(endpoint, query = list())
+cfbd_get(
+  endpoint,
+  query = list(),
+  throttle = NULL,
+  retry_max_tries = 5,
+  retry_max_seconds = 120
+)
 }
 \arguments{
 \item{endpoint}{API path, e.g. \code{"/draft/picks"}.}
 
 \item{query}{Named list of query parameters (optional).}
+
+\item{throttle}{Optional pacing in requests per second (e.g. \code{0.5} = one
+call every 2 s) for high-volume endpoints; \code{NULL} (default) paces nothing.}
+
+\item{retry_max_tries, retry_max_seconds}{Retry policy passed through to
+\code{\link[=cfbd_request]{cfbd_request()}}.}
 }
 \value{
 A tibble of the (vector-simplified) JSON response.

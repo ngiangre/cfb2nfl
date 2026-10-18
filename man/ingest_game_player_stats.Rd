@@ -4,17 +4,21 @@
 \alias{ingest_game_player_stats}
 \title{Ingest player game statistics}
 \usage{
-ingest_game_player_stats(years = 2010:2026)
+ingest_game_player_stats(years = 2010:2026, games = NULL)
 }
 \arguments{
 \item{years}{Integer vector of seasons (default 2010:2026).}
+
+\item{games}{Optional ingested \code{games} tibble (the \code{raw_games} target) used
+to derive played weeks without re-pulling \verb{/games}.}
 }
 \value{
 A flat tibble, one row per player-game-category-statType-stat.
 }
 \description{
-Pulls \verb{/games/players} week by week (weeks discovered from \verb{/games}, both
-season types) and flattens to one row per player-game-category-stat. The
+Pulls \verb{/games/players} week by week (weeks derived from the ingested \code{games}
+table when supplied, otherwise re-discovered from \verb{/games}) and flattens to
+one row per player-game-category-stat. The
 athlete \code{id} becomes the string \code{playerId} key (decision 0003 namespace), so
 this table joins \code{player_stats}/\code{roster} directly — no name guard needed.
 }

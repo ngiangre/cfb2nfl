@@ -4,7 +4,13 @@
 \alias{cfbd_request}
 \title{Build an authenticated CFBD API request}
 \usage{
-cfbd_request(endpoint, query = list())
+cfbd_request(
+  endpoint,
+  query = list(),
+  throttle = NULL,
+  retry_max_tries = 5,
+  retry_max_seconds = 120
+)
 }
 \arguments{
 \item{endpoint}{API path, e.g. \code{"/draft/picks"}.}

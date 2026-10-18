@@ -14,18 +14,26 @@ Roxygen: list(markdown = TRUE)
 Depends: 
     R (>= 4.1)
 Imports: 
+    bslib,
     cli,
     dplyr (>= 1.2.0),
     DT,
     ellmer,
+    htmltools,
+    golem,
+    htmlwidgets,
+    jsonlite,
     purrr,
     querychat,
     rlang,
     scales,
+    shiny,
     stats,
     tibble,
     tidyr,
-    utils
+    utils,
+    visNetwork,
+    yaml
 Suggests: 
     altdoc,
     arrow,
@@ -35,7 +43,6 @@ Suggests:
     ggiraph,
     ggpath,
     ggplot2,
-    htmltools,
     httr2,
     nflreadr,
     pkgload,
@@ -46,8 +53,6 @@ Suggests:
     targets,
     testthat (>= 3.0.0),
     thematic,
-    visNetwork,
-    withr,
-    yaml
+    withr
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.1.1
