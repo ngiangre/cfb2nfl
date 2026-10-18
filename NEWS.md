@@ -1,5 +1,11 @@
 # cfbstats 0.0.0.9000 (development version)
 
+- The `/games` family ingest is now dynamically branched in the pipeline
+  (one target branch per API call, decision 0029): an interrupted refresh
+  resumes at the first un-ingested season/week instead of re-pulling the whole
+  ~1,150-call sweep. Combined tables keep the same grain, so all downstream
+  targets and published assets are unchanged.
+
 First tracked release of the project scaffolding. The repo now carries the full
 ingest → clean → link → features → model → report pipeline, its lineage/audit
 layer, and the documentation site, all under version control.

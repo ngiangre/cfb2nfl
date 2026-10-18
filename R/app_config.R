@@ -8,5 +8,12 @@
 #' within your package. The default, none, returns the root of the app.
 #' @noRd
 app_sys <- function(...) {
-  system.file(..., package = "cfbstats")
+  # Under pkgload::load_all() system.file resolves into the package's temp
+  # install; on deployed bundles it can come back empty, so fall back to the
+  # project checkout on disk.
+  p <- system.file(..., package = "cfbstats")
+  if (!nzchar(p)) {
+    p <- file.path(getwd(), "inst", ...)
+  }
+  p
 }

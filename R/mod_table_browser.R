@@ -12,14 +12,64 @@ like_clause <- function(col, term) {
   sprintf("CAST(%s AS VARCHAR) ILIKE '%%%s%%'", col, sql_like_escape(term))
 }
 
+# DT's slider filters send "low ... high" strings (epoch-milliseconds for
+# date/time columns) and its selectize filters send JSON arrays; only
+# character columns arrive as plain substrings.
+range_clause <- function(col, type, term) {
+  parts <- strsplit(term, " ... ", fixed = TRUE)[[1]]
+  if (length(parts) != 2L) {
+    return(NULL)
+  }
+  lo <- suppressWarnings(as.numeric(trimws(parts[[1]])))
+  hi <- suppressWarnings(as.numeric(trimws(parts[[2]])))
+  if (is.na(lo) || is.na(hi)) {
+    return(NULL)
+  }
+  if (type == "date") {
+    sprintf("%s BETWEEN epoch_ms(%.0f) AND epoch_ms(%.0f)", col, lo, hi)
+  } else {
+    sprintf("CAST(%s AS DOUBLE) BETWEEN %.6g AND %.6g", col, lo, hi)
+  }
+}
+
+select_clause <- function(col, term) {
+  values <- tryCatch(jsonlite::fromJSON(term), error = function(e) NULL)
+  if (!is.character(values) || length(values) == 0L) {
+    return(NULL)
+  }
+  quoted <- vapply(
+    values,
+    function(v) paste0("'", sql_like_escape(v), "'"),
+    character(1)
+  )
+  sprintf("%s IN (%s)", col, paste(quoted, collapse = ", "))
+}
+
+filter_clause <- function(col, type, term) {
+  if (!nzchar(term)) {
+    return(NULL)
+  }
+  if (type %in% c("integer", "number", "date")) {
+    range_clause(col, type, term)
+  } else if (type %in% c("factor", "logical")) {
+    select_clause(col, term)
+  } else {
+    like_clause(col, term)
+  }
+}
+
 #' Build page/count SQL for a DataTables server-side request
 #'
 #' Pure function over the DataTables ajax parameters so it can be tested
-#' without a database. Columns must already be quoted identifiers.
+#' without a database. Columns must already be quoted identifiers; `types`
+#' mirrors DT's per-column filter types ("character", "integer", "number",
+#' "date", "factor") so each column search term is translated into SQL
+#' matching what DT's widget sends.
 #' @noRd
 dt_sql <- function(
   table,
   cols,
+  types = rep("character", length(cols)),
   search = "",
   col_search = rep("", length(cols)),
   order_col = 1L,
@@ -40,7 +90,10 @@ dt_sql <- function(
   if (length(col_search) == length(cols)) {
     hits <- which(nzchar(col_search))
     for (i in hits) {
-      where <- c(where, like_clause(cols[[i]], col_search[[i]]))
+      clause <- filter_clause(cols[[i]], types[[i]], col_search[[i]])
+      if (!is.null(clause)) {
+        where <- c(where, clause)
+      }
     }
   }
   where_sql <- if (length(where)) {
@@ -71,7 +124,7 @@ dt_sql <- function(
 #' ajax payload, pushes search/sort/paging into SQL, and answers with the
 #' JSON shape DataTables' server-side mode expects.
 #' @noRd
-dt_ajax_handler <- function(con, table, cols) {
+dt_ajax_handler <- function(con, table, cols, types) {
   quoted <- vapply(
     cols,
     function(x) as.character(DBI::dbQuoteIdentifier(con, x)),
@@ -103,6 +156,7 @@ dt_ajax_handler <- function(con, table, cols) {
     s <- dt_sql(
       quoted_table,
       unname(quoted),
+      types = types,
       search = search,
       col_search = col_search,
       order_col = order_col,
@@ -163,7 +217,7 @@ mod_table_browser_ui <- function(id) {
   bslib::card(
     fill = TRUE,
     bslib::card_header(shiny::uiOutput(ns("subtitle"))),
-    bslib::card_body(DT::DTOutput(ns("tbl")), height = "100%")
+    bslib::card_body(DT::DTOutput(ns("tbl")), height = "calc(100vh - 220px)")
   )
 }
 
@@ -174,9 +228,39 @@ mod_table_browser_server <- function(id, con, table, dict, n_rows) {
       con,
       sprintf("SELECT * FROM %s LIMIT 0", DBI::dbQuoteIdentifier(con, table))
     ))
-    empty <- DBI::dbGetQuery(
+    quoted_cols <- paste(
+      vapply(
+        cols,
+        function(x) as.character(DBI::dbQuoteIdentifier(con, x)),
+        character(1)
+      ),
+      collapse = ", "
+    )
+    # A small real sample so DT's type detection can pick the right filter
+    # widget per column (numeric range, date) instead of plain text everywhere;
+    # the rows themselves are replaced on the first server-side draw.
+    sample_rows <- DBI::dbGetQuery(
       con,
-      sprintf("SELECT * FROM %s LIMIT 0", DBI::dbQuoteIdentifier(con, table))
+      sprintf(
+        "SELECT %s FROM %s LIMIT 10",
+        quoted_cols,
+        DBI::dbQuoteIdentifier(con, table)
+      )
+    )
+    col_types <- vapply(
+      sample_rows,
+      function(d) {
+        if (inherits(d, c("Date", "POSIXct", "POSIXt"))) {
+          "date"
+        } else if (is.numeric(d)) {
+          if (is.integer(d)) "integer" else "number"
+        } else if (is.factor(d) || is.logical(d)) {
+          "factor"
+        } else {
+          "character"
+        }
+      },
+      character(1)
     )
 
     # A table missing from the dict (e.g. a not-yet-documented view) still browses.
@@ -206,7 +290,7 @@ mod_table_browser_server <- function(id, con, table, dict, n_rows) {
         )
       }
       DT::datatable(
-        empty,
+        sample_rows,
         # rownames=TRUE would prepend a phantom column and shift every
         # server-side column index by one.
         rownames = FALSE,
@@ -218,14 +302,16 @@ mod_table_browser_server <- function(id, con, table, dict, n_rows) {
         filter = "top",
         # HTML colnames (tooltip spans) survive only when not escaped.
         escape = FALSE,
+        # compact class tightens cell padding so more rows fit the taller card
+        class = "compact nowrap",
         fillContainer = TRUE,
         options = list(
           serverSide = TRUE,
           processing = TRUE,
-          pageLength = 25,
+          pageLength = 100,
           lengthMenu = list(
-            c(10, 25, 50, 100, -1),
-            c("10", "25", "50", "100", "All")
+            c(100, -1),
+            c("100", "All")
           ),
           scrollX = TRUE,
           searchDelay = 400,
@@ -236,7 +322,7 @@ mod_table_browser_server <- function(id, con, table, dict, n_rows) {
             url = session$registerDataObj(
               paste0("dt_", table),
               NULL,
-              dt_ajax_handler(con, table, cols)
+              dt_ajax_handler(con, table, cols, unname(col_types))
             )
           )
         )

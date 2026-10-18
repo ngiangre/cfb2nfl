@@ -44,6 +44,27 @@ erd_group_colors <- c(
 #' @param lines Character vector of the document's lines.
 #' @return List with `nodes` (id, group) and `edges` (from, to, card, label,
 #'   dashes) data frames.
+#' Load a file bundled under `inst/`
+#'
+#' Delegates to `app_sys()`, which falls back to the project checkout when
+#' `system.file()` comes back empty on a deployed bundle.
+#' @noRd
+erd_asset <- function(rel) {
+  p <- app_sys(rel)
+  if (!file.exists(p)) {
+    stop(sprintf("packaged asset not found: %s", rel), call. = FALSE)
+  }
+  p
+}
+
+#' Parse the mermaid erDiagram block from the data-model doc
+#'
+#' Extracts the entity-relationship graph as tidy nodes/edges data frames so
+#' the app renders the same ERD the documentation describes.
+#'
+#' @param lines Character vector of the document's lines.
+#' @return List with `nodes` (id, group) and `edges` (from, to, card, label,
+#'   dashes) data frames.
 #' @noRd
 parse_erd_mermaid <- function(lines) {
   rel <- grep('^\\s*\\w+\\s+\\S+\\s+\\w+\\s*:\\s*"', lines, value = TRUE)
@@ -74,11 +95,60 @@ parse_erd_mermaid <- function(lines) {
 #' carries `grain`, `key`, `description`, and per-column metadata used for
 #' table-header tooltips.
 #' @noRd
-app_dict <- function(dict_dir = system.file("dict", package = "cfbstats")) {
+app_dict <- function(dict_dir = app_sys("dict")) {
   files <- list.files(dict_dir, "\\.yml$", full.names = TRUE)
   out <- lapply(files, yaml::read_yaml)
   names(out) <- tools::file_path_sans_ext(basename(files))
   out
+}
+
+# Edge color by join namespace, so the five documented key families are
+# visually distinct (mirrors the "Join keys & namespaces" section of
+# inst/data-model.md).
+erd_edge_palette <- c(
+  athlete_id = "#4C78A8",
+  game_id = "#72B7B2",
+  draft_slot = "#54A24B",
+  gsis_id = "#2CA02C",
+  team_season = "#F58518",
+  conference_season = "#E45756",
+  derived = "#B0B0B0",
+  name_guarded = "#9467BD"
+)
+
+#' Classify an edge's join key into its namespace
+#'
+#' @param label The mermaid edge label (e.g. "playerId, season").
+#' @param dashes TRUE when the link is name-guarded.
+#' @return Named palette entry, or `derived` for intra-pipeline transforms.
+#' @noRd
+erd_key_namespace <- function(label, dashes) {
+  if (dashes) {
+    return("name_guarded")
+  }
+  l <- tolower(label)
+  if (grepl("pivoted|collapsed", l)) {
+    return("derived")
+  }
+  if (grepl("gsis_id", l)) {
+    return("gsis_id")
+  }
+  if (grepl("slot", l)) {
+    return("draft_slot")
+  }
+  if (grepl("gameid", l)) {
+    return("game_id")
+  }
+  if (grepl("conference", l)) {
+    return("conference_season")
+  }
+  if (grepl("team|school", l)) {
+    return("team_season")
+  }
+  if (grepl("playerid", l)) {
+    return("athlete_id")
+  }
+  "derived"
 }
 
 #' Build the visNetwork ERD widget
@@ -95,7 +165,7 @@ erd_network <- function(
   click_input = "erd_click",
   n_rows = NULL
 ) {
-  md <- readLines(system.file("data-model.md", package = "cfbstats"))
+  md <- readLines(erd_asset("data-model.md"))
   g <- parse_erd_mermaid(md)
 
   keep <- g$nodes$id %in% tables
@@ -105,6 +175,17 @@ erd_network <- function(
     ,
     drop = FALSE
   ]
+
+  if (nrow(g$nodes) == 0) {
+    return(
+      visNetwork::visNetwork(
+        data.frame(id = character(0), label = character(0)),
+        data.frame(from = character(0), to = character(0)),
+        height = "700px",
+        width = "100%"
+      )
+    )
+  }
 
   title <- vapply(
     g$nodes$id,
@@ -129,16 +210,28 @@ erd_network <- function(
 
   edges <- g$edges
   if (nrow(edges) > 0) {
+    ns <- mapply(erd_key_namespace, edges$label, edges$dashes)
     edges$arrows <- "to"
     edges$smooth <- FALSE
-    edges$font <- list(list(size = 11, color = "#555555", face = "sans"))
+    edges$color <- unname(erd_edge_palette[ns])
+    edges$title <- sprintf(
+      "<b>%s → %s</b><br/>Join key: %s%s",
+      edges$from,
+      edges$to,
+      htmltools::htmlEscape(edges$label),
+      ifelse(
+        ns == "name_guarded",
+        "<br/><i>Name-guarded, not a plain key join</i>",
+        ""
+      )
+    )
+    edges$font <- list(list(size = 13, color = "#333333", face = "sans"))
   }
 
   visNetwork::visNetwork(nodes, edges, height = "700px", width = "100%") |>
     visNetwork::visEdges(
       arrows = "to",
-      smooth = FALSE,
-      font = list(size = 11, color = "#555555", face = "sans")
+      smooth = FALSE
     ) |>
     visNetwork::visOptions(
       highlightNearest = list(enabled = TRUE, degree = 1, hover = TRUE),

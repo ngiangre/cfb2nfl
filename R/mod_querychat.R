@@ -7,7 +7,7 @@
 # per app session, not at global scope.
 querychat_setup <- function(con, tables) {
   dict_files <- list.files(
-    system.file("dict", package = "cfbstats"),
+    app_sys("dict"),
     "\\.yml$",
     full.names = TRUE
   )

@@ -143,7 +143,7 @@ build_duckdb <- function(tables, db_path = "data/cfbstats.duckdb") {
 #' @export
 schema_manifest <- function(
   table_names,
-  dict_dir = system.file("dict", package = "cfbstats")
+  dict_dir = app_sys("dict")
 ) {
   docs <- vapply(
     table_names,

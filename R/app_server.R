@@ -18,7 +18,10 @@ app_server <- function(input, output, session) {
     selected_table(),
     {
       tb <- selected_table()
-      if (!is.null(tb) && tb %in% d$tables) bslib::nav_select("topnav", tb)
+      if (!is.null(tb) && tb %in% d$tables) {
+        bslib::nav_select("topnav", "data")
+        bslib::nav_select("datatabs", tb)
+      }
     },
     ignoreInit = TRUE
   )
@@ -35,5 +38,5 @@ app_server <- function(input, output, session) {
     })
   }
 
-  mod_querychat_server("query", con = d$con, tables = d$tables)
+  #mod_querychat_server("query", con = d$con, tables = d$tables)
 }

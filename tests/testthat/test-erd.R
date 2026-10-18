@@ -49,6 +49,57 @@ test_that("dt_sql escapes single quotes and falls back on bad order index", {
   expect_match(s$page_sql, "ORDER BY \"a\" ASC", fixed = TRUE)
 })
 
+test_that("dt_sql translates slider ranges into BETWEEN clauses", {
+  s <- dt_sql(
+    "\"t\"",
+    c("\"season\"", "\"srs\""),
+    types = c("integer", "number"),
+    col_search = c("1950 ... 2000", "-1.2 ... 3.4")
+  )
+  expect_match(
+    s$filtered_sql,
+    "CAST(\"season\" AS DOUBLE) BETWEEN 1950 AND 2000",
+    fixed = TRUE
+  )
+  expect_match(
+    s$filtered_sql,
+    "CAST(\"srs\" AS DOUBLE) BETWEEN -1.2 AND 3.4",
+    fixed = TRUE
+  )
+})
+
+test_that("dt_sql translates date ranges via epoch_ms", {
+  s <- dt_sql(
+    "\"t\"",
+    "\"d\"",
+    types = "date",
+    col_search = "1e+12 ... 2e+12"
+  )
+  expect_match(s$filtered_sql, "\"d\" BETWEEN epoch_ms(", fixed = TRUE)
+  expect_match(s$filtered_sql, ") AND epoch_ms(", fixed = TRUE)
+})
+
+test_that("dt_sql translates factor selectize choices into IN", {
+  s <- dt_sql(
+    "\"t\"",
+    "\"conf\"",
+    types = "factor",
+    col_search = '["SEC","Big Ten"]'
+  )
+  expect_match(s$filtered_sql, "\"conf\" IN ('SEC', 'Big Ten')", fixed = TRUE)
+})
+
+test_that("dt_sql ignores malformed column filters instead of erroring", {
+  s <- dt_sql(
+    "\"t\"",
+    c("\"season\"", "\"conf\""),
+    types = c("integer", "factor"),
+    col_search = c("not a range", "not json")
+  )
+  expect_no_match(s$filtered_sql, "season", fixed = TRUE)
+  expect_no_match(s$filtered_sql, "conf", fixed = TRUE)
+})
+
 test_that("app_dict parses every dictionary with grain and typed columns", {
   d <- app_dict()
   expect_gt(length(d), 15)
