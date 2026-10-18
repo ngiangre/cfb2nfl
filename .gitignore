@@ -69,3 +69,6 @@ _quarto/
 
 *_files/shiny_bookmarks/
 shiny_bookmarks/
+
+.posit/publish/
+.posit/assistant/settings.json
