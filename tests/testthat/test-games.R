@@ -214,3 +214,67 @@ test_that("clean_games coerces the raw game metadata schema", {
     stop_on_fail = FALSE
   )))
 })
+
+# Chunk helpers (decision 0029): the targets pipeline maps these over season /
+# week grids, so each is asserted with cfbd_game_get mocked rather than the API.
+test_that("ingest_games_chunk flattens one /games call and NULLs unplayed types", {
+  raw <- tibble::tibble(
+    id = 401540273,
+    season = 2023,
+    week = 5,
+    seasonType = "regular",
+    venue = "Aviva Stadium"
+  )
+  withr::local_envvar(CFBD_API_KEY = "test-key")
+  testthat::local_mocked_bindings(
+    cfbd_game_get = function(endpoint, query = list()) {
+      expect_equal(endpoint, "/games")
+      # An unplayed season type returns an empty body (no columns at all).
+      if (query$seasonType == "postseason") {
+        return(tibble::tibble())
+      }
+      raw
+    },
+    .env = asNamespace("cfbstats")
+  )
+  out <- ingest_games_chunk(2023L, "regular")
+  expect_equal(out$venue_name, "Aviva Stadium")
+  expect_false("venue" %in% names(out))
+  expect_null(ingest_games_chunk(2023L, "postseason"))
+})
+
+test_that("ingest_game_team_stats_chunk flattens one /games/teams call", {
+  withr::local_envvar(CFBD_API_KEY = "test-key")
+  testthat::local_mocked_bindings(
+    cfbd_game_get = function(endpoint, query = list()) {
+      expect_equal(endpoint, "/games/teams")
+      expect_equal(
+        query,
+        list(year = 2023L, week = 5L, seasonType = "regular")
+      )
+      mk_team_raw()
+    },
+    .env = asNamespace("cfbstats")
+  )
+  out <- ingest_game_team_stats_chunk(2023L, 5L, "regular")
+  expect_equal(nrow(out), 4L)
+  expect_true(all(out$season == 2023L & out$week == 5L))
+})
+
+test_that("ingest_game_player_stats_chunk flattens one /games/players call", {
+  withr::local_envvar(CFBD_API_KEY = "test-key")
+  testthat::local_mocked_bindings(
+    cfbd_game_get = function(endpoint, query = list()) {
+      expect_equal(endpoint, "/games/players")
+      expect_equal(
+        query,
+        list(year = 2023L, week = 5L, seasonType = "regular")
+      )
+      mk_game_raw()
+    },
+    .env = asNamespace("cfbstats")
+  )
+  out <- ingest_game_player_stats_chunk(2023L, 5L, "regular")
+  expect_equal(nrow(out), 4L)
+  expect_setequal(out$playerId, c("4426688", "5550001"))
+})

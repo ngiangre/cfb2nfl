@@ -573,6 +573,67 @@ ingest_game_team_stats <- function(years = 2010:2026, games = NULL) {
     purrr::list_rbind()
 }
 
+# ---- dynamic-branching chunks (decision 0029) ------------------------------
+#
+# The targets pipeline maps these one-call helpers over (season x season type)
+# and (season x season type x week) grids, so a failed week pull resumes where
+# it left off instead of re-ingesting the whole sweep. The full-table
+# ingest_*() functions above stay as the programmatic API.
+
+#' Ingest game metadata for one season and season type
+#'
+#' One `/games` call; the per-season-type chunk target in `_targets.R` maps
+#' over `season_type` so each call is cached independently (decision 0029).
+#'
+#' @param year Season year.
+#' @param season_type `regular` or `postseason`.
+#' @return A flat tibble of games, or `NULL` for an unplayed season type.
+#' @keywords internal
+ingest_games_chunk <- function(year, season_type) {
+  raw <- cfbd_game_get("/games", list(year = year, seasonType = season_type))
+  if (!nrow(raw)) {
+    return(NULL)
+  }
+  raw |>
+    # `venue` is a flat venue-name string (venueId is top-level already).
+    dplyr::mutate(venue_name = as.character(.data$venue)) |>
+    dplyr::select(-dplyr::any_of("venue"))
+}
+
+#' Ingest one week of team game statistics
+#'
+#' One `/games/teams` call for a single season/week/season-type, flattened via
+#' [flatten_game_team_stats()] — the week-level branch target in `_targets.R`
+#' maps over this (decision 0029).
+#'
+#' @inheritParams ingest_games_chunk
+#' @param week Week number.
+#' @return A flat tibble, one row per team-game-category-stat.
+#' @keywords internal
+ingest_game_team_stats_chunk <- function(year, week, season_type) {
+  raw <- cfbd_game_get(
+    "/games/teams",
+    list(year = year, week = week, seasonType = season_type)
+  )
+  flatten_game_team_stats(raw, year, week, season_type)
+}
+
+#' Ingest one week of player game statistics
+#'
+#' One `/games/players` call for a single season/week/season-type, flattened
+#' via [flatten_game_player_stats()] (decision 0029).
+#'
+#' @inheritParams ingest_game_team_stats_chunk
+#' @return A flat tibble, one row per player-game-category-statType-stat.
+#' @keywords internal
+ingest_game_player_stats_chunk <- function(year, week, season_type) {
+  raw <- cfbd_game_get(
+    "/games/players",
+    list(year = year, week = week, seasonType = season_type)
+  )
+  flatten_game_player_stats(raw, year, week, season_type)
+}
+
 #' Ingest player game statistics
 #'
 #' Pulls `/games/players` week by week (weeks derived from the ingested `games`
