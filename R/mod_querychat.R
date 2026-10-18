@@ -48,13 +48,13 @@ querychat_setup <- function(con, tables) {
   )
 
   greeting <- sprintf(
-    "Welcome to **cfbstats** — exploring what shapes a college football player's
+    "Welcome to **cfbstats**  --  exploring what shapes a college football player's
 path to the NFL draft. This DuckDB bundle has **%d tables**: college stat lines
 (`player_season_stats` is the wide, player-season base table), rosters,
 coaches, recruiting, draft picks, and NFL outcomes via `nfl_pick_link`.
 
-Tables join on shared keys — `playerId` across college tables, `gsis_id` on the
-NFL side — so feel free to ask questions that span them.
+Tables join on shared keys  --  `playerId` across college tables, `gsis_id` on the
+NFL side  --  so feel free to ask questions that span them.
 
 ##### Explore the data
 <ul>

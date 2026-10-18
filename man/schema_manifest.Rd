@@ -4,10 +4,7 @@
 \alias{schema_manifest}
 \title{Build the schema manifest for the DuckDB bundle}
 \usage{
-schema_manifest(
-  table_names,
-  dict_dir = system.file("dict", package = "cfbstats")
-)
+schema_manifest(table_names, dict_dir = app_sys("dict"))
 }
 \arguments{
 \item{table_names}{Names of the tables bundled into the DuckDB file.}

@@ -155,7 +155,7 @@ erd_key_namespace <- function(label, dashes) {
 #'
 #' Nodes are tables (tooltips show grain, key, and row count); edges are the
 #' join relationships, dashed when name-guarded. Only tables present in the
-#' database are rendered — the doc's graph can lead the bundle (e.g. the
+#' database are rendered  --  the doc's graph can lead the bundle (e.g. the
 #' games family before its first publish). The click JS reports the selected
 #' node id to a (namespaced) Shiny input.
 #' @noRd
@@ -215,7 +215,7 @@ erd_network <- function(
     edges$smooth <- FALSE
     edges$color <- unname(erd_edge_palette[ns])
     edges$title <- sprintf(
-      "<b>%s → %s</b><br/>Join key: %s%s",
+      "<b>%s -> %s</b><br/>Join key: %s%s",
       edges$from,
       edges$to,
       htmltools::htmlEscape(edges$label),
