@@ -79,6 +79,7 @@ export(player_dossier)
 export(player_trajectory)
 export(resolve_nfl_outcome)
 export(reused_ids)
+export(run_app)
 export(scale_color_team)
 export(scale_fill_team)
 export(schema_hash)
@@ -102,7 +103,9 @@ export(viz_scatter_3d)
 export(viz_team_logos)
 export(viz_theme)
 export(viz_transfers_by_season)
+import(shiny)
 importFrom(rlang,
   "%||%",
   .data
 )
+importFrom(shiny,shinyApp)

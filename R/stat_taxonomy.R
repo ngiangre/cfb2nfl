@@ -26,7 +26,7 @@
 #' head(stat_taxonomy())
 stat_taxonomy <- function() {
   rlang::check_installed("tibble")
-  path <- system.file("extdata", "stat_taxonomy.csv", package = "cfbstats")
+  path <- app_sys("extdata", "stat_taxonomy.csv")
   if (!nzchar(path)) {
     cli::cli_abort(
       "{.file stat_taxonomy.csv} not found; is the package installed?"

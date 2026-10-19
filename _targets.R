@@ -50,18 +50,68 @@ list(
   ),
   # Game statistics (CFBD /games family). /games/players carries the shared
   # athlete id, so game_player_stats joins the playerId namespace directly.
+  # Dynamic branching (decision 0029): each branch is ONE API call, cached
+  # separately, so a failed refresh resumes at the first un-ingested week
+  # instead of re-pulling the whole sweep. Combines keep the original full-table
+  # shapes, so everything downstream is unchanged.
+  tar_target(
+    games_grid,
+    tidyr::expand_grid(
+      season = 2010:2026,
+      seasonType = c("regular", "postseason")
+    )
+  ),
+  # The branch targets map one API call per branch; these aggregates consume
+  # the full branch value, so a plain bind_rows restores the original
+  # full-table shape for everything downstream (decision 0029).
+  tar_target(
+    raw_games_chunk,
+    if (refresh_enabled()) {
+      ingest_games_chunk(games_grid$season, games_grid$seasonType)
+    },
+    pattern = map(games_grid)
+  ),
   tar_target(
     raw_games,
-    if (refresh_enabled()) ingest_games()
+    if (refresh_enabled()) dplyr::bind_rows(raw_games_chunk)
+  ),
+  # The week grid comes from the ingested games, so the stats ingests never
+  # re-pull /games to discover weeks.
+  tar_target(
+    week_grid,
+    raw_games |>
+      dplyr::distinct(season, seasonType, week) |>
+      dplyr::arrange(season, seasonType, week)
+  ),
+  tar_target(
+    raw_game_team_stats_chunk,
+    if (refresh_enabled()) {
+      ingest_game_team_stats_chunk(
+        week_grid$season,
+        week_grid$week,
+        week_grid$seasonType
+      )
+    },
+    pattern = map(week_grid)
   ),
   tar_target(
     raw_game_team_stats,
-    # raw_games feeds week discovery, so the stats ingests don't re-pull /games.
-    if (refresh_enabled()) ingest_game_team_stats(games = raw_games)
+    if (refresh_enabled()) dplyr::bind_rows(raw_game_team_stats_chunk)
+  ),
+  tar_target(
+    raw_game_player_stats_chunk,
+    if (refresh_enabled()) {
+      ingest_game_player_stats_chunk(
+        week_grid$season,
+        week_grid$week,
+        week_grid$seasonType
+      )
+    },
+    pattern = map(week_grid)
   ),
   tar_target(
     raw_game_player_stats,
-    if (refresh_enabled()) ingest_game_player_stats(games = raw_games)
+    if (refresh_enabled()) dplyr::bind_rows(raw_game_player_stats_chunk)
   ),
   # NFL outcomes via nflverse (decision 0014); no CFBD key required to ingest.
   tar_target(
