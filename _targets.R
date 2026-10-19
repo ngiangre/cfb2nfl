@@ -75,11 +75,12 @@ list(
     raw_games,
     if (refresh_enabled()) dplyr::bind_rows(raw_games_chunk)
   ),
-  # The week grid comes from the ingested games, so the stats ingests never
-  # re-pull /games to discover weeks.
+  # The week grid comes from the cleaned games (fresh ingest in refresh mode,
+  # the published parquet in track mode), so the stats ingests never re-pull
+  # /games to discover weeks and track mode never touches a NULL raw target.
   tar_target(
     week_grid,
-    raw_games |>
+    games |>
       dplyr::distinct(season, seasonType, week) |>
       dplyr::arrange(season, seasonType, week)
   ),
