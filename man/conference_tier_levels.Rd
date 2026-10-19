@@ -15,5 +15,5 @@ measuring transfer \emph{direction} (decision 0003). Higher is stronger, so a
 move from a smaller level to a larger one is "up".
 }
 \examples{
-conference_tier_levels()
+\dontrun{conference_tier_levels()}
 }

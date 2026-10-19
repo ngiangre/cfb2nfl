@@ -164,8 +164,13 @@ wrapper (`CFBSTATS_REFRESH=true` + `tar_make()`). Years 2010–2026.
   non-internal function linking to `../man/<fn>.html` (75 rendered man pages).
   Vignettes read the pipeline via `tar_read()` and set the knit wd to the
   project root from the `CFBSTATS_ROOT` env var
-  (altdoc renders in a temp dir); they use `library(cfbstats)` and
-  `system.file("dict", ...)`, so the package must be installed to render.
+  (altdoc renders in a temp dir); they do NOT require an installed cfbstats
+  package — setup chunks source `R/*.R` from the checkout when the package is
+  missing, and dicts are read via `file.path(root, "inst", "dict")` (decision
+  0030). altdoc injects `library("cfbstats")` into man-page `@examples`, so
+  examples must be `\dontrun{}`-wrapped to render unexecuted (`\donttest` is
+  NOT detected by altdoc's converter). altdoc may not re-copy edited vignettes
+  into `_quarto/` — clear stale copies if a render keeps old code.
   Viz is hybrid: R htmlwidgets default (`plotly`/`ggiraph`/`reactable`),
   OJS later. `vignettes/` is `.Rbuildignore`d (they need the pipeline/data,
   not CRAN).

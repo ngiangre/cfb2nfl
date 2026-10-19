@@ -16,11 +16,21 @@ vignette: >
 ```{r}
 #| label: setup
 #| include: false
-library(cfbstats)
+# Load cfbstats from the checkout when the package is not installed, so the
+# site build does not require a package install (decision 0030).
+if (!requireNamespace("cfbstats", quietly = TRUE)) {
+  dir <- getwd()
+  while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
+    dir <- dirname(dir)
+  }
+  for (src in sort(list.files(file.path(dir, "R"), pattern = "[.]R$", full.names = TRUE))) {
+    source(src, local = FALSE, encoding = "UTF-8")
+  }
+}
 library(dplyr)
 library(targets)
 # altdoc renders in a temp dir; point the knit wd at the project root so
-# tar_read() and system.file() resolve (set by CFBSTATS_ROOT in CI/site build).
+# tar_read() and inst/ paths resolve (set by CFBSTATS_ROOT in CI/site build).
 root <- cfbstats_root()
 if (nzchar(root)) knitr::opts_knit$set(root.dir = root)
 ```

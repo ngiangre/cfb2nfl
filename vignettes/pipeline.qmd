@@ -9,7 +9,17 @@ vignette: >
 ```{r}
 #| label: setup
 #| include: false
-library(cfbstats)
+# Load cfbstats from the checkout when the package is not installed, so the
+# site build does not require a package install (decision 0030).
+if (!requireNamespace("cfbstats", quietly = TRUE)) {
+  dir <- getwd()
+  while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
+    dir <- dirname(dir)
+  }
+  for (src in sort(list.files(file.path(dir, "R"), pattern = "[.]R$", full.names = TRUE))) {
+    source(src, local = FALSE, encoding = "UTF-8")
+  }
+}
 library(targets)
 library(dplyr)
 # Under altdoc, docs render in a temp dir; point the knit working directory at
