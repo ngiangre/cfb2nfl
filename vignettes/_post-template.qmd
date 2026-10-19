@@ -18,7 +18,11 @@ vignette: >
 #| include: false
 # Load cfbstats from the checkout when the package is not installed, so the
 # site build does not require a package install (decision 0030).
-if (!requireNamespace("cfbstats", quietly = TRUE)) {
+if (requireNamespace("cfbstats", quietly = TRUE)) {
+  # vignettes render in a fresh quarto R session: attach the installed package
+  # (CI installs it via local::.) or source the checkout fallback below.
+  library(cfbstats)
+} else {
   dir <- getwd()
   while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
     dir <- dirname(dir)

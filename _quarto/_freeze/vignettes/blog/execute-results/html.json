@@ -1,0 +1,21 @@
+{
+  "hash": "9995f9ddc456d195a737a8fb9a7bb51d",
+  "result": {
+    "engine": "knitr",
+    "markdown": "---\ntitle: \"Blog\"\nvignette: >\n  %\\VignetteIndexEntry{Blog}\n  %\\VignetteEngine{quarto::html}\n  %\\VignetteEncoding{UTF-8}\n---\n\n\n\n\n::: {.cell}\n::: {.cell-output-display}\n\n```{=html}\n<div class=\"reactable html-widget html-fill-item\" id=\"htmlwidget-2d25f3f6499205e7fccd\" style=\"width:auto;height:auto;\"></div>\n<script type=\"application/json\" data-for=\"htmlwidget-2d25f3f6499205e7fccd\">{\"x\":{\"tag\":{\"name\":\"Reactable\",\"attribs\":{\"data\":{\"date\":[\"2026-10-16\",\"2026-08-27\"],\"title\":[\"Seven quarterbacks, one database: stress-testing what we think we know\",\"Welcome to the NFL Preseason! Let's look at key players fighting to start\"],\"author\":[\"Nick Giangreco\",\"Nick Giangreco\"],\"href\":[\"2026-10-16-expectation-checks.html\",\"2026-08-27-buechele-allen.html\"]},\"columns\":[{\"id\":\"date\",\"name\":\"Date\",\"type\":\"character\",\"width\":110},{\"id\":\"title\",\"name\":\"Post\",\"type\":\"character\",\"cell\":[{\"name\":\"a\",\"attribs\":{\"href\":\"2026-10-16-expectation-checks.html\",\"className\":\"fs-5\"},\"children\":[\"Seven quarterbacks, one database: stress-testing what we think we know\"]},{\"name\":\"a\",\"attribs\":{\"href\":\"2026-08-27-buechele-allen.html\",\"className\":\"fs-5\"},\"children\":[\"Welcome to the NFL Preseason! Let's look at key players fighting to start\"]}]},{\"id\":\"author\",\"name\":\"Author\",\"type\":\"character\",\"width\":160},{\"id\":\"href\",\"name\":\"href\",\"type\":\"character\",\"show\":false}],\"sortable\":false,\"pagination\":false,\"theme\":{\"cellPadding\":\"12px 10px\"},\"dataKey\":\"03d76f40f97294423201c6ac48884ba8\"},\"children\":[]},\"class\":\"reactR_markup\"},\"evals\":[],\"jsHooks\":[]}</script>\n```\n\n:::\n:::\n\n",
+    "supporting": [
+      "blog_files"
+    ],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {
+      "include-in-header": [
+        "<script src=\"../site_libs/core-js-2.5.3/shim.min.js\"></script>\n<script src=\"../site_libs/react-18.2.0/react.min.js\"></script>\n<script src=\"../site_libs/react-18.2.0/react-dom.min.js\"></script>\n<script src=\"../site_libs/reactwidget-2.0.0/react-tools.js\"></script>\n<link href=\"../site_libs/htmltools-fill-0.5.9/fill.css\" rel=\"stylesheet\" />\n<script src=\"../site_libs/htmlwidgets-1.6.4/htmlwidgets.js\"></script>\n<link href=\"../site_libs/reactable-0.4.5/reactable.css\" rel=\"stylesheet\" />\n<script src=\"../site_libs/reactable-binding-0.4.5/reactable.js\"></script>\n"
+      ]
+    },
+    "engineDependencies": {},
+    "preserve": {},
+    "postProcess": true
+  }
+}
