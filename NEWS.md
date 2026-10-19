@@ -1,5 +1,10 @@
 # cfbstats 0.0.0.9000 (development version)
 
+- Fix a site-build failure: the pipeline's `week_grid` target now derives its
+  (season, seasonType, week) grid from the cleaned `games` table, which exists
+  in both refresh and track modes, instead of the ingest-mode-only `raw_games`
+  (NULL in track mode, which aborted `tar_make()` with a `distinct()` error).
+
 - The documentation site no longer requires the cfbstats package to be
   installed: vignette setup chunks source `R/*.R` from the checkout when the
   package is missing, and man-page examples render unexecuted
