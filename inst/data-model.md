@@ -112,7 +112,6 @@ erDiagram
     picks ||--o| nfl_pick_link : "same slot join, name-guarded"
     nfl_pick_link ||--o| nfl_draft_picks : "draft slot"
     nfl_draft_picks ||--o{ nfl_rosters : "gsis_id, season"
-    nfl_draft_picks ||--o{ nfl_rosters : "gsis_id, season"
     nfl_draft_picks ||--o{ nfl_player_stats : "gsis_id, season"
     ps_change }o--|| roster_flags : "playerId, season (flags/weights attach here)"
     roster |o--o{ career_summary : "playerId (collapsed)"
@@ -124,7 +123,7 @@ Solid lines are trustworthy joins; the dotted `recruiting` line is a
 
 ## Join keys & namespaces
 
-There are five distinct join namespaces. Using the wrong one silently produces
+There are six distinct join namespaces. Using the wrong one silently produces
 wrong rows, so they are called out explicitly.
 
 1. **College athlete id (`playerId`, string) — the canonical player key.**

@@ -24,5 +24,5 @@ enforced by \code{\link[=contract_stat_taxonomy]{contract_stat_taxonomy()}}, so 
 fails fast rather than going silently unlabeled.
 }
 \examples{
-head(stat_taxonomy())
+\dontrun{head(stat_taxonomy())}
 }

@@ -1,5 +1,16 @@
 # cfbstats 0.0.0.9000 (development version)
 
+- The documentation site no longer requires the cfbstats package to be
+  installed: vignette setup chunks source `R/*.R` from the checkout when the
+  package is missing, and man-page examples render unexecuted
+  ([decision 0030](https://github.com/ngiangre/cfbstats/blob/main/decisions/0030-site-build-no-package-install.md)).
+- The ERD on the Data page is now rendered live from mermaid (mirroring
+  `inst/data-model.md`) instead of a pre-rendered PNG that had drifted behind
+  the new `games`, `game_team_stats`, and `game_player_stats` tables.
+- `inst/data-model.md` fixes: the join-namespace count is six (the CFBD game id
+  namespace was added without updating the count) and a duplicated
+  `nfl_draft_picks ||--o{ nfl_rosters` edge was removed.
+
 - The `/games` family ingest is now dynamically branched in the pipeline
   (one target branch per API call, decision 0029): an interrupted refresh
   resumes at the first un-ingested season/week instead of re-pulling the whole

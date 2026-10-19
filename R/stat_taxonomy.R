@@ -23,7 +23,7 @@
 #' @export
 #'
 #' @examples
-#' head(stat_taxonomy())
+#' \dontrun{head(stat_taxonomy())}
 stat_taxonomy <- function() {
   rlang::check_installed("tibble")
   path <- app_sys("extdata", "stat_taxonomy.csv")

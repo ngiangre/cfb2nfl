@@ -8,7 +8,7 @@
 #' @export
 #'
 #' @examples
-#' conference_tier_levels()
+#' \dontrun{conference_tier_levels()}
 conference_tier_levels <- function() {
   c("FCS and below" = 1L, "Group of 5" = 2L, "Power" = 3L)
 }

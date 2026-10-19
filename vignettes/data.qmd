@@ -9,7 +9,17 @@ vignette: >
 ```{r}
 #| label: setup
 #| include: false
-library(cfbstats)
+# Load cfbstats from the checkout when the package is not installed, so the
+# site build does not require a package install (decision 0030).
+if (!requireNamespace("cfbstats", quietly = TRUE)) {
+  dir <- getwd()
+  while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
+    dir <- dirname(dir)
+  }
+  for (src in sort(list.files(file.path(dir, "R"), pattern = "[.]R$", full.names = TRUE))) {
+    source(src, local = FALSE, encoding = "UTF-8")
+  }
+}
 library(dplyr)
 library(reactable)
 library(targets)
@@ -29,7 +39,25 @@ derived from the join-namespace decisions — e.g. 0013, 0014 — rather than
 generated from the schema; solid lines are trustworthy key joins, the dotted
 `recruiting` line is name-guarded, not a plain id join):
 
-![Entity-relationship diagram of the cfbstats tables](images/erd.png)
+```{mermaid}
+erDiagram
+    player_stats }o--|| roster : "playerId, season"
+    player_stats ||--o{ player_season_stats : "pivoted wide (playerId, season, team)"
+    player_stats ||--o| picks : "playerId"
+    player_stats }o--|| coaches : "team=school, season"
+    player_stats }o--|| conference_tiers : "conference, season"
+    player_stats }o--|| teams : "team (display)"
+    recruiting |o..o| player_stats : "playerId (name-guarded)"
+    games ||--o{ game_team_stats : "gameId == id"
+    games ||--o{ game_player_stats : "gameId == id"
+    game_player_stats }o--|| player_stats : "playerId (shared athlete id)"
+    picks ||--o| nfl_pick_link : "same slot join, name-guarded"
+    nfl_pick_link ||--o| nfl_draft_picks : "draft slot"
+    nfl_draft_picks ||--o{ nfl_rosters : "gsis_id, season"
+    nfl_draft_picks ||--o{ nfl_player_stats : "gsis_id, season"
+    ps_change }o--|| roster_flags : "playerId, season (flags/weights attach here)"
+    roster |o--o{ career_summary : "playerId (collapsed)"
+```
 
 ## Sources
 
@@ -41,7 +69,7 @@ plus [nflverse](https://nflverse.nflreadr.com/) for post-draft NFL outcomes
 
 ```{r}
 #| label: dictionaries
-dict_dir <- system.file("dict", package = "cfbstats")
+dict_dir <- file.path(root, "inst", "dict")
 dict_files <- list.files(dict_dir, pattern = "\\.yml$", full.names = TRUE)
 purrr::map_dfr(dict_files, function(f) {
   d <- yaml::read_yaml(f)
