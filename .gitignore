@@ -72,3 +72,11 @@ shiny_bookmarks/
 
 .posit/publish/
 .posit/assistant/settings.json
+# The Beast draft guide (copyrighted; source PDF never committed)
+the-beast*.pdf
+the-beast*.txt
+tests/testthat/test-beast.R
+.gitignore
+data-raw/beast.R
+.gitignore
+R/beast.R
