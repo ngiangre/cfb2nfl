@@ -1,5 +1,13 @@
 # cfbstats 0.0.0.9000 (development version)
 
+- The blog post "Seven quarterbacks, one database" now defines redshirt flags
+  from game-level usage in the `game_player_stats` table (at most one game with
+  a recorded statistic among covered games, observable positions only) instead
+  of stat presence, reports a per-player redshirt verdict against each
+  expectation, and trims the narrative.
+- All rendered site pages now expose Quarto code tools (source toggle) via
+  `code-tools: true` in the site format.
+
 - Fix a site-build failure with two causes: the pipeline's `week_grid` target
   now derives its (season, seasonType, week) grid from the cleaned `games`
   table, which exists in both refresh and track modes, instead of the

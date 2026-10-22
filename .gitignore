@@ -72,3 +72,5 @@ shiny_bookmarks/
 
 .posit/publish/
 .posit/assistant/settings.json
+
+*_files/
