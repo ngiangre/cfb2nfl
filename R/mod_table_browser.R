@@ -216,8 +216,12 @@ mod_table_browser_ui <- function(id) {
   ns <- shiny::NS(id)
   bslib::card(
     fill = TRUE,
+    class = "tbl-card",
     bslib::card_header(shiny::uiOutput(ns("subtitle"))),
-    bslib::card_body(DT::DTOutput(ns("tbl")), height = "calc(100vh - 220px)")
+    bslib::card_body(
+      DT::DTOutput(ns("tbl")),
+      height = "calc(100vh - 220px)"
+    )
   )
 }
 

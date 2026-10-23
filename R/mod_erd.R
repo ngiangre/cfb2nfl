@@ -37,11 +37,13 @@ mod_erd_ui <- function(id) {
   ns <- shiny::NS(id)
   bslib::card(
     fill = TRUE,
+    class = "erd-card",
     bslib::card_header(
       bslib::card_title("How the data fits together"),
       "Each box is one data table; lines show how the tables connect."
     ),
     bslib::card_body(
+      # fixed height; app_theme's media query shrinks it on phones
       visNetwork::visNetworkOutput(ns("erd"), height = "700px"),
       htmltools::tags$style(sprintf(
         "#%s canvas { cursor: pointer; }",

@@ -4,15 +4,43 @@
 #'     DO NOT REMOVE.
 #' @import shiny
 #' @noRd
+# Shared theme + mobile CSS. Phones need relaxed heights (a fixed viewport
+# calc overflows small screens), wrap-friendly headers, and bigger touch
+# targets for DT's filter inputs and pagination.
+app_theme <- function() {
+  bslib::bs_theme() |>
+    bslib::bs_add_rules(
+      "html { -webkit-text-size-adjust: 100%; }
+       .dataTables_wrapper .form-control-sm,
+       .dataTables_wrapper .custom-select-sm { min-height: 2.4rem; }
+       @media (max-width: 767.98px) {
+         .tbl-card > .card-body {
+           height: auto !important;
+           max-height: none !important;
+           min-height: 65vh;
+         }
+         .dataTables_wrapper .dataTables_filter input {
+           width: 12rem;
+         }
+         .erd-card #erd { height: 60vh !important; }
+         footer, .card-header { font-size: 0.9rem; }
+       }"
+    )
+}
+
 app_ui <- function(request) {
   d <- app_data()
 
   bslib::page_navbar(
     id = "topnav",
+    theme = app_theme(),
     bslib::nav_panel(
       title = "Look at the data",
       value = "data",
       icon = shiny::icon("table-list"),
+      shiny::markdown(
+        "Diagram of the connections between the data, and all the tables currently ingested within tabs. Play-by-play data not included yet. See the [API documentation](https://api.collegefootballdata.com/api) for endpoints to pull data from, the [methodology overview](https://api.collegefootballdata.com/methodology-overview), and the [data availability by theme](https://api.collegefootballdata.com/data-availability)."
+      ),
       bslib::navset_underline(
         id = "datatabs",
         !!!c(
