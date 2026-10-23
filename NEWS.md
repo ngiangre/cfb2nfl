@@ -1,5 +1,11 @@
 # cfbstats 0.0.0.9000 (development version)
 
+- The Shiny app now works on phones: the table browser sends its server-side
+  request as a POST so the full DataTables payload fits in the request body
+  (the previous multi-kilobyte GET query string was rejected through proxied
+  deployments, showing a DataTables ajax error), and the table tabs scroll
+  sideways instead of stacking.
+
 - The blog post "Seven quarterbacks, one database" now defines redshirt flags
   from game-level usage in the `game_player_stats` table (at most one game with
   a recorded statistic among covered games, observable positions only) instead

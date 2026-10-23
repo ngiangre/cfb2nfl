@@ -13,6 +13,13 @@ app_theme <- function() {
       "html { -webkit-text-size-adjust: 100%; }
        .dataTables_wrapper .form-control-sm,
        .dataTables_wrapper .custom-select-sm { min-height: 2.4rem; }
+       /* many table tabs: scroll sideways on phones instead of stacking */
+       .nav-underline {
+         flex-wrap: nowrap;
+         overflow-x: auto;
+         -webkit-overflow-scrolling: touch;
+       }
+       .nav-underline .nav-link { white-space: nowrap; }
        @media (max-width: 767.98px) {
          .tbl-card > .card-body {
            height: auto !important;

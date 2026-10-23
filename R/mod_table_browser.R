@@ -320,9 +320,11 @@ mod_table_browser_server <- function(id, con, table, dict, n_rows) {
           scrollX = TRUE,
           searchDelay = 400,
           ajax = list(
-            # explicit GET so the payload lands in QUERY_STRING even though
-            # Shiny defaults jQuery ajax to POST
-            type = "GET",
+            # POST keeps the full DataTables payload (one block per column) in
+            # the request body: on mobile/proxied deployments (posit.cloud,
+            # iOS) a multi-KB GET query string is rejected and the table dies
+            # with a DataTables ajax error. The handler reads either.
+            type = "POST",
             url = session$registerDataObj(
               paste0("dt_", table),
               NULL,
