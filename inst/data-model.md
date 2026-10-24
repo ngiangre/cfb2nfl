@@ -29,6 +29,7 @@ dictionaries next to this file, one YAML per table:
 | `career_summary` | one player's college career | [`dict/career_summary.yml`](dict/career_summary.yml) |
 | `player_season_stats` | **wide**: player-season-team stat columns | [`dict/player_season_stats.yml`](dict/player_season_stats.yml) |
 | `nfl_pick_link` | one draft pick + name-guarded nflverse id | [`dict/nfl_pick_link.yml`](dict/nfl_pick_link.yml) |
+| `outcomes` | one player-season in the model population (person-period labels) | [`dict/outcomes.yml`](dict/outcomes.yml) |
 | `audit_log` | one audited pipeline step | [`dict/audit_log.yml`](dict/audit_log.yml) |
 
 **Bundle-only tables.** Several tables in the bundle are **derived in-pipeline**
@@ -171,12 +172,19 @@ wrong rows, so they are called out explicitly.
 ## Reasoning over the tables for the project's questions
 
 **Population / outcome (v1).** The unit is a player-season with a qualifying
-stat line in a draft-eligible season; the positive label is `drafted`. Build the
-feature backbone from `player_stats` (which is **long** — pivot
+stat line in a draft-eligible season; the positive label is `drafted`. The
+`outcomes` table (decision 0032) materializes this at the **person-period**
+grain: one row per player-season in the model population, with the
+eligibility clock (`hs_grad_year`, `draft_eligible`, `eligible_season_index`),
+the drafted / NFL-entry / NFL-success labels (`outcome_*` columns), and the
+survival bookkeeping (`years_to_nfl_entry` + `nfl_entry_event`,
+`status_end_of_season`, `outcome_observed_d` right-censoring). Models query
+the dependent variable directly from `outcomes` — no further derivation.
+Build the feature backbone from `player_stats` (which is **long** — pivot
 `category`/`statType`/`stat` into position-relevant columns), attach roster
-physicals, coaching and tier context, then join `picks` to label who was
-drafted. This is what the `player_season -> ps_coach -> ps_tier -> ps_draft`
-link targets do.
+physicals, coaching and tier context; the `outcomes` table is the label
+source. The older per-season `drafted` flag remains on `ps_change` for
+backward compatibility.
 
 **Career inputs vs. outcomes — guard against leakage.** Everything on the NFL
 side (`nfl_draft_picks`, `nfl_rosters`, `nfl_player_stats`) is an

@@ -373,6 +373,12 @@ list(
       contract_player_season_stats(player_season_stats, stop_on_fail = FALSE)
     )
   ),
+  tar_target(
+    ok_outcomes,
+    pointblank::all_passed(
+      contract_outcomes(outcomes, ps_pop, stop_on_fail = FALSE)
+    )
+  ),
   # Contract gate (decision 0023): a FALSE anywhere stops tar_make() (the
   # default error = "stop" aborts the run, so CI never publishes a failing
   # build). NA (steps without a contract yet) is not a failure.
@@ -404,7 +410,8 @@ list(
       career_summary = ok_career,
       redshirt = ok_roster_flags,
       stat_taxonomy = ok_stat_taxonomy,
-      player_season_stats = ok_player_season_stats
+      player_season_stats = ok_player_season_stats,
+      outcomes = ok_outcomes
     ))
   ),
   # ---- link-step contracts (audit-hygiene workstream C) ----------------------
@@ -478,6 +485,28 @@ list(
   # Wide player-season stats for the DuckDB bundle (decision 0026): a derived
   # convenience table, like career/roster_flags above.
   tar_target(player_season_stats, build_player_season_stats(player_stats)),
+  # Person-period outcome table (decision 0032): the modeling dependent
+  # variables. Derived from cleaned tables (no new API calls), but PUBLISHED
+  # as parquet on data-latest per plan (user request), alongside the DuckDB
+  # bundle — so models query the label directly from either asset.
+  tar_target(
+    outcomes_file,
+    parquet_asset(
+      "data/outcomes.parquet",
+      function() {
+        build_outcomes(
+          ps_pop,
+          career,
+          recruiting,
+          picks_nfl,
+          nfl_rosters,
+          nfl_player_stats
+        )
+      }
+    ),
+    format = "file"
+  ),
+  tar_target(outcomes, arrow::read_parquet(outcomes_file)),
 
   # ---- model + report (placeholders) ----------------------------------------
   tar_target(model_fit, fit_draft_model(model_table)),
@@ -509,6 +538,7 @@ list(
         career_summary = career,
         player_season_stats = player_season_stats,
         nfl_pick_link = picks_nfl,
+        outcomes = outcomes,
         audit_log = db_audit_log
       ),
       "data/cfbstats.duckdb"
@@ -710,6 +740,14 @@ list(
         "clean",
         keys = c("category", "statType"),
         contract_passed = ok_stat_taxonomy
+      ),
+      audit_step(
+        outcomes,
+        "build_outcomes",
+        "features",
+        ps_pop,
+        keys = c("playerId", "season"),
+        contract_passed = ok_outcomes
       )
     )
   ),

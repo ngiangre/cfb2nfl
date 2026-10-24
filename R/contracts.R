@@ -1041,3 +1041,81 @@ contract_game_player_stats <- function(
     pointblank::interrogate()
   enforce_contract(agent, "game_player_stats", stop_on_fail)
 }
+
+# ---- person-period outcome table (decision 0032) ---------------------------
+
+#' Contract for the person-period outcome table
+#'
+#' Validates `build_outcomes()` output: the modeling labels must preserve the
+#' population grain (no silent join loss), the drafted/UDFA events must stay
+#' mutually exclusive, `nfl_entry` must equal the union of its components, and
+#' administrative right-censoring must carry `NA` outcomes — never a fabricated
+#' 0.
+#'
+#' @param outcomes Person-period outcome table (see [build_outcomes()]).
+#' @param ps_pop Model population the table was built from; its
+#'   `(playerId, season)` row count is the expected row count.
+#' @param stop_on_fail Abort on failure? `FALSE` records the result for the
+#'   audit log instead (the `ok_*` target pattern).
+#'
+#' @return The interrogated pointblank agent (invisible).
+#' @export
+contract_outcomes <- function(outcomes, ps_pop, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  expected <- nrow(dplyr::distinct(ps_pop, .data$playerId, .data$season))
+  agent <- pointblank::create_agent(outcomes, label = "outcomes") |>
+    pointblank::col_vals_not_null(
+      pointblank::vars(
+        playerId,
+        season,
+        draft_year,
+        hs_grad_year,
+        draft_eligible,
+        outcome_observed_d
+      )
+    ) |>
+    pointblank::col_vals_equal(
+      pointblank::vars(n),
+      expected,
+      preconditions = function(x) {
+        dplyr::mutate(x, n = nrow(x))
+      }
+    ) |>
+    pointblank::rows_distinct(pointblank::vars(playerId, season)) |>
+    pointblank::col_vals_expr(rlang::expr(
+      draft_eligible == (.data$years_since_hs >= .data$min_years_since_hs)
+    )) |>
+    pointblank::col_vals_expr(rlang::expr(
+      !(coalesce(.data$outcome_drafted_d, FALSE) &
+        coalesce(.data$outcome_signed_udfa_d, FALSE))
+    )) |>
+    pointblank::col_vals_expr(rlang::expr(
+      coalesce(.data$outcome_nfl_entry_d, FALSE) ==
+        (coalesce(.data$outcome_drafted_d, FALSE) |
+          coalesce(.data$outcome_signed_udfa_d, FALSE))
+    )) |>
+    pointblank::col_vals_expr(rlang::expr(
+      .data$outcome_observed_d | is.na(.data$outcome_drafted_d)
+    )) |>
+    pointblank::col_vals_not_null(
+      pointblank::vars(outcome_draft_round_d, outcome_draft_pick_d),
+      preconditions = function(x) {
+        dplyr::filter(x, .data$outcome_drafted_d %in% TRUE)
+      }
+    ) |>
+    pointblank::col_vals_expr(rlang::expr(
+      (.data$outcome_nfl_entry_d %in% TRUE) ==
+        !is.na(
+          .data$outcome_made_roster_entry_year
+        )
+    )) |>
+    pointblank::col_vals_gt(
+      pointblank::vars(t),
+      0,
+      preconditions = function(x) {
+        dplyr::transmute(x, t = .data$years_to_nfl_entry)
+      }
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "outcomes", stop_on_fail)
+}
