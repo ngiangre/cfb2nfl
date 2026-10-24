@@ -3,10 +3,11 @@
 # The leading underscore keeps Quarto from rendering this template as a page.
 title: "TITLE — a short, human headline"
 date: "YYYY-MM-DD"
-# freeze: true pins this post as a point-in-time artifact: once its _freeze/
-# entry is committed, a data refresh never re-executes it. To refresh on
-# purpose, edit the post (or delete its _freeze entry) deliberately.
-freeze: true
+# freeze: auto re-executes only when this post's source changes, so committed
+# _freeze/ results keep data refreshes from re-running the chunk (dec 0015)
+# while deliberate edits still propagate. Never use freeze: true: it serves
+# the cached output even after the source is edited, so edits never deploy.
+freeze: auto
 vignette: >
   %\VignetteIndexEntry{TITLE — a short, human headline}
   %\VignetteEngine{quarto::html}

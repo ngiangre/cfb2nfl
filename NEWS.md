@@ -1,5 +1,14 @@
 # cfbstats 0.0.0.9000 (development version)
 
+- Site fixes for stale content (fixes the deployed site not showing edited
+  post titles, reported 2026-10-24). Vignette freeze mode changed from
+  `freeze: true` to `freeze: auto`: under `true`, Quarto serves the committed
+  `_quarto/_freeze/` cache unconditionally — even after the source changes —
+  so title edits never reached the deployed pages. The `site` workflow also
+  deletes the freeze caches for the `blog` and `reference` index pages before
+  rendering, because their knit-time reads of other files' YAML/metadata are
+  invisible to Quarto's per-document cache check.
+
 - Fix CI dependency resolution: `querychat` was archived off CRAN on
   2026-10-22 (check issues not corrected in time), so the `check` and `site`
   workflows failed to solve dependencies. A `Remotes: posit-dev/querychat/pkg-r`

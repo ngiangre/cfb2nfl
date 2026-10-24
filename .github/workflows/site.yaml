@@ -56,6 +56,14 @@ jobs:
       - name: Run pipeline
         run: Rscript -e 'targets::tar_make()'
 
+      # Pages whose code reads OTHER files at knit time (blog.qmd reads the
+      # posts' YAML titles; reference.qmd reads function metadata) have that
+      # dependency hidden from Quarto's per-document cache check, so their
+      # freeze entries go stale whenever those inputs change. Bust them so the
+      # index pages always re-execute.
+      - name: Bust freeze cache for index pages
+        run: rm -rf _quarto/_freeze/vignettes/blog _quarto/_freeze/vignettes/reference
+
       # freeze = TRUE reuses the committed _quarto/_freeze/ cache so CI does not
       # re-execute vignette code; renders are faster and deterministic (dec 0007).
       - name: Render site (altdoc -> docs/)

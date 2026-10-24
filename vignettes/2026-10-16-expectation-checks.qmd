@@ -3,7 +3,7 @@ title: "Deriving redshirt status from only game-level data of select college QBs
 date: "2026-10-16"
 author:
   - "Nick Giangreco"
-freeze: true
+freeze: auto
 vignette: >
   %\VignetteIndexEntry{Deriving redshirt status from only game-level data of select college QBs shows where the database falls short}
   %\VignetteEngine{quarto::html}

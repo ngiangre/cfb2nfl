@@ -193,8 +193,12 @@ wrapper (`CFBSTATS_REFRESH=true` + `tar_make()`). Years 2010–2026.
   apply it everywhere rather than re-theming per plot. TODO: create that theme
   helper.
 - **Blog posts** (decision 0015): dated files `vignettes/YYYY-MM-DD-slug.qmd`,
-  `freeze: true` + committed `_freeze/` so they don't rebreak on data refresh;
-  key on athlete id; start from `vignettes/_post-template.qmd`.
+  `freeze: auto` + committed `_freeze/` so they don't rebreak on data refresh
+  while source edits still propagate (`freeze: true` serves the cache even
+  after edits — caused stale deployed titles, fixed 2026-10-24); the `blog`/
+  `reference` index pages' freeze caches are deleted in `site.yaml` because
+  their knit-time reads of other files' YAML are invisible to Quarto's cache
+  check; key on athlete id; start from `vignettes/_post-template.qmd`.
 - **CI** (`.github/workflows/`): `check.yaml` (R CMD check + testthat + contract
   fixtures), `site.yaml` (pull data release asset → `tar_make()` → render →
   Pages), `data-refresh.yaml` (scheduled refresh-mode `tar_make()` → publish
