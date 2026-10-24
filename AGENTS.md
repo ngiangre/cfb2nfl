@@ -130,7 +130,12 @@ wrapper (`CFBSTATS_REFRESH=true` + `tar_make()`). Years 2010–2026.
   italicized gerund-phrased expectations, no em dashes anywhere, no
   rhetorical framing phrases, and no pipeline internals (decision records,
   cleaning mechanics) in the narrative. Reference implementation:
-  `vignettes/2026-10-16-expectation-checks.qmd`.
+  `vignettes/2026-10-16-expectation-checks.qmd`. **Titles** are one
+  declarative sentence — subject first, then the observed takeaway — never a
+  colon-joined fragment pair ("blah: blah"). Keep `title:` and
+  `%\VignetteIndexEntry{}` in sync. **Code/graphs over prose:** explain claims
+  with a table or figure backed by a code chunk (plus an asserting
+  `stopifnot()` where the claim could silently rot) rather than paragraphs.
 - **Decision log:** record substantive decisions in `decisions/` (copy
   `TEMPLATE.md`, next number); distill spike-branch findings into an entry.
   Decisions 0004–0006 cover `targets`, the lineage/audit layer, and the site.

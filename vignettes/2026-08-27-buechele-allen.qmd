@@ -1,11 +1,11 @@
 ---
-title: "Welcome to the NFL Preseason! Let's look at key players fighting to start"
+title: "Looking at the college trajectory of the Buffalo Bills' backup QBs as the 2026 season begins shows two transfers who reached the NFL without being drafted"
 date: "2026-08-27"
 author:
   - "Nick Giangreco"
 freeze: true
 vignette: >
-  %\VignetteIndexEntry{Welcome to the NFL Preseason! Let's look at key players fighting to start}
+  %\VignetteIndexEntry{Looking at the college trajectory of the Buffalo Bills' backup QBs as the 2026 season begins shows two transfers who reached the NFL without being drafted}
   %\VignetteEngine{quarto::html}
   %\VignetteEncoding{UTF-8}
 ---
@@ -212,7 +212,32 @@ p <- ggplot(spine, aes(x = season, y = who)) +
 girafe(ggobj = p, width_svg = 9, height_svg = 3.5)
 ```
 
-Both players have had a pretty good run in alot of good teams! Interestingly, what this figure doesn't tell you is that both players were not in the NFL draft. Both were free agents and picked up by NFL teams. This was seen when neither players have data records in the draft data. 
+Neither appears in the draft-pick records — both entered the NFL as undrafted free agents:
+
+```{r}
+#| label: undrafted-entry
+gsis <- arrow::open_dataset("data/nfl_rosters.parquet") |>
+  filter(player_name %in% c("Shane Buechele", "Kyle Allen")) |>
+  select(player_name, gsis_id) |>
+  distinct() |>
+  collect()
+
+draft_hits <- arrow::open_dataset("data/nfl_draft_picks.parquet") |>
+  filter(gsis_id %in% gsis$gsis_id) |>
+  count() |>
+  pull(n)
+stopifnot(draft_hits == 0)
+
+spine |>
+  filter(stage == "NFL") |>
+  group_by(who) |>
+  slice_min(season, n = 1) |>
+  ungroup() |>
+  transmute(player = who, rookie_season = season, first_nfl_team = team) |>
+  kable(caption = "NFL entry: each player's first roster season; the draft-pick table contains zero rows for either player.")
+```
+
+Both players have had a pretty good run on a lot of good teams!
 
 ## Good luck to Shane Buechele and Kyle Allen!
 

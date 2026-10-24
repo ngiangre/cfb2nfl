@@ -1,11 +1,11 @@
 ---
-title: "Seven quarterbacks, one database: stress-testing what we think we know"
+title: "Deriving redshirt status from only game-level data of select college QBs shows where the database falls short"
 date: "2026-10-16"
 author:
   - "Nick Giangreco"
 freeze: true
 vignette: >
-  %\VignetteIndexEntry{Seven quarterbacks, one database: stress-testing what we think we know}
+  %\VignetteIndexEntry{Deriving redshirt status from only game-level data of select college QBs shows where the database falls short}
   %\VignetteEngine{quarto::html}
   %\VignetteEncoding{UTF-8}
 ---
