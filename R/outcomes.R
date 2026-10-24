@@ -265,12 +265,16 @@ build_outcomes <- function(
         .data$outcome_drafted_d %in% TRUE ~ "r4_7",
         TRUE ~ "undrafted"
       ),
-      outcome_signed_udfa_d = dplyr::if_else(
-        .data$outcome_observed_d &
-          is.na(.data$pick_draft_year) &
-          !is.na(.data$nfl_first_season),
-        .data$draft_year == .data$nfl_first_season,
-        NA
+      # FALSE (not NA) for observed undrafted players with no roster match —
+      # only censored rows carry NA (dict: "else 0 (NA when censored)"). A
+      # drafted player is FALSE here by mutual exclusivity, even when the pick
+      # year differs from this row's draft year.
+      outcome_signed_udfa_d = dplyr::case_when(
+        !.data$outcome_observed_d ~ NA,
+        .data$outcome_drafted_d %in% TRUE ~ FALSE,
+        !is.na(.data$nfl_first_season) ~
+          .data$draft_year == .data$nfl_first_season,
+        TRUE ~ FALSE
       ),
       outcome_nfl_entry_d = dplyr::if_else(
         .data$outcome_observed_d,

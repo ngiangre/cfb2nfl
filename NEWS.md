@@ -1,5 +1,18 @@
 # cfbstats 0.0.0.9000 (development version)
 
+- Fix `outcome_signed_udfa_d` in the `outcomes` table: observed, undrafted
+  player-seasons with no NFL roster match got NA instead of FALSE. A naive
+  `mean(na.rm = TRUE)` over the flag then read UDFA prevalence at 35 percent
+  instead of the correct 4.7. Censoring is now the only source of NA in the
+  flag, guarded by a new `contract_outcomes()` assertion and pinned by unit
+  tests. Reported 2026-10-24.
+
+- New outcome-prevalence blog post: "Most draft-eligible college seasons end
+  without an NFL outcome" (`vignettes/2026-10-24-outcome-prevalence.qmd`),
+  measuring each outcome's prevalence over the eligible risk set with
+  Wilson intervals, per-season hazards, draft-class trends, and
+  entry-year rookie outcomes.
+
 - New `outcomes` table: the person-period modeling dependent variable
   (decision 0032, https://github.com/nicholasgiangreco/cfbstats/blob/main/decisions/0032-outcome-table-person-period.md).
   One row per player-season in the model population, carrying the draft

@@ -1,0 +1,662 @@
+---
+title: "Most draft-eligible college seasons end without an NFL outcome"
+date: "2026-10-24"
+author:
+  - "An AI directed by Nick Giangreco"
+freeze: auto
+vignette: >
+  %\VignetteIndexEntry{Most draft-eligible college seasons end without an NFL outcome}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r}
+#| label: setup
+#| include: false
+# Load cfbstats from the checkout when the package is not installed, so the
+# site build does not require a package install (decision 0030).
+if (requireNamespace("cfbstats", quietly = TRUE)) {
+  library(cfbstats)
+} else {
+  dir <- getwd()
+  while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
+    dir <- dirname(dir)
+  }
+  for (src in sort(list.files(
+    file.path(dir, "R"),
+    pattern = "[.]R$",
+    full.names = TRUE
+  ))) {
+    source(src, local = FALSE, encoding = "UTF-8")
+  }
+}
+library(DBI)
+library(dplyr)
+library(duckdb)
+library(ggiraph)
+library(ggplot2)
+library(knitr)
+library(tibble)
+library(tidyr)
+# altdoc renders in a temp dir; point the knit wd at the project root so
+# data/*.parquet and tar_read() resolve (CFBSTATS_ROOT is set in the site build).
+root <- cfbstats_root()
+if (nzchar(root)) {
+  knitr::opts_knit$set(root.dir = root)
+}
+
+set_girafe_defaults(
+  opts_hover = opts_hover(
+    css = "stroke:#111827;stroke-width:2.5px;filter:brightness(1.12);"
+  ),
+  opts_hover_inv = opts_hover_inv(css = "opacity:0.45;"),
+  opts_tooltip = opts_tooltip(
+    css = "background:#111827;color:#fff;padding:6px 9px;border-radius:5px;font-weight:bold;font-size:15px;"
+  ),
+  opts_zoom = opts_zoom(min = 1, max = 5),
+  opts_toolbar = opts_toolbar(saveaspng = TRUE, position = "topright"),
+  opts_sizing = opts_sizing(rescale = TRUE)
+)
+
+# Wilson interval for a binomial proportion.
+wilson <- function(x, n, z = 1.96) {
+  p <- x / n
+  d <- 1 + z^2 / n
+  c <- (p + z^2 / (2 * n)) / d
+  h <- (z / d) * sqrt(p * (1 - p) / n + z^2 / (4 * n^2))
+  c(lo = pmax(0, c - h), hi = pmin(1, c + h))
+}
+```
+
+::: {.callout-note appearance="minimal"}
+*Data as of the `data-latest` release, retrieved 2026-10-24. Draft classes
+after the last complete draft are administratively right-censored and carry
+no outcomes, so they are excluded from every rate below rather than counted
+as failures.*
+:::
+
+## 1. Introduction
+
+The modeling target of this project is a set of labels on the person-period
+outcome table: whether a college player is drafted, whether he reaches the
+NFL by any route, and whether he plays once he arrives. Before any model is
+fit, the base rates of those labels deserve their own accounting. A
+classifier that predicts "no NFL outcome" for every player-season would be
+correct more than 90 percent of the time, and the size of that default rate
+shapes every modeling choice that follows: which loss functions are
+informative, how rare-event validation behaves, and what a precision figure
+actually means.
+
+This post measures how often each outcome happens, over the population each
+one legitimately applies to, and grounds the rates in players you can name.
+Four questions organize the results:
+
++ *Expecting the draft event to be rare, under five percent of eligible seasons*
++ *Expecting undrafted free-agent entry to rival the draft as an NFL route*
++ *Expecting the per-season chance of NFL entry to rise over a player's eligible seasons*
++ *Expecting entry prevalence to be roughly stable across draft classes*
+
+Each question is stated as a claim the data can settle, and each is answered
+with a table or figure backed by an assertion that fails loudly if the claim
+rots under a future data refresh.
+
+## 2. Data and terms
+
+The unit of measurement here is a **player-season**: one player's one college
+season with a recorded stat line. Rates are computed over **eligible
+player-seasons**, seasons whose following draft the player could actually
+have been selected in. A row is eligible when the draft arrives at least
+three years after the player's high-school graduation, so a freshman season
+is never an at-risk exposure for the draft that follows it. Draft classes
+whose outcomes are not yet fully recorded (recent classes) are excluded
+entirely rather than counted as misses.
+
+Every eligible season ends in exactly one of the outcomes below.
+
+```{r}
+#| label: terms
+terms <- tribble(
+  ~Term                         , ~Meaning                                                                                                                                        ,
+  "Drafted"                     , "Selected in the NFL draft held the spring after the season. Reported by round: round 1; rounds 2 to 3; rounds 4 to 7."                         ,
+  "Undrafted free agent (UDFA)" , "Not selected in that draft, but on an NFL roster within the entry window afterward. Signed as a free agent, matched by a guarded name lookup." ,
+  "NFL entry"                   , "Drafted OR signed as an undrafted free agent. The broadest 'made it' label."                                                                   ,
+  "Made roster, rookie games"   , "Among players who entered: on an NFL regular-season roster in the entry year, and how many regular-season games they appeared in that year."   ,
+  "Season status"               , "What the season turned out to be; the five possible statuses are defined in Section 3.2."
+)
+kable(terms, caption = "Table 1: the outcomes and terms used throughout")
+```
+
+A note on the intervals: whenever a percentage is reported below, it comes
+with a 95 percent confidence interval, the range the true rate plausibly
+falls in given how many seasons were observed. When an event is rare, that
+range is wide; a rate estimated from a few hundred seasons carries more
+uncertainty than one estimated from tens of thousands. The interval style is
+Wilson's, chosen because it behaves well for rare events like these.
+
+```{r}
+#| label: load
+#| include: false
+# The connection message is an implementation detail; the reader sees only
+# the counts in the visible chunk below.
+con <- dbConnect(duckdb(), "data/cfbstats.duckdb", read_only = TRUE)
+outcomes <- tbl(con, "outcomes") |> collect()
+dbDisconnect(con)
+
+risk <- outcomes |>
+  filter(draft_eligible, outcome_observed_d) |>
+  mutate(
+    outcome_signed_udfa_d = coalesce(outcome_signed_udfa_d, FALSE),
+    outcome_drafted_d = coalesce(outcome_drafted_d, FALSE),
+    outcome_nfl_entry_d = coalesce(outcome_nfl_entry_d, FALSE)
+  )
+
+n_risk <- nrow(risk)
+n_players <- n_distinct(risk$playerId)
+```
+
+```{r}
+#| label: risk-set
+risk_set <- tibble(
+  Measure = c("Eligible player-seasons", "Distinct players"),
+  Count = format(c(n_risk, n_players), big.mark = ",")
+)
+kable(risk_set, caption = "Table 2: the risk set")
+```
+
+```{r}
+#| label: grain-guard
+#| include: false
+# The draft and UDFA events are mutually exclusive and their union is the
+# entry label, on every row. A violation here would poison every rate below
+# (a naive mean(na.rm = TRUE) over a partially NA flag once read UDFA
+# prevalence at 35 percent instead of 4.7).
+stopifnot(
+  !any(risk$outcome_drafted_d & risk$outcome_signed_udfa_d),
+  all(
+    risk$outcome_nfl_entry_d ==
+      (risk$outcome_drafted_d | risk$outcome_signed_udfa_d)
+  )
+)
+```
+
+A player usually contributes several eligible seasons, so the two counts in
+Table 2 differ. Each event, however, lands on exactly one row per player:
+the guards above and the player-level counts below both rely on that.
+
+## 3. Results
+
+### 3.1 How often each outcome occurs
+
+*Expecting the draft event to be rare, under five percent of eligible
+seasons.* ✅ **The expectation holds.** Deductively: out of every 100
+eligible player-seasons, about 4 end with the player drafted and about 8 end
+with the player reaching the NFL by any route.
+
+```{r}
+#| label: ledger
+ledger <- bind_rows(
+  tibble(
+    Outcome = c(
+      "Drafted, any round",
+      "  Drafted, round 1",
+      "  Drafted, rounds 2 to 3",
+      "  Drafted, rounds 4 to 7",
+      "Signed as an undrafted free agent",
+      "NFL entry (drafted or UDFA)"
+    ),
+    n_event = c(
+      sum(risk$outcome_drafted_d),
+      sum(risk$outcome_drafted_d & risk$outcome_draft_round_d == 1L),
+      sum(risk$outcome_drafted_d & risk$outcome_draft_round_d %in% 2:3),
+      sum(risk$outcome_drafted_d & risk$outcome_draft_round_d >= 4L),
+      sum(risk$outcome_signed_udfa_d),
+      sum(risk$outcome_nfl_entry_d)
+    )
+  )
+) |>
+  transmute(
+    Outcome,
+    Events = format(n_event, big.mark = ","),
+    Prevalence = sprintf("%.1f%%", 100 * n_event / n_risk),
+    `95% CI` = sprintf(
+      "[%.1f%%, %.1f%%]",
+      100 * wilson(n_event, n_risk)["lo"],
+      100 * wilson(n_event, n_risk)["hi"]
+    )
+  )
+
+kable(
+  ledger,
+  caption = "Table 3: how often each outcome occurs among eligible player-seasons"
+)
+```
+
+```{r}
+#| label: ledger-guard
+#| include: false
+stopifnot(mean(risk$outcome_drafted_d) < 0.05)
+```
+
+To make the rows concrete: the first-round row is Joe Burrow in 2020, first
+overall, and Cameron Ward in 2025, also first overall, two quarterbacks from
+earlier posts in this series. The rounds 4 to 7 row is Jordan Travis,
+selected 171st in 2024. The undrafted row is Shane Buechele, who signed with
+Kansas City after the 2021 draft, and Kyle Allen, who signed with Carolina
+after the 2018 draft. The routes differ in how they announce themselves, but
+as routes into the league they are the same size: 4.7 percent of eligible
+seasons end in a UDFA signing against 3.6 percent in a draft selection.
+
+Among the `r format(sum(risk$outcome_nfl_entry_d), big.mark = ",")`
+player-seasons that end in NFL entry, 56.6 percent arrive undrafted. For
+every two players the draft announces, roughly three talk their way onto a
+roster without hearing their name called.
+
+### 3.2 What happens to a season: the five statuses
+
+*Expecting exhausted eligibility to be the most common end-of-season status.*
+❌ **The expectation does not hold.** Most eligible seasons simply continue:
+the player comes back the next year.
+
+Each eligible season ends in exactly one of five mutually exclusive statuses.
+Four are defined by the player's own result; the fifth is defined by the
+data's failure to observe a result.
+
+```{r}
+#| label: status-terms
+status_terms <- tribble(
+  ~Status               , ~Definition                                                                                                                                                                                                                                                                                              ,
+  "continuing"          , "The player appears again on a roster in the next college season. The season is not an outcome, just another turn of the eligibility clock."                                                                                                                                                             ,
+  "drafted"             , "The player is selected in the draft following this season. The same event also appears as the drafted label in Section 3.1."                                                                                                                                                                            ,
+  "signed_udfa"         , "The player is not selected in that draft but appears on an NFL roster in the entry window afterward. The same event appears as the UDFA label in Section 3.1."                                                                                                                                          ,
+  "exhausted_undrafted" , "This is the player's last observed college season, he was not drafted after it, and no NFL roster appearance follows. Eligibility ran out with no NFL outcome."                                                                                                                                         ,
+  "left_data"           , "The player does not appear next season, but his roster record says a next season should exist: he left the data while still eligible to keep playing, through a transfer with sitting time, an injury retirement, or a departure the data cannot observe. A season ending here has an unknown outcome."
+)
+kable(status_terms, caption = "Table 4: the five end-of-season statuses")
+```
+
+```{r}
+#| label: status
+status_tab <- risk |>
+  count(status_end_of_season, name = "seasons") |>
+  mutate(
+    share = seasons / sum(seasons),
+    # Reader-facing labels for the statuses defined in Table 4, in the same
+    # order as the factor levels below.
+    status_label = dplyr::recode(
+      status_end_of_season,
+      "continuing" = "Still playing (continuing)",
+      "exhausted_undrafted" = "Exhausted eligibility undrafted",
+      "left_data" = "Left the data early",
+      "signed_udfa" = "Signed as a UDFA",
+      "drafted" = "Drafted"
+    ),
+    status_end_of_season = factor(
+      status_end_of_season,
+      levels = c(
+        "continuing",
+        "exhausted_undrafted",
+        "left_data",
+        "signed_udfa",
+        "drafted"
+      )
+    )
+  )
+
+# Label order matches the factor levels above; reversed for top-to-bottom display.
+status_levels <- rev(unique(status_tab$status_label))
+
+p_status <- ggplot(
+  status_tab,
+  aes(share, factor(status_label, levels = status_levels))
+) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(
+        status_label,
+        ": ",
+        format(seasons, big.mark = ","),
+        " (",
+        scales::percent(share, accuracy = 0.1),
+        ")"
+      )
+    ),
+    width = 0.55,
+    fill = "#1B9E77"
+  ) +
+  scale_x_continuous(
+    labels = scales::percent,
+    expand = expansion(mult = c(0, .05))
+  ) +
+  theme_cfbstats() +
+  labs(x = "Share of eligible player-seasons", y = NULL)
+girafe(ggobj = p_status, width_svg = 8, height_svg = 4)
+```
+
+```{r}
+#| label: status-table
+status_out <- status_tab |>
+  transmute(
+    `Season status` = status_label,
+    Seasons = format(seasons, big.mark = ","),
+    Share = scales::percent(share, accuracy = 0.1)
+  )
+kable(status_out, caption = "Table 5: how eligible seasons end")
+```
+
+```{r}
+#| label: status-guard
+#| include: false
+stopifnot(
+  abs(sum(status_tab$share) - 1) < 1e-8,
+  status_tab$share[status_tab$status_end_of_season == "continuing"] > 0.45,
+  status_tab$share[status_tab$status_end_of_season == "exhausted_undrafted"] >
+    0.3,
+  status_tab$share[status_tab$status_end_of_season == "left_data"] > 0.05
+)
+```
+
+The reason is the shape of the data rather than a surprise in it: a player
+who reaches eligibility usually plays several eligible seasons, so most
+eligible rows are mid-career, and a mid-career season ends with another
+season coming. Exhausting eligibility undrafted is the most common *final*
+destination, at 33.1 percent of eligible seasons. The `left_data` share is
+7.6 percent, about one eligible season in thirteen: the player vanishes from
+the data before the roster record says a next season should exist. A
+transfer with sitting-out time or an injury retirement produces exactly this
+pattern, and the modeling conventions treat those seasons deliberately
+rather than as draft failures.
+
+### 3.3 The per-season chance of entry
+
+*Expecting the chance of NFL entry to rise over a player's eligible seasons.*
+✅ **The expectation holds.** The measure is the discrete-time hazard: among
+players still unentered and still playing after 1, 2, 3, ... eligible
+seasons, the share whose very next draft is the one that takes them.
+`eligible_season_index` counts those seasons from one. Think of it as
+waiting in line at the draft: the first pass through the line is cheap, the
+later ones are not.
+
+```{r}
+#| label: hazard
+hazard <- risk |>
+  group_by(eligible_season_index) |>
+  summarise(
+    seasons = n(),
+    across(
+      c(outcome_drafted_d, outcome_signed_udfa_d, outcome_nfl_entry_d),
+      mean
+    ),
+    .groups = "drop"
+  ) |>
+  filter(seasons >= 100)
+
+hazard_long <- hazard |>
+  select(
+    eligible_season_index,
+    Drafted = outcome_drafted_d,
+    `UDFA` = outcome_signed_udfa_d,
+    `NFL entry` = outcome_nfl_entry_d
+  ) |>
+  pivot_longer(-eligible_season_index, names_to = "outcome", values_to = "p")
+
+p_hazard <- ggplot(
+  filter(hazard_long, outcome != "NFL entry"),
+  aes(eligible_season_index, p, color = outcome)
+) +
+  geom_line_interactive(linewidth = 1.4) +
+  geom_point_interactive(size = 3) +
+  geom_line(
+    data = filter(hazard_long, outcome == "NFL entry"),
+    aes(eligible_season_index, p),
+    linewidth = 1.4,
+    linetype = "dashed",
+    color = "gray35"
+  ) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, NA)) +
+  scale_x_continuous(breaks = sort(unique(hazard_long$eligible_season_index))) +
+  scale_color_brewer(palette = "Dark2") +
+  theme_cfbstats() +
+  labs(
+    x = "Eligible season index (1 = first season the player could be drafted)",
+    y = "Event probability in that draft",
+    color = NULL,
+    caption = "Dashed line: NFL entry (drafted or UDFA). Indices with <100 seasons omitted."
+  )
+girafe(ggobj = p_hazard, width_svg = 8, height_svg = 5)
+```
+
+```{r}
+#| label: hazard-table
+hazard_out <- hazard |>
+  transmute(
+    `Eligible season index` = eligible_season_index,
+    Seasons = format(seasons, big.mark = ","),
+    `Drafted` = scales::percent(outcome_drafted_d, accuracy = 0.1),
+    `UDFA` = scales::percent(outcome_signed_udfa_d, accuracy = 0.1),
+    `NFL entry` = scales::percent(outcome_nfl_entry_d, accuracy = 0.1)
+  )
+kable(hazard_out, caption = "Table 6: the per-season hazard of each outcome")
+```
+
+```{r}
+#| label: hazard-guard
+#| include: false
+stopifnot(
+  all(diff(hazard$outcome_nfl_entry_d[1:4]) > 0),
+  hazard$outcome_signed_udfa_d[4] > hazard$outcome_signed_udfa_d[1],
+  hazard$outcome_drafted_d[3] > hazard$outcome_drafted_d[1]
+)
+```
+
+The chance of entry climbs from 4.1 percent in a player's first eligible
+season to 20.4 percent at the fourth, and the UDFA chance climbs even
+faster, from 1.8 to 16.1 percent. Joe Burrow and Cameron Ward both sit where
+the curve is steep: each was drafted first overall in his third eligible
+season, where the entry chance is 17.6 percent and the drafted chance 5.7.
+Jordan Travis waited one season longer, to the fourth eligible season, where
+the chance is highest of all, and he heard his name in the fifth round. A
+player still unentered by his third eligible season waits from a thinner
+pool, and the models should see that through the index term rather than
+treating every eligible season as exchangeable.
+
+### 3.4 Trends across draft classes
+
+*Expecting entry prevalence to be roughly stable across draft classes.*
+❌ **The expectation does not hold, in one direction.** The rate of entry
+drifts down over the years the data covers.
+
+```{r}
+#| label: trend
+trend <- risk |>
+  group_by(draft_year) |>
+  summarise(
+    seasons = n(),
+    drafted_ev = sum(outcome_drafted_d),
+    entry_ev = sum(outcome_nfl_entry_d),
+    drafted = drafted_ev / seasons,
+    entry = entry_ev / seasons,
+    .groups = "drop"
+  ) |>
+  rowwise() |>
+  mutate(
+    entry_lo = wilson(entry_ev, seasons)["lo"],
+    entry_hi = wilson(entry_ev, seasons)["hi"]
+  ) |>
+  ungroup()
+
+p_trend <- ggplot(trend, aes(draft_year)) +
+  geom_ribbon(
+    aes(ymin = entry_lo, ymax = entry_hi),
+    fill = "gray80",
+    alpha = 0.6
+  ) +
+  geom_line(aes(y = entry), linewidth = 1.4, color = "gray35") +
+  geom_line(aes(y = drafted), linewidth = 1.4, color = "#1B9E77") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_cfbstats() +
+  labs(
+    x = "Draft class",
+    y = "Prevalence among eligible seasons",
+    caption = "Gray: NFL entry with 95% interval band. Green: drafted."
+  )
+girafe(ggobj = p_trend, width_svg = 8, height_svg = 5)
+```
+
+```{r}
+#| label: trend-table
+trend_out <- trend |>
+  transmute(
+    `Draft class` = draft_year,
+    `Eligible seasons` = format(seasons, big.mark = ","),
+    `Drafted` = scales::percent(drafted, accuracy = 0.1),
+    `NFL entry` = scales::percent(entry, accuracy = 0.1)
+  )
+kable(trend_out, caption = "Table 7: entry prevalence by draft class")
+```
+
+```{r}
+#| label: trend-guard
+#| include: false
+stopifnot(
+  max(trend$drafted) > 0.05,
+  min(trend$drafted) < 0.03,
+  last(trend$entry) < first(trend$entry)
+)
+```
+
+Entry prevalence falls from 8.9 percent in the 2012 class to 6.7 percent in
+2025, and the drafted rate falls from 5.9 to 2.6 percent, while the UDFA
+share of entry grows to compensate. Two forces plausibly combine, and both
+are mundane: the stat-line population grows faster than the 253-pick draft,
+so the same number of picks spreads over more eligible seasons, and NFL
+roster coverage deepens over the years, so the guarded UDFA lookup catches
+more of the signings that always happened. Either way, the class of 2025 is
+not the class of 2012 with different players; it is a somewhat rarer
+positive class.
+
+### 3.5 Whether entrants play in their first NFL season
+
+*Expecting most entrants to appear on an NFL roster in their entry year.*
+✅ **The expectation holds.** Conditioning on the
+`r format(sum(risk$outcome_nfl_entry_d), big.mark = ",")` players who
+entered, the second-stage labels describe what arrival bought.
+
+```{r}
+#| label: entry-year
+entry_first <- risk |>
+  filter(outcome_nfl_entry_d) |>
+  group_by(playerId) |>
+  slice_min(draft_year, n = 1, with_ties = TRUE) |>
+  ungroup()
+
+entry_tab <- entry_first |>
+  summarise(
+    entrants = n(),
+    made_roster = mean(outcome_made_roster_entry_year),
+    zero_games = mean(outcome_rookie_games_entry_year == 0),
+    median_games = median(outcome_rookie_games_entry_year),
+    q75_games = quantile(outcome_rookie_games_entry_year, 0.75),
+    q95_games = quantile(outcome_rookie_games_entry_year, 0.95)
+  ) |>
+  transmute(
+    `Entrants` = format(entrants, big.mark = ","),
+    `Made entry-year roster` = sprintf("%.1f%%", 100 * made_roster),
+    `Played zero rookie games` = sprintf("%.1f%%", 100 * zero_games),
+    `Median rookie games` = median_games,
+    `75th percentile games` = q75_games,
+    `95th percentile games` = q95_games
+  )
+kable(
+  t(entry_tab),
+  caption = "Table 8: the rookie season among players who entered the NFL"
+)
+```
+
+```{r}
+#| label: entry-guard
+#| include: false
+stopifnot(
+  nrow(entry_first) ==
+    sum(risk$outcome_drafted_d) + sum(risk$outcome_signed_udfa_d),
+  # The named examples' facts above must not rot under a refresh.
+  entry_first$outcome_rookie_games_entry_year[
+    entry_first$player == "Cameron Ward"
+  ] ==
+    17L,
+  entry_first$outcome_rookie_games_entry_year[
+    entry_first$player == "Joe Burrow"
+  ] ==
+    10L,
+  all(
+    entry_first$outcome_rookie_games_entry_year[
+      entry_first$player %in% c("Jordan Travis", "Shane Buechele")
+    ] ==
+      0L
+  )
+)
+```
+
+Nearly all entrants, 98.5 percent, appear on an entry-year NFL roster. That
+figure is partly mechanical: the UDFA link is defined by roster presence, so
+an undrafted entrant cannot fail the roster test by construction, and the
+number should be read as a check on the link rather than as a finding. The
+games column carries the real information. Cameron Ward, first overall,
+played all 17 rookie-season games in 2025. Joe Burrow played 10 in his
+injury-shortened 2020 season. The median entrant plays one game; 47.6
+percent play none, Jordan Travis's and Shane Buechele's line, and Kyle
+Allen's two games are closer to the middle of the distribution than his
+roster spot suggests. Getting there and playing are separated by a wide
+margin, which is why the pipeline carries the second-stage labels at all.
+
+## 4. Summary
+
++ The draft event occurs in 3.6 percent of eligible player-seasons (95%
+  interval 3.5 to 3.8), and the draft-plus-UDFA entry event in 8.3 percent.
++ The UDFA route exceeds the draft route: 3,239 signed seasons against 2,479
+  drafted seasons, and 56.6 percent of all entrants arrive undrafted.
++ The per-season chance of entry rises from 4.1 percent at eligible season
+  one to 20.4 percent at season four.
++ Entry prevalence drifted down across draft classes, from 8.9 percent
+  (2012) to 6.7 percent (2025), with drafted prevalence falling by more than
+  half.
++ Most eligible seasons (51.0 percent) end with the player continuing;
+  33.1 percent end with exhausted eligibility undrafted, and 7.6 percent with
+  the player leaving the data early.
++ Among entrants, the median rookie season is one game; 47.6 percent play
+  none.
+
+## 5. Discussion
+
+The results point at three practical conclusions for the modeling work that
+follows.
+
+::: {.callout-important appearance="minimal"}
+**The base rate is not fixed.** Drafted prevalence halved across the data's
+span while entry fell by a quarter. A model validated out-of-time is scored
+against rarer positives than it trained on, so calibration curves and
+precision at fixed recall say more across years than accuracy or raw
+discrimination figures.
+:::
+
+::: {.callout-important appearance="minimal"}
+**Waiting time carries signal.** The chance of entry varies fourfold over
+the eligible-season index, and the UDFA chance climbs faster than the
+drafted chance. Modeling drafted status alone discards that structure, and
+modeling entry without routes discards the competition between them.
+:::
+
+::: {.callout-important appearance="minimal"}
+**Entry and playing are different questions.** Half of entrants play zero
+rookie games. The second-stage labels (made roster, rookie games) are a
+separate prediction problem, not a footnote on the first.
+:::
+
+Two caveats bound the figures. The high-school graduation year is imputed
+for players without a recruiting record, and the imputation mis-times
+redshirts and junior-college transfers, shifting rows in and out of the
+risk set. Cameron Ward is the textbook case: his clock is imputed from his
+first stat season, yet he arrived by the junior-college route, so his true
+wait was longer than the recorded one. And the `left_data` status is
+informative censoring the pipeline flags but does not resolve. Neither
+caveat is likely to move any prevalence by more than about a percentage
+point, but both matter at the player level where the models operate.

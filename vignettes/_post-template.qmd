@@ -3,6 +3,9 @@
 # The leading underscore keeps Quarto from rendering this template as a page.
 title: "TITLE — a short, human headline"
 date: "YYYY-MM-DD"
+# Default authorship unless the user says otherwise (project convention).
+author:
+  - "An AI directed by Nick Giangreco"
 # freeze: auto re-executes only when this post's source changes, so committed
 # _freeze/ results keep data refreshes from re-running the chunk (dec 0015)
 # while deliberate edits still propagate. Never use freeze: true: it serves
