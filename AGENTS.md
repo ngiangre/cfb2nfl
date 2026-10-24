@@ -104,6 +104,12 @@ wrapper (`CFBSTATS_REFRESH=true` + `tar_make()`). Years 2010–2026.
   which name-guards the join and nulls wrong-person ratings (decision 0013).
   Genuinely unranked players (Cam Ward) are simply absent; model "unrated" as a
   real category, don't impute.
+- **CFBD API coverage is documented in `inst/cfbd-api-coverage.md`** (snapshot
+  of OpenAPI 5.33.0): every endpoint's grain, key attributes, join namespaces,
+  gating (Patreon tiers), and fan-out cost caveats. Consult it to answer
+  "can we get X?" before planning any new ingest. The key is **Patreon
+  level 1** — the gated `adjustedMetrics` endpoints (`/wepa/*`,
+  `/games/{id}/preview/adjusted`) are available; verify with `GET /info`.
 
 ## How we work
 
