@@ -1,5 +1,17 @@
 # cfbstats 0.0.0.9000 (development version)
 
+- New `outcomes` table: the person-period modeling dependent variable
+  (decision 0032, https://github.com/nicholasgiangreco/cfbstats/blob/main/decisions/0032-outcome-table-person-period.md).
+  One row per player-season in the model population, carrying the draft
+  eligibility clock (`hs_grad_year`, `draft_eligible`,
+  `eligible_season_index`), the drafted / NFL-entry / NFL-success labels
+  (`outcome_*` columns), and survival bookkeeping (`years_to_nfl_entry`,
+  `status_end_of_season`, `outcome_observed_d` right-censoring) — queryable
+  directly by models with no further derivation. Published as
+  `data/outcomes.parquet` on the data-latest release and bundled into
+  `cfbstats.duckdb`, documented in `inst/dict/outcomes.yml` and guarded by a
+  new `contract_outcomes()` pipeline contract.
+
 - Site fixes for stale content (fixes the deployed site not showing edited
   post titles, reported 2026-10-24). Vignette freeze mode changed from
   `freeze: true` to `freeze: auto`: under `true`, Quarto serves the committed

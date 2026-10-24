@@ -1,0 +1,179 @@
+dataset: outcomes
+source: derived in-pipeline (build_outcomes(ps_pop, career, recruiting, picks_nfl, nfl_rosters, nfl_player_stats))
+grain: one player-season in the model population (person-period)
+key: (playerId, season)
+description: >
+  The modeling dependent variables (decision 0032), at the person-period grain:
+  every observed stat season for a player in the model population (stat line in
+  `player_stats`, reused CFBD ids excluded, decision 0022). Season rows carry an
+  eligibility clock anchored at high-school graduation; career-level labels —
+  drafted, NFL entry (draft or UDFA), and first-year NFL success — are resolved
+  once per player and stamped on the relevant rows, so downstream models query
+  the dependent variable directly with no further derivation. NFL-side labels
+  are OUTCOMES ONLY, never model inputs (leakage; decision 0014). The draft
+  label joins the CFBD one-pick-per-player lookup (decision 0011); the UDFA
+  label is a name-guarded single-candidate roster match (decisions 0013/0014) —
+  ambiguous names resolve to no link, never a guess. Rows whose draft year is
+  after `last_complete_draft` carry NA outcomes and
+  `status_end_of_season = "censored"` (administrative right-censoring), never a
+  fabricated 0. Published as parquet on data-latest and bundled into the
+  DuckDB asset. Contract: `contract_outcomes()` (population grain preserved,
+  event mutual exclusivity, censoring carries NAs, positive event times).
+columns:
+  - name: playerId
+    type: string
+    description: Athlete id (the shared college-athlete namespace).
+    provenance: derived (player_stats.playerId)
+  - name: player
+    type: string
+    description: Player name (first stat-season name; used for the name guards).
+    provenance: derived (player_stats.player)
+  - name: season
+    type: int32
+    description: The college season being evaluated (s).
+    provenance: derived (player_stats.season)
+  - name: hs_grad_year
+    type: int32
+    description: >
+      High-school graduation year (h), the time origin of the eligibility
+      clock. Recruiting `hs_class` via the name-guarded link when available
+      (decision 0013); otherwise imputed as the first observed stat season
+      minus one (a direct HS enrollee's graduation year) with
+      `hs_year_imputed = 1`. The imputation mis-times redshirts, JUCO and late
+      enrollees — use the flag to filter or sensitivity-check.
+    provenance: derived (recruiting.hs_class, else imputed)
+  - name: hs_year_imputed
+    type: logical
+    description: 1 if `hs_grad_year` was imputed from the first observed college season, else 0.
+    provenance: derived
+  - name: last_season
+    type: int32
+    description: >
+      Last season the player is observed on a roster (roster backbone, may
+      extend past the last stat season — a no-stat final year still means "no
+      further college season").
+    provenance: derived (career_summary.last_season)
+  - name: draft_year
+    type: int32
+    description: The draft that follows the season (d = s + 1).
+    provenance: derived
+  - name: years_since_hs
+    type: int32
+    description: The eligibility clock, d - h; increases by 1 each row.
+    provenance: derived
+  - name: min_years_since_hs
+    type: int32
+    description: >
+      Required gap between HS graduation and the draft (3 for 2010-2026),
+      stored as a column so it can vary by draft year later.
+    provenance: derived (constant parameter)
+  - name: draft_eligible
+    type: logical
+    description: >
+      TRUE when years_since_hs >= min_years_since_hs — the risk-set indicator.
+      Only TRUE rows form the at-risk population.
+    provenance: derived
+  - name: eligible_season_index
+    type: int32
+    description: >
+      1 in the first eligible season, 2 in the second, and so on; NA before
+      eligibility. The discrete-time baseline hazard index (time since entering
+      the risk set).
+    provenance: derived
+  - name: gsis_id
+    type: string
+    description: >
+      nflverse id for the resolved NFL link (draft slot for drafted players,
+      name guard for UDFAs); NA when no NFL record. Audit/provenance only.
+    provenance: derived (picks_nfl, nfl_rosters)
+  - name: outcome_observed_d
+    type: logical
+    description: >
+      1 if draft_year <= the last draft year with complete data, else 0. Rows
+      with 0 get NA outcomes, not 0 — administrative right-censoring.
+    provenance: derived (last_complete_nfl_draft())
+  - name: outcome_drafted_d
+    type: logical
+    description: >
+      1 if selected in draft d, else 0 (NA when censored). The event indicator
+      for a draft-only analysis.
+    provenance: derived (picks via link_drafted, decision 0011)
+  - name: outcome_draft_round_d
+    type: int32
+    description: Round selected (1-7), NA if undrafted or censored. For ordinal models.
+    provenance: derived (picks)
+  - name: outcome_draft_pick_d
+    type: int32
+    description: Overall pick number, NA if undrafted or censored. For continuous draft-capital models.
+    provenance: derived (picks)
+  - name: outcome_draft_round_group_d
+    type: string
+    description: >
+      Ordered category r1 / r2_3 / r4_7 / undrafted (NA when censored). Can
+      define competing events (drafted early vs late) or strata.
+    provenance: derived (outcome_draft_round_d)
+  - name: outcome_signed_udfa_d
+    type: logical
+    description: >
+      1 if not drafted in d but on an NFL roster in the window after that
+      draft, else 0 (NA when censored). Mutually exclusive with
+      `outcome_drafted_d`. A competing event or a component of the broader
+      NFL-entry event.
+    provenance: derived (nfl_rosters via name guard)
+  - name: outcome_nfl_entry_d
+    type: logical
+    description: >
+      1 if drafted OR signed_udfa, else 0 (NA when censored). The broadest
+      event indicator and the best default for sparse positive cases.
+    provenance: derived (outcome_drafted_d | outcome_signed_udfa_d)
+  - name: outcome_nfl_entry_type_d
+    type: string
+    description: >
+      Competing-risks event type: drafted_r1 / drafted_r2_3 / drafted_r4_7 /
+      udfa / none (NA when censored).
+    provenance: derived
+  - name: outcome_nfl_entry_by_d_plus_k
+    type: logical
+    description: >
+      1 if the player entered the NFL (either route) in any draft class from d
+      through d + k - 1 (k = 1 by default). A fixed-horizon binary outcome.
+    provenance: derived
+  - name: outcome_made_roster_entry_year
+    type: logical
+    description: >
+      1 if on an NFL roster in the entry year, else 0; NA when the player did
+      not enter (or is censored). A second-stage event ("stuck" after entry).
+    provenance: derived (nfl_rosters via gsis_id)
+  - name: outcome_rookie_games_entry_year
+    type: int32
+    description: >
+      Games played in the entry season, 0 if none; NA when the player did not
+      enter (or is censored). A numeric outcome.
+    provenance: derived (nfl_player_stats.games via gsis_id)
+  - name: outcome_source
+    type: string
+    description: >
+      Where the label came from: draft_table / roster_table / none. Audit only.
+    provenance: derived
+  - name: years_to_nfl_entry
+    type: int32
+    description: >
+      Seasons from the HS time origin to NFL entry (entry draft year - h); for
+      players who never entered, the time to last observation. The event time
+      for time-to-event models. Contract: positive.
+    provenance: derived
+  - name: nfl_entry_event
+    type: logical
+    description: >
+      1 if entry occurred, 0 if the player is still at risk (censored).
+      Pairs with `years_to_nfl_entry` for a standard Cox-style analysis.
+    provenance: derived
+  - name: status_end_of_season
+    type: string
+    description: >
+      Competing-risks status: drafted / signed_udfa / exhausted_undrafted /
+      left_data / continuing / censored. `continuing` and `censored` are
+      right-censored; `left_data` (absent from the next season but not at the
+      roster backbone's last observed season) is informative censoring —
+      transfers, injuries, early departures — to be treated deliberately.
+    provenance: derived
