@@ -1,5 +1,10 @@
 # cfbstats 0.0.0.9000 (development version)
 
+- Fix CI dependency resolution: `querychat` was archived off CRAN on
+  2026-10-22 (check issues not corrected in time), so the `check` and `site`
+  workflows failed to solve dependencies. A `Remotes: posit-dev/querychat/pkg-r`
+  entry now installs it from GitHub.
+
 - The Shiny app now works on phones: the table browser sends its server-side
   request as a POST so the full DataTables payload fits in the request body
   (the previous multi-kilobyte GET query string was rejected through proxied

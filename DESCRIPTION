@@ -9,6 +9,8 @@ Description: Tools and data pipelines for studying what shapes a college
     the College Football Data (CFBD) API and pursues both explanatory and
     predictive modeling.
 License: MIT + file LICENSE
+Remotes:
+    posit-dev/querychat/pkg-r
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Depends: 
