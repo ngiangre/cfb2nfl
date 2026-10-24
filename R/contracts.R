@@ -1097,6 +1097,12 @@ contract_outcomes <- function(outcomes, ps_pop, stop_on_fail = TRUE) {
     pointblank::col_vals_expr(rlang::expr(
       .data$outcome_observed_d | is.na(.data$outcome_drafted_d)
     )) |>
+    # Censoring is the ONLY source of NA in the UDFA flag: an observed
+    # undrafted player with no roster match is 0, not NA (the left-join
+    # artifact this guards against makes naive prevalence denominators wrong).
+    pointblank::col_vals_expr(rlang::expr(
+      !.data$outcome_observed_d | !is.na(.data$outcome_signed_udfa_d)
+    )) |>
     pointblank::col_vals_not_null(
       pointblank::vars(outcome_draft_round_d, outcome_draft_pick_d),
       preconditions = function(x) {

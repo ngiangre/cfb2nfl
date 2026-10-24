@@ -137,6 +137,33 @@ wrapper (`CFBSTATS_REFRESH=true` + `tar_make()`). Years 2010–2026.
   `%\VignetteIndexEntry{}` in sync. **Code/graphs over prose:** explain claims
   with a table or figure backed by a code chunk (plus an asserting
   `stopifnot()` where the claim could silently rot) rather than paragraphs.
+- **Vignette writing critiques (user review of the 2026-10-24 outcome
+  prevalence post, applied going forward):**
+  - Define every variable and term in the narrative (person-season, eligible
+    season, round groups, status categories, hazard); readers do not know
+    column names like `outcome_drafted_d` or codes like `r2_3`. Display
+    reader-facing labels, not raw column values, in figures and tables.
+  - Keep implementation messages (e.g. DuckDB connection) out of the reader's
+    view: `include: false` for loading chunks.
+  - Render every vector/data-frame output with `knitr::kable` (with a
+    caption), never a bare tibble print.
+  - Introduce any statistical machinery in plain language before use (e.g.
+    "a confidence interval is the range the true rate plausibly occupies"),
+    naming the method (Wilson) only after the concept.
+  - No pie charts; use ordered horizontal `geom_col_interactive` bars.
+  - Avoid authoritative over-interpretation ("the failure is structural");
+    state what happened and the mechanism as explanation, not verdict.
+  - Verdict emojis (✅ holds / ❌ does not hold) are welcome after each
+    expectation statement, used sparingly and only there.
+  - Write for fans who love the game and want the answers: deductive framing
+    ("out of every 100 eligible seasons ...") and named player examples
+    (prefer the recurring cast of earlier vignettes: Burrow, Cam Ward, Jordan
+    Travis, Buechele, Kyle Allen), with example facts verified in the data
+    and pinned by `stopifnot()`.
+  - Discussion is callouts (`callout-important`) plus a short caveats
+    paragraph, not prose blocks.
+  - **Authorship:** vignette `author:` is "An AI directed by Nick Giangreco"
+    unless the user says otherwise.
 - **Decision log:** record substantive decisions in `decisions/` (copy
   `TEMPLATE.md`, next number); distill spike-branch findings into an entry.
   Decisions 0004–0006 cover `targets`, the lineage/audit layer, and the site.

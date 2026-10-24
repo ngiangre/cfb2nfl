@@ -157,6 +157,42 @@ test_that("UDFA entry is name-guarded and mutually exclusive with drafted", {
   expect_true(allen$outcome_nfl_entry_by_d_plus_k[allen$draft_year == 2018L])
 })
 
+test_that("an undrafted player with no roster match is FALSE, not NA", {
+  d <- make_inputs()
+  out <- build_outcomes(
+    d$ps_pop,
+    d$career,
+    d$recruiting,
+    d$picks_nfl,
+    d$nfl_rosters,
+    d$nfl_player_stats
+  )
+  # Ann Ex: observed, undrafted, no NFL link anywhere. The dict says
+  # "else 0 (NA when censored)" — NA here would silently shrink naive
+  # prevalence denominators (mean(na.rm = TRUE) reads 35% instead of 4.7%).
+  ann <- out[out$playerId == "30", ]
+  expect_false(is.na(ann$outcome_signed_udfa_d))
+  expect_false(ann$outcome_signed_udfa_d)
+  # Drafted players are FALSE by mutual exclusivity, not NA either.
+  ward <- out[out$playerId == "10", ]
+  expect_true(all(!is.na(ward$outcome_signed_udfa_d)))
+  expect_false(any(ward$outcome_signed_udfa_d %in% TRUE))
+  expect_false(is.na(ward$outcome_signed_udfa_d[ward$draft_year == 2025L]))
+  # Censoring remains the only source of NA.
+  c_out <- build_outcomes(
+    d$ps_pop,
+    d$career,
+    d$recruiting,
+    d$picks_nfl,
+    d$nfl_rosters,
+    d$nfl_player_stats,
+    last_complete_draft = 2024L
+  )
+  expect_true(is.na(c_out$outcome_signed_udfa_d[
+    c_out$playerId == "10" & c_out$draft_year == 2025L
+  ]))
+})
+
 test_that("an ambiguous name match yields no UDFA label", {
   d <- make_inputs()
   # Two distinct gsis_ids share Kyle Allen's normalized name: no guess.
