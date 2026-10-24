@@ -47,6 +47,7 @@ wrapper (`CFBSTATS_REFRESH=true` + `tar_make()`). Years 2010–2026.
 | `data/nfl_draft_picks.parquet` | one NFL draft pick | nflverse; key `(season, round, pick)`. Bridge to `gsis_id`/`pfr_player_id` + PFR career summary (decision 0014) |
 | `data/nfl_rosters.parquet` | one player-season on an NFL roster | nflverse; key `(gsis_id, season)`. Longevity source: distinct roster seasons |
 | `data/nfl_player_stats.parquet` | one player-season (regular season) | nflverse; key `(gsis_id, season)`. Weekly stats aggregated to season totals |
+| `data/outcomes.parquet` | one player-season in the model population (person-period) | **The modeling dependent variables** (decision 0032): eligibility clock (`hs_grad_year`, `draft_eligible`, `eligible_season_index`), `outcome_*` labels (drafted, NFL entry, entry-year success), survival bookkeeping. Contract `contract_outcomes()` |
 
 ### Gotchas (do not ignore)
 
