@@ -1,0 +1,627 @@
+---
+title: "Offensive linemen are drafted most often and quarterbacks earliest"
+date: "2026-10-24"
+author:
+  - "An AI directed by Nick Giangreco"
+freeze: auto
+vignette: >
+  %\VignetteIndexEntry{Offensive linemen are drafted most often and quarterbacks earliest}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r}
+#| label: setup
+# Load cfbstats from the checkout when the package is not installed, so the
+# site build does not require a package install (decision 0030).
+if (requireNamespace("cfbstats", quietly = TRUE)) {
+  library(cfbstats)
+} else {
+  dir <- getwd()
+  while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
+    dir <- dirname(dir)
+  }
+  for (src in sort(list.files(
+    file.path(dir, "R"),
+    pattern = "[.]R$",
+    full.names = TRUE
+  ))) {
+    source(src, local = FALSE, encoding = "UTF-8")
+  }
+}
+library(DBI)
+library(dplyr)
+library(duckdb)
+library(ggiraph)
+library(ggplot2)
+library(knitr)
+library(tibble)
+library(tidyr)
+# altdoc renders in a temp dir; point the knit wd at the project root so
+# data/*.parquet and tar_read() resolve (CFBSTATS_ROOT is set in the site build).
+root <- cfbstats_root()
+if (nzchar(root)) {
+  knitr::opts_knit$set(root.dir = root)
+}
+
+set_girafe_defaults(
+  opts_hover = opts_hover(
+    css = "stroke:#111827;stroke-width:2.5px;filter:brightness(1.12);"
+  ),
+  opts_hover_inv = opts_hover_inv(css = "opacity:0.45;"),
+  opts_tooltip = opts_tooltip(
+    css = "background:#111827;color:#fff;padding:6px 9px;border-radius:5px;font-weight:bold;font-size:15px;"
+  ),
+  opts_zoom = opts_zoom(min = 1, max = 5),
+  opts_toolbar = opts_toolbar(saveaspng = TRUE, position = "topright"),
+  opts_sizing = opts_sizing(rescale = TRUE)
+)
+
+# Wilson interval for a binomial proportion.
+wilson <- function(x, n, z = 1.96) {
+  p <- x / n
+  d <- 1 + z^2 / n
+  c <- (p + z^2 / (2 * n)) / d
+  h <- (z / d) * sqrt(p * (1 - p) / n + z^2 / (4 * n^2))
+  c(lo = pmax(0, c - h), hi = pmin(1, c + h))
+}
+```
+
+::: {.callout-note appearance="minimal"}
+*Data as of the `data-latest` release, retrieved 2026-10-24. Draft classes
+after the last complete draft are right-censored and carry no outcomes, so
+they are excluded from every rate below rather than counted as failures.
+Each season's position comes from the roster table, joined by athlete id
+and season.*
+:::
+
+## 1. Introduction
+
+The previous post measured how often eligible college seasons end in an NFL
+outcome, over the whole population at once. But nobody watches football that
+way. The draft broadcasts positional differences every spring:
+quarterbacks and pass rushers go early, punters appear once, late, on a
+conference call. Position is also the first thing any draft model would
+condition on, so the rates need tabulating where they actually vary.
+
+This post splits those eligible player-seasons by the position the player
+lined up at in that season, and asks five questions:
+
++ *Expecting quarterbacks to be the most draftable position*
++ *Expecting first-round picks to concentrate among quarterbacks*
++ *Expecting quarterbacks to be picked earliest on average, in every draft class*
++ *Expecting the per-season chance of NFL entry to rise with waiting, for every position*
++ *Expecting quarterbacks to arrive through the draft while other positions lean on the undrafted route*
+
+Each question is a claim the data can settle, answered with a table or
+figure backed by an assertion.
+
+## 2. Data and terms
+
+The unit is the same as before: a **player-season**, one player's college
+season with a recorded stat line. Rates are computed over
+**eligible player-seasons**, seasons whose following draft the player could
+have been selected in. Draft classes whose outcomes may occur in the future
+are excluded rather than counted as misses.
+
+Each season carries the roster position the player was listed at that
+season; a few carry none and form their own group in Table 1. Roster
+listings use two dozen shorthand codes, from QB to LS, and neighboring
+codes describe the same professional role. The analysis groups them into
+nine reader-facing groups, plus a tenth row for the seasons with none
+recorded.
+
+```{r}
+#| label: group-terms
+group_terms <- tribble(
+  ~Group             , ~"Roster codes in the group"                      ,
+  "Quarterback"      , "QB"                                              ,
+  "Running back"     , "RB, FB"                                          ,
+  "Receiver"         , "WR"                                              ,
+  "Tight end"        , "TE"                                              ,
+  "Offensive line"   , "T, G, C, OL"                                     ,
+  "Defensive line"   , "DL, DE, DT, NT, EDGE"                            ,
+  "Linebacker"       , "LB, ILB, OLB"                                    ,
+  "Defensive back"   , "DB, S, CB"                                       ,
+  "Special teams"    , "PK, P, LS, PR"                                   ,
+  "Position not recorded", "Seasons whose roster entry carries no usable position code, including the rare ATH listing (concentrated in earlier draft classes), or no roster row at all"
+)
+kable(group_terms, caption = "Table 1: the position groups used throughout")
+```
+
+A note on the uncertainty intervals: whenever a percentage is reported
+below, it comes with a 95 percent confidence interval, the range the true
+rate plausibly occupies given how many seasons were observed. The style is
+Wilson's, chosen because it behaves well for rare events like these.
+
+```{r}
+#| label: load
+# The connection message is an implementation detail; the reader sees only
+# the counts in the visible chunks.
+con <- dbConnect(duckdb(), "data/cfbstats.duckdb", read_only = TRUE)
+outcomes <- tbl(con, "outcomes") |> collect()
+roster_pos <- tbl(con, "roster") |>
+  # A few players carry two roster rows in one season (mid-season moves);
+  # they always agree on the position, so one row per player-season is kept.
+  select(playerId, season, position) |>
+  distinct() |>
+  collect()
+dbDisconnect(con)
+
+risk <- outcomes |>
+  filter(draft_eligible, outcome_observed_d) |>
+  mutate(
+    across(
+      c(outcome_drafted_d, outcome_signed_udfa_d, outcome_nfl_entry_d),
+      ~ coalesce(.x, FALSE)
+    )
+  ) |>
+  left_join(roster_pos, by = c("playerId", "season"))
+
+pos_group <- c(
+  QB = "Quarterback", RB = "Running back", FB = "Running back",
+  WR = "Receiver", TE = "Tight end",
+  T = "Offensive line", G = "Offensive line", C = "Offensive line",
+  OL = "Offensive line",
+  DL = "Defensive line", DE = "Defensive line", DT = "Defensive line",
+  NT = "Defensive line", EDGE = "Defensive line",
+  LB = "Linebacker", ILB = "Linebacker", OLB = "Linebacker",
+  DB = "Defensive back", S = "Defensive back", CB = "Defensive back",
+  PK = "Special teams", P = "Special teams", LS = "Special teams",
+  PR = "Special teams"
+)
+n_risk_pre <- nrow(risk)
+risk <- risk |>
+  mutate(
+    group = dplyr::coalesce(
+      dplyr::recode(position, !!!pos_group, .default = "Position not recorded"),
+      "Position not recorded"
+    )
+  )
+
+n_risk <- nrow(risk)
+n_players <- n_distinct(risk$playerId)
+```
+
+```{r}
+#| label: risk-set
+risk_set <- tibble(
+  Measure = c("Eligible player-seasons", "Distinct players"),
+  Count = format(c(n_risk, n_players), big.mark = ",")
+)
+kable(risk_set, caption = "Table 2: the risk set")
+```
+
+```{r}
+#| label: grain-guard
+#| include: false
+# The guarded position join adds or drops no rows, and the outcome labels
+# stay mutually exclusive after the join.
+stopifnot(
+  nrow(risk) == n_risk_pre,
+  !any(is.na(risk$group)),
+  !any(risk$outcome_drafted_d & risk$outcome_signed_udfa_d),
+  all(
+    risk$outcome_nfl_entry_d ==
+      (risk$outcome_drafted_d | risk$outcome_signed_udfa_d)
+  )
+)
+```
+
+Players move, and a player can carry a different code in a different
+season; each season is counted at the position it was played at.
+
+## 3. Results
+
+### 3.1 How often each position is drafted
+
+*Expecting quarterbacks to be the most draftable position.* ❌ **The
+expectation does not hold.** The quarterback row sits mid-table; the top
+belongs to the offensive line, the bottom to the specialists.
+
+```{r}
+#| label: rates
+rates <- risk |>
+  group_by(group) |>
+  summarise(
+    seasons = n(),
+    players = n_distinct(playerId),
+    drafted_ev = sum(outcome_drafted_d),
+    entry_ev = sum(outcome_nfl_entry_d),
+    .groups = "drop"
+  ) |>
+  mutate(
+    drafted = drafted_ev / seasons,
+    entry = entry_ev / seasons,
+    drafted_lo = 100 * wilson(drafted_ev, seasons)["lo"],
+    drafted_hi = 100 * wilson(drafted_ev, seasons)["hi"]
+  ) |>
+  arrange(desc(drafted))
+
+rates_out <- rates |>
+  transmute(
+    `Position group` = group,
+    `Eligible seasons` = format(seasons, big.mark = ","),
+    `Players` = format(players, big.mark = ","),
+    `Drafted` = sprintf("%.1f%%", 100 * drafted),
+    `95% CI` = sprintf("[%.1f%%, %.1f%%]", drafted_lo, drafted_hi),
+    `NFL entry` = sprintf("%.1f%%", 100 * entry)
+  )
+kable(
+  rates_out,
+  caption = "Table 3: drafted and NFL-entry prevalence by position group"
+)
+```
+
+```{r}
+#| label: rates-bars
+bars <- rates |>
+  select(group, drafted, entry) |>
+  pivot_longer(-group, names_to = "outcome", values_to = "p") |>
+  mutate(
+    outcome = dplyr::recode(outcome, drafted = "Drafted", entry = "NFL entry"),
+    group = factor(group, levels = rev(rates$group))
+  )
+
+p_rates <- ggplot(bars, aes(p, group, fill = outcome)) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(
+        group, ", ", tolower(outcome), ": ",
+        scales::percent(p, accuracy = 0.1)
+      )
+    ),
+    position = position_dodge(width = 0.75),
+    width = 0.7
+  ) +
+  scale_x_continuous(
+    labels = scales::percent,
+    expand = expansion(mult = c(0, .05))
+  ) +
+  scale_fill_manual(values = c("Drafted" = "#1B9E77", "NFL entry" = "gray55")) +
+  theme_cfbstats() +
+  labs(
+    x = "Prevalence among eligible player-seasons",
+    y = NULL,
+    fill = NULL
+  )
+girafe(ggobj = p_rates, width_svg = 8, height_svg = 6)
+```
+
+```{r}
+#| label: rates-guard
+#| include: false
+stopifnot(
+  # The draft event stays rare inside every position group.
+  all(rates$drafted < 0.10),
+  # The claimed ordering: offensive line on top, special teams at the bottom,
+  # quarterbacks mid-pack.
+  rates$group[1] == "Offensive line",
+  rates$drafted[rates$group == "Offensive line"] >
+    rates$drafted[rates$group == "Quarterback"],
+  rates$drafted[rates$group == "Quarterback"] >
+    rates$drafted[rates$group == "Special teams"]
+)
+```
+
+Out of every 100 eligible offensive-line seasons, about 8 end with the
+player drafted and 16 with the player reaching the NFL by any route,
+against 4 and 7 for quarterbacks and 1 and 4 for specialists. The drafted
+spread from top to bottom is more than sixfold. The offensive-line result
+deserves a qualifier that Section 5 returns to: linemen rarely record a
+statistic, and this population counts only seasons with a stat line, so
+the 8.2 percent is the draft rate of the small, selected minority of
+linemen who left one.
+
+### 3.2 Where the first round goes
+
+*Expecting first-round picks to concentrate among quarterbacks.* ✅ **The
+expectation holds.** The recurring cast of this series is, as it happens,
+all quarterbacks: Joe Burrow first overall in 2020, Cameron Ward first
+overall in 2025, Jordan Travis in the fifth round in 2024, and Shane
+Buechele and Kyle Allen undrafted. The cast's one-position makeup is itself
+a hint at the shape of the first round.
+
+```{r}
+#| label: round-mix
+round_mix <- risk |>
+  filter(outcome_drafted_d) |>
+  group_by(group) |>
+  summarise(
+    drafted_seasons = n(),
+    round1 = sum(outcome_draft_round_d == 1L),
+    .groups = "drop"
+  ) |>
+  mutate(round1_share = round1 / drafted_seasons) |>
+  arrange(desc(round1_share))
+
+round_out <- round_mix |>
+  transmute(
+    `Position group` = group,
+    `Drafted seasons` = format(drafted_seasons, big.mark = ","),
+    `Of which round 1` = round1,
+    `Round-1 share` = scales::percent(round1_share, accuracy = 0.1)
+  )
+kable(
+  round_out,
+  caption = "Table 4: the round-1 share of drafted seasons by position group"
+)
+```
+
+```{r}
+#| label: round-guard
+#| include: false
+stopifnot(
+  round_mix$group[1] == "Quarterback",
+  round_mix$round1_share[1] > 0.25,
+  round_mix$round1_share[1] > 2 * round_mix$round1_share[round_mix$group == "Running back"],
+  # The cast's pinned facts.
+  risk$outcome_draft_pick_d[risk$player == "Joe Burrow" & risk$outcome_drafted_d] == 1L,
+  risk$outcome_draft_pick_d[risk$player == "Cameron Ward" & risk$outcome_drafted_d] == 1L,
+  risk$outcome_draft_round_d[risk$player == "Jordan Travis" & risk$outcome_drafted_d] == 5L,
+  all(risk$outcome_signed_udfa_d[risk$player %in% c("Shane Buechele", "Kyle Allen") & risk$outcome_nfl_entry_d])
+)
+```
+
+When a quarterback does get drafted, the pick is a first-rounder 26.2
+percent of the time, well ahead of the 16.8 percent of defensive linemen,
+the next group. The draft's most valuable resource, the early pick, is
+spent on one position disproportionately, while the back of the draft is
+where the running backs and specialists hear their names. A quarterback
+season is average in its chance of any pick and extreme in what that pick
+is worth. Both facts matter for modeling: the drafted label treats
+Burrow's first pick and Travis's 171st as the same event, and the position
+term is where a model can recover part of the difference.
+
+### 3.3 Where in the draft each position lands, over the years
+
+*Expecting quarterbacks to be picked earliest on average, in every draft
+class.* ❌ **The expectation does not hold.** The measure is the average
+overall pick among each group's drafted seasons, across draft classes. Over
+the whole span quarterbacks do carry the lowest average, pick 112, with
+defensive linemen at 114 and specialists far back at 179. But the
+year-to-year ordering is noisy: quarterbacks are the lowest group in only
+5 of the 14 draft classes.
+
+```{r}
+#| label: pick-trend
+pick_trend <- risk |>
+  filter(outcome_drafted_d, !is.na(outcome_draft_pick_d)) |>
+  group_by(group, draft_year) |>
+  summarise(
+    picks = n(),
+    avg_pick = mean(outcome_draft_pick_d),
+    .groups = "drop"
+  ) |>
+  filter(picks >= 5)
+
+p_pick <- ggplot(
+  pick_trend,
+  aes(draft_year, avg_pick, color = group)
+) +
+  geom_hline(yintercept = 126.6, linetype = "dashed", color = "gray70") +
+  geom_line_interactive(linewidth = 1.1) +
+  geom_point_interactive(
+    aes(
+      tooltip = paste0(
+        group, ", ", draft_year, ": pick ",
+        sprintf("%.0f", avg_pick), " on average (", picks, " picks)"
+      )
+    ),
+    size = 2.6
+  ) +
+  scale_x_continuous(breaks = seq(2012, 2025, by = 2)) +
+  scale_y_continuous(limits = c(0, NA)) +
+  scale_color_brewer(palette = "Dark2") +
+  theme_cfbstats() +
+  labs(
+    x = "Draft class",
+    y = "Average overall pick among drafted seasons",
+    color = NULL,
+    caption = "Group-year cells with fewer than 5 picks omitted. Dashed line: average across all drafted seasons."
+  )
+girafe(ggobj = p_pick, width_svg = 9, height_svg = 5.5)
+```
+
+```{r}
+#| label: pick-guard
+#| include: false
+qb_avg_all <- mean(pick_trend$avg_pick[pick_trend$group == "Quarterback"])
+complete_groups <- pick_trend |> count(group) |> filter(n == max(n)) |> pull(group)
+group_means <- pick_trend |>
+  filter(group %in% complete_groups) |>
+  group_by(group) |>
+  summarise(m = mean(avg_pick), .groups = "drop")
+lowest_per_year <- pick_trend |>
+  group_by(draft_year) |>
+  slice_min(avg_pick, n = 1) |>
+  ungroup()
+stopifnot(
+  # Quarterbacks carry the lowest long-run average pick among the groups
+  # with a published cell in every draft class.
+  group_means$group[which.min(group_means$m)] == "Quarterback",
+  qb_avg_all < 120,
+  # But not in every class: the yearly minimum changes hands.
+  sum(lowest_per_year$group == "Quarterback") == 5,
+  sum(lowest_per_year$group == "Quarterback") < nrow(lowest_per_year),
+  # The dashed reference line in the figure is the pooled average pick.
+  abs(
+    mean(risk$outcome_draft_pick_d[risk$outcome_drafted_d & !is.na(risk$outcome_draft_pick_d)]) -
+      126.6
+  ) <
+    0.05
+)
+```
+
+The instability has a mundane source: a class hands each position only a
+handful of picks, so one early selection moves a group's average by dozens
+of slots. The offensive line's cell appears only from 2018 on, the
+stat-line selection of Section 3.1 again, and swings from pick 58 to pick
+170 on a dozen picks' worth of evidence. What survives year to year is the
+ordering at the extremes: quarterbacks and defensive linemen live in the
+first two rounds on average, running backs and specialists in the back
+half.
+
+### 3.4 The per-season chance of entry, by position
+
+*Expecting the chance of NFL entry to rise with waiting, for every
+position.* ❌ **The expectation does not hold, for one group.** The measure
+is again the discrete-time hazard: among players still unentered after 1, 2, 3, ... eligible seasons,
+the share whose very next draft is the one that takes them. Every group with at least three published
+indices climbs over its first three; the offensive line publishes only two,
+and climbs over both. Special teams climbs to its third eligible season,
+then falls back.
+
+```{r}
+#| label: hazard
+hazard <- risk |>
+  group_by(group, eligible_season_index) |>
+  summarise(
+    seasons = n(),
+    entry = mean(outcome_nfl_entry_d),
+    .groups = "drop"
+  ) |>
+  filter(seasons >= 50)
+
+hazard_wide <- hazard |>
+  select(group, eligible_season_index, entry) |>
+  mutate(entry = scales::percent(entry, accuracy = 0.1)) |>
+  pivot_wider(
+    names_from = eligible_season_index,
+    values_from = entry,
+    names_prefix = "Season "
+  )
+kable(
+  hazard_wide,
+  caption = "Table 5: the per-season hazard of NFL entry by position group and eligible season index (indices with fewer than 50 seasons omitted)"
+)
+```
+
+```{r}
+#| label: hazard-guard
+#| include: false
+entry_by <- function(g) {
+  hazard$entry[hazard$group == g][order(hazard$eligible_season_index[hazard$group == g])]
+}
+# Groups with at least three published indices all rise over their first three;
+# the offensive line only publishes two.
+multi <- unique(hazard$group)[
+  vapply(unique(hazard$group), function(g) length(entry_by(g)) >= 3L, logical(1))
+]
+stopifnot(
+  all(
+    vapply(
+      setdiff(multi, "Special teams"),
+      function(g) all(diff(entry_by(g)[1:3]) > 0),
+      logical(1)
+    )
+  ),
+  # The one exception: special teams falls back at index 4.
+  entry_by("Special teams")[4] < entry_by("Special teams")[3]
+)
+```
+
+The climb is steep everywhere it happens. Quarterbacks go from 2.6 percent
+in their first eligible season to 25.2 percent at their fourth; tight ends
+reach 26.8 and 28.3 percent at their third and fourth seasons, the highest
+hazard in the table. The special-teams exception fits how that group is
+built: kickers and punters still unentered after three eligible seasons are
+increasingly the ones nobody was planning to draft, and the marginal fourth
+season does not change that. For the skill positions, an additional
+eligible season reads as accumulated proof, and the draft chance rises with
+it.
+
+### 3.5 How each position reaches the NFL
+
+*Expecting quarterbacks to arrive through the draft while other positions
+lean on the undrafted route.* ✅ **The expectation holds.** Conditioning on
+the seasons that end in NFL entry, the undrafted share varies by position, and the ordering matches the
+fan's model of the sport.
+
+```{r}
+#| label: udfa-share
+udfa_share <- risk |>
+  filter(outcome_nfl_entry_d) |>
+  group_by(group) |>
+  summarise(entrants = n(), udfa = sum(outcome_signed_udfa_d), .groups = "drop") |>
+  mutate(share = udfa / entrants) |>
+  arrange(desc(share))
+
+udfa_out <- udfa_share |>
+  transmute(
+    `Position group` = group,
+    `Entrants` = format(entrants, big.mark = ","),
+    `Arrived as UDFA` = scales::percent(share, accuracy = 0.1)
+  )
+kable(
+  udfa_out,
+  caption = "Table 6: the undrafted share of NFL entrants by position group"
+)
+```
+
+```{r}
+#| label: udfa-guard
+#| include: false
+stopifnot(
+  udfa_share$group[1] == "Special teams",
+  udfa_share$group[nrow(udfa_share)] == "Quarterback",
+  min(udfa_share$share) < 0.5,
+  max(udfa_share$share) > 0.65
+)
+```
+
+Among positions with real sample sizes, quarterbacks are the only group
+where the draft is the majority route: 43.5 percent of quarterback entrants
+arrived undrafted, against 61.4 percent for receivers and 68.6 percent for
+specialists. The overall figure from the previous post, 56.6 percent, sits
+between the extremes, and the position split explains part of why the
+aggregate looks the way it does. Buechele and Allen, the cast's two UDFA
+members, are both quarterbacks who entered through the minority route of
+their majority-drafted position.
+
+## 4. Summary
+
++ The drafted rate spans from 8.2 percent of eligible offensive-line seasons
+  down to 1.2 percent for special teams, a more than sixfold spread;
+  quarterbacks sit mid-table at 3.7 percent.
++ Quarterbacks dominate the top of the draft: 26.2 percent of drafted
+  quarterback seasons are first-round picks, well ahead of any other
+  position's share.
++ Quarterbacks carry the lowest long-run average pick (112) among the
+  groups with a cell in every draft class, but they are the year's lowest
+  group in only 5 of 14 classes.
++ The per-season hazard of entry rises steeply with waiting for every group
+  that publishes at least three indices; special teams peaks at eligible
+  season three and falls back at season four.
++ Quarterbacks are the only position group whose entrants mostly arrive
+  drafted (56.5 percent); for specialists the undrafted route carries 68.6
+  percent.
+
+## 5. Discussion
+
+::: {.callout-important appearance="minimal"}
+**The offensive line rate is a selection, not a fact about linemen.** This
+population requires a stat line, and linemen rarely appear in one. The 806
+linemen in the risk set are those who recovered a fumble, caught a
+deflection, or otherwise left a statistical trace, and their 8.2 percent
+drafted rate describes that selected group. Models that use position should
+treat the line as a thin-data category, not the position with the best
+observed rate.
+:::
+
+::: {.callout-important appearance="minimal"}
+**Position is a feature the models should carry.** Both the level (a
+sixfold spread in drafted rates) and the shape (round mix, average pick,
+hazard timing, entry route) differ by position. A single pooled model would
+spend its capacity explaining variance that position names in one column.
+:::
+
+Two caveats bound the figures. The not-recorded category holds 299 seasons,
+under half a percent of the risk set, concentrated in earlier draft classes
+whose roster entries lacked a usable position code, plus a few seasons with
+no roster row at all; their rates are reported but not compared. And the
+eligibility-clock imputation noted in the previous post applies here:
+high-school graduation year is imputed for players without a recruiting
+record, shifting rows in and out of the risk set. The shifts are not
+position-specific, so the between-group comparisons are sturdier than the
+absolute levels.

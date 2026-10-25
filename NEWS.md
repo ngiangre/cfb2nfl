@@ -1,5 +1,11 @@
 # cfbstats 0.0.0.9000 (development version)
 
+- New blog post: "Offensive linemen are drafted most often and quarterbacks
+  earliest" (`vignettes/2026-10-24-draft-eligibility-by-position.qmd`),
+  splitting the eligible risk set by roster position: drafted and
+  NFL-entry rates, round-1 shares, average draft pick over draft classes,
+  per-season entry hazards, and undrafted-route shares by position group.
+
 - Fix `outcome_signed_udfa_d` in the `outcomes` table: observed, undrafted
   player-seasons with no NFL roster match got NA instead of FALSE. A naive
   `mean(na.rm = TRUE)` over the flag then read UDFA prevalence at 35 percent
