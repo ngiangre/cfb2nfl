@@ -13,10 +13,10 @@ vignette: >
 ```{r}
 #| label: setup
 #| include: false
-# Load cfbstats from the checkout when the package is not installed, so the
+# Load cfb2nfl from the checkout when the package is not installed, so the
 # site build does not require a package install (decision 0030).
-if (requireNamespace("cfbstats", quietly = TRUE)) {
-  library(cfbstats)
+if (requireNamespace("cfb2nfl", quietly = TRUE)) {
+  library(cfb2nfl)
 } else {
   dir <- getwd()
   while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
@@ -38,8 +38,8 @@ library(knitr)
 library(tibble)
 library(tidyr)
 # altdoc renders in a temp dir; point the knit wd at the project root so
-# tar_read() and inst/ paths resolve (CFBSTATS_ROOT is set in the site build).
-root <- cfbstats_root()
+# tar_read() and inst/ paths resolve (CFB2NFL_ROOT is set in the site build).
+root <- cfb2nfl_root()
 if (nzchar(root)) {
   knitr::opts_knit$set(root.dir = root)
 }
@@ -190,7 +190,7 @@ p_trend <- ggplot(per_season_lab, aes(x = season, y = 100 * share, group = 1)) +
     y = "Players playing for a new school (%)",
     title = "Share of players whose season follows a transfer"
   ) +
-  theme_cfbstats()
+  theme_cfb2nfl()
 
 girafe(ggobj = p_trend, width_svg = 8, height_svg = 4.5)
 ```
@@ -254,7 +254,7 @@ p_dir <- ggplot(dir_plot, aes(x = 100 * Share, y = reorder(direction_label, Shar
     y = NULL,
     title = "Where transferred players land, by competition tier"
   ) +
-  theme_cfbstats()
+  theme_cfb2nfl()
 
 girafe(ggobj = p_dir, width_svg = 8, height_svg = 3.5)
 ```

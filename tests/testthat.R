@@ -1,4 +1,4 @@
 library(testthat)
-library(cfbstats)
+library(cfb2nfl)
 
-test_check("cfbstats")
+test_check("cfb2nfl")

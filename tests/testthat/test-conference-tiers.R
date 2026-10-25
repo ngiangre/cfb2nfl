@@ -30,8 +30,8 @@ test_that("build_conference_tiers assigns season-aware tiers", {
 })
 
 test_that("parquet_asset tracks an existing file when refresh is off", {
-  Sys.setenv(CFBSTATS_REFRESH = "false")
-  on.exit(Sys.unsetenv("CFBSTATS_REFRESH"), add = TRUE)
+  Sys.setenv(CFB2NFL_REFRESH = "false")
+  on.exit(Sys.unsetenv("CFB2NFL_REFRESH"), add = TRUE)
   path <- tempfile(fileext = ".parquet")
   on.exit(unlink(path), add = TRUE)
   file.create(path)
@@ -44,8 +44,8 @@ test_that("parquet_asset tracks an existing file when refresh is off", {
 })
 
 test_that("parquet_asset errors when off and the asset is missing", {
-  Sys.setenv(CFBSTATS_REFRESH = "false")
-  on.exit(Sys.unsetenv("CFBSTATS_REFRESH"), add = TRUE)
+  Sys.setenv(CFB2NFL_REFRESH = "false")
+  on.exit(Sys.unsetenv("CFB2NFL_REFRESH"), add = TRUE)
   expect_error(
     parquet_asset(tempfile(fileext = ".parquet"), function() NULL),
     "not found"
@@ -54,8 +54,8 @@ test_that("parquet_asset errors when off and the asset is missing", {
 
 test_that("parquet_asset ingests and writes in refresh mode", {
   skip_if_not_installed("arrow")
-  Sys.setenv(CFBSTATS_REFRESH = "true")
-  on.exit(Sys.unsetenv("CFBSTATS_REFRESH"), add = TRUE)
+  Sys.setenv(CFB2NFL_REFRESH = "true")
+  on.exit(Sys.unsetenv("CFB2NFL_REFRESH"), add = TRUE)
   path <- tempfile(fileext = ".parquet")
   on.exit(unlink(path), add = TRUE)
 

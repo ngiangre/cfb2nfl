@@ -1,14 +1,14 @@
 ---
-name: cfbstats
+name: cfb2nfl
 description: >-
-  Work with the cfbstats college-football data and analysis in this repository.
+  Work with the cfb2nfl college-football data and analysis in this repository.
   Use when loading, cleaning, joining, or modeling the CFBD draft-picks,
   player-season-stats, roster, or coaches datasets, building features toward
   predicting NFL draft outcomes, or extending the targets pipeline / Quarto
   site. Covers the data schemas, known linkage gotchas, and project conventions.
 ---
 
-# cfbstats
+# cfb2nfl
 
 Analysis of what predicts (and explains) a college football player being drafted
 into the NFL — both explanatory (inference) and predictive answers.

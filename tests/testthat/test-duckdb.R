@@ -141,7 +141,7 @@ test_that("build_duckdb adds _schema_manifest, _meta and the ps_change view", {
 
 test_that("schema_manifest reads grain/key from the dictionaries", {
   skip_if_not_installed("yaml")
-  dict_dir <- system.file("dict", package = "cfbstats")
+  dict_dir <- system.file("dict", package = "cfb2nfl")
   m <- schema_manifest(c("picks", "no_such_table"), dict_dir = dict_dir)
   expect_true(m$documented[1])
   expect_false(m$documented[2])

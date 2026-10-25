@@ -9,12 +9,12 @@ vignette: >
 ```{r}
 #| label: setup
 #| include: false
-# Load cfbstats from the checkout when the package is not installed, so the
+# Load cfb2nfl from the checkout when the package is not installed, so the
 # site build does not require a package install (decision 0030).
-if (requireNamespace("cfbstats", quietly = TRUE)) {
+if (requireNamespace("cfb2nfl", quietly = TRUE)) {
   # vignettes render in a fresh quarto R session: attach the installed package
   # (CI installs it via local::.) or source the checkout fallback below.
-  library(cfbstats)
+  library(cfb2nfl)
 } else {
   dir <- getwd()
   while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
@@ -31,7 +31,7 @@ library(reactable)
 
 # Blog posts are dated vignettes (decision 0015); the table is built from the
 # files themselves so a new post appears just by adding YYYY-MM-DD-slug.qmd.
-root <- cfbstats_root()
+root <- cfb2nfl_root()
 post_files <- sort(list.files(file.path(root, "vignettes"),
   pattern = "^\\d{4}-\\d{2}-\\d{2}-.+\\.qmd$", full.names = TRUE
 ), decreasing = TRUE)

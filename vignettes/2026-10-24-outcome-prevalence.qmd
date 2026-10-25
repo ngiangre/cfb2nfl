@@ -12,10 +12,10 @@ vignette: >
 
 ```{r}
 #| label: setup
-# Load cfbstats from the checkout when the package is not installed, so the
+# Load cfb2nfl from the checkout when the package is not installed, so the
 # site build does not require a package install (decision 0030).
-if (requireNamespace("cfbstats", quietly = TRUE)) {
-  library(cfbstats)
+if (requireNamespace("cfb2nfl", quietly = TRUE)) {
+  library(cfb2nfl)
 } else {
   dir <- getwd()
   while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
@@ -38,8 +38,8 @@ library(knitr)
 library(tibble)
 library(tidyr)
 # altdoc renders in a temp dir; point the knit wd at the project root so
-# data/*.parquet and tar_read() resolve (CFBSTATS_ROOT is set in the site build).
-root <- cfbstats_root()
+# data/*.parquet and tar_read() resolve (CFB2NFL_ROOT is set in the site build).
+root <- cfb2nfl_root()
 if (nzchar(root)) {
   knitr::opts_knit$set(root.dir = root)
 }
@@ -127,7 +127,7 @@ Wilson's, chosen because it behaves well for rare events like these.
 #| label: load
 # The connection message is an implementation detail; the reader sees only
 # the counts in the visible chunk below.
-con <- dbConnect(duckdb(), "data/cfbstats.duckdb", read_only = TRUE)
+con <- dbConnect(duckdb(), "data/cfb2nfl.duckdb", read_only = TRUE)
 outcomes <- tbl(con, "outcomes") |> collect()
 dbDisconnect(con)
 
@@ -316,7 +316,7 @@ p_status <- ggplot(
     labels = scales::percent,
     expand = expansion(mult = c(0, .05))
   ) +
-  theme_cfbstats() +
+  theme_cfb2nfl() +
   labs(x = "Share of eligible player-seasons", y = NULL)
 girafe(ggobj = p_status, width_svg = 8, height_svg = 4)
 ```
@@ -404,7 +404,7 @@ p_hazard <- ggplot(
   scale_y_continuous(labels = scales::percent, limits = c(0, NA)) +
   scale_x_continuous(breaks = sort(unique(hazard_long$eligible_season_index))) +
   scale_color_brewer(palette = "Dark2") +
-  theme_cfbstats() +
+  theme_cfb2nfl() +
   labs(
     x = "Eligible season index (1 = first season the player could be drafted)",
     y = "Event probability in that draft",
@@ -482,7 +482,7 @@ p_trend <- ggplot(trend, aes(draft_year)) +
   geom_line(aes(y = entry), linewidth = 1.4, color = "gray35") +
   geom_line(aes(y = drafted), linewidth = 1.4, color = "#1B9E77") +
   scale_y_continuous(labels = scales::percent) +
-  theme_cfbstats() +
+  theme_cfb2nfl() +
   labs(
     x = "Draft class",
     y = "Prevalence among eligible seasons",

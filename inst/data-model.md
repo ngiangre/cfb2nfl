@@ -1,6 +1,6 @@
-# cfbstats data model — ERD & query guide
+# cfb2nfl data model — ERD & query guide
 
-This document describes how the cfbstats tables relate and how to reason over
+This document describes how the cfb2nfl tables relate and how to reason over
 them for the project's core question: **what shapes a college football player's
 path to the NFL draft, and how well can it be forecast from information
 available during their career?**
@@ -81,7 +81,7 @@ table (decision 0018).
 
 ## The DuckDB asset
 
-`data/cfbstats.duckdb` bundles every cleaned table into one SQL-queryable file.
+`data/cfb2nfl.duckdb` bundles every cleaned table into one SQL-queryable file.
 It is built by the **`duckdb_file`** target in `_targets.R` (`build_duckdb()`,
 decision 0016) from the cleaned, contract-checked tables — the same tables
 written to the `data/*.parquet` assets (decision 0018), so parquet and DuckDB
@@ -91,7 +91,7 @@ match the rows above (`conference_tiers`, not `tiers`).
 
 ```r
 library(DBI)
-con <- dbConnect(duckdb::duckdb(), "data/cfbstats.duckdb", read_only = TRUE)
+con <- dbConnect(duckdb::duckdb(), "data/cfb2nfl.duckdb", read_only = TRUE)
 dbListTables(con)
 dbGetQuery(con, "SELECT COUNT(*) FROM player_stats")
 ```

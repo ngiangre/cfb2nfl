@@ -1,4 +1,4 @@
-# cfbstats — Project Vision
+# cfb2nfl — Project Vision
 
 ## 1. Purpose
 

@@ -21,7 +21,7 @@ wiki_extract <- function(title) {
       format = "json",
       titles = title
     ) |>
-    httr2::req_user_agent("cfbstats (https://github.com)") |>
+    httr2::req_user_agent("cfb2nfl (https://github.com)") |>
     httr2::req_perform() |>
     httr2::resp_body_json()
   pg <- pages$query$pages[[1]]

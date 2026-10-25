@@ -235,7 +235,7 @@ test_that("ingest_games_chunk flattens one /games call and NULLs unplayed types"
       }
       raw
     },
-    .env = asNamespace("cfbstats")
+    .env = asNamespace("cfb2nfl")
   )
   out <- ingest_games_chunk(2023L, "regular")
   expect_equal(out$venue_name, "Aviva Stadium")
@@ -254,7 +254,7 @@ test_that("ingest_game_team_stats_chunk flattens one /games/teams call", {
       )
       mk_team_raw()
     },
-    .env = asNamespace("cfbstats")
+    .env = asNamespace("cfb2nfl")
   )
   out <- ingest_game_team_stats_chunk(2023L, 5L, "regular")
   expect_equal(nrow(out), 4L)
@@ -272,7 +272,7 @@ test_that("ingest_game_player_stats_chunk flattens one /games/players call", {
       )
       mk_game_raw()
     },
-    .env = asNamespace("cfbstats")
+    .env = asNamespace("cfb2nfl")
   )
   out <- ingest_game_player_stats_chunk(2023L, 5L, "regular")
   expect_equal(nrow(out), 4L)
