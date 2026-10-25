@@ -1,0 +1,401 @@
+---
+title: "One player in five now plays a college season for a new school"
+date: "2026-10-24"
+author:
+  - "An AI directed by Nick Giangreco"
+freeze: auto
+vignette: >
+  %\VignetteIndexEntry{One player in five now plays a college season for a new school}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r}
+#| label: setup
+#| include: false
+# Load cfbstats from the checkout when the package is not installed, so the
+# site build does not require a package install (decision 0030).
+if (requireNamespace("cfbstats", quietly = TRUE)) {
+  library(cfbstats)
+} else {
+  dir <- getwd()
+  while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
+    dir <- dirname(dir)
+  }
+  for (src in sort(list.files(
+    file.path(dir, "R"),
+    pattern = "[.]R$",
+    full.names = TRUE
+  ))) {
+    source(src, local = FALSE, encoding = "UTF-8")
+  }
+}
+library(dplyr)
+library(ggiraph)
+library(targets)
+library(ggplot2)
+library(knitr)
+library(tibble)
+library(tidyr)
+# altdoc renders in a temp dir; point the knit wd at the project root so
+# tar_read() and inst/ paths resolve (CFBSTATS_ROOT is set in the site build).
+root <- cfbstats_root()
+if (nzchar(root)) {
+  knitr::opts_knit$set(root.dir = root)
+}
+
+set_girafe_defaults(
+  opts_hover = opts_hover(
+    css = "stroke:#111827;stroke-width:2.5px;filter:brightness(1.12);"
+  ),
+  opts_hover_inv = opts_hover_inv(css = "opacity:0.45;"),
+  opts_tooltip = opts_tooltip(
+    css = "background:#111827;color:#fff;padding:6px 9px;border-radius:5px;font-weight:bold;font-size:15px;"
+  ),
+  opts_zoom = opts_zoom(min = 1, max = 5),
+  opts_toolbar = opts_toolbar(saveaspng = TRUE, position = "topright"),
+  opts_sizing = opts_sizing(rescale = TRUE)
+)
+
+# Wilson interval for a binomial proportion.
+wilson <- function(x, n, z = 1.96) {
+  p <- x / n
+  d <- 1 + z^2 / n
+  c <- (p + z^2 / (2 * n)) / d
+  h <- (z / d) * sqrt(p * (1 - p) / n + z^2 / (4 * n^2))
+  c(lo = pmax(0, c - h), hi = pmin(1, c + h))
+}
+
+dir_label <- c(up = "To a higher tier", lateral = "Same tier", down = "To a lower tier")
+```
+
+```{r}
+#| label: load
+#| include: false
+ps_change <- tar_read(ps_change)
+career <- tar_read(career)
+
+# A transfer event: an observed season whose team differs from the player's
+# prior observed season. Direction compares conference tiers.
+tr <- ps_change |>
+  filter(transferred) |>
+  mutate(direction_label = dir_label[transfer_direction])
+
+per_season <- ps_change |>
+  group_by(season) |>
+  summarise(
+    seasons = n(),
+    transfers = sum(transferred, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(share = transfers / seasons)
+
+stopifnot(
+  nrow(tr) > 10000,
+  # Direction is always assigned once a transfer is observed with both tiers.
+  all(!is.na(tr$transfer_direction)),
+  all(!is.na(tr$prev_team))
+)
+```
+
+::: {.callout-note appearance="minimal"}
+*Data as of the `data-latest` release, retrieved 2026-10-24.*
+:::
+
+## 1. Introduction
+
+Every college football offseason, some players change schools. The mechanics
+have changed dramatically: before 2021 a player who transferred generally had
+to sit out a season at the new school, and after the NCAA adopted the
+one-time transfer waiver and the transfer portal opened in October 2018, moving
+became both easier and far more common. This post measures how many transfers
+happen and, when a player moves, whether the move goes to a stronger or a
+weaker level of competition.
+
+We organize the results with four expectations:
+
++ *Expecting transfers to have grown sharply since the 2021 one-time transfer rule*
++ *Expecting most transfers to move within the same competition tier*
++ *Expecting more moves upward than downward among players from lower tiers*
++ *Expecting quarterbacks and running backs to move down more than other positions*
+
+Each expectation is stated as a claim the data can settle, and each is answered
+with a table or figure backed by an assertion.
+
+## 2. Data and terms
+
+The unit of measurement is a **player-season**: one player's one college season
+with a recorded stat line. A season is a **transfer event** when the player's
+team differs from his team in his previous observed season. Two consequences of
+this definition matter:
+
++ A transfer is only visible if both the old and the new season have a stat
+  line. A player who moved and then never appeared in a stat line again is not
+  counted.
++ The comparison runs through each player's own season history, so a move
+  separated by a gap season (for example, a redshirt year at the new school)
+  is still caught.
+
+To describe where a player moved, each school in each season is placed in a
+**competition tier**: tier 3 is the Power conferences, tier 2 is the other
+Football Bowl Subdivision conferences, and tier 1 is Football Championship
+Subdivision and lower. The tier assignment is season-aware, so realignment
+(Pac-12 collapse, Big East to the American) is handled by the data rather than
+hard-coded. A transfer's **direction** compares the new tier to the old:
+
+```{r}
+#| label: terms
+terms <- tribble(
+  ~Term             , ~Meaning                                                                                                    ,
+  "Transfer event"  , "An observed season at a school different from the player's previous observed season."                     ,
+  "Up"              , "The new school sits in a higher competition tier than the old one (for example, an FCS school to a Power conference)." ,
+  "Same tier"       , "Both schools sit in the same tier."                                                                       ,
+  "Down"            , "The new school sits in a lower tier than the old one (for example, a Power conference to a Group of Five school)." ,
+  "Share"           , "Transfers divided by observed player-seasons, with a 95 percent confidence interval: the range the true rate plausibly occupies." ,
+)
+kable(terms, caption = "Table 1: the transfer terms used throughout")
+```
+
+One data note before the numbers: roster coverage in this dataset is thin
+before roughly 2016, so early-season transfer counts reflect which seasons we
+can see rather than the true volume of movement. Rates from those years are
+lower bounds, not estimates.
+
+## 3. Results
+
+### 3.1 How many transfers
+
+*Expecting transfers to have grown sharply since the 2021 one-time transfer rule.* Before the rule, fewer than five percent of the players who took the
+field in a season were playing for a school different from their previous
+one. That share has climbed every year since 2020 and reaches 19 percent in
+2026: nearly one player in five now spends his season at a school he did not
+play for the year before. The 2020 dip and the 2021 jump bracket the rule
+change itself.
+
+```{r}
+#| label: trend
+per_season_lab <- per_season |>
+  mutate(
+    tooltip = paste0(
+      season, ": ", sprintf("%.1f", 100 * share), "% of players that season played for a new school (",
+      transfers, " of ", format(seasons, big.mark = ","), ")"
+    )
+  )
+
+p_trend <- ggplot(per_season_lab, aes(x = season, y = 100 * share, group = 1)) +
+  geom_line_interactive(aes(tooltip = tooltip), linewidth = 1.4) +
+  geom_point_interactive(aes(tooltip = tooltip), size = 3) +
+  labs(
+    x = "Season",
+    y = "Players playing for a new school (%)",
+    title = "Share of players whose season follows a transfer"
+  ) +
+  theme_cfbstats()
+
+girafe(ggobj = p_trend, width_svg = 8, height_svg = 4.5)
+```
+
+```{r}
+#| label: check-trend
+stopifnot(
+  # Pre-rule era stays below five percent.
+  max(per_season$share[per_season$season <= 2020]) < 0.05,
+  # Portal era: the 2026 share clears fifteen percent.
+  per_season$share[per_season$season == 2026] > 0.15
+)
+per_season |>
+  filter(season %in% c(2018, 2019, 2020, 2021, 2022, 2024, 2026)) |>
+  transmute(
+    Season = season,
+    `Players observed` = seasons,
+    `Changed schools` = transfers,
+    `Share (%)` = sprintf("%.1f", 100 * share)
+  ) |>
+  kable(caption = "Table 2: players changing schools per season, selected years")
+```
+
+Over a full career the same story holds: among the 135,275 players in the
+population, 18,460 (13.6 percent, 95 percent CI 13.4 to 13.8) changed schools
+at least once.
+
+```{r}
+#| label: career-rate
+rate <- transfer_rate(career)
+ci <- wilson(rate$transferred, rate$players)
+stopifnot(rate$share > 0.12, rate$share < 0.15)
+```
+
+### 3.2 Where transfers go
+
+*Expecting most transfers to move within the same competition tier.* Yes. Of the 14,107 players we see changing schools, 42 percent land in the same tier,
+35 percent move down, and 24 percent move up.
+
+```{r}
+#| label: direction
+dir_tab <- tr |>
+  count(direction_label, name = "Transfers") |>
+  mutate(Share = Transfers / sum(Transfers))
+
+stopifnot(
+  nrow(dir_tab) == 3,
+  max(dir_tab$Share) == dir_tab$Share[dir_tab$direction_label == "Same tier"]
+)
+
+dir_plot <- dir_tab |>
+  mutate(tooltip = paste0(
+    direction_label, ": ", Transfers, " transfers (",
+    sprintf("%.1f", 100 * Share), "%)"
+  ))
+
+p_dir <- ggplot(dir_plot, aes(x = 100 * Share, y = reorder(direction_label, Share))) +
+  geom_col_interactive(aes(tooltip = tooltip), width = 0.65) +
+  labs(
+    x = "Share of transferred players (%)",
+    y = NULL,
+    title = "Where transferred players land, by competition tier"
+  ) +
+  theme_cfbstats()
+
+girafe(ggobj = p_dir, width_svg = 8, height_svg = 3.5)
+```
+
+The full origin-to-destination matrix shows why the aggregate hides movement
+in both directions. Players leaving tier 3 (Power) schools mostly stay in
+tier 3 or drop one level, while players leaving tier 1 schools move up nearly
+half the time.
+
+```{r}
+#| label: matrix
+# Named tier_name, not tier_label: ps_change already carries a tier_label
+# column, and a same-named lookup vector is shadowed by the data mask.
+tier_name <- c(`1` = "FCS and below", `2` = "Group of Five", `3` = "Power")
+matrix_tab <- tr |>
+  count(From = tier_name[as.character(prev_tier)], To = tier_name[as.character(tier)]) |>
+  pivot_wider(names_from = To, values_from = n, values_fill = 0L)
+
+stopifnot(sum(as.matrix(matrix_tab[, -1])) == nrow(tr))
+kable(matrix_tab, caption = "Table 3: where transferred players land, by origin and destination tier")
+```
+
+*Expecting more moves upward than downward among players from lower tiers.* Holds, with a nuance. Players who start at a tier 1 school move up 4,927
+times against 985 moves down, about five to one. But players from tier 2
+schools also move upward or sideways more often than down to tier 1, so the
+ladder effect is strongest at the bottom and fades by tier 2.
+
+```{r}
+#| label: check-ladder
+tier1 <- tr |> filter(prev_tier == 1) |> count(transfer_direction)
+n_up_t1 <- tier1$n[tier1$transfer_direction == "up"]
+n_down_t1 <- tier1$n[tier1$transfer_direction == "down"]
+stopifnot(n_up_t1 > 2 * n_down_t1)
+```
+
+Four quarterbacks from the recurring cast of earlier posts illustrate the
+range of moves: Joe Burrow left Ohio State for LSU in 2018 (same tier) and won
+a national championship and the first overall pick; Shane Buechele moved from
+Texas down to SMU in 2019; Jordan Travis moved from Louisville to Florida
+State in 2019 (same tier); and Cameron Ward climbed from Incarnate Word to
+Washington State in 2022 and again to Miami in 2024, two tiers up and then
+within the top tier, before being drafted in 2025.
+
+```{r}
+#| label: examples
+ex <- ps_change |>
+  filter(
+    ((player == "Joe Burrow" & season == 2018) |
+      (player == "Shane Buechele" & season == 2019) |
+      (player == "Jordan Travis" & season == 2019) |
+      (player == "Cameron Ward")) &
+      transferred
+  ) |>
+  distinct(player, season, prev_team, team, transfer_direction) |>
+  transmute(
+    Player = player,
+    Season = season,
+    From = prev_team,
+    To = team,
+    Direction = dir_label[transfer_direction]
+  ) |>
+  arrange(Player, Season)
+
+stopifnot(nrow(ex) == 5, "Cameron Ward" %in% ex$Player)
+kable(ex, caption = "Table 4: example transfers from the recurring cast")
+```
+
+### 3.3 Who moves where, by position
+
+*Expecting quarterbacks and running backs to move down more than other positions.* Holds. Among positions with more than 200 transfers, quarterbacks and
+running backs who change schools move down more often than any other position
+group (41 percent each) and move up the least (17 and 19 percent), while
+punters and kickers move up the most (38 and 34 percent).
+
+```{r}
+#| label: position
+pos_tab <- tr |>
+  filter(position %in% c("QB", "RB", "WR", "TE", "LB", "DB", "P", "PK")) |>
+  count(position, direction_label) |>
+  group_by(position) |>
+  mutate(Share = n / sum(n)) |>
+  ungroup() |>
+  select(position, direction_label, Share) |>
+  pivot_wider(names_from = direction_label, values_from = Share) |>
+  transmute(
+    Position = position,
+    `Up (%)` = sprintf("%.0f", 100 * `To a higher tier`),
+    `Same tier (%)` = sprintf("%.0f", 100 * `Same tier`),
+    `Down (%)` = sprintf("%.0f", 100 * `To a lower tier`)
+  )
+
+stopifnot(
+  max(pos_tab$`Down (%)`) %in% c("41"),
+  max(pos_tab$`Up (%)`) == "38"
+)
+kable(pos_tab, caption = "Table 5: transfer direction by position (share of that position's transfer events)")
+```
+
+The specialist pattern is consistent with the opportunity structure: there
+are few punting and kicking jobs, and a specialist's path to the top often
+runs through a smaller program first. Quarterbacks and running backs carry
+the opposite incentive, since depth charts at big programs are long and the
+next snap may only exist one tier down.
+
+## 4. Summary
+
++ *Players change schools far more often since the 2021 rule.* The per-season share rose from about 2 percent before the rule to 19 percent in 2026. ✅
++ *Most players who transfer stay in the same tier.* 42 percent land in the same tier, against 35 percent down and 24 percent up. ✅
++ *Players from lower tiers move up more than down.* Players starting at a tier 1 school move up about five times as often as they move down. ✅
++ *Quarterbacks and running backs move down the most.* Both sit at 41 percent down, the highest of any position group. ✅
+
+## 5. Discussion
+
+::: {.callout-important appearance="minimal"}
+The transfer count is a **floor**. It only sees moves where both seasons carry
+a stat line, so a player who transfers and never records another stat is
+invisible, and players whose final season precedes our roster coverage leave
+no trail at all. Early-year rates (before 2016) are lower bounds on true
+movement.
+:::
+
+::: {.callout-important appearance="minimal"}
+Direction is measured against **competition tiers, not individual programs**.
+A move from one Power program to another is lateral here even when the new
+program is stronger, and conference realignment can shift a school's tier
+while its roster stays put. The 794 player-seasons where a team's tier
+changed between seasons without a school change are excluded from every
+count above.
+:::
+
+Finally, the trend line conflates two forces: the 2021 rule change and the
+growing coverage of the underlying roster data. The pre-2016 counts are
+certainly incomplete, but the post-2018 climb is too steep and too sustained
+to be a coverage artifact alone, and it lines up year by year with the portal's
+opening and the one-time waiver.
+
+A natural next question is what these moves are worth: whether a transfer
+season changes a player's chance of being drafted, which the outcome labels in
+this project can answer directly.
+
+```{r}
+#| label: session-info
+#| include: false
+```

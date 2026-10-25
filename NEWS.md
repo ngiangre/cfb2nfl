@@ -1,5 +1,12 @@
 # cfbstats 0.0.0.9000 (development version)
 
+- New blog post: "One player in five now plays a college season for a new
+  school" (`vignettes/2026-10-24-transfers.qmd`), measuring transfer volume
+  per season and direction across competition tiers: the post-2021
+  one-time-rule climb from under five percent to 19 percent, same-tier vs
+  up vs down shares, the origin-to-destination tier matrix, and transfer
+  direction by position group.
+
 - New blog post: "Offensive linemen are drafted most often and quarterbacks
   earliest" (`vignettes/2026-10-24-draft-eligibility-by-position.qmd`),
   splitting the eligible risk set by roster position: drafted and
