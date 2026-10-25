@@ -4,7 +4,7 @@
 # this script, then re-dispatch `site.yaml` so the track-mode site build picks
 # up the new data.
 
-repo <- "ngiangre/cfbstats"
+repo <- "ngiangre/cfb2nfl"
 
 assets <- list.files(
   "data",

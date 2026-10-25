@@ -11,7 +11,7 @@ app_sys <- function(...) {
   # Under pkgload::load_all() system.file resolves into the package's temp
   # install; on deployed bundles it can come back empty, so fall back to the
   # project checkout on disk.
-  p <- system.file(..., package = "cfbstats")
+  p <- system.file(..., package = "cfb2nfl")
   if (!nzchar(p)) {
     p <- file.path(getwd(), "inst", ...)
   }

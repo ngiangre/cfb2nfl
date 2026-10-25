@@ -13,7 +13,7 @@
 #' @param base_family Base font family (default "").
 #' @return A ggplot2 theme object.
 #' @export
-theme_cfbstats <- function(base_size = 16, base_family = "") {
+theme_cfb2nfl <- function(base_size = 16, base_family = "") {
   rlang::check_installed("ggplot2")
   ggplot2::theme_minimal(base_size = base_size, base_family = base_family) +
     ggplot2::theme(
@@ -42,14 +42,14 @@ theme_cfbstats <- function(base_size = 16, base_family = "") {
 
 #' Shared ggplot2 theme (retained alias)
 #'
-#' Backward-compatible alias that delegates to [theme_cfbstats()] so existing
-#' figures pick up the accessible-font standard. Prefer [theme_cfbstats()] in
+#' Backward-compatible alias that delegates to [theme_cfb2nfl()] so existing
+#' figures pick up the accessible-font standard. Prefer [theme_cfb2nfl()] in
 #' new code.
 #'
 #' @return A ggplot2 theme object.
 #' @export
 viz_theme <- function() {
-  theme_cfbstats()
+  theme_cfb2nfl()
 }
 
 #' Team brand-color values for a discrete color/fill scale
@@ -396,7 +396,7 @@ viz_career_length <- function(roster) {
       title = "How long is a college football career?",
       subtitle = "Distinct roster seasons per player, 2010\u20132026"
     ) +
-    theme_cfbstats()
+    theme_cfb2nfl()
   ggiraph::girafe(ggobj = p)
 }
 
@@ -455,7 +455,7 @@ viz_transfers_by_season <- function(ps_change) {
       title = "Team changes by season and tier direction",
       subtitle = "Up = transfer to a higher conference tier (season-aware)"
     ) +
-    theme_cfbstats()
+    theme_cfb2nfl()
   ggiraph::girafe(ggobj = p)
 }
 
@@ -524,7 +524,7 @@ viz_redshirt_by_career_length <- function(roster) {
         "coverage gaps (see seasonality chart)"
       )
     ) +
-    theme_cfbstats()
+    theme_cfb2nfl()
   ggiraph::girafe(ggobj = p)
 }
 
@@ -623,7 +623,7 @@ viz_redshirt_seasonality <- function(roster) {
         "bounds how much of the teal is real"
       )
     ) +
-    theme_cfbstats()
+    theme_cfb2nfl()
   ggiraph::girafe(ggobj = p)
 }
 

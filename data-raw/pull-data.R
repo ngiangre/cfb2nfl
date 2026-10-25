@@ -5,7 +5,7 @@
 
 dir.create("data", showWarnings = FALSE)
 piggyback::pb_download(
-  repo = "ngiangre/cfbstats",
+  repo = "ngiangre/cfb2nfl",
   tag = "data-latest",
   dest = "data"
 )

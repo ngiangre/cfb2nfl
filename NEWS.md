@@ -1,4 +1,9 @@
-# cfbstats 0.0.0.9000 (development version)
+# cfb2nfl 0.0.0.9000 (development version)
+
+- Project renamed from `cfbstats` to `cfb2nfl`: package name, `theme_cfb2nfl()`
+  and `cfb2nfl_root()` helpers, `CFB2NFL_{REFRESH,ROOT,DB}` environment
+  variables, and `data/cfb2nfl.duckdb`. The GitHub repository moves to
+  https://github.com/ngiangre/cfb2nfl (old URLs redirect).
 
 - New blog post: "One player in five now plays a college season for a new
   school" (`vignettes/2026-10-24-transfers.qmd`), measuring transfer volume
@@ -27,7 +32,7 @@
   entry-year rookie outcomes.
 
 - New `outcomes` table: the person-period modeling dependent variable
-  (decision 0032, https://github.com/nicholasgiangreco/cfbstats/blob/main/decisions/0032-outcome-table-person-period.md).
+  (decision 0032, https://github.com/nicholasgiangreco/cfb2nfl/blob/main/decisions/0032-outcome-table-person-period.md).
   One row per player-season in the model population, carrying the draft
   eligibility clock (`hs_grad_year`, `draft_eligible`,
   `eligible_season_index`), the drafted / NFL-entry / NFL-success labels
@@ -35,7 +40,7 @@
   `status_end_of_season`, `outcome_observed_d` right-censoring) — queryable
   directly by models with no further derivation. Published as
   `data/outcomes.parquet` on the data-latest release and bundled into
-  `cfbstats.duckdb`, documented in `inst/dict/outcomes.yml` and guarded by a
+  `cfb2nfl.duckdb`, documented in `inst/dict/outcomes.yml` and guarded by a
   new `contract_outcomes()` pipeline contract.
 
 - Site fixes for stale content (fixes the deployed site not showing edited
@@ -70,15 +75,15 @@
   now derives its (season, seasonType, week) grid from the cleaned `games`
   table, which exists in both refresh and track modes, instead of the
   ingest-mode-only `raw_games` (NULL in track mode, which aborted
-  `tar_make()`); and the content vignettes now attach the installed cfbstats
-  package in their setup chunk, so `cfbstats_root()` resolves in the fresh
+  `tar_make()`); and the content vignettes now attach the installed cfb2nfl
+  package in their setup chunk, so `cfb2nfl_root()` resolves in the fresh
   quarto R session (previously only sourced from the checkout when the package
   was absent).
 
-- The documentation site no longer requires the cfbstats package to be
+- The documentation site no longer requires the cfb2nfl package to be
   installed: vignette setup chunks source `R/*.R` from the checkout when the
   package is missing, and man-page examples render unexecuted
-  ([decision 0030](https://github.com/ngiangre/cfbstats/blob/main/decisions/0030-site-build-no-package-install.md)).
+  ([decision 0030](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0030-site-build-no-package-install.md)).
 - The ERD on the Data page is now rendered live from mermaid (mirroring
   `inst/data-model.md`) instead of a pre-rendered PNG that had drifted behind
   the new `games`, `game_team_stats`, and `game_player_stats` tables.
@@ -119,12 +124,12 @@ layer, and the documentation site, all under version control.
 - The DuckDB bundle now carries a wide `player_season_stats` table (one row per
   player-season-team, one numeric column per `(category, statType)` pair) so
   SQL users no longer pivot the 1.5M-row long `player_stats` by hand
-  ([decision 0026](https://github.com/ngiangre/cfbstats/blob/main/decisions/0026-wide-player-season-stats-duckdb.md)).
+  ([decision 0026](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0026-wide-player-season-stats-duckdb.md)).
 - The drafted-rate-by-tier example query in `inst/data-model.md` is corrected to
   aggregate the long stats to player-season grain before joining (the old query
   counted stat lines, not players).
 - The DuckDB bundle is now self-documenting and self-checking
-  ([decision 0027](https://github.com/ngiangre/cfbstats/blob/main/decisions/0027-duckdb-queryability-batch.md)):
+  ([decision 0027](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0027-duckdb-queryability-batch.md)):
   a name-guarded `nfl_pick_link` bridge to the NFL tables, a queryable slimmed
   `audit_log`, a generated `_schema_manifest` (grain/key from the
   dictionaries), a `_meta` row recording the last complete season/draft class,
@@ -134,17 +139,17 @@ layer, and the documentation site, all under version control.
 - CFBD ingest requests retry transient failures (429/5xx) with exponential
   backoff, so a temporary API outage or rate-limit window no longer fails the
   whole weekly refresh
-  ([decision 0028](https://github.com/ngiangre/cfbstats/blob/main/decisions/0028-cfbd-retry-backoff.md)).
+  ([decision 0028](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0028-cfbd-retry-backoff.md)).
 
 - The expectation-check blog post is revised into a research-article structure
   (Introduction, Data, Results, Summary, Discussion) with neutral scientific
   phrasing and corrected observations re-verified against the published data;
   the class-year audit section was removed in favor of the fix recorded in
-  [decision 0024](https://github.com/ngiangre/cfbstats/blob/main/decisions/0024-class-year-coercion-and-fifth-year-flag.md).
+  [decision 0024](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0024-class-year-coercion-and-fifth-year-flag.md).
 
 - The roster backbone is now guarded against two defects surfaced by the
   expectation-check blog post
-  ([decision 0024](https://github.com/ngiangre/cfbstats/blob/main/decisions/0024-class-year-coercion-and-fifth-year-flag.md)).
+  ([decision 0024](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0024-class-year-coercion-and-fifth-year-flag.md)).
   `clean_roster()` coerces `class_year` outside the plausible 1-5 eligibility
   range to `NA` — older CFBD seasons return the queried *year* in the
   eligibility-class field (~124k rows, pre-2020) — so the derived
@@ -167,14 +172,14 @@ layer, and the documentation site, all under version control.
   provenance page renders the new columns and the history. Data contracts now
   **block the build**: a new `contract_gate` target aborts `tar_make()` when
   any `ok_*` check fails, so failing data never publishes ([decision 0023](
-  https://github.com/ngiangre/cfbstats/blob/main/decisions/0023-contract-gate-blocks-build.md)).
+  https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0023-contract-gate-blocks-build.md)).
   New contracts cover every model-path link/features step (coach link fan-out,
   tier link, reused-id filter, change features, roster weight, recruiting
   link, player-season uniqueness), and the audit's key declarations were
   corrected (`clean_picks` keys on the draft slot; mid-season transfers are
   distinct rows at `(playerId, season, team)`). CFBD athlete-id reuse is
   handled explicitly ([decision 0022](
-  https://github.com/ngiangre/cfbstats/blob/main/decisions/0022-cfbd-athlete-id-reuse.md)):
+  https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0022-cfbd-athlete-id-reuse.md)):
   `reused_ids()` flags ids spanning implausible career windows (> 7 seasons),
   `career_summary(max_span = 7L)` drops them, and a `ps_pop` target filters the
   model population.
@@ -194,11 +199,11 @@ layer, and the documentation site, all under version control.
 
 - Derived feature tables are now **first-class pipeline targets** bundled into
   the DuckDB asset and documented in the data model ([decision 0021](
-  https://github.com/ngiangre/cfbstats/blob/main/decisions/0021-derived-feature-tables-in-pipeline.md)).
+  https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0021-derived-feature-tables-in-pipeline.md)).
   `career_summary(roster)` (`career` target), `flag_redshirt(roster,
   player_stats)` (`roster_flags` target), and the existing `ps_change` backbone
   carry contracts and audit rows like the cleaned tables, ship in
-  `data/cfbstats.duckdb` with new dictionaries (`inst/dict/*.yml`) and ERD
+  `data/cfb2nfl.duckdb` with new dictionaries (`inst/dict/*.yml`) and ERD
   entries, and are **not** published as standalone parquet (they rebuild from
   other cleaned tables in any mode, so no release asset is needed before a
   track-mode build). `player_dossier()` gains optional `career` /
@@ -246,8 +251,8 @@ layer, and the documentation site, all under version control.
   COVID years are not separable at this grain; that disambiguation is the
   later redshirt question).
 - Fixed vignette rendering outside altdoc: vignettes now resolve the project
-  root via `cfbstats_root()`, which falls back to walking up to the nearest
-  `_targets` store when `CFBSTATS_ROOT` is unset, so a direct `quarto preview`
+  root via `cfb2nfl_root()`, which falls back to walking up to the nearest
+  `_targets` store when `CFB2NFL_ROOT` is unset, so a direct `quarto preview`
   no longer fails with "targets data store _targets not found".
 
 - Added a **stat-phase taxonomy** and an **interpretable player dossier** so a
@@ -279,7 +284,7 @@ layer, and the documentation site, all under version control.
   an FCS coach gap). Covered by `tests/testthat/test-stat-taxonomy.R`,
   `test-nfl-outcome.R`, and `test-dossier.R`. **`nfl_rosters` must be refreshed
   and republished on `data-latest` before merge** (schema change).
-  See [decision 0019](https://github.com/ngiangre/cfbstats/blob/main/decisions/0019-stat-taxonomy-and-player-dossier.md).
+  See [decision 0019](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0019-stat-taxonomy-and-player-dossier.md).
 
 - **Published parquet are now the cleaned tables** (decision 0018), so the
   `data/*.parquet` assets, the DuckDB bundle, and the data dictionaries all carry
@@ -287,21 +292,21 @@ layer, and the documentation site, all under version control.
   refresh mode only; each `<table>_file` target writes the *cleaned* parquet and
   `<table>` reads it back, making the cleaned parquet the single source of truth
   downstream. Track-mode builds read the cleaned parquet directly (no re-clean,
-  no key). See [decision 0018](https://github.com/ngiangre/cfbstats/blob/main/decisions/0018-cleaned-parquet-assets.md).
+  no key). See [decision 0018](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0018-cleaned-parquet-assets.md).
 
 - **The `targets` pipeline now owns ingest → process → assets** (decision 0017).
-  A single `tar_make()` in **refresh mode** (`CFBSTATS_REFRESH=true`) ingests
+  A single `tar_make()` in **refresh mode** (`CFB2NFL_REFRESH=true`) ingests
   every source — including `conference_tiers`, now derived in-pipeline from the
   ingested `player_stats` by the new `build_conference_tiers()` — processes it,
-  and writes every data asset (raw parquet **and** `cfbstats.duckdb`) in one
+  and writes every data asset (raw parquet **and** `cfb2nfl.duckdb`) in one
   dependency-ordered pass. Ingestion is env-gated via `parquet_asset()`: refresh
   mode writes the parquet, the default **track mode** reads the
   committed/downloaded file with no API key (how the keyless site build runs).
   `data-raw/refresh.R` is now a thin wrapper and `data-raw/conference_tiers.R`
   is removed; the `data-refresh` workflow is a single `tar_make()` +
-  publish-assets. See [decision 0017](https://github.com/ngiangre/cfbstats/blob/main/decisions/0017-pipeline-owns-ingest-and-assets.md).
+  publish-assets. See [decision 0017](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0017-pipeline-owns-ingest-and-assets.md).
 
-- Added a **queryable DuckDB data asset** (`data/cfbstats.duckdb`) that bundles
+- Added a **queryable DuckDB data asset** (`data/cfb2nfl.duckdb`) that bundles
   every cleaned, contract-checked table into one SQL-queryable file, built by the
   new `build_duckdb()` (`R/duckdb.R`) as the `duckdb_file` pipeline target
   (`format = "file"`, downstream of the clean stage) so its schema matches the
@@ -312,7 +317,7 @@ layer, and the documentation site, all under version control.
   the two look-alike traps, `recruiting.playerId` and `picks.nflAthleteId`),
   leakage / out-of-time guidance, and example SQL — cross-linking each table to
   its `inst/dict/*.yml`. `DBI` and `duckdb` added to `Suggests`.
-  See [decision 0016](https://github.com/ngiangre/cfbstats/blob/main/decisions/0016-duckdb-query-asset.md).
+  See [decision 0016](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0016-duckdb-query-asset.md).
 
 - Added **NFL outcomes for drafted players** from nflverse (`nflreadr`) as three
   first-class tables (`ingest_nfl_*()` → `clean_nfl_*()`, published on the
@@ -335,7 +340,7 @@ layer, and the documentation site, all under version control.
   `contract_nfl_rosters()` / `contract_nfl_player_stats()` / `contract_nfl_link()`,
   data dictionaries (`inst/dict/nfl_*.yml`, dict-parity test), and
   `tests/testthat/test-nfl.R`.
-  See [decision 0014](https://github.com/ngiangre/cfbstats/blob/main/decisions/0014-nfl-outcomes-nflverse-link.md).
+  See [decision 0014](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0014-nfl-outcomes-nflverse-link.md).
 - Added **high-school recruiting ratings** as a first-class table
   (`ingest_recruiting()` → `data/recruiting.parquet`, published on the
   `data-latest` release): CFBD `stars`/`rating`/`ranking` per recruit.
@@ -351,7 +356,7 @@ layer, and the documentation site, all under version control.
   dictionary (`inst/dict/recruiting.yml`, dict-parity test), and
   `tests/testthat/test-recruiting.R`. Kept off the model path for now (like the
   team display dimension).
-  See [decision 0013](https://github.com/ngiangre/cfbstats/blob/main/decisions/0013-recruiting-id-namespace-collision.md).
+  See [decision 0013](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0013-recruiting-id-namespace-collision.md).
 - Extended the data window from 2010–2025 to **2010–2026**: `ingest_player_stats()`
   and `ingest_roster()` now default to `2010:2026` (and `data-raw/refresh.R` pulls
   through 2026), with the season contracts (`contract_player_stats()`,
@@ -361,14 +366,14 @@ layer, and the documentation site, all under version control.
   draft), and `contract_picks()`/`contract_drafted()` widen their year checks. The
   2026 refresh adds preseason rosters and the completed 2026 draft class; 2026
   season stats are not yet available (season not started).
-  See [decision 0012](https://github.com/ngiangre/cfbstats/blob/main/decisions/0012-extend-data-window-to-2026.md).
+  See [decision 0012](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0012-extend-data-window-to-2026.md).
 - `targets` pipeline (`_targets.R`) as the single source of truth for the DAG,
   with stage functions in `R/` (`ingest`, `clean`, `link`, `features`, `model`).
-  See [decision 0004](https://github.com/ngiangre/cfbstats/blob/main/decisions/0004-adopt-targets-orchestration.md).
+  See [decision 0004](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0004-adopt-targets-orchestration.md).
 - Lineage/audit layer: `audit_step()` emits a per-step record (row/col counts,
   key coverage, schema hash, contract status, git SHA) into the `audit_log`
   target; data dictionaries in `inst/dict/`.
-  See [decision 0005](https://github.com/ngiangre/cfbstats/blob/main/decisions/0005-lineage-and-audit-design.md).
+  See [decision 0005](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0005-lineage-and-audit-design.md).
 - Data contracts (`pointblank`) and unit tests (`testthat`) run in the pipeline.
 - Data dictionaries reconciled with the cleaned schema and now guarded by a
   test: `inst/dict/{coaches,roster,picks}.yml` were completed (coaches gains
@@ -376,9 +381,9 @@ layer, and the documentation site, all under version control.
   documents all 26 pass-through columns), `contract_coaches()`/`contract_picks()`
   assert the added columns, and `tests/testthat/test-dict.R` asserts every
   `inst/dict/*.yml` matches its target's column names and types.
-  See [decision 0010](https://github.com/ngiangre/cfbstats/blob/main/decisions/0010-reviewer-skills-and-dict-parity-test.md).
+  See [decision 0010](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0010-reviewer-skills-and-dict-parity-test.md).
 - v1 scope — weight/coaching/transfer change features and the drafted outcome.
-  See [decision 0003](https://github.com/ngiangre/cfbstats/blob/main/decisions/0003-expand-v1-scope-weight-coaching-transfers.md).
+  See [decision 0003](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0003-expand-v1-scope-weight-coaching-transfers.md).
 - The `data-refresh` workflow now creates the `data-latest` release on first run
   (before uploading), so bootstrapping the data asset no longer needs a manual step.
 - Roster finalized as a first-class pipeline target (`roster_file` → `raw_roster`
@@ -388,7 +393,7 @@ layer, and the documentation site, all under version control.
   multi-season players vary). Enforcing the roster contract surfaced a
   data-quality issue the fallback had hidden: `clean_roster()` now coerces a
   placeholder `weight` of `0` to `NA`, and the contract weight range is 100–500 lb.
-  See [decision 0009](https://github.com/ngiangre/cfbstats/blob/main/decisions/0009-finalize-roster-drop-weight-delta.md).
+  See [decision 0009](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0009-finalize-roster-drop-weight-delta.md).
 - Fixed a silent fan-out and false-positive draft attribution in the
   draft-outcome join: `picks` carries the full NFL draft history (back to 1936)
   and CFBD reuses `collegeAthleteId` across eras, so a modern player's id could
@@ -399,12 +404,12 @@ layer, and the documentation site, all under version control.
   marking `drafted` for an in-window pick. The new `contract_drafted()`
   (`ok_drafted`, fed into the `link_drafted` audit record) and
   `tests/testthat/test-link.R` guard against regressions.
-  See [decision 0011](https://github.com/ngiangre/cfbstats/blob/main/decisions/0011-draft-outcome-one-pick-per-player.md).
+  See [decision 0011](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0011-draft-outcome-one-pick-per-player.md).
 - Team logos & colors: a `teams` display dimension sourced from CFBD `/teams`
   (`ingest_teams()`/`clean_teams()`, `data/teams.parquet`), joined by school name
   via `link_team_meta()` at the report layer only (kept off the model path).
   `contract_teams()` enforces full team-name coverage of the player-season
-  backbone. See [decision 0008](https://github.com/ngiangre/cfbstats/blob/main/decisions/0008-team-logos-dimension.md).
+  backbone. See [decision 0008](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0008-team-logos-dimension.md).
 
 ## Documentation site
 
@@ -420,7 +425,7 @@ layer, and the documentation site, all under version control.
   (non-null `who`/`team`/`stage`, `stage` in `{College, NFL}`, complete logical
   `drafted`). Covered by `tests/testthat/test-link.R` and
   `tests/testthat/test-contracts.R`.
-  See [decision 0015](https://github.com/ngiangre/cfbstats/blob/main/decisions/0015-blog-post-conventions-and-build-robustness.md).
+  See [decision 0015](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0015-blog-post-conventions-and-build-robustness.md).
   `player_trajectory()` and the first blog post now read the published parquet
   on its **cleaned** schema (decision 0018) rather than the raw schema they were
   written against: the helper filters roster `playerId` and NFL roster
@@ -429,7 +434,7 @@ layer, and the documentation site, all under version control.
   `recruit_name`, `hs_class`, `national_rank`, `committed_to`) and `teams$team`.
   The post's committed Quarto freeze was regenerated against the fixed code.
 - Added `data-raw/build-site.R`, a thin local-build wrapper mirroring the
-  `site` workflow: it sets `CFBSTATS_ROOT` to the project root (so vignettes
+  `site` workflow: it sets `CFB2NFL_ROOT` to the project root (so vignettes
   resolve `data/*.parquet` and `tar_read()` from altdoc's temp build dir) and
   runs `altdoc::render_docs(freeze = TRUE)` to reuse the committed freeze cache.
 - Added an **NFL-outcomes exemplar** to the Explore page: `viz_nfl_roster_seasons_by_round()`
@@ -438,14 +443,14 @@ layer, and the documentation site, all under version control.
   recent classes. The vision/question and data-source pages (`VISION.md`,
   `README.md`, `about`/`data`/`pipeline` vignettes) now cover the post-draft NFL
   question and the three nflverse tables.
-  See [decision 0014](https://github.com/ngiangre/cfbstats/blob/main/decisions/0014-nfl-outcomes-nflverse-link.md).
+  See [decision 0014](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0014-nfl-outcomes-nflverse-link.md).
 - `altdoc` + Quarto website built to `docs/` and deployed to GitHub Pages;
   vignettes read the pipeline via `tar_read()`.
-  See [decision 0006](https://github.com/ngiangre/cfbstats/blob/main/decisions/0006-quarto-site-architecture-and-viz.md).
+  See [decision 0006](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0006-quarto-site-architecture-and-viz.md).
 - Site renders reuse a committed Quarto freeze cache (`_quarto/_freeze/`) so CI
   is faster and deterministic.
 - Reworked the fan-facing Home (`README.md`) and About page for the
-  non-technical fan in [VISION.md](https://github.com/ngiangre/cfbstats/blob/main/VISION.md)
+  non-technical fan in [VISION.md](https://github.com/ngiangre/cfb2nfl/blob/main/VISION.md)
   §10: added a "Where to start" fan path (About → Explore → Analysis) on the
   README, translated the About page's scope and methodology into plain football
   language, and tucked the statistical/tooling detail (the two cultures,
@@ -455,20 +460,20 @@ layer, and the documentation site, all under version control.
 ## Project conventions
 
 - Developed as an R package; `check()` is a conventions gate, not CRAN prep.
-  See [decision 0002](https://github.com/ngiangre/cfbstats/blob/main/decisions/0002-rbuildignore-non-package-files.md)
-  and [decision 0001](https://github.com/ngiangre/cfbstats/blob/main/decisions/0001-establish-project-vision-and-conventions.md).
+  See [decision 0002](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0002-rbuildignore-non-package-files.md)
+  and [decision 0001](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0001-establish-project-vision-and-conventions.md).
 - Established the feature-branch → NEWS → squash-merge workflow used for most
   work here, with this changelog linked from the site.
-  See [decision 0007](https://github.com/ngiangre/cfbstats/blob/main/decisions/0007-feature-branch-news-merge-workflow.md).
+  See [decision 0007](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0007-feature-branch-news-merge-workflow.md).
 - Set the package author/maintainer.
-- Added three invocable `.claude/skills/` skills: `cfbstats` (slimmed to a
+- Added three invocable `.claude/skills/` skills: `cfb2nfl` (slimmed to a
   pointer to `AGENTS.md`/`VISION.md`/dictionaries), `fan-experience-improver`
   (edits the fan-facing site toward the non-technical fan audience while
   protecting the technical pages), and `architecture-improver` (keeps the
   pipeline, data model, and conventions legible and auditable, works
   test/contract-first, and checks that graphics/models preserve expected counts
   and subsets).
-  See [decision 0010](https://github.com/ngiangre/cfbstats/blob/main/decisions/0010-reviewer-skills-and-dict-parity-test.md).
+  See [decision 0010](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0010-reviewer-skills-and-dict-parity-test.md).
 
 The full decision log lives in
-[`decisions/`](https://github.com/ngiangre/cfbstats/tree/main/decisions).
+[`decisions/`](https://github.com/ngiangre/cfb2nfl/tree/main/decisions).

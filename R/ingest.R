@@ -12,14 +12,14 @@ cfbd_base_url <- function() {
 
 #' Is the pipeline running in refresh (re-ingest) mode?
 #'
-#' Refresh mode is opt-in via the `CFBSTATS_REFRESH` environment variable so the
+#' Refresh mode is opt-in via the `CFB2NFL_REFRESH` environment variable so the
 #' pipeline can run offline against committed/downloaded parquet by default
 #' (decision 0017). The site build and ordinary analysis leave it unset.
 #'
-#' @return `TRUE` when `CFBSTATS_REFRESH` is set to a truthy value.
+#' @return `TRUE` when `CFB2NFL_REFRESH` is set to a truthy value.
 #' @keywords internal
 refresh_enabled <- function() {
-  isTRUE(as.logical(Sys.getenv("CFBSTATS_REFRESH", "false")))
+  isTRUE(as.logical(Sys.getenv("CFB2NFL_REFRESH", "false")))
 }
 
 #' Materialize (in refresh mode) or track a parquet data asset
@@ -44,7 +44,7 @@ parquet_asset <- function(path, build) {
   } else if (!file.exists(path)) {
     cli::cli_abort(c(
       "Data asset {.path {path}} not found and refresh is off.",
-      "i" = "Set {.envvar CFBSTATS_REFRESH=true} to ingest it, or download the {.val data-latest} release."
+      "i" = "Set {.envvar CFB2NFL_REFRESH=true} to ingest it, or download the {.val data-latest} release."
     ))
   }
   path
@@ -80,7 +80,7 @@ cfbd_request <- function(
   req <- httr2::request(cfbd_base_url()) |>
     httr2::req_url_path_append(endpoint) |>
     httr2::req_headers(Authorization = paste("Bearer", key)) |>
-    httr2::req_user_agent("cfbstats (https://github.com)") |>
+    httr2::req_user_agent("cfb2nfl (https://github.com)") |>
     # 429/503 are transient by default; broaden to all server-side 5xx. 5
     # tries with exponential backoff (~1s..16s) rides out short outages
     # without dragging a refresh for minutes per call. High-volume pulls

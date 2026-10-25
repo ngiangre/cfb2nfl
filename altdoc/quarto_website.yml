@@ -35,7 +35,7 @@ format:
   html:
     code-link: true
     code-tools: true
-    theme: cosmo
+    theme: [cosmo, custom.scss]
     toc: true
     code-fold: true
     # Widen the body column (default 800px) to reduce empty gutter space while

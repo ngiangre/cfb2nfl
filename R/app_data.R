@@ -11,7 +11,7 @@
 #' player-season table), per-table row counts, and the data dictionaries.
 #' @noRd
 app_data <- function(
-  dbdir = Sys.getenv("CFBSTATS_DB", "data/cfbstats.duckdb")
+  dbdir = Sys.getenv("CFB2NFL_DB", "data/cfb2nfl.duckdb")
 ) {
   if (is.null(.app_state$con)) {
     con <- DBI::dbConnect(

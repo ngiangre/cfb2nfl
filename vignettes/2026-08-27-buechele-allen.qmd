@@ -13,12 +13,12 @@ vignette: >
 ```{r}
 #| label: setup
 #| include: false
-# Load cfbstats from the checkout when the package is not installed, so the
+# Load cfb2nfl from the checkout when the package is not installed, so the
 # site build does not require a package install (decision 0030).
-if (requireNamespace("cfbstats", quietly = TRUE)) {
+if (requireNamespace("cfb2nfl", quietly = TRUE)) {
   # vignettes render in a fresh quarto R session: attach the installed package
   # (CI installs it via local::.) or source the checkout fallback below.
-  library(cfbstats)
+  library(cfb2nfl)
 } else {
   dir <- getwd()
   while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
@@ -35,8 +35,8 @@ library(ggiraph)
 library(ggpath)
 library(knitr)
 # altdoc renders in a temp dir; point the knit wd at the project root so
-# data/*.parquet and tar_read() resolve (CFBSTATS_ROOT is set in the site build).
-root <- cfbstats_root()
+# data/*.parquet and tar_read() resolve (CFB2NFL_ROOT is set in the site build).
+root <- cfb2nfl_root()
 if (nzchar(root)) {
   knitr::opts_knit$set(root.dir = root)
 }
@@ -207,7 +207,7 @@ p <- ggplot(spine, aes(x = season, y = who)) +
   scale_fill_identity() +
   scale_x_continuous(breaks = seq(min(spine$season), max(spine$season), 1)) +
   labs(x = NULL, y = NULL) +
-  theme_cfbstats(base_size = 14) +
+  theme_cfb2nfl(base_size = 14) +
   theme(panel.grid = element_blank(), legend.position = "none")
 girafe(ggobj = p, width_svg = 9, height_svg = 3.5)
 ```

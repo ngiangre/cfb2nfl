@@ -1,15 +1,23 @@
-# cfbstats
+<div class="hero" align="center">
+
+**CFB2NFL**
+
+*What makes a college football player go pro?*
+
+Every year, a small fraction of college football players hear their name called
+in the NFL Draft. This project asks *why* — and how early we could have seen it
+coming.
+
+<img src="man/figures/hero/hero.gif" alt="Rotating career timelines of the first five picks of the 2024 and 2025 NFL drafts: each player's team by season, college through the NFL" width="360">
+
+[About](vignettes/about.qmd) · [Explore](vignettes/explore.qmd) · [Blog](vignettes/blog.qmd)
+
+</div>
 
 > [!WARNING]
 > **Work in progress.** This project is under active development and will
 > change frequently and without notice — data, code, methods, and conclusions
 > may all shift. Nothing here should be treated as stable or final.
-
-**What makes a college football player go pro?**
-
-Every year, a small fraction of college football players hear their name called
-in the NFL Draft. This project asks *why* — and how early we could have seen it
-coming.
 
 ## The idea
 

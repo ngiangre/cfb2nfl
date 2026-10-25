@@ -1,7 +1,7 @@
 ---
 name: fan-experience-improver
 description: >-
-  Improve the cfbstats public site for the non-technical, invested college
+  Improve the cfb2nfl public site for the non-technical, invested college
   football fan described in VISION.md. Use when writing or editing the README,
   the fan-facing vignettes (about, analysis, explore), the querychat companion
   app, or the altdoc site navigation — or when reviewing whether a fan can find
@@ -83,7 +83,7 @@ Chart *correctness* and count/subset preservation belong to
    altdoc::render_docs()   # writes to docs/
    ```
    Vignettes read the pipeline via `tar_read()` and need the package installed
-   and `CFBSTATS_ROOT` set (see AGENTS.md "Site"). If the pipeline isn't built,
+   and `CFB2NFL_ROOT` set (see AGENTS.md "Site"). If the pipeline isn't built,
    review the `.qmd` source instead of forcing a render.
 4. **Stay in bounds.** For substantive site *architecture* (new nav structure,
    reordering pages, a new fan page), follow the repo's decision-record + NEWS

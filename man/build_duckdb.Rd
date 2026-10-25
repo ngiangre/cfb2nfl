@@ -4,7 +4,7 @@
 \alias{build_duckdb}
 \title{Bundle cleaned tables into a queryable DuckDB database}
 \usage{
-build_duckdb(tables, db_path = "data/cfbstats.duckdb")
+build_duckdb(tables, db_path = "data/cfb2nfl.duckdb")
 }
 \arguments{
 \item{tables}{A named list of data frames. Each name becomes a DuckDB table
@@ -18,7 +18,7 @@ build_duckdb(tables, db_path = "data/cfbstats.duckdb")
 }
 \description{
 Writes each supplied data frame as a table in a single DuckDB database file,
-so the whole cfbstats data model can be explored with SQL from one asset
+so the whole cfb2nfl data model can be explored with SQL from one asset
 (decision 0016). The database is rebuilt from scratch on each call so a
 dropped or renamed table never lingers. Intended to run as the \code{duckdb_file}
 target: it bundles the cleaned tables whose schemas are documented in

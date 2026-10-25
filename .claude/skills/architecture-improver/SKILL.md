@@ -1,7 +1,7 @@
 ---
 name: architecture-improver
 description: >-
-  Keep the cfbstats architecture understandable and auditable, and catch loose
+  Keep the cfb2nfl architecture understandable and auditable, and catch loose
   ends before they ship. Use when adding or changing R functions, extending the
   targets pipeline, altering the data model or naming/style conventions, or
   building graphics/models. Verifies changes with behavior/test-driven
@@ -12,7 +12,7 @@ description: >-
 
 # architecture-improver
 
-Guard the *legibility* and *integrity* of the cfbstats architecture. Two jobs:
+Guard the *legibility* and *integrity* of the cfb2nfl architecture. Two jobs:
 make the structure easy to understand and audit, and make sure no change leaves
 loose ends — enforced by tests and data contracts, not by inspection alone. Read
 [VISION.md](../../../VISION.md), [AGENTS.md](../../../AGENTS.md), and the relevant
