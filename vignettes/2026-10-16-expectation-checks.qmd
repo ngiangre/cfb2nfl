@@ -2,7 +2,7 @@
 title: "Deriving redshirt status from only game-level data of select college QBs shows where the database falls short"
 date: "2026-10-16"
 author:
-  - "Nick Giangreco"
+  - "An AI Directed by Nick Giangreco"
 freeze: auto
 vignette: >
   %\VignetteIndexEntry{Deriving redshirt status from only game-level data of select college QBs shows where the database falls short}
