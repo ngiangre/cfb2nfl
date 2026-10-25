@@ -12,7 +12,6 @@ vignette: >
 
 ```{r}
 #| label: setup
-#| include: false
 # Load cfbstats from the checkout when the package is not installed, so the
 # site build does not require a package install (decision 0030).
 if (requireNamespace("cfbstats", quietly = TRUE)) {
@@ -77,19 +76,12 @@ as failures.*
 
 ## 1. Introduction
 
-The modeling target of this project is a set of labels on the person-period
-outcome table: whether a college player is drafted, whether he reaches the
-NFL by any route, and whether he plays once he arrives. Before any model is
-fit, the base rates of those labels deserve their own accounting. A
+The modeling objective of this project includes setting the dependent variable or outcome: whether a college player is drafted, whether he reaches the NFL by any route, and whether he plays once he arrives. Before any model is
+fit, the base rates of those labels need to be tabulated. A
 classifier that predicts "no NFL outcome" for every player-season would be
-correct more than 90 percent of the time, and the size of that default rate
-shapes every modeling choice that follows: which loss functions are
-informative, how rare-event validation behaves, and what a precision figure
-actually means.
+correct more than 90 percent of the time, and so the model chosen needs to exceed this base rate.
 
-This post measures how often each outcome happens, over the population each
-one legitimately applies to, and grounds the rates in players you can name.
-Four questions organize the results:
+This post measures how often each outcome happens, over the entire eligible population, and grounds the rates with examples. Four questions organize the results:
 
 + *Expecting the draft event to be rare, under five percent of eligible seasons*
 + *Expecting undrafted free-agent entry to rival the draft as an NFL route*
@@ -97,19 +89,17 @@ Four questions organize the results:
 + *Expecting entry prevalence to be roughly stable across draft classes*
 
 Each question is stated as a claim the data can settle, and each is answered
-with a table or figure backed by an assertion that fails loudly if the claim
-rots under a future data refresh.
+with a table or figure backed by an assertion.
 
 ## 2. Data and terms
 
-The unit of measurement here is a **player-season**: one player's one college
-season with a recorded stat line. Rates are computed over **eligible
+The unit of measurement, or observation, here is a **player-season**: one player's one college
+season with a recorded stat line i.e. they played during the season. Rates are computed over **eligible
 player-seasons**, seasons whose following draft the player could actually
 have been selected in. A row is eligible when the draft arrives at least
 three years after the player's high-school graduation, so a freshman season
-is never an at-risk exposure for the draft that follows it. Draft classes
-whose outcomes are not yet fully recorded (recent classes) are excluded
-entirely rather than counted as misses.
+is never an at-risk exposure or in other words, a season that is not eligible. Draft classes
+whose outcomes may occur in the future are excluded rather than counted as misses.
 
 Every eligible season ends in exactly one of the outcomes below.
 
@@ -126,7 +116,7 @@ terms <- tribble(
 kable(terms, caption = "Table 1: the outcomes and terms used throughout")
 ```
 
-A note on the intervals: whenever a percentage is reported below, it comes
+A note on the uncertainty intervals: whenever a percentage is reported below, it comes
 with a 95 percent confidence interval, the range the true rate plausibly
 falls in given how many seasons were observed. When an event is rare, that
 range is wide; a rate estimated from a few hundred seasons carries more
@@ -135,7 +125,6 @@ Wilson's, chosen because it behaves well for rare events like these.
 
 ```{r}
 #| label: load
-#| include: false
 # The connection message is an implementation detail; the reader sees only
 # the counts in the visible chunk below.
 con <- dbConnect(duckdb(), "data/cfbstats.duckdb", read_only = TRUE)
@@ -214,9 +203,11 @@ ledger <- bind_rows(
     )
   )
 ) |>
+  dplyr::rowwise() |>
   transmute(
     Outcome,
     Events = format(n_event, big.mark = ","),
+    `At risk` = format(n_risk, big.mark = ","),
     Prevalence = sprintf("%.1f%%", 100 * n_event / n_risk),
     `95% CI` = sprintf(
       "[%.1f%%, %.1f%%]",
@@ -302,12 +293,10 @@ status_tab <- risk |>
     )
   )
 
-# Label order matches the factor levels above; reversed for top-to-bottom display.
-status_levels <- rev(unique(status_tab$status_label))
-
+# Bars ordered by descending share, largest at top.
 p_status <- ggplot(
   status_tab,
-  aes(share, factor(status_label, levels = status_levels))
+  aes(share, reorder(status_label, share))
 ) +
   geom_col_interactive(
     aes(

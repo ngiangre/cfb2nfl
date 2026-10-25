@@ -162,7 +162,7 @@ wrapper (`CFBSTATS_REFRESH=true` + `tar_make()`). Years 2010–2026.
     and pinned by `stopifnot()`.
   - Discussion is callouts (`callout-important`) plus a short caveats
     paragraph, not prose blocks.
-  - **Authorship:** vignette `author:` is "An AI directed by Nick Giangreco"
+  - **Authorship:** vignette `author:` is "AI directed by Nick Giangreco"
     unless the user says otherwise.
 - **Decision log:** record substantive decisions in `decisions/` (copy
   `TEMPLATE.md`, next number); distill spike-branch findings into an entry.
