@@ -114,17 +114,17 @@ recorded.
 ```{r}
 #| label: group-terms
 group_terms <- tribble(
-  ~Group             , ~"Roster codes in the group"                      ,
-  "Quarterback"      , "QB"                                              ,
-  "Running back"     , "RB, FB"                                          ,
-  "Receiver"         , "WR"                                              ,
-  "Tight end"        , "TE"                                              ,
-  "Offensive line"   , "T, G, C, OL"                                     ,
-  "Defensive line"   , "DL, DE, DT, NT, EDGE"                            ,
-  "Linebacker"       , "LB, ILB, OLB"                                    ,
-  "Defensive back"   , "DB, S, CB"                                       ,
-  "Special teams"    , "PK, P, LS, PR"                                   ,
-  "Position not recorded", "Seasons whose roster entry carries no usable position code, including the rare ATH listing (concentrated in earlier draft classes), or no roster row at all"
+  ~Group                  , ~"Roster codes in the group"                                                                                                                                  ,
+  "Quarterback"           , "QB"                                                                                                                                                          ,
+  "Running back"          , "RB, FB"                                                                                                                                                      ,
+  "Receiver"              , "WR"                                                                                                                                                          ,
+  "Tight end"             , "TE"                                                                                                                                                          ,
+  "Offensive line"        , "T, G, C, OL"                                                                                                                                                 ,
+  "Defensive line"        , "DL, DE, DT, NT, EDGE"                                                                                                                                        ,
+  "Linebacker"            , "LB, ILB, OLB"                                                                                                                                                ,
+  "Defensive back"        , "DB, S, CB"                                                                                                                                                   ,
+  "Special teams"         , "PK, P, LS, PR"                                                                                                                                               ,
+  "Position not recorded" , "Seasons whose roster entry carries no usable position code, including the rare ATH listing (concentrated in earlier draft classes), or no roster row at all"
 )
 kable(group_terms, caption = "Table 1: the position groups used throughout")
 ```
@@ -159,15 +159,29 @@ risk <- outcomes |>
   left_join(roster_pos, by = c("playerId", "season"))
 
 pos_group <- c(
-  QB = "Quarterback", RB = "Running back", FB = "Running back",
-  WR = "Receiver", TE = "Tight end",
-  T = "Offensive line", G = "Offensive line", C = "Offensive line",
+  QB = "Quarterback",
+  RB = "Running back",
+  FB = "Running back",
+  WR = "Receiver",
+  TE = "Tight end",
+  T = "Offensive line",
+  G = "Offensive line",
+  C = "Offensive line",
   OL = "Offensive line",
-  DL = "Defensive line", DE = "Defensive line", DT = "Defensive line",
-  NT = "Defensive line", EDGE = "Defensive line",
-  LB = "Linebacker", ILB = "Linebacker", OLB = "Linebacker",
-  DB = "Defensive back", S = "Defensive back", CB = "Defensive back",
-  PK = "Special teams", P = "Special teams", LS = "Special teams",
+  DL = "Defensive line",
+  DE = "Defensive line",
+  DT = "Defensive line",
+  NT = "Defensive line",
+  EDGE = "Defensive line",
+  LB = "Linebacker",
+  ILB = "Linebacker",
+  OLB = "Linebacker",
+  DB = "Defensive back",
+  S = "Defensive back",
+  CB = "Defensive back",
+  PK = "Special teams",
+  P = "Special teams",
+  LS = "Special teams",
   PR = "Special teams"
 )
 n_risk_pre <- nrow(risk)
@@ -230,6 +244,7 @@ rates <- risk |>
     entry_ev = sum(outcome_nfl_entry_d),
     .groups = "drop"
   ) |>
+  dplyr::rowwise() |>
   mutate(
     drafted = drafted_ev / seasons,
     entry = entry_ev / seasons,
@@ -267,7 +282,10 @@ p_rates <- ggplot(bars, aes(p, group, fill = outcome)) +
   geom_col_interactive(
     aes(
       tooltip = paste0(
-        group, ", ", tolower(outcome), ": ",
+        group,
+        ", ",
+        tolower(outcome),
+        ": ",
         scales::percent(p, accuracy = 0.1)
       )
     ),
@@ -354,12 +372,26 @@ kable(
 stopifnot(
   round_mix$group[1] == "Quarterback",
   round_mix$round1_share[1] > 0.25,
-  round_mix$round1_share[1] > 2 * round_mix$round1_share[round_mix$group == "Running back"],
+  round_mix$round1_share[1] >
+    2 * round_mix$round1_share[round_mix$group == "Running back"],
   # The cast's pinned facts.
-  risk$outcome_draft_pick_d[risk$player == "Joe Burrow" & risk$outcome_drafted_d] == 1L,
-  risk$outcome_draft_pick_d[risk$player == "Cameron Ward" & risk$outcome_drafted_d] == 1L,
-  risk$outcome_draft_round_d[risk$player == "Jordan Travis" & risk$outcome_drafted_d] == 5L,
-  all(risk$outcome_signed_udfa_d[risk$player %in% c("Shane Buechele", "Kyle Allen") & risk$outcome_nfl_entry_d])
+  risk$outcome_draft_pick_d[
+    risk$player == "Joe Burrow" & risk$outcome_drafted_d
+  ] ==
+    1L,
+  risk$outcome_draft_pick_d[
+    risk$player == "Cameron Ward" & risk$outcome_drafted_d
+  ] ==
+    1L,
+  risk$outcome_draft_round_d[
+    risk$player == "Jordan Travis" & risk$outcome_drafted_d
+  ] ==
+    5L,
+  all(risk$outcome_signed_udfa_d[
+    risk$player %in%
+      c("Shane Buechele", "Kyle Allen") &
+      risk$outcome_nfl_entry_d
+  ])
 )
 ```
 
@@ -404,8 +436,14 @@ p_pick <- ggplot(
   geom_point_interactive(
     aes(
       tooltip = paste0(
-        group, ", ", draft_year, ": pick ",
-        sprintf("%.0f", avg_pick), " on average (", picks, " picks)"
+        group,
+        ", ",
+        draft_year,
+        ": pick ",
+        sprintf("%.0f", avg_pick),
+        " on average (",
+        picks,
+        " picks)"
       )
     ),
     size = 2.6
@@ -427,7 +465,10 @@ girafe(ggobj = p_pick, width_svg = 9, height_svg = 5.5)
 #| label: pick-guard
 #| include: false
 qb_avg_all <- mean(pick_trend$avg_pick[pick_trend$group == "Quarterback"])
-complete_groups <- pick_trend |> count(group) |> filter(n == max(n)) |> pull(group)
+complete_groups <- pick_trend |>
+  count(group) |>
+  filter(n == max(n)) |>
+  pull(group)
 group_means <- pick_trend |>
   filter(group %in% complete_groups) |>
   group_by(group) |>
@@ -446,7 +487,9 @@ stopifnot(
   sum(lowest_per_year$group == "Quarterback") < nrow(lowest_per_year),
   # The dashed reference line in the figure is the pooled average pick.
   abs(
-    mean(risk$outcome_draft_pick_d[risk$outcome_drafted_d & !is.na(risk$outcome_draft_pick_d)]) -
+    mean(risk$outcome_draft_pick_d[
+      risk$outcome_drafted_d & !is.na(risk$outcome_draft_pick_d)
+    ]) -
       126.6
   ) <
     0.05
@@ -501,12 +544,18 @@ kable(
 #| label: hazard-guard
 #| include: false
 entry_by <- function(g) {
-  hazard$entry[hazard$group == g][order(hazard$eligible_season_index[hazard$group == g])]
+  hazard$entry[hazard$group == g][order(hazard$eligible_season_index[
+    hazard$group == g
+  ])]
 }
 # Groups with at least three published indices all rise over their first three;
 # the offensive line only publishes two.
 multi <- unique(hazard$group)[
-  vapply(unique(hazard$group), function(g) length(entry_by(g)) >= 3L, logical(1))
+  vapply(
+    unique(hazard$group),
+    function(g) length(entry_by(g)) >= 3L,
+    logical(1)
+  )
 ]
 stopifnot(
   all(
@@ -543,7 +592,11 @@ fan's model of the sport.
 udfa_share <- risk |>
   filter(outcome_nfl_entry_d) |>
   group_by(group) |>
-  summarise(entrants = n(), udfa = sum(outcome_signed_udfa_d), .groups = "drop") |>
+  summarise(
+    entrants = n(),
+    udfa = sum(outcome_signed_udfa_d),
+    .groups = "drop"
+  ) |>
   mutate(share = udfa / entrants) |>
   arrange(desc(share))
 
