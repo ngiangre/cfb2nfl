@@ -12,7 +12,7 @@ dict_type_to_typeof <- c(
 )
 
 check_dict <- function(ds, actual) {
-  dict_dir <- system.file("dict", package = "cfbstats")
+  dict_dir <- system.file("dict", package = "cfb2nfl")
   skip_if(identical(dict_dir, ""), "installed dict/ not found")
 
   dict <- yaml::read_yaml(file.path(dict_dir, paste0(ds, ".yml")))
@@ -101,7 +101,7 @@ test_that("player_season_stats dict matches build_player_season_stats() output s
   # The wide table's stat columns are dynamic (one per observed (category,
   # statType) pair), so the dict documents them with a <category>_<statType>
   # placeholder: check the identity columns exactly, and the pattern for the rest.
-  dict_dir <- system.file("dict", package = "cfbstats")
+  dict_dir <- system.file("dict", package = "cfb2nfl")
   skip_if(identical(dict_dir, ""), "installed dict/ not found")
   dict <- yaml::read_yaml(file.path(dict_dir, "player_season_stats.yml"))
   documented <- vapply(dict$columns, function(col) col$name, character(1))

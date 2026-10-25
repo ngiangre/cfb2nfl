@@ -10,7 +10,7 @@ viz_theme()
 A ggplot2 theme object.
 }
 \description{
-Backward-compatible alias that delegates to \code{\link[=theme_cfbstats]{theme_cfbstats()}} so existing
-figures pick up the accessible-font standard. Prefer \code{\link[=theme_cfbstats]{theme_cfbstats()}} in
+Backward-compatible alias that delegates to \code{\link[=theme_cfb2nfl]{theme_cfb2nfl()}} so existing
+figures pick up the accessible-font standard. Prefer \code{\link[=theme_cfb2nfl]{theme_cfb2nfl()}} in
 new code.
 }

@@ -1,7 +1,7 @@
 # Plan — Traceability backbone, pipeline DAG, and Quarto site infra
 
 **Date:** 2026-08-22
-**Goal:** Stand up the infrastructure that makes `cfbstats` faithful to and
+**Goal:** Stand up the infrastructure that makes `cfb2nfl` faithful to and
 transparent about its data — full lineage from raw → processed → model →
 results and back — plus a `targets` pipeline, an auditable process map/DAG,
 interactive-viz templates, and a well-structured Quarto website. Keep every

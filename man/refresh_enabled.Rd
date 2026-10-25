@@ -7,10 +7,10 @@
 refresh_enabled()
 }
 \value{
-\code{TRUE} when \code{CFBSTATS_REFRESH} is set to a truthy value.
+\code{TRUE} when \code{CFB2NFL_REFRESH} is set to a truthy value.
 }
 \description{
-Refresh mode is opt-in via the \code{CFBSTATS_REFRESH} environment variable so the
+Refresh mode is opt-in via the \code{CFB2NFL_REFRESH} environment variable so the
 pipeline can run offline against committed/downloaded parquet by default
 (decision 0017). The site build and ordinary analysis leave it unset.
 }

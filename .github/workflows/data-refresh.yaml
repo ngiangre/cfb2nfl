@@ -18,7 +18,7 @@ jobs:
       CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       # Refresh mode: the pipeline ingests fresh and writes every asset (dec 0017).
-      CFBSTATS_REFRESH: "true"
+      CFB2NFL_REFRESH: "true"
     steps:
       - uses: actions/checkout@v4
 

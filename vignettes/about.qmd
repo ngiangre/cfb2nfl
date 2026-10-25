@@ -6,10 +6,10 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-`cfbstats` studies what shapes a college football player's path to the NFL
+`cfb2nfl` studies what shapes a college football player's path to the NFL
 draft, and how well we could have seen it coming from what we knew during their
 career. This page is the short version; the full working plan lives in the
-project's [VISION.md](https://github.com/ngiangre/cfbstats/blob/main/VISION.md).
+project's [VISION.md](https://github.com/ngiangre/cfb2nfl/blob/main/VISION.md).
 
 ## The questions
 

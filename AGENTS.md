@@ -1,9 +1,9 @@
-# cfbstats — agent guide
+# cfb2nfl — agent guide
 
 Project memory for AI assistants. Full rationale lives in [VISION.md](VISION.md)
 and the [decision log](decisions/); read those before substantive changes.
 
-`cfbstats` studies what shapes a college football player's path to the NFL
+`cfb2nfl` studies what shapes a college football player's path to the NFL
 draft, and how well it can be **forecast** from information available during
 their career — pursuing both explanatory (inference) and predictive answers
 (Breiman's two cultures).
@@ -28,12 +28,12 @@ calls: the `/games` family ingests (`games`, `game_team_stats`,
 budget (`cfbd_game_get()`); don't re-run a failed refresh without first
 working out what it would re-pull.
 The **pipeline owns ingest → process → assets** (decision 0017): a single
-`tar_make()` in **refresh mode** (`CFBSTATS_REFRESH=true`) ingests every source
+`tar_make()` in **refresh mode** (`CFB2NFL_REFRESH=true`) ingests every source
 (incl. `conference_tiers`, derived in-pipeline from `player_stats` by
 `build_conference_tiers()`), processes it, and writes all assets (raw parquet +
-`cfbstats.duckdb`). Default/**track mode** reads committed/downloaded parquet
+`cfb2nfl.duckdb`). Default/**track mode** reads committed/downloaded parquet
 with no API key (how the site build runs). `data-raw/refresh.R` is a thin
-wrapper (`CFBSTATS_REFRESH=true` + `tar_make()`). Years 2010–2026.
+wrapper (`CFB2NFL_REFRESH=true` + `tar_make()`). Years 2010–2026.
 
 | File | Grain | Key / notes |
 |------|-------|-------------|
@@ -202,11 +202,11 @@ wrapper (`CFBSTATS_REFRESH=true` + `tar_make()`). Years 2010–2026.
   render time; `reference.qmd` builds a searchable reactable of every
   non-internal function linking to `../man/<fn>.html` (75 rendered man pages).
   Vignettes read the pipeline via `tar_read()` and set the knit wd to the
-  project root from the `CFBSTATS_ROOT` env var
-  (altdoc renders in a temp dir); they do NOT require an installed cfbstats
+  project root from the `CFB2NFL_ROOT` env var
+  (altdoc renders in a temp dir); they do NOT require an installed cfb2nfl
   package — setup chunks source `R/*.R` from the checkout when the package is
   missing, and dicts are read via `file.path(root, "inst", "dict")` (decision
-  0030). altdoc injects `library("cfbstats")` into man-page `@examples`, so
+  0030). altdoc injects `library("cfb2nfl")` into man-page `@examples`, so
   examples must be `\dontrun{}`-wrapped to render unexecuted (`\donttest` is
   NOT detected by altdoc's converter). altdoc may not re-copy edited vignettes
   into `_quarto/` — clear stale copies if a render keeps old code.
@@ -233,7 +233,7 @@ wrapper (`CFBSTATS_REFRESH=true` + `tar_make()`). Years 2010–2026.
   `*.{parquet,duckdb}` via `piggyback`). Refresh needs `CFBD_API_KEY`; the site
   build runs in track mode (no key) and needs Pages enabled.
 - **DuckDB query asset** (decision 0016): `build_duckdb()` (`R/duckdb.R`) bundles
-  the **cleaned** tables into `data/cfbstats.duckdb`, built by the `duckdb_file`
+  the **cleaned** tables into `data/cfb2nfl.duckdb`, built by the `duckdb_file`
   target (`format = "file"`, downstream of clean) so its schema matches the
   dicts. Published on `data-latest` alongside the parquet by the single
   refresh-mode `tar_make()` (decision 0017), then uploaded as

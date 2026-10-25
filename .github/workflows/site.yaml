@@ -27,7 +27,7 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       # Vignettes read the pipeline from the project root under altdoc's build.
-      CFBSTATS_ROOT: ${{ github.workspace }}
+      CFB2NFL_ROOT: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
 
@@ -37,8 +37,8 @@ jobs:
         with:
           use-public-rspm: true
 
-      # local::. installs the cfbstats package itself (vignettes call
-      # library(cfbstats)); altdoc builds the site, piggyback pulls the data.
+      # local::. installs the cfb2nfl package itself (vignettes call
+      # library(cfb2nfl)); altdoc builds the site, piggyback pulls the data.
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: |

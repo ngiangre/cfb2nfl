@@ -1,4 +1,4 @@
-# cfbstats pipeline (decision 0004). Single source of truth for the processing
+# cfb2nfl pipeline (decision 0004). Single source of truth for the processing
 # graph, lineage/audit (decision 0005), and the rendered process map.
 #
 # Stages: ingest -> clean -> link -> features -> model -> report.
@@ -19,7 +19,7 @@ targets::tar_source()
 
 list(
   # ---- ingest (decisions 0017-0018) -----------------------------------------
-  # Refresh mode (CFBSTATS_REFRESH=true) pulls each source from CFBD/nflverse in
+  # Refresh mode (CFB2NFL_REFRESH=true) pulls each source from CFBD/nflverse in
   # memory; track mode (default, no key) leaves them NULL because the cleaned
   # parquet below is read directly. Targets are NOT cued "always": a re-refresh
   # is explicit, via data-raw/refresh.R, which invalidates the ingest targets
@@ -541,7 +541,7 @@ list(
         outcomes = outcomes,
         audit_log = db_audit_log
       ),
-      "data/cfbstats.duckdb"
+      "data/cfb2nfl.duckdb"
     ),
     format = "file"
   ),

@@ -20,12 +20,12 @@ vignette: >
 ```{r}
 #| label: setup
 #| include: false
-# Load cfbstats from the checkout when the package is not installed, so the
+# Load cfb2nfl from the checkout when the package is not installed, so the
 # site build does not require a package install (decision 0030).
-if (requireNamespace("cfbstats", quietly = TRUE)) {
+if (requireNamespace("cfb2nfl", quietly = TRUE)) {
   # vignettes render in a fresh quarto R session: attach the installed package
   # (CI installs it via local::.) or source the checkout fallback below.
-  library(cfbstats)
+  library(cfb2nfl)
 } else {
   dir <- getwd()
   while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
@@ -38,8 +38,8 @@ if (requireNamespace("cfbstats", quietly = TRUE)) {
 library(dplyr)
 library(targets)
 # altdoc renders in a temp dir; point the knit wd at the project root so
-# tar_read() and inst/ paths resolve (set by CFBSTATS_ROOT in CI/site build).
-root <- cfbstats_root()
+# tar_read() and inst/ paths resolve (set by CFB2NFL_ROOT in CI/site build).
+root <- cfb2nfl_root()
 if (nzchar(root)) knitr::opts_knit$set(root.dir = root)
 ```
 

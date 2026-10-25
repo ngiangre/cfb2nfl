@@ -56,7 +56,7 @@ build_player_season_stats <- function(player_stats) {
 #' Bundle cleaned tables into a queryable DuckDB database
 #'
 #' Writes each supplied data frame as a table in a single DuckDB database file,
-#' so the whole cfbstats data model can be explored with SQL from one asset
+#' so the whole cfb2nfl data model can be explored with SQL from one asset
 #' (decision 0016). The database is rebuilt from scratch on each call so a
 #' dropped or renamed table never lingers. Intended to run as the `duckdb_file`
 #' target: it bundles the cleaned tables whose schemas are documented in
@@ -78,7 +78,7 @@ build_player_season_stats <- function(player_stats) {
 #' @return `db_path`, invisibly (so the target can track it with
 #'   `format = "file"`).
 #' @export
-build_duckdb <- function(tables, db_path = "data/cfbstats.duckdb") {
+build_duckdb <- function(tables, db_path = "data/cfb2nfl.duckdb") {
   rlang::check_installed(
     c("DBI", "duckdb", "yaml"),
     reason = "to build the DuckDB data asset."

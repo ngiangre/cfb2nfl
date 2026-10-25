@@ -37,7 +37,7 @@ test_that("each inst/dict/*.yml documents exactly its cleaned target schema", {
   data_dir <- test_path("..", "..", "data")
   skip_if_not(dir.exists(data_dir), "raw data/ not available")
 
-  dict_dir <- system.file("dict", package = "cfbstats")
+  dict_dir <- system.file("dict", package = "cfb2nfl")
   skip_if(identical(dict_dir, ""), "installed dict/ not found")
 
   for (ds in names(dict_parquet)) {

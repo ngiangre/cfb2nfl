@@ -1,4 +1,4 @@
-# Launch file for the cfbstats data browser, following the golem convention:
+# Launch file for the cfb2nfl data browser, following the golem convention:
 # load the package from source, then start the app via run_app(). The app's
 # UI/server/data logic lives in R/app_ui.R, R/app_server.R, R/app_data.R, and
 # R/run_app.R — edit those, not this file.
