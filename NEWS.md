@@ -1,5 +1,11 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- The front-page hero banner gif now scales to the viewport
+  (capped at 360 px wide) instead of rendering at a fixed width, so it
+  fits the banner on phones as well as laptops
+  ([README.md](https://github.com/ngiangre/cfb2nfl/blob/main/README.md),
+  `altdoc/custom.scss`).
+
 - Project renamed from `cfbstats` to `cfb2nfl`: package name, `theme_cfb2nfl()`
   and `cfb2nfl_root()` helpers, `CFB2NFL_{REFRESH,ROOT,DB}` environment
   variables, and `data/cfb2nfl.duckdb`. The GitHub repository moves to
