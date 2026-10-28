@@ -45,5 +45,13 @@ utils::globalVariables(c(
   # pointblank::vars() targets in the game-statistics contracts
   "id",
   "week",
-  "gameId"
+  "gameId",
+  # pointblank::vars() targets and data-masked columns in contract_outcomes
+  "draft_year",
+  "hs_grad_year",
+  "draft_eligible",
+  "outcome_observed_d",
+  "n",
+  "outcome_draft_round_d",
+  "outcome_draft_pick_d"
 ))

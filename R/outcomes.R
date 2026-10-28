@@ -99,7 +99,7 @@ build_outcomes <- function(
         recruiting,
         "playerId",
         recruit_name = "recruit_name",
-        hs_class
+        "hs_class"
       ),
       by = "playerId"
     ) |>
@@ -162,7 +162,7 @@ build_outcomes <- function(
     # year at or before the player's first stat season is impossible for a real
     # career, so the whole link is nulled rather than trusted.
     dplyr::left_join(
-      dplyr::select(players, "playerId", first_stat_season),
+      dplyr::select(players, "playerId", "first_stat_season"),
       by = "playerId"
     ) |>
     dplyr::filter(.data$pick_draft_year > .data$first_stat_season) |>
