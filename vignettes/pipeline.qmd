@@ -54,10 +54,13 @@ flowchart LR
 
 ## Live dependency graph
 
+`tar_visnetwork()` renders the graph as an interactive `visNetwork` widget:
+nodes carry the target name and runtime, clicking a node shows its output, and
+the widget renders faster than a large static Mermaid diagram.
+
 ```{r}
 #| label: dag
-#| output: asis
-cat("```{mermaid}", tar_mermaid(), "```", sep = "\n")
+tar_visnetwork(allow = NULL, label = "time")
 ```
 
 ## What remains
