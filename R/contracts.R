@@ -1086,13 +1086,13 @@ contract_outcomes <- function(outcomes, ps_pop, stop_on_fail = TRUE) {
       draft_eligible == (.data$years_since_hs >= .data$min_years_since_hs)
     )) |>
     pointblank::col_vals_expr(rlang::expr(
-      !(coalesce(.data$outcome_drafted_d, FALSE) &
-        coalesce(.data$outcome_signed_udfa_d, FALSE))
+      !(dplyr::coalesce(.data$outcome_drafted_d, FALSE) &
+        dplyr::coalesce(.data$outcome_signed_udfa_d, FALSE))
     )) |>
     pointblank::col_vals_expr(rlang::expr(
-      coalesce(.data$outcome_nfl_entry_d, FALSE) ==
-        (coalesce(.data$outcome_drafted_d, FALSE) |
-          coalesce(.data$outcome_signed_udfa_d, FALSE))
+      dplyr::coalesce(.data$outcome_nfl_entry_d, FALSE) ==
+        (dplyr::coalesce(.data$outcome_drafted_d, FALSE) |
+          dplyr::coalesce(.data$outcome_signed_udfa_d, FALSE))
     )) |>
     pointblank::col_vals_expr(rlang::expr(
       .data$outcome_observed_d | is.na(.data$outcome_drafted_d)

@@ -27,3 +27,5 @@
 ^\.githooks$
 ^plans$
 ^app\.R$
+^shiny_bookmarks$
+^the-beast-2026\.txt$

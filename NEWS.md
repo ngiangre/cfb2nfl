@@ -1,5 +1,12 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Removed the stale `test-beast.R` suite (it referenced parser functions that
+  no longer exist) and fixed the two `R CMD check` notes: top-level
+  `shiny_bookmarks/` and `the-beast-2026.txt` are now `.Rbuildignore`d, and
+  the data-masked column names in `build_outcomes()` / `contract_outcomes()`
+  are declared or `dplyr::`-qualified so no undefined-global note remains.
+  `R CMD check` is clean again.
+
 - The front-page hero banner gif now scales to the viewport
   (capped at 360 px wide) instead of rendering at a fixed width, so it
   fits the banner on phones as well as laptops
