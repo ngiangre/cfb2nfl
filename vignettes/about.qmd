@@ -21,7 +21,7 @@ project's [VISION.md](https://github.com/ngiangre/cfb2nfl/blob/main/VISION.md).
 - For the players who get drafted, what do they go on to do in the NFL — the
   statistics they put up, and **how long they last**?
 
-Want to chase your own version of these? The **Explore** page lets you poke at
+There's so many more questions to ask and interrogate. The **Explore** page lets you poke at
 the data with interactive charts, and **Analysis** collects the write-ups as
 they take shape.
 
@@ -55,10 +55,7 @@ We go after every question two ways at once:
 - **How well we can call it** — whether we could genuinely have *predicted*
   future draft classes, not just explained the past after the fact.
 
-The honest test is the second one. When we say a model can predict a draft
-class, it's only allowed to use what we'd have known *before* that class was
-picked — no peeking at the future. That's a much harder bar than fitting numbers
-we already have, and it's the one we hold ourselves to.
+When we say a model can predict a draft class, it's only allowed to use what we'd have known *before* that class was picked — no peeking at the future. That's a much harder bar than fitting numbers we already have, and it's the one we hold ourselves to.
 
 ::: {.callout-note collapse="true"}
 ## For the stats-minded

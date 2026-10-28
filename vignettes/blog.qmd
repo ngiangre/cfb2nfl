@@ -6,6 +6,14 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
+Articles for data investigations and challenging  beliefs and expectations. AI may be indicated in generating blogs. However, all code and data used originate from the validated audited pipeline so no findings are fabricated. 
+
+
+```{r}
+#| label: setup
+#| include: false
+# Load cfb2nfl from the checkout when the package is not installed, so the
+# site build does not require a package install (decision 0030).
 ```{r}
 #| label: setup
 #| include: false

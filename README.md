@@ -22,7 +22,7 @@ coming.
 ## The idea
 
 We're two football fans trying to untangle which parts of a player's college
-experience actually matter for reaching the NFL. Some of the questions we keep
+trajectory actually matter for reaching the NFL. Some of the questions we keep
 coming back to:
 
 - What is it about a player's college career that predicts turning pro?
