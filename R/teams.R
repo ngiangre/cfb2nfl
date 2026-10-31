@@ -212,6 +212,13 @@ build_team_season <- function(roster, games, tiers, player_season, coaches) {
         1L,
         .data$tier
       ),
+      # Notre Dame is the one independent tiered Power (decision 0003); the
+      # lookup puts all FBS Independents in Group of 5.
+      tier = dplyr::if_else(
+        .data$team == "Notre Dame" & .data$conference %in% "FBS Independents",
+        3L,
+        .data$tier
+      ),
       tier_label = names(tier_levels)[match(.data$tier, tier_levels)]
     ) |>
     dplyr::select(

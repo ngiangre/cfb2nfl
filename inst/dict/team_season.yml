@@ -16,7 +16,7 @@ columns:
   - {name: conference, type: string, description: "Conference that season (most frequent in games; NA if the team has no games; also NA for ~317 low-division team-seasons whose games list no conference, which still get tier 1 because they played games).", provenance: games}
   - {name: classification, type: string, description: "Division: fbs, fcs, ii, iii (filled from the nearest season when the team has no games; NA if never in games or when the games list none).", provenance: games}
   - {name: conference_filled, type: logical, description: "TRUE when conference/classification were filled from the team's nearest season because it played no games that season (e.g. UAB 2015-16, COVID opt-outs 2020).", provenance: derived}
-  - {name: tier, type: int32, description: "3 Power, 2 Group of 5, 1 FCS and below (decision 0003); non-FBS teams outside the lookup get 1. NA for teams never seen in games (a handful of roster-only small schools); only FBS rows are guaranteed a tier by contract.", provenance: derived (conference_tiers)}
+  - {name: tier, type: int32, description: "3 Power, 2 Group of 5, 1 FCS and below (decision 0003); non-FBS teams outside the lookup get 1; Notre Dame is overridden to 3 while listed under FBS Independents (decision 0003). NA for teams never seen in games (a handful of roster-only small schools); only FBS rows are guaranteed a tier by contract.", provenance: derived (conference_tiers)}
   - {name: tier_label, type: string, description: Tier label., provenance: derived}
   - {name: games_played, type: int32, description: Completed games with a score., provenance: derived (games)}
   - {name: wins, type: int32, description: Wins in completed games., provenance: derived (games)}

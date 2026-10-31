@@ -363,3 +363,35 @@ test_that("build_team_season fills conference for roster-only seasons", {
   ts2 <- build_team_season(f$roster, g, f$tiers, f$player_season, f$coaches)
   expect_equal(ts2$tier[ts2$team == "Div2 U"], 1L)
 })
+
+test_that("build_team_season tiers Notre Dame as Power (decision 0003)", {
+  f <- team_fixture()
+  f$games <- tibble::tibble(
+    season = 2019L,
+    completed = TRUE,
+    homeTeam = "Notre Dame",
+    homeConference = "FBS Independents",
+    homeClassification = "fbs",
+    homePoints = 30L,
+    awayTeam = "Army",
+    awayConference = "FBS Independents",
+    awayClassification = "fbs",
+    awayPoints = 20L
+  )
+  f$tiers <- tibble::tibble(
+    season = 2019L,
+    conference = "FBS Independents",
+    tier = 2L,
+    tier_label = "Group of 5"
+  )
+  ts <- build_team_season(
+    f$roster,
+    f$games,
+    f$tiers,
+    f$player_season,
+    f$coaches
+  )
+  expect_equal(ts$tier[ts$team == "Notre Dame"], 3L)
+  expect_equal(ts$tier_label[ts$team == "Notre Dame"], "Power")
+  expect_equal(ts$tier[ts$team == "Army"], 2L)
+})
