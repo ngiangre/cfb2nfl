@@ -93,3 +93,68 @@ test_that("team_record gives NA win_pct when a team has no completed games", {
   expect_equal(rec$games_played, c(0L, 0L))
   expect_true(all(is.na(rec$win_pct)))
 })
+
+team_fixture <- function() {
+  list(
+    games = tibble::tibble(
+      season = 2019L,
+      completed = TRUE,
+      homeTeam = c("LSU", "Montana"),
+      homeConference = c("SEC", "Big Sky"),
+      homeClassification = c("fbs", "fcs"),
+      homePoints = c(42L, 30L),
+      awayTeam = c("Alabama", "Div2 U"),
+      awayConference = c("SEC", "GLIAC"),
+      awayClassification = c("fbs", "ii"),
+      awayPoints = c(25L, 10L)
+    ),
+    roster = tibble::tibble(
+      playerId = c("1", "2", "3", "4"),
+      season = 2019L,
+      team = c("LSU", "LSU", "Alabama", "Tulane"),
+      position = "QB"
+    ),
+    tiers = tibble::tibble(
+      season = 2019L,
+      conference = c("SEC", "Big Sky"),
+      tier = c(3L, 1L),
+      tier_label = c("Power", "FCS and below")
+    ),
+    player_season = tibble::tibble(
+      playerId = "1",
+      season = 2019L,
+      team = "LSU"
+    ),
+    coaches = tibble::tibble(
+      school = c("LSU", "LSU"),
+      season = 2019L,
+      srs = c(NA, 34.2),
+      sp_overall = c(NA, 30.1)
+    )
+  )
+}
+
+test_that("build_team_season unions games and roster team-seasons", {
+  f <- team_fixture()
+  ts <- build_team_season(
+    f$roster,
+    f$games,
+    f$tiers,
+    f$player_season,
+    f$coaches
+  )
+  expect_setequal(ts$team, c("LSU", "Alabama", "Montana", "Div2 U", "Tulane"))
+  expect_false(anyDuplicated(ts[c("team", "season")]) > 0)
+  lsu <- ts[ts$team == "LSU", ]
+  expect_equal(c(lsu$n_roster, lsu$n_stat_players), c(2L, 1L))
+  expect_true(lsu$has_stat_lines)
+  expect_equal(c(lsu$srs, lsu$sp_overall), c(34.2, 30.1))
+  expect_equal(lsu$tier_label, "Power")
+  # Division II team absent from tiers falls back to tier 1.
+  expect_equal(ts$tier[ts$team == "Div2 U"], 1L)
+  # Roster-only team (no games) keeps its row with zero games, NA tier.
+  tul <- ts[ts$team == "Tulane", ]
+  expect_equal(tul$games_played, 0L)
+  expect_true(is.na(tul$tier))
+  expect_equal(ts$n_roster[ts$team == "Montana"], 0L)
+})

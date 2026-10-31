@@ -134,3 +134,92 @@ team_record <- function(games) {
       )
     )
 }
+
+#' Build the team-season table
+#'
+#' One row per team per season across every division: conference and tier,
+#' win-loss record ([team_record()]), FBS ratings (SRS, SP+ from the coaches
+#' table; NA elsewhere), roster size, and how many players carry a stat line.
+#' The universe is every team in `games` plus any roster team without games,
+#' so the landscape counts teams that played, not only teams with stats.
+#' Conferences missing from the tier lookup (Division II/III and others that
+#' never appear in player stats) fall back to tier 1 when the team is not FBS.
+#'
+#' @param roster Cleaned roster.
+#' @param games Cleaned games.
+#' @param tiers Conference-tier lookup.
+#' @param player_season Player-season table ([build_player_season()]).
+#' @param coaches Cleaned coaches.
+#' @return One row per `(team, season)`.
+#' @export
+build_team_season <- function(roster, games, tiers, player_season, coaches) {
+  tier_levels <- conference_tier_levels()
+  ros <- roster |>
+    dplyr::filter(!is.na(.data$team)) |>
+    dplyr::distinct(.data$season, .data$team, .data$playerId) |>
+    dplyr::count(.data$season, .data$team, name = "n_roster")
+  stat <- player_season |>
+    dplyr::distinct(.data$season, .data$team, .data$playerId) |>
+    dplyr::count(.data$season, .data$team, name = "n_stat_players")
+  # Mid-season coaching changes duplicate (school, season); ratings are team
+  # properties, so take the first non-NA.
+  rating <- coaches |>
+    dplyr::group_by(team = .data$school, .data$season) |>
+    dplyr::summarise(
+      srs = dplyr::first(stats::na.omit(.data$srs), default = NA_real_),
+      sp_overall = dplyr::first(
+        stats::na.omit(.data$sp_overall),
+        default = NA_real_
+      ),
+      .groups = "drop"
+    )
+  team_record(games) |>
+    dplyr::full_join(ros, by = c("season", "team")) |>
+    dplyr::left_join(stat, by = c("season", "team")) |>
+    dplyr::left_join(rating, by = c("season", "team")) |>
+    dplyr::left_join(
+      dplyr::select(tiers, "season", "conference", "tier"),
+      by = c("season", "conference")
+    ) |>
+    dplyr::mutate(
+      dplyr::across(
+        c(
+          "games_played",
+          "wins",
+          "losses",
+          "ties",
+          "n_roster",
+          "n_stat_players"
+        ),
+        \(x) dplyr::coalesce(as.integer(x), 0L)
+      ),
+      has_stat_lines = .data$n_stat_players > 0L,
+      tier = dplyr::if_else(
+        is.na(.data$tier) &
+          !is.na(.data$classification) &
+          .data$classification != "fbs",
+        1L,
+        .data$tier
+      ),
+      tier_label = names(tier_levels)[match(.data$tier, tier_levels)]
+    ) |>
+    dplyr::select(
+      "team",
+      "season",
+      "conference",
+      "classification",
+      "tier",
+      "tier_label",
+      "games_played",
+      "wins",
+      "losses",
+      "ties",
+      "win_pct",
+      "srs",
+      "sp_overall",
+      "n_roster",
+      "n_stat_players",
+      "has_stat_lines"
+    ) |>
+    dplyr::arrange(.data$season, .data$team)
+}
