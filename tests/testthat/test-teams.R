@@ -218,9 +218,9 @@ test_that("exit_cohort credits the last pre-draft roster team", {
   p1 <- out[out$playerId == "1", ]
   expect_equal(p1$team, "LSU")
   expect_equal(p1$last_season, 2019L)
-  expect_equal(p1$draft_class, 2020L)
+  expect_equal(p1$draft_class, 2021L)
   expect_true(p1$drafted && p1$eligible)
-  expect_equal(p1$draft_round, 1L) # earliest pick wins (decision 0011)
+  expect_equal(p1$draft_round, 2L) # most recent in-window pick wins (decision 0011)
   expect_equal(p1$position_group, "Quarterback")
 
   # Undrafted, 2 seasons, not UDFA: an exit but not eligible.
@@ -286,4 +286,80 @@ test_that("build_team_draft aggregates exits by team, final season, position", {
   expect_equal(qb$conference, "SEC")
   expect_equal(nrow(td), 2L)
   expect_equal(sum(td$n_exits), nrow(cohort))
+})
+
+test_that("exit_cohort ignores picks outside the draft window (id reuse)", {
+  roster <- tibble::tibble(
+    playerId = "7",
+    season = 2015:2017,
+    team = c("A", "B", "B"),
+    position = "LB"
+  )
+  picks <- tibble::tibble(
+    playerId = "7",
+    year = c(1983L, 2018L),
+    round = c(5L, 1L)
+  )
+  out <- exit_cohort(
+    roster,
+    picks,
+    udfa_ids = character(),
+    reused = character(),
+    last_roster_season = 2021L
+  )
+  expect_equal(nrow(out), 1L)
+  expect_equal(out$team, "B")
+  expect_equal(out$draft_class, 2018L)
+  expect_equal(out$draft_round, 1L)
+})
+
+test_that("mode_chr breaks ties alphabetically and ignores NA", {
+  expect_equal(mode_chr(c("b", "a", "b", "a", NA)), "a")
+  expect_equal(mode_chr(c(NA_character_, NA_character_)), NA_character_)
+})
+
+test_that("build_team_season fills conference for roster-only seasons", {
+  f <- team_fixture()
+  f$games <- dplyr::bind_rows(
+    f$games,
+    tibble::tibble(
+      season = 2018L,
+      completed = TRUE,
+      homeTeam = "Tulane",
+      homeConference = "SEC",
+      homeClassification = "fbs",
+      homePoints = 10L,
+      awayTeam = "LSU",
+      awayConference = "SEC",
+      awayClassification = "fbs",
+      awayPoints = 7L
+    )
+  )
+  f$tiers <- dplyr::bind_rows(
+    f$tiers,
+    tibble::tibble(
+      season = 2018L,
+      conference = "SEC",
+      tier = 3L,
+      tier_label = "Power"
+    )
+  )
+  # Tulane: games in 2018, roster only in 2019.
+  ts <- build_team_season(
+    f$roster,
+    f$games,
+    f$tiers,
+    f$player_season,
+    f$coaches
+  )
+  tul19 <- ts[ts$team == "Tulane" & ts$season == 2019L, ]
+  expect_equal(tul19$conference, "SEC")
+  expect_equal(tul19$tier, 3L)
+  expect_true(tul19$conference_filled)
+  expect_false(ts$conference_filled[ts$team == "Tulane" & ts$season == 2018L])
+  # Games-listed team with no classification falls back to tier 1.
+  g <- f$games
+  g$awayClassification[g$awayTeam == "Div2 U"] <- NA
+  ts2 <- build_team_season(f$roster, g, f$tiers, f$player_season, f$coaches)
+  expect_equal(ts2$tier[ts2$team == "Div2 U"], 1L)
 })

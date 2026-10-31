@@ -18,7 +18,8 @@ build_team_season(roster, games, tiers, player_season, coaches)
 \item{coaches}{Cleaned coaches.}
 }
 \value{
-One row per \verb{(team, season)}.
+One row per \verb{(team, season)}. \code{conference_filled} is TRUE where the
+conference came from the team's nearest season with games.
 }
 \description{
 One row per team per season across every division: conference and tier,

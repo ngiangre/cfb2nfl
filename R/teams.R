@@ -150,7 +150,8 @@ team_record <- function(games) {
 #' @param tiers Conference-tier lookup.
 #' @param player_season Player-season table ([build_player_season()]).
 #' @param coaches Cleaned coaches.
-#' @return One row per `(team, season)`.
+#' @return One row per `(team, season)`. `conference_filled` is TRUE where the
+#'   conference came from the team's nearest season with games.
 #' @export
 build_team_season <- function(roster, games, tiers, player_season, coaches) {
   tier_levels <- conference_tier_levels()
@@ -173,8 +174,18 @@ build_team_season <- function(roster, games, tiers, player_season, coaches) {
       ),
       .groups = "drop"
     )
+  # Roster-only team-seasons (no games ingested) borrow conference and
+  # classification from the nearest season so FBS teams keep their tier.
   team_record(games) |>
     dplyr::full_join(ros, by = c("season", "team")) |>
+    dplyr::arrange(.data$team, .data$season) |>
+    dplyr::mutate(conference_filled = is.na(.data$conference)) |>
+    dplyr::group_by(.data$team) |>
+    tidyr::fill("conference", "classification", .direction = "downup") |>
+    dplyr::ungroup() |>
+    dplyr::mutate(
+      conference_filled = .data$conference_filled & !is.na(.data$conference)
+    ) |>
     dplyr::left_join(stat, by = c("season", "team")) |>
     dplyr::left_join(rating, by = c("season", "team")) |>
     dplyr::left_join(
@@ -196,8 +207,8 @@ build_team_season <- function(roster, games, tiers, player_season, coaches) {
       has_stat_lines = .data$n_stat_players > 0L,
       tier = dplyr::if_else(
         is.na(.data$tier) &
-          !is.na(.data$classification) &
-          .data$classification != "fbs",
+          ((!is.na(.data$classification) & .data$classification != "fbs") |
+            (is.na(.data$classification) & .data$games_played > 0L)),
         1L,
         .data$tier
       ),
@@ -208,6 +219,7 @@ build_team_season <- function(roster, games, tiers, player_season, coaches) {
       "season",
       "conference",
       "classification",
+      "conference_filled",
       "tier",
       "tier_label",
       "games_played",
@@ -227,18 +239,24 @@ build_team_season <- function(roster, games, tiers, player_season, coaches) {
 #' Each player's college exit: the team that gets credit and the outcome
 #'
 #' A drafted player is credited to the team of their final roster season
-#' before the draft year (one pick per player, the earliest, decision 0011);
+#' before the draft year (one pick per player: the most recent pick inside
+#' `draft_window`, decision 0011, since CFBD ids are reused by decades-old
+#' picks);
 #' an undrafted player to their final roster season, feeding the next draft
 #' class. Undrafted players still on the latest roster are excluded (their
 #' outcome is not yet known). "Eligible" is a roster-based proxy for the NFL's
 #' three-years-out-of-high-school rule: three or more roster seasons, or
-#' drafted, or signed as a UDFA.
+#' drafted, or signed as a UDFA. The proxy is left-truncated for players whose
+#' careers began before the 2010 roster window, so use draft classes 2014 and
+#' later for rates. Roster coverage jumps (2022 lists 307 teams versus about
+#' 225 earlier) create one-season listings that look like exits.
 #'
 #' @param roster Cleaned roster with `playerId`, `season`, `team`, `position`.
 #' @param picks Cleaned picks with `playerId`, `year`, `round`.
 #' @param udfa_ids Character vector of player ids who signed as undrafted
 #'   free agents (from `outcomes`).
 #' @param reused Reused athlete ids to exclude ([reused_ids()]).
+#' @param draft_window Plausible draft years; picks outside it are ignored.
 #' @param last_roster_season Latest roster season in the data.
 #' @return One row per player: `playerId`, `team`, `last_season`,
 #'   `first_season`, `seasons`, `position`, `position_group`, `draft_class`,
@@ -249,13 +267,17 @@ exit_cohort <- function(
   picks,
   udfa_ids,
   reused,
+  draft_window = 2010:2027,
   last_roster_season = max(roster$season)
 ) {
   pk <- picks |>
-    dplyr::filter(!is.na(.data$playerId), !.data$playerId %in% reused) |>
-    dplyr::group_by(.data$playerId) |>
-    dplyr::slice_min(.data$year, with_ties = FALSE) |>
-    dplyr::ungroup() |>
+    dplyr::filter(
+      !is.na(.data$playerId),
+      !.data$playerId %in% reused,
+      .data$year %in% draft_window
+    ) |>
+    dplyr::arrange(.data$playerId, dplyr::desc(.data$year)) |>
+    dplyr::distinct(.data$playerId, .keep_all = TRUE) |>
     dplyr::select("playerId", draft_year = "year", draft_round = "round")
   roster |>
     dplyr::filter(!.data$playerId %in% reused, !is.na(.data$team)) |>

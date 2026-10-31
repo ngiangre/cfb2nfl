@@ -9,6 +9,7 @@ exit_cohort(
   picks,
   udfa_ids,
   reused,
+  draft_window = 2010:2027,
   last_roster_season = max(roster$season)
 )
 }
@@ -22,6 +23,8 @@ free agents (from \code{outcomes}).}
 
 \item{reused}{Reused athlete ids to exclude (\code{\link[=reused_ids]{reused_ids()}}).}
 
+\item{draft_window}{Plausible draft years; picks outside it are ignored.}
+
 \item{last_roster_season}{Latest roster season in the data.}
 }
 \value{
@@ -31,10 +34,15 @@ One row per player: \code{playerId}, \code{team}, \code{last_season},
 }
 \description{
 A drafted player is credited to the team of their final roster season
-before the draft year (one pick per player, the earliest, decision 0011);
+before the draft year (one pick per player: the most recent pick inside
+\code{draft_window}, decision 0011, since CFBD ids are reused by decades-old
+picks);
 an undrafted player to their final roster season, feeding the next draft
 class. Undrafted players still on the latest roster are excluded (their
 outcome is not yet known). "Eligible" is a roster-based proxy for the NFL's
 three-years-out-of-high-school rule: three or more roster seasons, or
-drafted, or signed as a UDFA.
+drafted, or signed as a UDFA. The proxy is left-truncated for players whose
+careers began before the 2010 roster window, so use draft classes 2014 and
+later for rates. Roster coverage jumps (2022 lists 307 teams versus about
+225 earlier) create one-season listings that look like exits.
 }
