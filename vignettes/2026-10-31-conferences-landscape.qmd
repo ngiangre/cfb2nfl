@@ -501,6 +501,427 @@ stopifnot(
 ```
 
 ```{r}
+#| label: s33-compute
+#| include: false
+# credited picks: players whose final college season was 2013 to 2025,
+# i.e. the draft classes of 2014 to 2026
+credited <- filter(team_draft, season >= first_class - 1L, season <= last_season)
+group_picks <- credited |>
+  group_by(group = position_group) |>
+  summarise(picks = sum(n_drafted), .groups = "drop")
+ol_cov <- roster |>
+  filter(season <= last_season) |>
+  distinct(playerId, season, position) |>
+  left_join(
+    mutate(player_stats_seasons, has_stat = TRUE),
+    by = c("playerId", "season")
+  ) |>
+  mutate(group = position_group(position), has_stat = coalesce(has_stat, FALSE)) |>
+  group_by(group) |>
+  summarise(seasons = n(), with_stat = sum(has_stat), share = mean(has_stat), .groups = "drop") |>
+  left_join(group_picks, by = "group") |>
+  mutate(pick_share = picks / sum(picks)) |>
+  arrange(share)
+ol <- filter(ol_cov, group == "Offensive line")
+others <- filter(ol_cov, !group %in% c("Offensive line", "Position not recorded"))
+```
+
+### 3.3 Offensive linemen supply one in six credited draft picks, but only `r pct(ol$share, 0)` of their roster seasons carry a stat line
+
+The table and figure set each position group's roster seasons against those
+with a stat line; offensive linemen block rather than carry, catch, or
+tackle, so they are on every roster but almost never in the stat sheets,
+which is why the draft rates in the next two posts count everyone who left a
+roster rather than everyone with a stat line.
+
+```{r}
+#| label: s33-table
+ol_cov |>
+  transmute(
+    `Position group` = group,
+    `Roster player-seasons` = fmt(seasons),
+    `With a stat line` = fmt(with_stat),
+    `Share with a stat line` = pct(share),
+    `Credited draft picks` = fmt(picks),
+    `Share of picks` = pct(pick_share)
+  ) |>
+  kable(
+    caption = "Roster player-seasons and how many carry a stat line, 2010 to 2025, with credited draft picks for the classes of 2014 to 2026, by position group."
+  )
+```
+
+```{r}
+#| label: s33-explain
+#| fig-height: 6
+p <- ggplot(ol_cov, aes(share, reorder(group, share), fill = group == "Offensive line")) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(
+        group, ": ", fmt(with_stat), " of ", fmt(seasons), " roster seasons with a stat line (", pct(share), ")\n",
+        fmt(picks), " credited draft picks (", pct(pick_share), " of all)"
+      ),
+      data_id = group
+    ),
+    width = 0.75
+  ) +
+  geom_text(
+    aes(label = pct(share, 0)),
+    hjust = -0.15,
+    size = 5,
+    fontface = "bold"
+  ) +
+  scale_fill_manual(values = c(`TRUE` = "#b91c1c", `FALSE` = "#9ca3af"), guide = "none") +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 0.8)) +
+  labs(
+    x = "Roster player-seasons with a stat line, 2010 to 2025",
+    y = NULL,
+    title = "Offensive linemen are on rosters but not in the stat sheets",
+    subtitle = paste0("Yet they are ", pct(ol$pick_share, 0), " of credited draft picks; hover a bar for counts")
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s33-pin
+#| include: false
+stopifnot(
+  ol_cov$group[1] == "Offensive line",
+  ol$share < 0.07,
+  all(others$share > 0.45),
+  ol$pick_share > 0.15,
+  ol$pick_share < 0.175,
+  rank(-group_picks$picks)[group_picks$group == "Offensive line"] == 3
+)
+```
+
+```{r}
+#| label: s34-compute
+#| include: false
+school_picks <- credited |>
+  arrange(team, season) |>
+  group_by(team) |>
+  summarise(
+    picks = sum(n_drafted),
+    # the school's tier and conference in its latest credited season
+    tier = last(tier_label),
+    conference = last(conference),
+    .groups = "drop"
+  ) |>
+  filter(picks > 0) |>
+  arrange(desc(picks), team) |>
+  mutate(rank = row_number(), cum_share = cumsum(picks) / sum(picks))
+total_credited <- sum(school_picks$picks)
+n_schools <- nrow(school_picks)
+half_n <- which(school_picks$cum_share >= 0.5)[1]
+fbs_teams_window <- played |>
+  filter(season >= first_class - 1L, classification == "fbs") |>
+  distinct(team) |>
+  pull()
+fbs_with_pick <- sum(fbs_teams_window %in% school_picks$team)
+```
+
+### 3.4 Twenty-five schools account for half of the credited draft picks
+
+The table counts the share of `r fmt(total_credited)` credited picks
+supplied by the top schools, the curve shows how quickly that share
+accumulates as schools are added in order, and the bar chart ranks the 60
+leading schools.
+
+```{r}
+#| label: s34-table
+tibble::tibble(
+  Schools = c("Top 10", "Top 25", "Top 50", "Top 100", paste("All", n_schools, "schools with a pick")),
+  n = c(10L, 25L, 50L, 100L, n_schools)
+) |>
+  mutate(
+    `Credited picks` = fmt(cumsum(school_picks$picks)[n]),
+    `Share of picks` = pct(school_picks$cum_share[n])
+  ) |>
+  select(-n) |>
+  kable(
+    caption = "Share of credited draft picks (classes of 2014 to 2026) from the schools with the most picks."
+  )
+```
+
+```{r}
+#| label: s34-explain
+#| fig-height: 6
+p <- ggplot(school_picks, aes(rank, cum_share)) +
+  geom_step(linewidth = 1.3, color = "#374151") +
+  geom_segment(
+    aes(x = 0, xend = half_n, y = 0.5, yend = 0.5),
+    linetype = "dashed",
+    color = "#b91c1c"
+  ) +
+  geom_segment(
+    aes(x = half_n, xend = half_n, y = 0, yend = 0.5),
+    linetype = "dashed",
+    color = "#b91c1c"
+  ) +
+  geom_point_interactive(
+    data = filter(school_picks, rank <= half_n),
+    aes(
+      tooltip = paste0("#", rank, " ", team, ": ", picks, " picks (", pct(cum_share, 0), " cumulative)"),
+      data_id = team
+    ),
+    color = "#b91c1c",
+    size = 3
+  ) +
+  annotate(
+    "text",
+    x = half_n + 5,
+    y = 0.42,
+    label = paste0("The top ", half_n, " schools: half of all picks"),
+    hjust = 0,
+    size = 5.5,
+    fontface = "bold",
+    color = "#b91c1c"
+  ) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  labs(
+    x = "Schools, ranked by credited draft picks",
+    y = "Cumulative share of picks",
+    title = "A short list of schools accounts for half the draft",
+    subtitle = paste0(n_schools, " schools with at least one credited pick, classes of 2014 to 2026")
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s34-explore
+#| fig-height: 13
+top <- filter(school_picks, rank <= 60)
+p <- ggplot(top, aes(picks, reorder(team, picks), fill = team)) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0("#", rank, " ", team, " (", conference, ", ", tier, "): ", picks, " picks"),
+      data_id = team
+    ),
+    width = 0.8
+  ) +
+  scale_fill_team(teams, guide = "none") +
+  labs(
+    x = "Credited draft picks, classes of 2014 to 2026",
+    y = NULL,
+    title = "The 60 schools with the most credited draft picks",
+    subtitle = "Team colors; hover a bar for the school's latest conference and tier"
+  ) +
+  theme_cfb2nfl(base_size = 12)
+girafe(ggobj = p, width_svg = 13, height_svg = 13)
+```
+
+```{r}
+#| label: s34-pin
+#| include: false
+stopifnot(
+  half_n == 25L,
+  school_picks$cum_share[10] > 0.25,
+  school_picks$cum_share[10] < 0.3,
+  n_schools == 178L,
+  total_credited == 3129L,
+  school_picks$team[1] == "Alabama",
+  fbs_with_pick == length(fbs_teams_window) - 1L
+)
+```
+
+```{r}
+#| label: registry
+#| include: false
+# Key on athlete id, never name (recruiting ids collide, decision 0013).
+subjects <- tibble::tribble(
+  ~who           , ~cfb_athlete_id ,
+  "Carson Wentz" , "2573079"       ,
+  "Trey Lance"   , "4383351"
+)
+```
+
+```{r}
+#| label: s35-compute
+#| include: false
+reused <- reused_ids(roster)
+# a pick is traced when its player is on a roster before the draft year
+traced_ids <- picks |>
+  filter(
+    !is.na(playerId),
+    !playerId %in% reused,
+    year >= first_class,
+    year <= last_season + 1L
+  ) |>
+  inner_join(distinct(roster, playerId, season), by = "playerId", relationship = "many-to-many") |>
+  filter(season < year) |>
+  distinct(playerId) |>
+  pull()
+# draft-day school's tier in its latest recorded season before the draft
+school_tier <- team_season |>
+  filter(!is.na(tier_label)) |>
+  transmute(collegeTeam = team, tier_season = season, tier = as.character(tier_label), conference)
+window_picks <- picks |>
+  filter(year >= first_class, year <= last_season + 1L) |>
+  left_join(school_tier, by = join_by(collegeTeam, closest(year > tier_season))) |>
+  mutate(traced = playerId %in% traced_ids)
+id_picks <- window_picks |> filter(!is.na(playerId), !playerId %in% reused)
+traced_share <- mean(id_picks$traced)
+small <- filter(window_picks, tier == "FCS and below")
+small_traced <- mean(small$traced)
+fbs_traced <- mean(window_picks$traced[window_picks$tier %in% c("Power", "Group of 5")])
+small_schools <- small |>
+  group_by(collegeTeam) |>
+  summarise(
+    picks = n(),
+    traced = sum(traced),
+    conference = last(conference),
+    .groups = "drop"
+  ) |>
+  arrange(desc(picks), collegeTeam)
+ndsu <- filter(small, collegeTeam == "North Dakota State")
+star <- function(id) filter(picks, playerId == id)
+wentz <- star(subjects$cfb_athlete_id[1])
+lance <- star(subjects$cfb_athlete_id[2])
+```
+
+### 3.5 FCS-and-below schools sent `r nrow(small)` players to the draft, North Dakota State `r nrow(ndsu)` of them, but rosters trace fewer than half
+
+The table counts draft picks by draft-day school from FCS and below, and how
+many the rosters trace to a final college season (`r pct(small_traced, 0)`,
+against `r pct(fbs_traced, 0)` for FBS schools); the bar chart ranks the
+schools, and the scatter shows every pick.
+
+```{r}
+#| label: s35-table
+small |>
+  group_by(`Draft class` = year) |>
+  summarise(
+    `Draft picks` = n(),
+    `Schools with a pick` = n_distinct(collegeTeam),
+    `Traced to a roster` = sum(traced),
+    .groups = "drop"
+  ) |>
+  kable(
+    caption = "Draft picks whose draft-day school played FCS or below in the season before the draft, by draft class, and how many the rosters trace to a final college season."
+  )
+```
+
+```{r}
+#| label: s35-explain
+#| fig-height: 7
+top_small <- small_schools |>
+  slice_head(n = 12) |>
+  mutate(
+    n_traced = traced,
+    untraced = picks - n_traced,
+    lead = collegeTeam == small_schools$collegeTeam[1]
+  )
+bars <- bind_rows(
+  transmute(top_small, collegeTeam, picks, conference, lead, part = "Traced to a roster", n = n_traced),
+  transmute(top_small, collegeTeam, picks, conference, lead, part = "Not on any roster", n = untraced)
+) |>
+  mutate(
+    part = factor(part, levels = c("Not on any roster", "Traced to a roster")),
+    fill = case_when(
+      lead & part == "Traced to a roster" ~ "#15803d",
+      lead ~ "#86efac",
+      part == "Traced to a roster" ~ "#4b5563",
+      TRUE ~ "#d1d5db"
+    )
+  )
+p <- ggplot(bars, aes(n, reorder(collegeTeam, picks), fill = fill, group = part)) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(collegeTeam, " (", conference, "): ", n, " of ", picks, " picks ", tolower(part)),
+      data_id = collegeTeam
+    ),
+    width = 0.75
+  ) +
+  annotate(
+    "curve",
+    x = 13.2,
+    xend = 12,
+    y = 9.1,
+    yend = 11.6,
+    curvature = 0.2,
+    color = "#15803d",
+    arrow = grid::arrow(length = grid::unit(0.25, "cm"))
+  ) +
+  annotate(
+    "text",
+    x = nrow(ndsu) - 0.2,
+    y = 8.5,
+    label = paste0(
+      "Carson Wentz (", wentz$year, ", pick ", wentz$overall, ") and Trey Lance (",
+      lance$year, ", pick ", lance$overall, ")\nare on no roster in the data"
+    ),
+    hjust = 1,
+    size = 4.6,
+    fontface = "bold",
+    color = "#15803d"
+  ) +
+  scale_fill_identity() +
+  labs(
+    x = "Draft picks, classes of 2014 to 2026",
+    y = NULL,
+    title = "North Dakota State leads the small schools",
+    subtitle = "Dark: traced to a roster; light: not on any roster in the data"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: s35-explore
+#| fig-height: 7
+p <- ggplot(small, aes(year, overall, color = traced)) +
+  geom_point_interactive(
+    aes(
+      tooltip = paste0(
+        name, ", ", collegeTeam, " (", conference, ")\n", year, " draft, round ", round, ", pick ", overall,
+        if_else(traced, "\nTraced to a roster", "\nNot on any roster")
+      ),
+      data_id = paste(year, overall)
+    ),
+    size = 3.2,
+    alpha = 0.85,
+    position = position_jitter(width = 0.15, height = 0, seed = 1)
+  ) +
+  scale_y_reverse() +
+  scale_x_continuous(breaks = seq(first_class, last_season + 1L, 2)) +
+  scale_color_manual(
+    values = c(`TRUE` = "#4b5563", `FALSE` = "#f59e0b"),
+    labels = c(`TRUE` = "Traced to a roster", `FALSE` = "Not on any roster"),
+    name = NULL
+  ) +
+  labs(
+    x = "Draft class",
+    y = "Overall pick (earlier picks at the top)",
+    title = "Every draft pick from an FCS-and-below school",
+    subtitle = "Hover a point for the player, school, and pick"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: s35-pin
+#| include: false
+stopifnot(
+  small_schools$collegeTeam[1] == "North Dakota State",
+  nrow(ndsu) == 15L,
+  small_traced < 0.5,
+  fbs_traced > 0.95,
+  abs(traced_share - 0.946) < 0.001,
+  length(traced_ids) == total_credited,
+  wentz$name == "Carson Wentz",
+  wentz$year == 2016L,
+  wentz$collegeTeam == "North Dakota State",
+  lance$name == "Trey Lance",
+  lance$year == 2021L,
+  lance$collegeTeam == "North Dakota State",
+  !any(subjects$cfb_athlete_id %in% roster$playerId)
+)
+```
+
+```{r}
 #| label: teardown
 #| include: false
 dbDisconnect(con, shutdown = TRUE)
