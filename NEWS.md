@@ -1,5 +1,19 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- New derived tables `team_season` and `team_draft` in the DuckDB bundle
+  ([decision 0033](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0033-team-draft-attribution.md)).
+  `team_season` has one row per team per season across every division:
+  conference, tier, win-loss record, SP+ and SRS (FBS only), roster size, and
+  stat-line coverage. Notre Dame is tiered Power, as decision 0003 specifies.
+  `team_draft` credits draft picks and undrafted signings to the player's
+  final college team, by position group, and it includes offensive linemen.
+  Both are checked by new data contracts. `position_group()` is now one shared
+  position map.
+- New blog post on the college football landscape: the conferences and tiers,
+  realignment, what the data records for each division, and how concentrated
+  draft picks are
+  ([vignettes/2026-10-31-conferences-landscape.qmd](https://github.com/ngiangre/cfb2nfl/blob/main/vignettes/2026-10-31-conferences-landscape.qmd)).
+
 - Blog posts follow a revised section format
   ([decision 0025](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0025-blog-post-writing-style.md)):
   each section is a numbered assertion heading, one or two sentences, then a
