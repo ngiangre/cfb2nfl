@@ -158,6 +158,348 @@ tibble::tribble(
   kable(caption = "Terms used throughout.")
 ```
 
+## 3. Results
+
+```{r}
+#| label: s31-compute
+#| include: false
+fbs <- played |>
+  filter(classification == "fbs") |>
+  # the Pac-10 became the Pac-12 in 2011: a rename, not a move
+  mutate(league = if_else(conference == "Pac-10", "Pac-12", conference))
+moves <- fbs |>
+  arrange(team, season) |>
+  group_by(team) |>
+  mutate(from = lag(league), from_tier = lag(as.character(tier_label))) |>
+  ungroup() |>
+  filter(!is.na(from), from != league)
+n_moves <- nrow(moves)
+n_movers <- n_distinct(moves$team)
+fbs_n <- count(fbs, season, name = "teams")
+fbs_2010 <- fbs_n$teams[fbs_n$season == 2010L]
+fbs_2025 <- fbs_n$teams[fbs_n$season == 2025L]
+n_conf_2025 <- n_distinct(
+  fbs$league[fbs$season == 2025L & fbs$league != "FBS Independents"]
+)
+wave1 <- sum(moves$season %in% 2011:2014)
+wave2 <- sum(moves$season %in% 2023:2024)
+pac12_2024 <- sort(fbs$team[fbs$season == 2024L & fbs$league == "Pac-12"])
+```
+
+### 3.1 FBS grew from `r fbs_2010` to `r fbs_2025` teams, and `r n_movers` of them changed conference at least once
+
+The table counts teams and conferences by tier in the seasons around the two
+waves of realignment, the figure shows when the `r n_moves` conference
+changes happened, and the tile chart traces every school that moved.
+
+```{r}
+#| label: s31-table
+conf_by_tier <- played |>
+  filter(conference != "FBS Independents" | is.na(conference)) |>
+  group_by(season, tier_label) |>
+  summarise(conferences = n_distinct(conference), .groups = "drop")
+teams_by_tier <- count(played, season, tier_label, name = "teams")
+sel <- c(2010L, 2012L, 2013L, 2014L, 2023L, 2024L, 2025L)
+teams_by_tier |>
+  left_join(conf_by_tier, by = c("season", "tier_label")) |>
+  filter(season %in% sel) |>
+  mutate(
+    cell = if_else(
+      tier_label == "FCS and below",
+      fmt(teams),
+      paste0(teams, " in ", conferences)
+    )
+  ) |>
+  select(season, tier_label, cell) |>
+  tidyr::pivot_wider(names_from = tier_label, values_from = cell) |>
+  left_join(count(moves, season, name = "moved"), by = "season") |>
+  transmute(
+    Season = season,
+    `Power teams in conferences` = Power,
+    `Group of 5 teams in conferences` = `Group of 5`,
+    `FCS and below teams` = `FCS and below`,
+    `FBS teams that changed conference` = coalesce(moved, 0L)
+  ) |>
+  kable(
+    caption = "Teams that played at least one recorded game, and the conferences they played in, by tier, in seasons around the two waves of realignment. Conference counts leave out the FBS independents. FCS-and-below counts grow from 2021 because Division II and III games enter the data then."
+  )
+```
+
+```{r}
+#| label: s31-explain
+#| fig-height: 6
+moves_n <- moves |>
+  count(season, name = "moves") |>
+  tidyr::complete(season = 2011:2025, fill = list(moves = 0L)) |>
+  mutate(wave = season %in% c(2011:2014, 2023:2024))
+p <- ggplot(moves_n, aes(season, moves, fill = wave)) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(season, ": ", moves, " FBS conference changes"),
+      data_id = season
+    ),
+    width = 0.8
+  ) +
+  annotate(
+    "text",
+    x = 2015.2,
+    y = 21,
+    label = "2011 to 2014: the Big East breaks up\nand the American Athletic forms",
+    hjust = 0,
+    size = 5,
+    fontface = "bold"
+  ) +
+  annotate(
+    "curve",
+    x = 2015.1,
+    xend = 2013.5,
+    y = 21,
+    yend = 22,
+    curvature = 0.2,
+    arrow = grid::arrow(length = grid::unit(0.25, "cm"))
+  ) +
+  annotate(
+    "text",
+    x = 2022.4,
+    y = 11,
+    label = "2023 to 2024: the Pac-12 breaks up;\nTexas and Oklahoma join the SEC",
+    hjust = 1,
+    size = 5,
+    fontface = "bold"
+  ) +
+  annotate(
+    "curve",
+    x = 2022.5,
+    xend = 2023.6,
+    y = 11,
+    yend = 14.6,
+    curvature = -0.2,
+    arrow = grid::arrow(length = grid::unit(0.25, "cm"))
+  ) +
+  scale_fill_manual(values = c(`TRUE` = "#1d4ed8", `FALSE` = "#9ca3af"), guide = "none") +
+  scale_x_continuous(breaks = seq(2011, 2025, 2)) +
+  labs(
+    x = "Season",
+    y = "Conference changes",
+    title = "Realignment came in two waves",
+    subtitle = "FBS teams playing in a different conference than in their previous season"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s31-explore
+#| fig-height: 13
+movers <- fbs |>
+  filter(team %in% moves$team) |>
+  group_by(team) |>
+  mutate(first_move = min(moves$season[moves$team == first(team)])) |>
+  ungroup()
+p <- ggplot(movers, aes(season, reorder(team, -first_move), fill = tier_label)) +
+  geom_tile_interactive(
+    aes(
+      tooltip = paste0(team, ", ", season, ": ", conference, " (", tier_label, ")"),
+      data_id = team
+    ),
+    color = "white"
+  ) +
+  scale_fill_manual(values = tier_colors, name = NULL) +
+  scale_x_continuous(breaks = seq(2010, 2025, 3)) +
+  labs(
+    x = "Season",
+    y = NULL,
+    title = "Every FBS school that changed conference",
+    subtitle = "Ordered by first move, earliest at the top; hover a tile for the conference",
+    caption = "Gaps are seasons a school played outside FBS or played no games."
+  ) +
+  theme_cfb2nfl(base_size = 12)
+girafe(ggobj = p, width_svg = 13, height_svg = 13)
+```
+
+```{r}
+#| label: s31-pin
+#| include: false
+conf_of <- function(t, s) fbs$conference[fbs$team == t & fbs$season == s]
+stopifnot(
+  fbs_2010 == 120L,
+  fbs_2025 == 136L,
+  n_movers == 61L,
+  n_moves == 81L,
+  n_conf_2025 == 10L,
+  wave1 == 45L,
+  wave2 == 26L,
+  conf_of("Texas", 2023L) == "Big 12",
+  conf_of("Texas", 2024L) == "SEC",
+  conf_of("Oklahoma", 2023L) == "Big 12",
+  conf_of("Oklahoma", 2024L) == "SEC",
+  identical(pac12_2024, c("Oregon State", "Washington State")),
+  max(fbs$season[fbs$conference == "Big East"]) == 2012L,
+  max(moves_n$moves) == moves_n$moves[moves_n$season == 2013L]
+)
+```
+
+```{r}
+#| label: s32-compute
+#| include: false
+division_order <- c("FBS", "FCS", "Division II and below")
+division_colors <- c(
+  "FBS" = "#1d4ed8",
+  "FCS" = "#0f766e",
+  "Division II and below" = "#6b7280"
+)
+coverage <- played |>
+  mutate(
+    division = case_when(
+      classification == "fbs" ~ "FBS",
+      classification == "fcs" ~ "FCS",
+      TRUE ~ "Division II and below"
+    ),
+    division = factor(division, levels = division_order)
+  ) |>
+  group_by(season, division) |>
+  summarise(
+    played = n(),
+    with_stats = sum(has_stat_lines),
+    with_roster = sum(n_roster > 0),
+    depth = median(n_stat_players[has_stat_lines]),
+    .groups = "drop"
+  ) |>
+  mutate(share = with_stats / played)
+cov_at <- function(s, d, col) coverage[[col]][coverage$season == s & coverage$division == d]
+fcs_pre <- coverage |> filter(division == "FCS", season <= 2019L)
+fcs_post <- coverage |> filter(division == "FCS", season >= 2021L)
+low_post <- coverage |> filter(division == "Division II and below", season >= 2021L)
+fbs_depth_2015 <- cov_at(2015L, "FBS", "depth")
+fbs_depth_2016 <- cov_at(2016L, "FBS", "depth")
+```
+
+### 3.2 Every FBS team has stat lines every season, FCS teams only from 2021, and Division II and III teams almost never
+
+The table counts, for each division and season, the teams that played and
+the teams with at least one player stat line; the first figure tracks that
+share, and the second shows how many players per team carry a stat line,
+which doubles in 2016 when deeper stat records begin.
+
+```{r}
+#| label: s32-table
+coverage |>
+  mutate(cell = paste0(with_stats, " of ", played)) |>
+  select(season, division, cell) |>
+  tidyr::pivot_wider(names_from = division, values_from = cell) |>
+  rename(Season = season) |>
+  kable(
+    caption = "Teams with at least one player stat line, of the teams that played at least one recorded game, by division and season, 2010 to 2025."
+  )
+```
+
+```{r}
+#| label: s32-explain
+#| fig-height: 6
+p <- ggplot(coverage, aes(season, share, color = division)) +
+  geom_line(linewidth = 1.4) +
+  geom_point_interactive(
+    aes(
+      tooltip = paste0(season, ", ", division, ": ", with_stats, " of ", played, " teams (", pct(share, 0), ")"),
+      data_id = paste(season, division)
+    ),
+    size = 3
+  ) +
+  annotate(
+    "text",
+    x = 2017.6,
+    y = 0.3,
+    label = paste0("2020: ", cov_at(2020L, "FCS", "with_stats"), " of ", cov_at(2020L, "FCS", "played"), " FCS teams\n(the FCS moved most of 2020 to spring 2021)"),
+    hjust = 1,
+    size = 5,
+    fontface = "bold",
+    color = division_colors[["FCS"]]
+  ) +
+  annotate(
+    "curve",
+    x = 2017.8,
+    xend = 2019.8,
+    y = 0.3,
+    yend = cov_at(2020L, "FCS", "share") - 0.03,
+    curvature = 0.2,
+    color = division_colors[["FCS"]],
+    arrow = grid::arrow(length = grid::unit(0.25, "cm"))
+  ) +
+  annotate(
+    "text",
+    x = 2021.2,
+    y = 0.85,
+    label = "From 2021: every FCS team",
+    hjust = 0,
+    size = 5,
+    fontface = "bold",
+    color = division_colors[["FCS"]]
+  ) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1.02)) +
+  scale_x_continuous(breaks = seq(2010, 2025, 3)) +
+  scale_color_manual(values = division_colors, name = NULL) +
+  labs(
+    x = "Season",
+    y = "Teams with a stat line",
+    title = "The stat sheets cover FBS completely and FCS only recently"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s32-explore
+#| fig-height: 6
+depth <- filter(coverage, with_stats > 0)
+p <- ggplot(depth, aes(season, depth, color = division)) +
+  geom_vline(xintercept = 2015.5, linetype = "dashed") +
+  geom_line(linewidth = 1.2) +
+  geom_point_interactive(
+    aes(
+      tooltip = paste0(
+        season, ", ", division, ": median ", depth, " players with a stat line per team\n",
+        with_stats, " of ", played, " teams with stat lines; ", with_roster, " with a roster"
+      ),
+      data_id = paste(season, division)
+    ),
+    size = 3
+  ) +
+  annotate(
+    "text",
+    x = 2015.7,
+    y = 8,
+    label = "2016: deeper stat records begin",
+    hjust = 0,
+    size = 5,
+    fontface = "bold"
+  ) +
+  scale_x_continuous(breaks = seq(2010, 2025, 3)) +
+  scale_color_manual(values = division_colors, name = NULL) +
+  labs(
+    x = "Season",
+    y = "Median players with a stat line",
+    title = "Players with a stat line per team",
+    subtitle = "Median over teams with any stat line; hover for team and roster counts"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s32-pin
+#| include: false
+stopifnot(
+  all(coverage$share[coverage$division == "FBS"] == 1),
+  all(fcs_pre$share < 0.75),
+  all(fcs_post$share >= 0.98),
+  cov_at(2020L, "FCS", "with_stats") == 14L,
+  cov_at(2020L, "FCS", "played") == 22L,
+  all(low_post$share < 0.2),
+  fbs_depth_2015 <= 32,
+  fbs_depth_2016 >= 58
+)
+```
+
 ```{r}
 #| label: teardown
 #| include: false
