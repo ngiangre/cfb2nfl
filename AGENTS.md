@@ -221,6 +221,10 @@ wrapper (`CFB2NFL_REFRESH=true` + `tar_make()`). Years 2010–2026.
   apply it everywhere rather than re-theming per plot. TODO: create that theme
   helper.
 - **Blog posts** (decision 0015): dated files `vignettes/YYYY-MM-DD-slug.qmd`,
+  each YAML carrying `description:` (one declarative sentence stating the
+  finding, not the topic) and `followups:` (list of open questions / next
+  analyses informing later investigations and pipeline work); displayed in the
+  `blog.qmd` index table and grep-able across `vignettes/`,
   `freeze: auto` + committed `_freeze/` so they don't rebreak on data refresh
   while source edits still propagate (`freeze: true` serves the cache even
   after edits — caused stale deployed titles, fixed 2026-10-24); the `blog`/

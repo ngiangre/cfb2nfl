@@ -44,6 +44,7 @@ posts <- map_dfr(post_files, function(f) {
   tibble(
     date = meta$date,
     title = meta$title,
+    description = meta$description %||% NA_character_,
     author = paste(meta$author, collapse = ", "),
     href = paste0(slug, ".html")
   )
@@ -64,6 +65,12 @@ reactable(
       }
     ),
     author = colDef(name = "Author", width = 160),
+    description = colDef(
+      name = "Description",
+      na = "—",
+      minWidth = 300,
+      html = TRUE
+    ),
     href = colDef(show = FALSE)
   ),
   sortable = FALSE,
