@@ -65,5 +65,6 @@ utils::globalVariables(c(
   "n_udfa",
   "n_eligible",
   "n_exits",
-  "n_round1"
+  "n_round1",
+  "win_pct"
 ))
