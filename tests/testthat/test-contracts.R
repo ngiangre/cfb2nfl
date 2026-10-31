@@ -420,3 +420,101 @@ test_that("contract_player_season_stats passes a valid wide table and flags viol
     contract_player_season_stats(bad_inf, stop_on_fail = FALSE)
   ))
 })
+
+test_that("contract_team_season passes a well-formed table and flags a bad record", {
+  skip_if_not_installed("pointblank")
+  ts <- tibble::tibble(
+    team = c("LSU", "Montana"),
+    season = 2019L,
+    conference = c("SEC", "Big Sky"),
+    classification = c("fbs", "fcs"),
+    conference_filled = FALSE,
+    tier = c(3L, 1L),
+    tier_label = c("Power", "FCS and below"),
+    games_played = c(15L, 12L),
+    wins = c(15L, 9L),
+    losses = c(0L, 3L),
+    ties = 0L,
+    win_pct = c(1, 0.75),
+    srs = c(34.2, NA),
+    sp_overall = c(30.1, NA),
+    n_roster = c(120L, 95L),
+    n_stat_players = c(70L, 40L),
+    has_stat_lines = TRUE
+  )
+  expect_true(pointblank::all_passed(contract_team_season(
+    ts,
+    stop_on_fail = FALSE
+  )))
+  bad <- ts
+  bad$wins[1] <- 16L # wins + losses + ties != games_played
+  expect_false(pointblank::all_passed(contract_team_season(
+    bad,
+    stop_on_fail = FALSE
+  )))
+  bad <- ts
+  bad$tier[1] <- NA # an FBS team must carry a tier
+  expect_false(pointblank::all_passed(contract_team_season(
+    bad,
+    stop_on_fail = FALSE
+  )))
+})
+
+test_that("contract_team_draft checks counts and pick attribution coverage", {
+  skip_if_not_installed("pointblank")
+  cohort <- tibble::tibble(
+    playerId = c("1", "2"),
+    drafted = c(TRUE, FALSE),
+    draft_class = 2020L
+  )
+  td <- tibble::tibble(
+    team = "LSU",
+    season = 2019L,
+    conference = "SEC",
+    tier = 3L,
+    tier_label = "Power",
+    position_group = "Quarterback",
+    n_exits = 2L,
+    n_eligible = 2L,
+    n_drafted = 1L,
+    n_round1 = 1L,
+    n_udfa = 1L
+  )
+  picks <- tibble::tibble(playerId = "1", year = 2020L)
+  expect_true(pointblank::all_passed(
+    contract_team_draft(
+      td,
+      cohort,
+      picks,
+      reused = character(),
+      min_class = 2014L,
+      stop_on_fail = FALSE
+    )
+  ))
+  # A pick that never attributes drops coverage to 50% < 93%.
+  picks2 <- tibble::tibble(playerId = c("1", "7"), year = 2020L)
+  expect_false(pointblank::all_passed(
+    contract_team_draft(
+      td,
+      cohort,
+      picks2,
+      reused = character(),
+      min_class = 2014L,
+      stop_on_fail = FALSE
+    )
+  ))
+  # Exit totals must equal the cohort (no silent loss in aggregation).
+  td2 <- td
+  td2$n_exits <- 3L
+  td2$n_eligible <- 3L
+  expect_false(pointblank::all_passed(
+    contract_team_draft(
+      td2,
+      cohort,
+      picks,
+      reused = character(),
+      min_class = 2014L,
+      stop_on_fail = FALSE
+    )
+  ))
+})
