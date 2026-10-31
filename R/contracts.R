@@ -1125,3 +1125,107 @@ contract_outcomes <- function(outcomes, ps_pop, stop_on_fail = TRUE) {
     pointblank::interrogate()
   enforce_contract(agent, "outcomes", stop_on_fail)
 }
+
+#' Data contract for pick-level coach links
+#'
+#' Asserts [link_coaches_picks()] produced a valid pick x coach table: unique
+#' `(year, overall, coach_id)` key, every linked coach-season exists in the
+#' coaches table, every crediting roster season is before the draft year, and
+#' under the `last` rule each pick's `season` is that pick's **maximum**
+#' roster season. Also asserts the link is not silently empty relative to the
+#' eligible pick population (coverage floor guards against a broken join).
+#'
+#' @param linked Pick-coach links from [link_coaches_picks()].
+#' @param picks Cleaned picks (same input as the link).
+#' @param roster Roster backbone (same input as the link).
+#' @param coaches Cleaned coach-seasons (same input as the link).
+#' @param rule Attribution rule used.
+#' @param draft_year_min Draft-year floor used by the link.
+#' @param min_coverage Minimum share of eligible picks that must appear with
+#'   at least one coach (guards silent join loss).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_coaches_picks <- function(
+  linked,
+  picks,
+  roster,
+  coaches,
+  rule = c("last", "any"),
+  draft_year_min = 2011L,
+  min_coverage = 0.9,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  rule <- rlang::arg_match(rule)
+  eligible <- picks |>
+    dplyr::filter(!is.na(.data$playerId), .data$year >= .env$draft_year_min) |>
+    dplyr::distinct(.data$year, .data$overall)
+  covered <- dplyr::distinct(linked, .data$year, .data$overall)
+  coverage <- nrow(covered) / nrow(eligible)
+
+  # expected seasons pool per pick: what the link should have joined against
+  pool <- picks |>
+    dplyr::filter(!is.na(.data$playerId), .data$year >= .env$draft_year_min) |>
+    dplyr::distinct(.data$playerId, .data$year, .data$overall) |>
+    dplyr::inner_join(
+      dplyr::distinct(roster, .data$playerId, .data$season, .data$team),
+      by = "playerId",
+      relationship = "many-to-many"
+    ) |>
+    dplyr::filter(.data$season < .data$year)
+
+  agent <- pointblank::create_agent(linked, label = "coaches_picks") |>
+    pointblank::col_exists(c(
+      "year",
+      "overall",
+      "position",
+      "name",
+      "playerId",
+      "team",
+      "season",
+      "coach_id",
+      "coach_name"
+    )) |>
+    pointblank::col_vals_not_null(pointblank::vars(year, overall, coach_id)) |>
+    pointblank::col_vals_not_null(pointblank::vars(season)) |>
+    pointblank::col_vals_equal(
+      "n",
+      nrow(dplyr::distinct(linked, .data$year, .data$overall, .data$coach_id)),
+      preconditions = function(x) dplyr::mutate(x, n = nrow(x))
+    ) |>
+    pointblank::interrogate()
+  # referential checks pointblank can't express against another table; run as
+  # hard assertions alongside the agent.
+  ok_ref <- all(linked$season < linked$year) &&
+    all(linked$season %in% coaches$season) &&
+    all(
+      paste(linked$team, linked$season, linked$coach_id) %in%
+        paste(coaches$school, coaches$season, coaches$coach_id)
+    )
+  ok_rule <- if (rule == "last") {
+    expected_last <- pool |>
+      dplyr::group_by(.data$year, .data$overall) |>
+      dplyr::summarise(max_season = max(.data$season), .groups = "drop")
+    nrow(dplyr::anti_join(
+      linked,
+      expected_last |> dplyr::rename(season = "max_season"),
+      by = c("year", "overall", "season")
+    )) ==
+      0L
+  } else {
+    nrow(dplyr::anti_join(linked, pool, by = c("year", "overall", "season"))) ==
+      0L
+  }
+  ok_cov <- coverage >= min_coverage
+  ok <- ok_ref && ok_rule && ok_cov
+  if (!ok && stop_on_fail) {
+    stop(sprintf(
+      "coaches_picks contract failed: referential=%s, rule=%s, coverage=%.3f",
+      ok_ref,
+      ok_rule,
+      coverage
+    ))
+  }
+  invisible(agent)
+}

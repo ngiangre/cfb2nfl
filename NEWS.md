@@ -1,5 +1,14 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- New blog post: "Counting every college season instead of only the last
+  changes the named head coaches for nearly half of recent draft picks"
+  ([vignettes/2026-10-30-counting-coaches.qmd](https://github.com/ngiangre/cfb2nfl/blob/main/vignettes/2026-10-30-counting-coaches.qmd)),
+  counting draftee-coach associations under a last-school and an
+  every-season rule, with the transfer boom explaining most of the
+  widening disagreement, plus position mixes and school-to-school splits
+  for coaches who changed jobs. Adds `link_coaches_picks()` and
+  `contract_coaches_picks()` with tests.
+
 - Blog posts now declare `description:` (a one-sentence statement of the
   finding, also used for `<meta name="description">`) and `followups:` (open
   questions feeding later investigations and pipeline work) in their YAML;

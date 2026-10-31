@@ -597,3 +597,102 @@ link_nfl_draft <- function(picks, nfl_draft_picks) {
     ) |>
     dplyr::select(-dplyr::any_of("nfl_name"))
 }
+
+# Pick-level coach links: the blog-analysis grain. A head coach is associated
+# with a draftee, not their sole developer (CFBD has no assistant data), so the
+# verb throughout is "coached under", never "produced". Two attribution rules
+# are supported side by side because they answer different questions and
+# disagree for a large share of picks (see plans/coaches-draftees.md).
+
+#' Link draft picks to the head coaches who coached them
+#'
+#' Joins draft picks to head-coach seasons through the roster backbone
+#' (`playerId` -> `(season, team)` -> `(school, season)`), restricted to roster
+#' seasons **before** the draft year. Two attribution rules:
+#'
+#' * `last`: only the coach(es) of the player's final roster season before the
+#'   draft (credit for the finished product).
+#' * `any`: every coach the player had at least one roster season with,
+#'   counted once per pick (everyone who oversaw part of the development). No
+#'   minimum-exposure threshold: one season is credit.
+#'
+#' Schools with multiple recorded head coaches in a season (mid-season
+#' changes, interims) credit **all** of them; the result is association, not
+#' sole attribution.
+#'
+#' @param picks Cleaned picks with `playerId`, `year`, `overall`, `position`,
+#'   `name`. Picks without a `playerId` are dropped (id coverage is ~100%
+#'   from draft year 2011 on).
+#' @param roster Roster backbone (`playerId`, `season`, `team`).
+#' @param coaches Cleaned coach-seasons (`school`, `season`, `coach_id`,
+#'   `coach_name`).
+#' @param rule Attribution rule: `"last"` or `"any"`.
+#' @param reused Optional character vector of reused athlete ids (from
+#'   [reused_ids()]) to exclude; NULL keeps everything.
+#' @param draft_year_min Minimum draft year to include (roster coverage starts
+#'   in 2010, so early classes have truncated observable careers).
+#'
+#' @return One row per `(year, overall, coach_id)`: the pick columns plus
+#'   `team`, `season` (the crediting roster season), and coach columns.
+#' @export
+link_coaches_picks <- function(
+  picks,
+  roster,
+  coaches,
+  rule = c("last", "any"),
+  reused = NULL,
+  draft_year_min = 2011L
+) {
+  rule <- rlang::arg_match(rule)
+  stopifnot(
+    all(c("playerId", "year", "overall") %in% names(picks)),
+    all(c("playerId", "season", "team") %in% names(roster)),
+    all(c("school", "season", "coach_id", "coach_name") %in% names(coaches))
+  )
+  p <- picks |>
+    dplyr::filter(!is.na(.data$playerId), .data$year >= .env$draft_year_min)
+  if (!is.null(reused)) {
+    p <- dplyr::filter(p, !.data$playerId %in% .env$reused)
+  }
+  seasons <- p |>
+    dplyr::inner_join(
+      dplyr::distinct(roster, .data$playerId, .data$season, .data$team),
+      by = "playerId",
+      relationship = "many-to-many"
+    ) |>
+    dplyr::filter(.data$season < .data$year)
+  if (rule == "last") {
+    seasons <- seasons |>
+      dplyr::group_by(.data$year, .data$overall) |>
+      dplyr::filter(.data$season == max(.data$season)) |>
+      dplyr::ungroup()
+  }
+  seasons |>
+    dplyr::inner_join(
+      dplyr::distinct(
+        coaches,
+        .data$school,
+        .data$season,
+        .data$coach_id,
+        .data$coach_name
+      ),
+      by = dplyr::join_by(team == school, season)
+    ) |>
+    dplyr::distinct(
+      .data$year,
+      .data$overall,
+      .data$coach_id,
+      .keep_all = TRUE
+    ) |>
+    dplyr::select(
+      "year",
+      "overall",
+      "position",
+      "name",
+      "playerId",
+      "team",
+      "season",
+      "coach_id",
+      "coach_name"
+    )
+}
