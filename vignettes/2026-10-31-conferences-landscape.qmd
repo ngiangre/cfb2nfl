@@ -1,7 +1,7 @@
 ---
-title: "College football's draft picks come from a few dozen schools, and the data sees every FBS team but only part of the rest"
+title: "Twenty-five schools supply half of college football's draft picks, and the data sees every FBS team but only part of the rest"
 date: "2026-10-31"
-description: "DRAFT, rewritten with the measured numbers once the Results are in."
+description: "Realignment moved 61 FBS schools between conferences since 2010, stat lines cover every FBS team but FCS teams only from 2021 and offensive linemen in 6% of roster seasons, and 25 schools account for half of the 3,129 credited draft picks in the classes of 2014 to 2026."
 followups:
   - "Which conferences and schools produce draftees above expectation, by position? (Post 2)"
   - "Do teams that win more produce more draftees? (Post 3)"
@@ -11,7 +11,7 @@ author:
   - "AI directed by Nick Giangreco"
 freeze: auto
 vignette: >
-  %\VignetteIndexEntry{College football's draft picks come from a few dozen schools, and the data sees every FBS team but only part of the rest}
+  %\VignetteIndexEntry{Twenty-five schools supply half of college football's draft picks, and the data sees every FBS team but only part of the rest}
   %\VignetteEngine{quarto::html}
   %\VignetteEncoding{UTF-8}
 ---
@@ -186,7 +186,7 @@ wave2 <- sum(moves$season %in% 2023:2024)
 pac12_2024 <- sort(fbs$team[fbs$season == 2024L & fbs$league == "Pac-12"])
 ```
 
-### 3.1 FBS grew from `r fbs_2010` to `r fbs_2025` teams, and `r n_movers` of them changed conference at least once
+### 3.1 FBS grew from 120 to 136 teams, and 61 schools changed conference at least once
 
 The table counts teams and conferences by tier in the seasons around the two
 waves of realignment, the figure shows when the `r n_moves` conference
@@ -526,11 +526,11 @@ ol <- filter(ol_cov, group == "Offensive line")
 others <- filter(ol_cov, !group %in% c("Offensive line", "Position not recorded"))
 ```
 
-### 3.3 Offensive linemen supply one in six credited draft picks, but only `r pct(ol$share, 0)` of their roster seasons carry a stat line
+### 3.3 Offensive linemen supply one in six credited draft picks, but only 6% of their roster seasons carry a stat line
 
 The table and figure set each position group's roster seasons against those
 with a stat line; offensive linemen block rather than carry, catch, or
-tackle, so they are on every roster but almost never in the stat sheets,
+tackle, so they fill rosters but almost never in the stat sheets,
 which is why the draft rates in the next two posts count everyone who left a
 roster rather than everyone with a stat line.
 
@@ -587,7 +587,8 @@ girafe(ggobj = p, width_svg = 13, height_svg = 6)
 #| include: false
 stopifnot(
   ol_cov$group[1] == "Offensive line",
-  ol$share < 0.07,
+  ol$share > 0.055,
+  ol$share < 0.065,
   all(others$share > 0.45),
   ol$pick_share > 0.15,
   ol$pick_share < 0.175,
@@ -649,13 +650,21 @@ tibble::tibble(
 #| fig-height: 6
 p <- ggplot(school_picks, aes(rank, cum_share)) +
   geom_step(linewidth = 1.3, color = "#374151") +
-  geom_segment(
-    aes(x = 0, xend = half_n, y = 0.5, yend = 0.5),
+  annotate(
+    "segment",
+    x = 0,
+    xend = half_n,
+    y = 0.5,
+    yend = 0.5,
     linetype = "dashed",
     color = "#b91c1c"
   ) +
-  geom_segment(
-    aes(x = half_n, xend = half_n, y = 0, yend = 0.5),
+  annotate(
+    "segment",
+    x = half_n,
+    xend = half_n,
+    y = 0,
+    yend = 0.5,
     linetype = "dashed",
     color = "#b91c1c"
   ) +
@@ -781,7 +790,7 @@ wentz <- star(subjects$cfb_athlete_id[1])
 lance <- star(subjects$cfb_athlete_id[2])
 ```
 
-### 3.5 FCS-and-below schools sent `r nrow(small)` players to the draft, North Dakota State `r nrow(ndsu)` of them, but rosters trace fewer than half
+### 3.5 FCS-and-below schools sent 193 players to the draft, North Dakota State 15 of them, but rosters trace fewer than half
 
 The table counts draft picks by draft-day school from FCS and below, and how
 many the rosters trace to a final college season (`r pct(small_traced, 0)`,
@@ -907,6 +916,7 @@ girafe(ggobj = p, width_svg = 13, height_svg = 7)
 stopifnot(
   small_schools$collegeTeam[1] == "North Dakota State",
   nrow(ndsu) == 15L,
+  nrow(small) == 193L,
   small_traced < 0.5,
   fbs_traced > 0.95,
   abs(traced_share - 0.946) < 0.001,
@@ -920,6 +930,72 @@ stopifnot(
   !any(subjects$cfb_athlete_id %in% roster$playerId)
 )
 ```
+
+## 4. Summary
+
+The data sees all of FBS, much of the FCS, and little below it, and within
+what it sees the draft draws from a short list of schools.
+
+```{r}
+#| label: summary
+tibble::tribble(
+  ~Finding                                                   , ~Evidence                                                                                                                                                   ,
+  "FBS grew, and realignment moved a large share of it"       , sprintf("%d FBS teams in 2010, %d in 2025; %d schools made %d conference changes.", fbs_2010, fbs_2025, n_movers, n_moves)                                    ,
+  "Stat lines cover FBS fully and FCS only from 2021"         , sprintf("Every FBS team every season; at most %s of FCS teams through 2019, all from 2021.", pct(max(fcs_pre$share), 0))                                    ,
+  "Offensive linemen are drafted but rarely have stat lines"  , sprintf("%s of offensive-line roster seasons have a stat line; linemen are %s of credited picks.", pct(ol$share, 0), pct(ol$pick_share, 0))                 ,
+  "Half the credited picks come from 25 schools"              , sprintf("Top 25: %s of %s picks; top 10: %s.", pct(school_picks$cum_share[25]), fmt(total_credited), pct(school_picks$cum_share[10]))                       ,
+  "Small schools produce picks the rosters often miss"        , sprintf("%d picks from FCS and below, %d from North Dakota State; %s traced to a roster.", nrow(small), nrow(ndsu), pct(small_traced, 0))
+) |>
+  kable(caption = "The findings and the numbers behind them.")
+```
+
+## 5. Discussion
+
+::: {.callout-important}
+Draft output is concentrated, but a raw pick count does not separate what a
+school develops from how many players pass through it.
+
+- The next post divides each school's picks by the players who left its
+  roster, position by position, before calling any school a producer.
+:::
+
+::: {.callout-important}
+The stat sheets miss offensive linemen, and the rosters miss many small-school
+draftees.
+
+- A population built from stat lines nearly drops offensive linemen; counting
+  everyone who left a roster keeps them.
+- Small-school rosters are too incomplete for team-by-team rates, so FCS and
+  below enter the next posts as one group.
+:::
+
+```{r}
+#| label: caveats-pin
+#| include: false
+fcs_roster_2021 <- cov_at(2021L, "FCS", "with_roster")
+fcs_roster_2022 <- cov_at(2022L, "FCS", "with_roster")
+stopifnot(
+  fcs_roster_2021 < 100L,
+  fcs_roster_2022 == cov_at(2022L, "FCS", "played"),
+  mean(!id_picks$tier[!id_picks$traced] %in% c("Power", "Group of 5")) > 0.6
+)
+```
+
+Several caveats bound these numbers.
+
+- FCS-and-below rosters are incomplete: `r fcs_roster_2021` FCS teams had a
+  roster in 2021 and all `r fcs_roster_2022` that played in 2022, so roster
+  counts jump between those seasons, and Division II and III rosters are
+  nearly absent throughout.
+- The FCS played most of its 2020 season in spring 2021, which the data
+  barely records, so 2020 is a gap for every school below FBS.
+- A pick is credited to the player's final college team, so a transfer's
+  pick counts for his last stop, not the school that developed him.
+- `r pct(traced_share)` of the 2014 to 2026 picks that carry an athlete id
+  are credited to a team; the rest, mostly small-school players, are on no
+  roster in the data.
+- Offensive linemen rarely have stat lines, so any analysis built on stat
+  lines rather than rosters undercounts them.
 
 ```{r}
 #| label: teardown
