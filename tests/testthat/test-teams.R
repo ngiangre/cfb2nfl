@@ -258,3 +258,32 @@ test_that("exit_cohort drops reused ids", {
   )
   expect_equal(nrow(out), 0L)
 })
+
+test_that("build_team_draft aggregates exits by team, final season, position", {
+  cohort <- tibble::tibble(
+    playerId = c("1", "2", "3"),
+    team = "LSU",
+    last_season = 2019L,
+    position_group = c("Quarterback", "Quarterback", "Offensive line"),
+    drafted = c(TRUE, FALSE, FALSE),
+    draft_round = c(1L, NA, NA),
+    udfa = c(FALSE, TRUE, FALSE),
+    eligible = c(TRUE, TRUE, FALSE)
+  )
+  ts <- tibble::tibble(
+    team = "LSU",
+    season = 2019L,
+    conference = "SEC",
+    tier = 3L,
+    tier_label = "Power"
+  )
+  td <- build_team_draft(cohort, ts)
+  qb <- td[td$position_group == "Quarterback", ]
+  expect_equal(
+    c(qb$n_exits, qb$n_eligible, qb$n_drafted, qb$n_round1, qb$n_udfa),
+    c(2L, 2L, 1L, 1L, 1L)
+  )
+  expect_equal(qb$conference, "SEC")
+  expect_equal(nrow(td), 2L)
+  expect_equal(sum(td$n_exits), nrow(cohort))
+})

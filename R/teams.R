@@ -305,3 +305,43 @@ exit_cohort <- function(
       "eligible"
     )
 }
+
+#' Draft output per team, final college season, and position group
+#'
+#' Aggregates [exit_cohort()] to the team whose roster the player left, in
+#' the season they left it, with that season's conference and tier from
+#' [build_team_season()]. Rates are `n_drafted / n_eligible`.
+#'
+#' @param cohort Output of [exit_cohort()].
+#' @param team_season Output of [build_team_season()].
+#' @return One row per `(team, season, position_group)`.
+#' @export
+build_team_draft <- function(cohort, team_season) {
+  cohort |>
+    dplyr::group_by(
+      .data$team,
+      season = .data$last_season,
+      .data$position_group
+    ) |>
+    dplyr::summarise(
+      n_exits = dplyr::n(),
+      n_eligible = sum(.data$eligible),
+      n_drafted = sum(.data$drafted),
+      n_round1 = sum(.data$draft_round %in% 1L),
+      n_udfa = sum(.data$udfa),
+      .groups = "drop"
+    ) |>
+    dplyr::mutate(dplyr::across(dplyr::starts_with("n_"), as.integer)) |>
+    dplyr::left_join(
+      dplyr::select(
+        team_season,
+        "team",
+        "season",
+        "conference",
+        "tier",
+        "tier_label"
+      ),
+      by = c("team", "season")
+    ) |>
+    dplyr::relocate("conference", "tier", "tier_label", .after = "season")
+}
