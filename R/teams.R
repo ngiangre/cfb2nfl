@@ -179,13 +179,31 @@ build_team_season <- function(roster, games, tiers, player_season, coaches) {
   team_record(games) |>
     dplyr::full_join(ros, by = c("season", "team")) |>
     dplyr::arrange(.data$team, .data$season) |>
-    dplyr::mutate(conference_filled = is.na(.data$conference)) |>
+    # Only teams with no games that season borrow; teams that played but list
+    # no conference (Division II/III) stay NA and take the tier-1 fallback.
+    dplyr::mutate(
+      conference_filled = is.na(.data$conference) &
+        .data$games_played %in% c(NA, 0L),
+      conf_near = .data$conference,
+      class_near = .data$classification
+    ) |>
     dplyr::group_by(.data$team) |>
-    tidyr::fill("conference", "classification", .direction = "downup") |>
+    tidyr::fill("conf_near", "class_near", .direction = "downup") |>
     dplyr::ungroup() |>
     dplyr::mutate(
+      conference = dplyr::if_else(
+        .data$conference_filled,
+        .data$conf_near,
+        .data$conference
+      ),
+      classification = dplyr::if_else(
+        .data$conference_filled,
+        .data$class_near,
+        .data$classification
+      ),
       conference_filled = .data$conference_filled & !is.na(.data$conference)
     ) |>
+    dplyr::select(-"conf_near", -"class_near") |>
     dplyr::left_join(stat, by = c("season", "team")) |>
     dplyr::left_join(rating, by = c("season", "team")) |>
     dplyr::left_join(

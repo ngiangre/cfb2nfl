@@ -395,3 +395,30 @@ test_that("build_team_season tiers Notre Dame as Power (decision 0003)", {
   expect_equal(ts$tier_label[ts$team == "Notre Dame"], "Power")
   expect_equal(ts$tier[ts$team == "Army"], 2L)
 })
+
+test_that("build_team_season does not fill conference for teams that played", {
+  f <- team_fixture()
+  f$games <- tibble::tibble(
+    season = c(2018L, 2019L),
+    completed = TRUE,
+    homeTeam = "Small College",
+    homeConference = c("Conf X", NA),
+    homeClassification = c("ii", "ii"),
+    homePoints = 10L,
+    awayTeam = c("Other A", "Other B"),
+    awayConference = c("Conf X", NA),
+    awayClassification = "ii",
+    awayPoints = 7L
+  )
+  ts <- build_team_season(
+    f$roster,
+    f$games,
+    f$tiers,
+    f$player_season,
+    f$coaches
+  )
+  sc <- ts[ts$team == "Small College" & ts$season == 2019L, ]
+  expect_true(is.na(sc$conference))
+  expect_false(sc$conference_filled)
+  expect_equal(sc$tier, 1L)
+})
