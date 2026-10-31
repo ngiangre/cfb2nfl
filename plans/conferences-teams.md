@@ -40,7 +40,7 @@ expectation statements); Post 3 tests that single expectation with a verdict.
 - **Position groups** from the roster position, one map used for both
   numerator and denominator: QB, RB (incl. FB), WR, TE, OL (OL/OT/G/C),
   DL (DL/DE/DT/NT/EDGE), LB (LB/OLB/ILB), DB (DB/CB/S), ST (PK/P/LS);
-  `?`/ATH/NA → "Unknown" (counted, reported, not ranked).
+  `?`/ATH/NA → "Position not recorded" (counted, reported, not ranked).
 - **Rate (denominator):** draftees ÷ distinct **draft-eligible rostered
   players** credited to the team under the same last-roster-season rule
   (one player counted once, at their final pre-draft team). UDFA rates

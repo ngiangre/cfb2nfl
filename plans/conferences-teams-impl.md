@@ -888,7 +888,8 @@ columns:
   - {name: team, type: string, description: School name (joins teams/roster/games by name)., provenance: games / roster}
   - {name: season, type: int32, description: Season., provenance: games / roster}
   - {name: conference, type: string, description: "Conference that season (most frequent in games; NA if the team has no games).", provenance: games}
-  - {name: classification, type: string, description: "Division: fbs, fcs, ii, iii (NA without games).", provenance: games}
+  - {name: classification, type: string, description: "Division: fbs, fcs, ii, iii (filled from the nearest season when the team has no games; NA if never in games).", provenance: games}
+  - {name: conference_filled, type: logical, description: "TRUE when conference/classification were filled from the team's nearest season because it played no games that season (e.g. UAB 2015-16, COVID opt-outs 2020).", provenance: derived}
   - {name: tier, type: int32, description: "3 Power, 2 Group of 5, 1 FCS and below (decision 0003); non-FBS teams outside the lookup get 1.", provenance: derived (conference_tiers)}
   - {name: tier_label, type: string, description: Tier label., provenance: derived}
   - {name: games_played, type: int32, description: Completed games with a score., provenance: derived (games)}
@@ -970,7 +971,15 @@ and in the mermaid ERD block add:
   stat-line denominator: drops OL; raw counts: no rate; any-season credit:
   multi-team double counting, see the coaches post). **Consequences**
   (94.6% of 2014+ id-bearing picks attributed; OL UDFAs undercounted;
-  players who transfer to a school outside roster coverage look like exits).
+  players who transfer to a school outside roster coverage look like exits;
+  picks restricted to the 2010–2027 window and the most recent pick kept,
+  matching decision 0011, because old picks share ids with modern players
+  (Royce Smith 1972 / Roquan Smith 2018); the eligibility proxy is
+  left-truncated before ~2013 exits; the 2022 roster-coverage jump (307 vs
+  ~225 teams) creates one-season listings counted as exits; 24 draftees are
+  credited two or three seasons before their draft; teams with a roster but
+  no games inherit their nearest season's conference, flagged
+  `conference_filled`).
 - [ ] **Step 2:** Commit: `git add decisions/0033-team-draft-attribution.md && git commit -m "docs(decisions): 0033 team draft attribution"`
 
 ---
