@@ -610,7 +610,8 @@ stopifnot(
 #| label: s33-compute
 #| include: false
 # credited picks: players whose final college season was 2013 to 2025,
-# i.e. the draft classes of 2014 to 2026
+# approximately the draft classes of 2014 to 2026 (24 draftees are credited
+# two or three seasons before their draft)
 credited <- filter(team_draft, season >= first_class - 1L, season <= last_season)
 group_picks <- credited |>
   group_by(group = position_group) |>

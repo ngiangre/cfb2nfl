@@ -212,7 +212,10 @@ wrapper (`CFB2NFL_REFRESH=true` + `tar_make()`). Years 2010–2026.
   contract pass/fail, git SHA) → the `audit_log` target. Data dictionaries in
   `inst/dict/*.yml`. Known audit signals: `build_player_season` collapses the
   long stats (~1.2M → ~144k rows); `link_coaches` inflates rows where a school
-  had >1 head coach in a season (intentional many-to-many).
+  had >1 head coach in a season (intentional many-to-many);
+  `build_team_season` collapses roster player-seasons to team-seasons and
+  `build_team_draft` collapses player exits to team × season × position group
+  (decision 0033), so both report large "rows dropped".
 - **Site** (decision 0006): **`altdoc` owns the site** (`quarto_website`),
   configured in `altdoc/quarto_website.yml`, built to `docs/` via
   `altdoc::render_docs()`. Navigation lives entirely in the top **navbar**

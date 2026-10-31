@@ -54,8 +54,10 @@ any-season credit (multi-team double counting, see the coaches post).
 - The 2022 roster-coverage jump (307 teams versus about 225) creates
   one-season listings that are counted as exits.
 - 24 draftees are credited two or three seasons before their draft.
-- Teams with a roster but no games inherit their nearest season's
-  conference, flagged `conference_filled`.
+- Teams that played no games in a season (UAB 2015-16, COVID opt-outs in
+  2020) carry their conference from the previous (else next) season,
+  flagged `conference_filled`. Low-division teams whose games list no
+  conference keep an NA conference and are tiered 1.
 
 ## Outcome / what we learned
 

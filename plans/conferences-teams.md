@@ -61,6 +61,14 @@ expectation statements); Post 3 tests that single expectation with a verdict.
 
 ## Pipeline work: `team_season` target
 
+> **Superseded as built (2026-10-31):** see `plans/conferences-teams-impl.md`,
+> decision 0033, and `inst/dict/team_*.yml`. `team_draft` is keyed by the
+> player's **final college season** (not draft year) and carries `n_round1`
+> rather than round groups; there are no `n_roster_<group>` columns (group
+> counts live in `team_draft`); ratings come from `coaches`, not `ps_tier`;
+> `team_season` adds `conference_filled`. Plan Posts 2–3 against the built
+> grain.
+
 Derived table (decision 0021 pattern), one row per `(team, season)`:
 
 | column | source |
