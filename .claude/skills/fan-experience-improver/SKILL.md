@@ -51,6 +51,26 @@ aren't *funneled* into them.
 Chart *correctness* and count/subset preservation belong to
 `architecture-improver`. Coordinate; don't rewrite the chart logic.
 
+## Vignette review pass (after the first draft)
+
+When asked to review a draft blog vignette (or when reviewing one unprompted
+after it is written), do **not** edit yet. Read it start to finish exactly as
+the fan reader would, in order, and report how the read goes:
+
+- **Flow:** does each section's assertion follow from the previous section's
+  exhibits? Could the reader reconstruct the takeaway from headings and
+  tables/figures alone?
+- **Wordiness:** the style is one concise statement per section, then exhibits
+  (AGENTS.md "Blog style"). Flag every paragraph doing a table's job, every
+  "data tour" passage that surveys everything instead of showing the snapshot
+  the argument needs, and any section with more than one idea.
+- **Reception:** where does the reader stall — an undefined term, a code name
+  leaking into an exhibit, a conclusion the exhibits don't visibly support?
+  Note the exact spot and the smallest fix.
+
+Deliver the review as a short ordered list of spots with fixes, then make the
+edits only if asked (or confirm the draft and move on).
+
 ## Rubric — check every fan page against these
 
 1. **Plain language.** Flag and rewrite jargon that leaked from the technical

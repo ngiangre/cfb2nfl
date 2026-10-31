@@ -37,14 +37,16 @@ jobs:
         with:
           use-public-rspm: true
 
-      # local::. installs the cfb2nfl package itself (vignettes call
-      # library(cfb2nfl)); altdoc builds the site, piggyback pulls the data.
+      # local::. installs the cfb2nfl package itself (altdoc injects
+      # library(cfb2nfl) into man-page examples); vignettes load it from the
+      # checkout via pkgload and query the DuckDB bundle. piggyback pulls data.
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: |
             local::.
             any::altdoc
             any::piggyback
+            any::pkgload
             any::duckdb
 
       # data/ is gitignored, so it is absent on a fresh checkout; pb_download

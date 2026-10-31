@@ -126,17 +126,28 @@ wrapper (`CFB2NFL_REFRESH=true` + `tar_make()`). Years 2010–2026.
 - **Plans:** multi-session work plans live in `plans/*.md` (e.g.
   `plans/explore-questions.md` — the question-driven Explore revision).
   `decisions/` is for ratified choices only.
-- **Blog style (decision 0025):** posts are written in a research-article
+- **Blog style (decision 0025, revised):** posts are written in a research-article
   register — numbered Introduction / Data / Results / Summary / Discussion,
-  italicized gerund-phrased expectations, no em dashes anywhere, no
-  rhetorical framing phrases, and no pipeline internals (decision records,
-  cleaning mechanics) in the narrative. Reference implementation:
-  `vignettes/2026-10-16-expectation-checks.qmd`. **Titles** are one
-  declarative sentence — subject first, then the observed takeaway — never a
-  colon-joined fragment pair ("blah: blah"). Keep `title:` and
-  `%\VignetteIndexEntry{}` in sync. **Code/graphs over prose:** explain claims
-  with a table or figure backed by a code chunk (plus an asserting
-  `stopifnot()` where the claim could silently rot) rather than paragraphs.
+  no em dashes anywhere, no rhetorical framing phrases, and no pipeline
+  internals (decision records, cleaning mechanics) in the narrative.
+  **Titles** are one declarative sentence — subject first, then the observed
+  takeaway — never a colon-joined fragment pair ("blah: blah"). Keep `title:`
+  and `%\VignetteIndexEntry{}` in sync.
+  - **Snapshots, not tours.** A post shows particular snapshots of the data for
+    its question, not everything the data contains about a topic. Cut any
+    exhibit that serves completeness rather than the argument.
+  - **One statement per section; exhibits carry the picture.** Each section
+    heading is an **assertion** (a claim the section demonstrates). The section
+    body is a single concise sentence saying what the following table/figure
+    shows and why it is there — then the exhibit. Tables and figures are both
+    **expository** (defining the data being discussed) and **explanatory**
+    (making the section's claim); let them do the work instead of prose.
+  - **Flow.** The post must read as one argument from beginning to end: each
+    section's assertion should follow from the previous section's exhibits, so
+    a reader can reconstruct the takeaway from headings and exhibits alone.
+  - Still: `stopifnot()` where a claim could silently rot; code chunks back
+    every exhibit. Reference implementation for register/format:
+    `vignettes/2026-10-16-expectation-checks.qmd`.
 - **Vignette writing critiques (user review of the 2026-10-24 outcome
   prevalence post, applied going forward):**
   - Define every variable and term in the narrative (person-season, eligible

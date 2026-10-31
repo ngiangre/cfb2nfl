@@ -1,14 +1,14 @@
 ---
-title: "Looking at the college trajectory of the Buffalo Bills' backup QBs as the 2026 season begins shows two transfers who reached the NFL without being drafted"
+title: "The Buffalo Bills' 2026 backup quarterbacks, Kyle Allen and Shane Buechele, both transferred in college and reached the NFL undrafted"
 date: "2026-08-27"
-description: "Traces Shane Buechele and Kyle Allen through recruiting, transfers, and NFL entry; both Bills backup QBs reached the NFL undrafted, and neither appears in the draft-pick records."
+description: "Kyle Allen, a five-star recruit, and Shane Buechele, a four-star recruit, each transferred once in college, went undrafted, and stayed on NFL rosters into 2026 as Buffalo Bills backup quarterbacks."
 followups:
   - "Add more backup-QB career case studies to build a recurring cast for later posts."
 author:
   - "Nick Giangreco"
 freeze: auto
 vignette: >
-  %\VignetteIndexEntry{Looking at the college trajectory of the Buffalo Bills' backup QBs as the 2026 season begins shows two transfers who reached the NFL without being drafted}
+  %\VignetteIndexEntry{The Buffalo Bills' 2026 backup quarterbacks, Kyle Allen and Shane Buechele, both transferred in college and reached the NFL undrafted}
   %\VignetteEngine{quarto::html}
   %\VignetteEncoding{UTF-8}
 ---
@@ -16,33 +16,31 @@ vignette: >
 ```{r}
 #| label: setup
 #| include: false
-# Load cfb2nfl from the checkout when the package is not installed, so the
-# site build does not require a package install (decision 0030).
-if (requireNamespace("cfb2nfl", quietly = TRUE)) {
-  # vignettes render in a fresh quarto R session: attach the installed package
-  # (CI installs it via local::.) or source the checkout fallback below.
-  library(cfb2nfl)
-} else {
+# Load the package from the checkout with pkgload; no package install is
+# required. Under altdoc the render runs in a temp dir, so resolve the root
+# first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
+root <- Sys.getenv("CFB2NFL_ROOT", "")
+if (!nzchar(root)) {
   dir <- getwd()
   while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
     dir <- dirname(dir)
   }
-  for (src in sort(list.files(file.path(dir, "R"), pattern = "[.]R$", full.names = TRUE))) {
-    source(src, local = FALSE, encoding = "UTF-8")
-  }
+  root <- if (file.exists(file.path(dir, "_targets"))) dir else getwd()
 }
-library(arrow)
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+library(DBI)
 library(dplyr)
+library(duckdb)
 library(ggplot2)
 library(ggiraph)
 library(ggpath)
 library(knitr)
-# altdoc renders in a temp dir; point the knit wd at the project root so
-# data/*.parquet and tar_read() resolve (CFB2NFL_ROOT is set in the site build).
-root <- cfb2nfl_root()
-if (nzchar(root)) {
-  knitr::opts_knit$set(root.dir = root)
-}
 
 # Accessible, consistent interactivity for every girafe figure in this post:
 # a clear (non-yellow) hover pop, dimming of non-hovered marks, a dark tooltip,
@@ -74,33 +72,64 @@ subjects <- tibble::tribble(
 )
 ```
 
-::: {.callout-important appearance="simple"}
-This is the first blog post of this website! Please bear with us as we get our bearings and set things up. But I couldn't resist starting to look at some football data!
-:::
+```{r}
+#| label: data
+#| include: false
+# thousands-separated formatter for inline numbers in the narrative
+fmt <- function(x, digits = 0) {
+  formatC(as.numeric(x), big.mark = ",", format = "f", digits = digits)
+}
+```
+
+## 1. Introduction
+
+- Kyle Allen and Shane Buechele are the Buffalo Bills' backup quarterbacks
+  as the 2026 season begins.
+- This post, the site's first, follows both from their high-school
+  recruiting profiles through their college rosters to their NFL entry, to
+  see how two quarterbacks with different starting points reached the same
+  NFL role.
+
+## 2. Data
 
 ::: {.callout-note appearance="minimal"}
-*Data as of the `data-latest` release, retrieved 2026-08-27. Both players' NFL
-careers are ongoing, so late seasons reflect roster presence in the current
-data and may extend further.*
+*Data as of the `data-latest` release, retrieved 2026-08-27. Both players'
+NFL careers are ongoing, so the NFL record runs through the 2026 roster and
+may extend further.*
 :::
 
-I am a Buffalo Bills fan. I'll admit, I do not watch as many games as I should. However, I always cheer on the Bills from afar: celebrating their victories, hoping for the best following losses, and wishing them well as the team grows and does good in the Buffalo community. I am just a lowly data scientist, who rather explore data than watch football on TV. 
+### Four records follow each player from high school to the NFL
 
-Previous data projects I have done included investigating NFL data exclusively, but this project intends to look at player's trajectories through their college career, the NFL draft, and their NFL career. While this is a large endeavor, this website is dedicated for achieving that objective over time. I am also looking forward to seeing improvement in my communication and data storytelling. 
-
-In that spirit, I want to start investigating players playing tonight in the home-opener preseason game between the Buffalo Bills and Pittsburgh Steelers. Specifically, Shane Buechele who is starting and Kyle Allen who is also vying for the QB2 position right behind Josh Allen. 
-
-## Origins of Shane Buechele and Kyle Allen
+Each record below is matched on the player's own id, never on his name, so
+the trajectory cannot borrow a different player with the same name.
 
 ```{r}
-#| label: recruiting-origins
-# Cleaned recruiting schema (decision 0018): raw athleteId/name/year/committedTo/
-# ranking are now playerId/recruit_name/hs_class/committed_to/national_rank, and
-# hometown (city/stateProvince) is not carried. The recruiting id is an
-# untrusted namespace (decision 0013); this direct filter is QA-verified for
-# these two named players, not a general-purpose join.
-open_dataset("data/recruiting.parquet") |>
-  filter(playerId %in% subjects$cfb_athlete_id) |>
+#| label: records-table
+tibble::tribble(
+  ~record                , ~what_it_holds                                                                                                                      , ~source                        ,
+  "Recruiting profile"   , "Star grade (2 to 5), a 0 to 1 composite rating, and the national rank among all recruits in the high-school class"                   , "CFBD recruiting"              ,
+  "College roster season" , "A season in which the player appears on a college team's roster, whether or not he played"                                       , "CFBD rosters"                 ,
+  "NFL roster season"    , "A season in which the player appears on an NFL club's roster, whatever his role"                                                  , "nflverse rosters"             ,
+  "Draft record"         , "A pick in the NFL draft; an NFL player with no draft record entered the league undrafted"                                         , "CFBD and nflverse draft picks"
+) |>
+  kable(
+    col.names = c("Record", "What it holds", "Source"),
+    caption = "The four records behind each player's trajectory."
+  )
+```
+
+## 3. Results
+
+### Kyle Allen arrived as the far higher-rated recruit
+
+```{r}
+#| label: recruiting-nums
+#| include: false
+# The recruiting id is an untrusted namespace (decision 0013); this direct
+# filter is QA-verified for these two named players (the pin below checks the
+# recruit name), not a general-purpose join.
+recruits <- tbl(con, "recruiting") |>
+  filter(playerId %in% !!subjects$cfb_athlete_id) |>
   select(
     playerId,
     recruit_name,
@@ -112,15 +141,57 @@ open_dataset("data/recruiting.parquet") |>
     national_rank
   ) |>
   collect() |>
-  arrange(desc(stars)) |>
-  kable(caption = "High-school recruiting profiles (CFBD).")
+  inner_join(subjects, by = c("playerId" = "cfb_athlete_id"))
+rget <- function(who, col) recruits[[col]][recruits$who == who]
 ```
 
-Unfortunately, I'm not very well versed in high school football rating. But at first glance it looks like Kyle Allen was a more promising prospect early in his career compared to Shane Buechele.
+Kyle Allen was a `r rget("Kyle Allen", "stars")`-star recruit ranked
+`r fmt(rget("Kyle Allen", "national_rank"))` nationally in the class of
+`r rget("Kyle Allen", "hs_class")`, while Shane Buechele was a
+`r rget("Shane Buechele", "stars")`-star ranked
+`r fmt(rget("Shane Buechele", "national_rank"))` in the class of
+`r rget("Shane Buechele", "hs_class")`, and the table sets the two profiles
+side by side.
 
-## Teams of Shane Buechele and Kyle Allen
+```{r}
+#| label: recruiting-origins
+style_labels <- c(
+  PRO = "Pro-style quarterback",
+  DUAL = "Dual-threat quarterback"
+)
+recruits |>
+  arrange(desc(stars)) |>
+  transmute(
+    Player = who,
+    `High-school class` = hs_class,
+    `Committed to` = committed_to,
+    `Recruited as` = unname(style_labels[recruit_position]),
+    Stars = stars,
+    `Composite rating` = sprintf("%.4f", rating),
+    `National rank` = national_rank
+  ) |>
+  kable(
+    caption = "High-school recruiting profiles. A lower national rank is better; rank 1 is the top recruit in the class."
+  )
+```
 
-Let's see where they went to where they are now:
+```{r}
+#| label: recruiting-pin
+stopifnot(
+  nrow(recruits) == 2,
+  all(recruits$recruit_name == recruits$who),
+  rget("Kyle Allen", "stars") == 5,
+  rget("Kyle Allen", "national_rank") == 8,
+  rget("Kyle Allen", "hs_class") == 2014,
+  rget("Kyle Allen", "committed_to") == "Texas A&M",
+  rget("Shane Buechele", "stars") == 4,
+  rget("Shane Buechele", "national_rank") == 182,
+  rget("Shane Buechele", "hs_class") == 2016,
+  rget("Shane Buechele", "committed_to") == "Texas"
+)
+```
+
+### Both quarterbacks left their first school and finished college at a second
 
 ```{r}
 #| label: build-spine
@@ -131,9 +202,9 @@ Let's see where they went to where they are now:
 # from nfl_draft_picks.
 spine <- player_trajectory(
   subjects,
-  roster = open_dataset("data/roster.parquet"),
-  nfl_rosters = open_dataset("data/nfl_rosters.parquet"),
-  nfl_draft_picks = open_dataset("data/nfl_draft_picks.parquet")
+  roster = tbl(con, "roster"),
+  nfl_rosters = tbl(con, "nfl_rosters"),
+  nfl_draft_picks = tbl(con, "nfl_draft_picks")
 )
 
 # Guard the spine before display enrichment: non-null who/team/stage, stage in
@@ -158,7 +229,7 @@ rel_lum <- function(hex) {
   }
   out
 }
-college_meta <- open_dataset("data/teams.parquet") |>
+college_meta <- tbl(con, "teams") |>
   select(team, color, logo_light, logo_dark) |>
   collect() |>
   transmute(
@@ -198,51 +269,318 @@ stopifnot(
 ```
 
 ```{r}
+#| label: path-nums
+#| include: false
+# One row per player summarising the college and NFL legs of the spine,
+# bounded at 2026 so later refreshes cannot move the pinned counts.
+path <- spine |>
+  filter(season <= 2026) |>
+  arrange(who, season)
+college_leg <- path |>
+  filter(stage == "College") |>
+  group_by(who) |>
+  summarise(
+    college_seasons = n_distinct(season),
+    n_schools = n_distinct(team),
+    first_school = first(name),
+    last_school = last(name),
+    transfer_after = max(season[team == first(team)]),
+    last_college = max(season),
+    .groups = "drop"
+  )
+nfl_leg <- path |>
+  filter(stage == "NFL") |>
+  group_by(who) |>
+  summarise(
+    rookie_season = min(season),
+    first_club = first(name),
+    nfl_seasons = n_distinct(season),
+    n_clubs = n_distinct(team),
+    club_2026 = name[season == 2026][1],
+    .groups = "drop"
+  )
+path_summary <- subjects |>
+  left_join(college_leg, by = "who") |>
+  left_join(nfl_leg, by = "who")
+pget <- function(who, col) path_summary[[col]][path_summary$who == who]
+```
+
+Each tile in the figure is one roster season colored and badged by its
+team, and the arrows mark the two moments the argument turns on: the
+transfer after `r pget("Kyle Allen", "transfer_after")` for Allen and after
+`r pget("Shane Buechele", "transfer_after")` for Buechele, and the step
+from college to the NFL with no draft pick in between.
+
+```{r}
 #| label: fig-timeline
-#| fig-cap: "Team by season, college through the NFL, in each team's brand colors and logos. Hover any tile for the team and season. Neither player appears in the NFL draft-pick records — both entered undrafted."
-p <- ggplot(spine, aes(x = season, y = who)) +
+#| fig-height: 5
+tl <- spine |>
+  mutate(who = factor(who, levels = c("Kyle Allen", "Shane Buechele")))
+# row 1 = Allen (annotated below), row 2 = Buechele (annotated above);
+# arrows point at the boundary between the two tiles where each move happens
+a_xfer <- pget("Kyle Allen", "transfer_after") + 0.5
+a_entry <- pget("Kyle Allen", "rookie_season") - 0.5
+b_xfer <- pget("Shane Buechele", "transfer_after") + 0.5
+b_entry <- pget("Shane Buechele", "rookie_season") - 0.5
+xfer_label <- function(who) {
+  sprintf(
+    "Transfer after %d:\n%s to %s",
+    pget(who, "transfer_after"),
+    pget(who, "first_school"),
+    pget(who, "last_school")
+  )
+}
+entry_label <- function(who) {
+  sprintf(
+    "Undrafted NFL entry:\n%s, %d",
+    pget(who, "first_club"),
+    pget(who, "rookie_season")
+  )
+}
+p <- ggplot(tl, aes(x = season, y = who)) +
   geom_tile_interactive(
     aes(fill = color, tooltip = tooltip, data_id = paste(who, season)),
     color = "white",
     height = 0.7
   ) +
-  geom_from_path(aes(path = logo), height = 0.11) +
+  geom_from_path(aes(path = logo), height = 0.09) +
+  annotate(
+    "text",
+    x = a_xfer + 0.3,
+    y = 0.25,
+    label = xfer_label("Kyle Allen"),
+    size = 4,
+    hjust = 1
+  ) +
+  annotate(
+    "curve",
+    x = a_xfer + 0.1,
+    y = 0.42,
+    xend = a_xfer,
+    yend = 0.64,
+    curvature = 0.2,
+    arrow = arrow(length = unit(0.25, "cm")),
+    linewidth = 0.7,
+    alpha = 0.6
+  ) +
+  annotate(
+    "text",
+    x = a_entry - 0.3,
+    y = 0.25,
+    label = entry_label("Kyle Allen"),
+    size = 4,
+    hjust = 0
+  ) +
+  annotate(
+    "curve",
+    x = a_entry - 0.1,
+    y = 0.42,
+    xend = a_entry,
+    yend = 0.64,
+    curvature = -0.2,
+    arrow = arrow(length = unit(0.25, "cm")),
+    linewidth = 0.7,
+    alpha = 0.6
+  ) +
+  annotate(
+    "text",
+    x = b_xfer + 0.3,
+    y = 2.78,
+    label = xfer_label("Shane Buechele"),
+    size = 4,
+    hjust = 1
+  ) +
+  annotate(
+    "curve",
+    x = b_xfer + 0.1,
+    y = 2.6,
+    xend = b_xfer,
+    yend = 2.36,
+    curvature = -0.2,
+    arrow = arrow(length = unit(0.25, "cm")),
+    linewidth = 0.7,
+    alpha = 0.6
+  ) +
+  annotate(
+    "text",
+    x = b_entry - 0.3,
+    y = 2.78,
+    label = entry_label("Shane Buechele"),
+    size = 4,
+    hjust = 0
+  ) +
+  annotate(
+    "curve",
+    x = b_entry - 0.1,
+    y = 2.6,
+    xend = b_entry,
+    yend = 2.36,
+    curvature = 0.2,
+    arrow = arrow(length = unit(0.25, "cm")),
+    linewidth = 0.7,
+    alpha = 0.6
+  ) +
   scale_fill_identity() +
-  scale_x_continuous(breaks = seq(min(spine$season), max(spine$season), 1)) +
-  labs(x = NULL, y = NULL) +
+  scale_x_continuous(breaks = seq(min(tl$season), max(tl$season), 1)) +
+  scale_y_discrete(expand = expansion(add = 0.95)) +
+  labs(
+    title = "Two schools each, then the NFL without a draft pick",
+    subtitle = "Team by roster season, college through the NFL",
+    x = NULL,
+    y = NULL,
+    caption = "Read each row left to right; a change of tile color is a change of team. Hover any tile for the team and season."
+  ) +
   theme_cfb2nfl(base_size = 14) +
   theme(panel.grid = element_blank(), legend.position = "none")
-girafe(ggobj = p, width_svg = 9, height_svg = 3.5)
+girafe(ggobj = p, width_svg = 12, height_svg = 5)
 ```
 
-Neither appears in the draft-pick records — both entered the NFL as undrafted free agents:
+```{r}
+#| label: path-pin
+stopifnot(
+  all(path_summary$n_schools == 2),
+  pget("Kyle Allen", "first_school") == "Texas A&M",
+  pget("Kyle Allen", "last_school") == "Houston",
+  pget("Kyle Allen", "transfer_after") == 2015,
+  pget("Kyle Allen", "college_seasons") == 4,
+  pget("Shane Buechele", "first_school") == "Texas",
+  pget("Shane Buechele", "last_school") == "SMU",
+  pget("Shane Buechele", "transfer_after") == 2018,
+  pget("Shane Buechele", "college_seasons") == 5,
+  # no gap year: each NFL entry follows the final college season directly
+  all(path_summary$rookie_season == path_summary$last_college + 1)
+)
+```
+
+### Neither quarterback was drafted, and both stayed on NFL rosters into 2026 with the Bills
+
+```{r}
+#| label: nfl-nums
+#| include: false
+# Draft status checked in both draft sources, each on its own id namespace:
+# CFBD picks on the college athlete id, nflverse picks on the NFL player id.
+cfbd_draft_rows <- vapply(
+  as.integer(subjects$cfb_athlete_id),
+  \(id) {
+    tbl(con, "picks") |>
+      filter(collegeAthleteId == !!id) |>
+      count() |>
+      pull(n)
+  },
+  numeric(1)
+)
+nflverse_draft_rows <- vapply(
+  subjects$gsis_id,
+  \(id) {
+    tbl(con, "nfl_draft_picks") |>
+      filter(gsis_id == !!id) |>
+      count() |>
+      pull(n)
+  },
+  numeric(1)
+)
+path_summary$draft_rows <- cfbd_draft_rows + nflverse_draft_rows
+nfl_positions <- tbl(con, "nfl_rosters") |>
+  filter(gsis_id %in% !!subjects$gsis_id) |>
+  distinct(gsis_id, position) |>
+  collect()
+```
+
+Both draft records return zero rows for either player, yet Allen has
+`r pget("Kyle Allen", "nfl_seasons")` NFL roster seasons across
+`r pget("Kyle Allen", "n_clubs")` clubs and Buechele
+`r pget("Shane Buechele", "nfl_seasons")` across
+`r pget("Shane Buechele", "n_clubs")`, and the table lists each player's
+entry and where his NFL record stands in 2026.
 
 ```{r}
 #| label: undrafted-entry
-gsis <- arrow::open_dataset("data/nfl_rosters.parquet") |>
-  filter(player_name %in% c("Shane Buechele", "Kyle Allen")) |>
-  select(player_name, gsis_id) |>
-  distinct() |>
-  collect()
-
-draft_hits <- arrow::open_dataset("data/nfl_draft_picks.parquet") |>
-  filter(gsis_id %in% gsis$gsis_id) |>
-  count() |>
-  pull(n)
-stopifnot(draft_hits == 0)
-
-spine |>
-  filter(stage == "NFL") |>
-  group_by(who) |>
-  slice_min(season, n = 1) |>
-  ungroup() |>
-  transmute(player = who, rookie_season = season, first_nfl_team = team) |>
-  kable(caption = "NFL entry: each player's first roster season; the draft-pick table contains zero rows for either player.")
+path_summary |>
+  arrange(who) |>
+  transmute(
+    Player = who,
+    `Last college team` = last_school,
+    `NFL entry` = sprintf("%s, %d", first_club, rookie_season),
+    `Draft records found` = draft_rows,
+    `NFL roster seasons` = nfl_seasons,
+    `NFL clubs` = n_clubs,
+    `2026 club` = club_2026
+  ) |>
+  kable(
+    caption = "NFL entry and NFL record through 2026. Draft records found counts matching rows in both the CFBD and nflverse draft-pick tables."
+  )
 ```
 
-Both players have had a pretty good run on a lot of good teams!
+```{r}
+#| label: nfl-pin
+stopifnot(
+  # The "neither was drafted" claim, backed by both draft-pick tables and the
+  # spine's own draft status: fail the build if either player ever appears.
+  all(path_summary$draft_rows == 0),
+  !any(spine$drafted),
+  all(nfl_positions$position == "QB"),
+  pget("Kyle Allen", "first_club") == "Carolina Panthers",
+  pget("Kyle Allen", "rookie_season") == 2018,
+  pget("Kyle Allen", "nfl_seasons") == 9,
+  pget("Kyle Allen", "n_clubs") == 6,
+  pget("Shane Buechele", "first_club") == "Kansas City Chiefs",
+  pget("Shane Buechele", "rookie_season") == 2021,
+  pget("Shane Buechele", "nfl_seasons") == 6,
+  pget("Shane Buechele", "n_clubs") == 2,
+  all(path_summary$club_2026 == "Buffalo Bills"),
+  # an NFL roster season in every season from entry through 2026
+  all(path_summary$nfl_seasons == 2026 - path_summary$rookie_season + 1)
+)
+```
 
-## Good luck to Shane Buechele and Kyle Allen!
+## 4. Summary
 
-There's so much more to look into, like how much they played, their statistics when they played, their injuries, et cetera. But, alas, that will be for another day after much thinking with my partner. But this short post was a great look into some of the data and a type of visualization of these player's trajectory!
+The Bills' two backup quarterbacks started far apart and converged. Kyle
+Allen was a `r rget("Kyle Allen", "stars")`-star recruit ranked
+`r fmt(rget("Kyle Allen", "national_rank"))` nationally and Shane
+Buechele a `r rget("Shane Buechele", "stars")`-star ranked
+`r fmt(rget("Shane Buechele", "national_rank"))`. Each then spent his
+college career at two schools, Allen at
+`r pget("Kyle Allen", "first_school")` and
+`r pget("Kyle Allen", "last_school")`, Buechele at
+`r pget("Shane Buechele", "first_school")` and
+`r pget("Shane Buechele", "last_school")`, and each went from his final
+college season straight to an NFL roster with no draft record in either
+draft source. Through 2026, Allen has `r pget("Kyle Allen", "nfl_seasons")`
+NFL roster seasons with `r pget("Kyle Allen", "n_clubs")` clubs and
+Buechele `r pget("Shane Buechele", "nfl_seasons")` with
+`r pget("Shane Buechele", "n_clubs")`, and both are on the
+`r pget("Kyle Allen", "club_2026")` roster in 2026.
 
+## 5. Discussion
+
+::: {.callout-important}
+Neither recruiting profile led to a draft pick, a top-ten national rank included.
+
+- Allen's national rank of `r fmt(rget("Kyle Allen", "national_rank"))`
+  and Buechele's `r fmt(rget("Shane Buechele", "national_rank"))` ended
+  at the same NFL entry point: undrafted, then on a roster the following
+  season.
+- Two careers are a case study, not a rate; how often highly rated
+  quarterback recruits go undrafted is a question for the full population.
+:::
+
+::: {.callout-important}
+Going undrafted did not end either NFL career early.
+
+- Both players have appeared on an NFL roster in every season since
+  entering the league, Allen with `r pget("Kyle Allen", "n_clubs")` clubs
+  in `r pget("Kyle Allen", "nfl_seasons")` seasons and Buechele with
+  `r pget("Shane Buechele", "n_clubs")` in
+  `r pget("Shane Buechele", "nfl_seasons")`.
+:::
+
+Several caveats bound these facts.
+
+- A roster season records presence on a roster, not playing time,
+  starts, or statistics, so the trajectory says where each player was,
+  not how much he played.
+- Both NFL careers are ongoing, so the NFL record is incomplete by
+  construction.
+- The recruiting rating is a single composite grade from the high-school
+  class year and does not reflect later development.

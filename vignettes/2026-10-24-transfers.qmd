@@ -1,7 +1,7 @@
 ---
 title: "One player in five now plays a college season for a new school"
 date: "2026-10-24"
-description: "Measures within-career transfers by competition tier: the per-season share climbed from under 5% before 2021 to 19% in 2026, 42% of transfers stay in the same tier, and quarterbacks and running backs move down most (41% each)."
+description: "The share of college players spending a season at a new school rose from about 5% in 2020 to 19% in 2026, 42% of transfers stay in the same competition tier while more drop a tier than climb one, and quarterbacks and running backs drop most often (41% each)."
 followups:
   - "Test whether a transfer season or its direction changes a player's draft chance, using the outcome labels (the post's own closing question)."
   - "Split the transfer population by portal era once season cutoffs are agreed; pre-2016 rates are coverage floors, not estimates."
@@ -17,36 +17,32 @@ vignette: >
 ```{r}
 #| label: setup
 #| include: false
-# Load cfb2nfl from the checkout when the package is not installed, so the
-# site build does not require a package install (decision 0030).
-if (requireNamespace("cfb2nfl", quietly = TRUE)) {
-  library(cfb2nfl)
-} else {
+# Load the package from the checkout with pkgload; no package install is
+# required. Under altdoc the render runs in a temp dir, so resolve the root
+# first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
+root <- Sys.getenv("CFB2NFL_ROOT", "")
+if (!nzchar(root)) {
   dir <- getwd()
   while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
     dir <- dirname(dir)
   }
-  for (src in sort(list.files(
-    file.path(dir, "R"),
-    pattern = "[.]R$",
-    full.names = TRUE
-  ))) {
-    source(src, local = FALSE, encoding = "UTF-8")
-  }
+  root <- if (file.exists(file.path(dir, "_targets"))) dir else getwd()
 }
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+library(DBI)
 library(dplyr)
+library(duckdb)
 library(ggiraph)
-library(targets)
 library(ggplot2)
 library(knitr)
 library(tibble)
 library(tidyr)
-# altdoc renders in a temp dir; point the knit wd at the project root so
-# tar_read() and inst/ paths resolve (CFB2NFL_ROOT is set in the site build).
-root <- cfb2nfl_root()
-if (nzchar(root)) {
-  knitr::opts_knit$set(root.dir = root)
-}
 
 set_girafe_defaults(
   opts_hover = opts_hover(
@@ -76,8 +72,8 @@ dir_label <- c(up = "To a higher tier", lateral = "Same tier", down = "To a lowe
 ```{r}
 #| label: load
 #| include: false
-ps_change <- tar_read(ps_change)
-career <- tar_read(career)
+ps_change <- tbl(con, "ps_change") |> collect()
+career <- tbl(con, "career_summary") |> collect()
 
 # A transfer event: an observed season whose team differs from the player's
 # prior observed season. Direction compares conference tiers.

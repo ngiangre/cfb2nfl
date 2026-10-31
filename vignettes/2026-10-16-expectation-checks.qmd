@@ -18,26 +18,24 @@ vignette: >
 ```{r}
 #| label: setup
 #| include: false
-# Load cfb2nfl from the checkout when the package is not installed, so the
-# site build does not require a package install (decision 0030).
-if (requireNamespace("cfb2nfl", quietly = TRUE)) {
-  # vignettes render in a fresh quarto R session: attach the installed package
-  # (CI installs it via local::.) or source the checkout fallback below.
-  library(cfb2nfl)
-} else {
+# Load the package from the checkout with pkgload; no package install is
+# required. Under altdoc the render runs in a temp dir, so resolve the root
+# first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
+root <- Sys.getenv("CFB2NFL_ROOT", "")
+if (!nzchar(root)) {
   dir <- getwd()
   while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
     dir <- dirname(dir)
   }
-  for (src in sort(list.files(
-    file.path(dir, "R"),
-    pattern = "[.]R$",
-    full.names = TRUE
-  ))) {
-    source(src, local = FALSE, encoding = "UTF-8")
-  }
+  root <- if (file.exists(file.path(dir, "_targets"))) dir else getwd()
 }
-library(arrow)
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
 library(dplyr)
 library(ggiraph)
 library(ggplot2)
@@ -45,12 +43,6 @@ library(knitr)
 library(tidyr)
 library(DBI)
 library(duckdb)
-# altdoc renders in a temp dir; point the knit wd at the project root so
-# data/*.parquet and tar_read() resolve (CFB2NFL_ROOT is set in the site build).
-root <- cfb2nfl_root()
-if (nzchar(root)) {
-  knitr::opts_knit$set(root.dir = root)
-}
 
 set_girafe_defaults(
   opts_hover = opts_hover(
@@ -113,7 +105,6 @@ expectation.
 ```{r}
 #| label: build-spine
 #| include: false
-con <- dbConnect(duckdb(), "data/cfb2nfl.duckdb", read_only = TRUE)
 ids_sql <- paste(sprintf("'%s'", subjects$cfb_athlete_id), collapse = ",")
 
 # Roster backbone + eligibility flags (derived table, decision 0021).
@@ -149,7 +140,7 @@ college_picks <- dbGetQuery(
 dbDisconnect(con, shutdown = TRUE)
 
 # Usage: passing attempts per season from the long stats table.
-stats <- open_dataset("data/player_stats.parquet") |>
+stats <- tbl(con, "player_stats") |>
   filter(playerId %in% subjects$cfb_athlete_id) |>
   select(playerId, season, team, category, statType, stat) |>
   collect()
@@ -160,12 +151,12 @@ attempts <- stats |>
 # Game-level usage for the redshirt definition (section 2.1): regular-season
 # games with any recorded statistic, and how many of each team's games the
 # game-statistics table observed at all.
-player_games <- open_dataset("data/game_player_stats.parquet") |>
+player_games <- tbl(con, "game_player_stats") |>
   filter(playerId %in% subjects$cfb_athlete_id, seasonType == "regular") |>
   distinct(playerId, season, gameId) |>
   count(playerId, season, name = "games_with_stat") |>
   collect()
-covered <- open_dataset("data/game_player_stats.parquet") |>
+covered <- tbl(con, "game_player_stats") |>
   filter(seasonType == "regular") |>
   distinct(season, team, gameId) |>
   count(season, team, name = "games_covered") |>
@@ -201,7 +192,7 @@ stopifnot(
 ```{r}
 #| label: team-colors
 #| include: false
-teams <- open_dataset("data/teams.parquet") |>
+teams <- tbl(con, "teams") |>
   select(team, color) |>
   collect()
 spine <- spine |>
@@ -287,11 +278,11 @@ each position):
 ```{r}
 #| label: observability
 #| include: false
-gp_all <- open_dataset("data/game_player_stats.parquet") |>
+gp_all <- tbl(con, "game_player_stats") |>
   filter(seasonType == "regular") |>
   select(playerId, season, team, gameId, category, statType, stat) |>
   collect()
-pos_of <- open_dataset("data/roster.parquet") |>
+pos_of <- tbl(con, "roster") |>
   select(playerId, season, team, position) |>
   distinct() |>
   collect() |>
