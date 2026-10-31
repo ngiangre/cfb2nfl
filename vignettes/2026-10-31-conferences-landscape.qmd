@@ -73,7 +73,9 @@ pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
 subjects <- tibble::tribble(
   ~who           , ~cfb_athlete_id ,
   "Carson Wentz" , "2573079"       ,
-  "Trey Lance"   , "4383351"
+  "Trey Lance"   , "4383351"       ,
+  "Josh Allen"   , "3918298"       ,
+  "Tyreek Hill"  , "3116406"
 )
 ```
 
@@ -139,15 +141,22 @@ traced_ids <- picks |>
   pull()
 window_picks <- picks |>
   filter(year >= first_class, year <= last_season + 1L) |>
-  left_join(school_tier, by = join_by(collegeTeam, closest(year > tier_season))) |>
+  left_join(
+    school_tier,
+    by = join_by(collegeTeam, closest(year > tier_season))
+  ) |>
   mutate(
     traced = playerId %in% traced_ids,
     tier = coalesce(tier, "School not in the data")
   )
 n_window <- nrow(window_picks)
-star <- function(id) filter(picks, playerId == id)
-wentz <- star(subjects$cfb_athlete_id[1])
-lance <- star(subjects$cfb_athlete_id[2])
+star <- function(who) {
+  filter(picks, playerId == subjects$cfb_athlete_id[subjects$who == who])
+}
+wentz <- star("Carson Wentz")
+lance <- star("Trey Lance")
+allen <- star("Josh Allen")
+hill <- star("Tyreek Hill")
 stopifnot(
   n_played_2025 == 699L,
   n_window == 3334L,
@@ -160,7 +169,18 @@ stopifnot(
   lance$year == 2021L,
   lance$overall == 3L,
   lance$collegeTeam == "North Dakota State",
-  !any(subjects$cfb_athlete_id %in% roster$playerId)
+  !any(subjects$cfb_athlete_id[1:2] %in% roster$playerId),
+  nrow(allen) == 1L,
+  allen$name == "Josh Allen",
+  allen$collegeTeam == "Wyoming",
+  allen$year == 2018L,
+  allen$round == 1L,
+  allen$overall == 7L,
+  nrow(hill) == 1L,
+  hill$name == "Tyreek Hill",
+  hill$collegeTeam == "West Alabama",
+  hill$year == 2016L,
+  hill$round == 5L
 )
 ```
 
@@ -192,21 +212,21 @@ tier without changing division.
 ```{r}
 #| label: terms
 tibble::tribble(
-  ~Term                   , ~Meaning ,
-  "Division"              , "The NCAA level a school plays at: FBS (Football Bowl Subdivision, the top level), FCS (Football Championship Subdivision, the next level down), Division II, and Division III. This post groups Division II, Division III, and the few schools with no recorded division as 'Division II and below'." ,
-  "Conference"            , "A league of schools that schedule each other and share a championship, such as the SEC or the Big Sky. A few FBS schools are independents and belong to no football conference." ,
-  "Realignment"           , "Schools changing conference. A conference change here is an FBS school playing in a different conference, or as an independent, than in its previous FBS season." ,
-  "Tier"                  , "Our three-level grouping of conferences by competitive level, set season by season because schools change conferences." ,
-  "Power"                 , "The top tier: the SEC, Big Ten, ACC, and Big 12; the Pac-12 through 2023 (the Pac-10 before 2011); the Big East through 2012; and Notre Dame." ,
-  "Group of 5"            , "The rest of FBS: the American Athletic (from 2013), Conference USA, Mid-American, Mountain West, Sun Belt, Western Athletic (through 2012), the two-school Pac-12 from 2024, and the independents other than Notre Dame. The name counts five conferences, but the group has held five or six." ,
-  "FCS and below"         , "Every school outside FBS: the FCS (such as the Big Sky or Missouri Valley), Division II, and Division III." ,
-  "Team-season"           , "One school in one season." ,
-  "Roster player-season"  , "One player listed on one school's roster in one season." ,
-  "Stat line"             , "At least one recorded statistic (a carry, catch, tackle, or kick) for a player in a season." ,
-  "Position group"        , "The roster position, grouped: quarterback, running back (fullbacks included), receiver, tight end, offensive line, defensive line, linebacker, defensive back, and special teams. A roster with no position, or a generic one such as athlete, is 'Position not recorded'." ,
-  "Draft class"           , "The players picked in one year's NFL draft; the class of 2016 was drafted in April 2016, after the 2015 college season." ,
-  "Draft-day school"      , "The college the NFL draft lists for a player." ,
-  "Credited pick"         , sprintf("A draft pick traced to the last college roster the player was on before the draft. Carson Wentz was drafted from North Dakota State (%d, pick %d) but is on no roster in the data, so his pick is not credited.", wentz$year, wentz$overall)
+  ~Term                  , ~Meaning                                                                                                                                                                                                                                                                                               ,
+  "Division"             , "The NCAA level a school plays at: FBS (Football Bowl Subdivision, the top level), FCS (Football Championship Subdivision, the next level down), Division II, and Division III. This post groups Division II, Division III, and the few schools with no recorded division as 'Division II and below'." ,
+  "Conference"           , "A league of schools that schedule each other and share a championship, such as the SEC or the Big Sky. A few FBS schools are independents and belong to no football conference."                                                                                                                      ,
+  "Realignment"          , "Schools changing conference. A conference change here is an FBS school playing in a different conference, or as an independent, than in its previous FBS season."                                                                                                                                     ,
+  "Tier"                 , "Our three-level grouping of conferences by competitive level, set season by season because schools change conferences."                                                                                                                                                                               ,
+  "Power"                , "The top tier: the SEC, Big Ten, ACC, and Big 12; the Pac-12 through 2023 (the Pac-10 before 2011); the Big East through 2012; and Notre Dame."                                                                                                                                                        ,
+  "Group of 5"           , "The rest of FBS: the American Athletic (from 2013), Conference USA, Mid-American, Mountain West, Sun Belt, Western Athletic (through 2012), the two-school Pac-12 from 2024, and the independents other than Notre Dame. The name counts five conferences, but the group has held five or six."       ,
+  "FCS and below"        , "Every school outside FBS: the FCS (such as the Big Sky or Missouri Valley), Division II, and Division III."                                                                                                                                                                                           ,
+  "Team-season"          , "One school in one season."                                                                                                                                                                                                                                                                            ,
+  "Roster player-season" , "One player listed on one school's roster in one season."                                                                                                                                                                                                                                              ,
+  "Stat line"            , "At least one recorded statistic (a carry, catch, tackle, or kick) for a player in a season."                                                                                                                                                                                                          ,
+  "Position group"       , "The roster position, grouped: quarterback, running back (fullbacks included), receiver, tight end, offensive line, defensive line, linebacker, defensive back, and special teams. A roster with no position, or a generic one such as athlete, is 'Position not recorded'."                           ,
+  "Draft class"          , "The players picked in one year's NFL draft; the class of 2016 was drafted in April 2016, after the 2015 college season."                                                                                                                                                                              ,
+  "Draft-day school"     , "The college the NFL draft lists for a player."                                                                                                                                                                                                                                                        ,
+  "Credited pick"        , sprintf("A draft pick traced to the last college roster the player was on before the draft. Carson Wentz was drafted from North Dakota State (%d, pick %d) but is on no roster in the data, so his pick is not credited.", wentz$year, wentz$overall)
 ) |>
   kable(caption = "Terms used throughout.")
 ```
@@ -239,10 +259,14 @@ wave2 <- sum(moves$season %in% 2023:2024)
 pac12_2024 <- sort(fbs$team[fbs$season == 2024L & fbs$league == "Pac-12"])
 big_east_2012 <- fbs$team[fbs$season == 2012L & fbs$league == "Big East"]
 big_east_to_acc <- sort(
-  fbs$team[fbs$season == 2013L & fbs$team %in% big_east_2012 & fbs$league == "ACC"]
+  fbs$team[
+    fbs$season == 2013L & fbs$team %in% big_east_2012 & fbs$league == "ACC"
+  ]
 )
 big_east_to_aac <- sum(
-  fbs$season == 2013L & fbs$team %in% big_east_2012 & fbs$league == "American Athletic"
+  fbs$season == 2013L &
+    fbs$team %in% big_east_2012 &
+    fbs$league == "American Athletic"
 )
 conf_by_tier <- played |>
   filter(conference != "FBS Independents" | is.na(conference)) |>
@@ -365,10 +389,22 @@ movers <- fbs |>
     summarise(group_by(moves, team), first_move = min(season)),
     by = "team"
   )
-p <- ggplot(movers, aes(season, reorder(team, -first_move), fill = tier_label)) +
+p <- ggplot(
+  movers,
+  aes(season, reorder(team, -first_move), fill = tier_label)
+) +
   geom_tile_interactive(
     aes(
-      tooltip = paste0(team, ", ", season, ": ", conference, " (", tier_label, ")"),
+      tooltip = paste0(
+        team,
+        ", ",
+        season,
+        ": ",
+        conference,
+        " (",
+        tier_label,
+        ")"
+      ),
       data_id = team
     ),
     color = "white"
@@ -490,7 +526,10 @@ coverage |>
   kable(
     caption = sprintf(
       "Teams with at least one player stat line, of the teams that played at least one recorded game, by division and season, 2010 to 2025, with the median FBS team's players with a stat line and roster size. From 2016 the stat records list about twice as many players per FBS team (a median of %d in 2015, %d in 2016) while roster sizes held level (%d and %d), so the change is in how many players the stat records include.",
-      fbs_depth_2015, fbs_depth_2016, fbs_roster_2015, fbs_roster_2016
+      fbs_depth_2015,
+      fbs_depth_2016,
+      fbs_roster_2015,
+      fbs_roster_2016
     )
   )
 ```
@@ -503,7 +542,18 @@ p <- ggplot(coverage, aes(season, share, color = division)) +
   geom_line(linewidth = 1.4) +
   geom_point_interactive(
     aes(
-      tooltip = paste0(season, ", ", division, ": ", with_stats, " of ", played, " teams (", pct(share, 0), ")"),
+      tooltip = paste0(
+        season,
+        ", ",
+        division,
+        ": ",
+        with_stats,
+        " of ",
+        played,
+        " teams (",
+        pct(share, 0),
+        ")"
+      ),
       data_id = paste(season, division)
     ),
     size = 3
@@ -513,8 +563,11 @@ p <- ggplot(coverage, aes(season, share, color = division)) +
     x = 2017.6,
     y = fcs_2020$share - 0.33,
     label = paste0(
-      "2020: only ", fcs_2020$played, " FCS teams played a recorded game, ",
-      fcs_2020$with_stats, " with stat lines\n(the FCS moved most of its season to spring 2021)"
+      "2020: only ",
+      fcs_2020$played,
+      " FCS teams played a recorded game, ",
+      fcs_2020$with_stats,
+      " with stat lines\n(the FCS moved most of its season to spring 2021)"
     ),
     hjust = 1,
     size = 4.6,
@@ -562,19 +615,33 @@ fcs_tiles <- played_div |>
   mutate(stat_seasons = sum(has_stat_lines)) |>
   ungroup() |>
   mutate(status = if_else(has_stat_lines, "Has stat lines", "No stat lines"))
-p <- ggplot(fcs_tiles, aes(season, reorder(team, stat_seasons), fill = status)) +
+p <- ggplot(
+  fcs_tiles,
+  aes(season, reorder(team, stat_seasons), fill = status)
+) +
   geom_tile_interactive(
     aes(
       tooltip = paste0(
-        team, ", ", season, " (", coalesce(conference, "no conference"), ")\n",
-        n_stat_players, " players with a stat line; ", n_roster, " on the roster"
+        team,
+        ", ",
+        season,
+        " (",
+        coalesce(conference, "no conference"),
+        ")\n",
+        n_stat_players,
+        " players with a stat line; ",
+        n_roster,
+        " on the roster"
       ),
       data_id = team
     ),
     color = "white"
   ) +
   scale_fill_manual(
-    values = c("Has stat lines" = division_colors[["FCS"]], "No stat lines" = "#e5e7eb"),
+    values = c(
+      "Has stat lines" = division_colors[["FCS"]],
+      "No stat lines" = "#e5e7eb"
+    ),
     name = NULL
   ) +
   scale_x_continuous(breaks = seq(2010, 2025, 3)) +
@@ -612,7 +679,11 @@ stopifnot(
 # credited picks: players whose final college season was 2013 to 2025,
 # approximately the draft classes of 2014 to 2026 (24 draftees are credited
 # two or three seasons before their draft)
-credited <- filter(team_draft, season >= first_class - 1L, season <= last_season)
+credited <- filter(
+  team_draft,
+  season >= first_class - 1L,
+  season <= last_season
+)
 group_picks <- credited |>
   group_by(group = position_group) |>
   summarise(picks = sum(n_drafted), .groups = "drop")
@@ -639,7 +710,10 @@ ol_cov <- roster_stat |>
   mutate(pick_share = picks / sum(picks)) |>
   arrange(share)
 ol <- filter(ol_cov, group == "Offensive line")
-others <- filter(ol_cov, !group %in% c("Offensive line", "Position not recorded"))
+others <- filter(
+  ol_cov,
+  !group %in% c("Offensive line", "Position not recorded")
+)
 ```
 
 ### 3.3 Offensive linemen supply one in six credited draft picks, but only 6% of their roster seasons carry a stat line
@@ -666,12 +740,25 @@ ol_cov |>
 ```{r}
 #| label: s33-explain
 #| fig-height: 6
-p <- ggplot(ol_cov, aes(share, reorder(group, share), fill = group == "Offensive line")) +
+p <- ggplot(
+  ol_cov,
+  aes(share, reorder(group, share), fill = group == "Offensive line")
+) +
   geom_col_interactive(
     aes(
       tooltip = paste0(
-        group, ": ", fmt(with_stat), " of ", fmt(seasons), " roster seasons with a stat line (", pct(share), ")\n",
-        fmt(picks), " credited draft picks (", pct(pick_share), " of all)"
+        group,
+        ": ",
+        fmt(with_stat),
+        " of ",
+        fmt(seasons),
+        " roster seasons with a stat line (",
+        pct(share),
+        ")\n",
+        fmt(picks),
+        " credited draft picks (",
+        pct(pick_share),
+        " of all)"
       ),
       data_id = group
     ),
@@ -683,13 +770,20 @@ p <- ggplot(ol_cov, aes(share, reorder(group, share), fill = group == "Offensive
     size = 5,
     fontface = "bold"
   ) +
-  scale_fill_manual(values = c(`TRUE` = "#b91c1c", `FALSE` = "#9ca3af"), guide = "none") +
+  scale_fill_manual(
+    values = c(`TRUE` = "#b91c1c", `FALSE` = "#9ca3af"),
+    guide = "none"
+  ) +
   scale_x_continuous(labels = scales::percent, limits = c(0, 0.8)) +
   labs(
     x = "Roster player-seasons with a stat line, 2010 to 2025",
     y = NULL,
     title = "Offensive linemen are on rosters but not in the stat sheets",
-    subtitle = paste0("Yet they are ", pct(ol$pick_share, 0), " of credited draft picks; hover a bar for counts")
+    subtitle = paste0(
+      "Yet they are ",
+      pct(ol$pick_share, 0),
+      " of credited draft picks; hover a bar for counts"
+    )
   ) +
   theme_cfb2nfl()
 girafe(ggobj = p, width_svg = 13, height_svg = 6)
@@ -705,18 +799,30 @@ by_code <- roster_stat |>
   summarise(seasons = n(), share = mean(has_stat), .groups = "drop") |>
   mutate(is_ol = group == "Offensive line")
 p <- ggplot(by_code, aes(share, reorder(position, share), color = is_ol)) +
-  geom_segment(aes(x = 0, xend = share, yend = reorder(position, share)), linewidth = 0.8) +
+  geom_segment(
+    aes(x = 0, xend = share, yend = reorder(position, share)),
+    linewidth = 0.8
+  ) +
   geom_point_interactive(
     aes(
       size = seasons,
       tooltip = paste0(
-        position, " (", group, "): ", fmt(seasons), " roster seasons, ",
-        pct(share), " with a stat line"
+        position,
+        " (",
+        group,
+        "): ",
+        fmt(seasons),
+        " roster seasons, ",
+        pct(share),
+        " with a stat line"
       ),
       data_id = position
     )
   ) +
-  scale_color_manual(values = c(`TRUE` = "#b91c1c", `FALSE` = "#6b7280"), guide = "none") +
+  scale_color_manual(
+    values = c(`TRUE` = "#b91c1c", `FALSE` = "#6b7280"),
+    guide = "none"
+  ) +
   scale_size_area(max_size = 9, guide = "none") +
   scale_x_continuous(labels = scales::percent, limits = c(0, 1)) +
   labs(
@@ -740,7 +846,9 @@ stopifnot(
   ol$pick_share < 0.175,
   rank(-group_picks$picks)[group_picks$group == "Offensive line"] == 3,
   max(by_code$share[by_code$is_ol]) <
-    min(by_code$share[!by_code$is_ol & by_code$group != "Position not recorded"])
+    min(by_code$share[
+      !by_code$is_ol & by_code$group != "Position not recorded"
+    ])
 )
 ```
 
@@ -766,6 +874,10 @@ fbs_teams_window <- played |>
   distinct(team) |>
   pull()
 fbs_without_pick <- setdiff(fbs_teams_window, school_picks$team)
+# Josh Allen's school, far down the list from the top producers
+wyo <- filter(school_picks, team == allen$collegeTeam)
+wyo_color <- team_color_values(teams)[[allen$collegeTeam]]
+allen_pick <- filter(window_picks, playerId == allen$playerId, year == allen$year)
 ```
 
 ### 3.4 Twenty-seven schools account for half of all draft picks
@@ -773,12 +885,20 @@ fbs_without_pick <- setdiff(fbs_teams_window, school_picks$team)
 Every one of the `r length(fbs_teams_window)` schools that played FBS from
 2013 to 2025 except `r fbs_without_pick` had a pick, yet the table, the curve, and the
 ranked bars show the `r fmt(n_window)` picks of the 2014 to 2026 classes
-piling up at a short list of schools.
+piling up at a short list of schools. Josh Allen's Wyoming, which produced
+the seventh pick of 2018, is No. `r wyo$rank` with `r wyo$picks` picks.
 
 ```{r}
 #| label: s34-table
 tibble::tibble(
-  Schools = c("Top 10", "Top 25", paste("Top", half_n), "Top 50", "Top 100", paste("All", n_schools, "draft-day schools")),
+  Schools = c(
+    "Top 10",
+    "Top 25",
+    paste("Top", half_n),
+    "Top 50",
+    "Top 100",
+    paste("All", n_schools, "draft-day schools")
+  ),
   n = c(10L, 25L, half_n, 50L, 100L, n_schools)
 ) |>
   mutate(
@@ -817,7 +937,17 @@ p <- ggplot(school_picks, aes(rank, cum_share)) +
   geom_point_interactive(
     data = filter(school_picks, rank <= half_n),
     aes(
-      tooltip = paste0("#", rank, " ", team, ": ", picks, " picks (", pct(cum_share, 0), " cumulative)"),
+      tooltip = paste0(
+        "#",
+        rank,
+        " ",
+        team,
+        ": ",
+        picks,
+        " picks (",
+        pct(cum_share, 0),
+        " cumulative)"
+      ),
       data_id = team
     ),
     color = "#b91c1c",
@@ -833,12 +963,50 @@ p <- ggplot(school_picks, aes(rank, cum_share)) +
     fontface = "bold",
     color = "#b91c1c"
   ) +
+  geom_point_interactive(
+    data = wyo,
+    aes(
+      tooltip = paste0(
+        "#", rank, " ", team, ": ", picks, " picks, including Josh Allen (",
+        allen$year, ", pick ", allen$overall, ")"
+      ),
+      data_id = team
+    ),
+    color = wyo_color,
+    size = 5
+  ) +
+  annotate(
+    "curve",
+    x = wyo$rank + 14,
+    xend = wyo$rank + 1.5,
+    y = wyo$cum_share - 0.2,
+    yend = wyo$cum_share - 0.02,
+    curvature = 0.25,
+    color = wyo_color,
+    arrow = grid::arrow(length = grid::unit(0.25, "cm"))
+  ) +
+  annotate(
+    "text",
+    x = wyo$rank + 15,
+    y = wyo$cum_share - 0.2,
+    label = paste0(
+      "Wyoming (Josh Allen, pick ", allen$overall, " in ", allen$year, "):\n",
+      wyo$picks, " picks, rank ", wyo$rank
+    ),
+    hjust = 0,
+    size = 5,
+    fontface = "bold",
+    color = wyo_color
+  ) +
   scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
   labs(
     x = "Draft-day schools, ranked by draft picks",
     y = "Cumulative share of picks",
     title = "A short list of schools accounts for half the draft",
-    subtitle = paste0(n_schools, " draft-day schools with at least one pick, classes of 2014 to 2026")
+    subtitle = paste0(
+      n_schools,
+      " draft-day schools with at least one pick, classes of 2014 to 2026"
+    )
   ) +
   theme_cfb2nfl()
 girafe(ggobj = p, width_svg = 13, height_svg = 6)
@@ -847,20 +1015,56 @@ girafe(ggobj = p, width_svg = 13, height_svg = 6)
 ```{r}
 #| label: s34-explore
 #| fig-height: 13
-top <- filter(school_picks, rank <= 60)
-p <- ggplot(top, aes(picks, reorder(team, picks), fill = team)) +
+# the top 60, plus Josh Allen's Wyoming wherever it ranks
+top <- filter(school_picks, rank <= 60 | team == allen$collegeTeam) |>
+  mutate(
+    label = if_else(
+      team == allen$collegeTeam,
+      paste0(team, " (#", rank, ")"),
+      team
+    ),
+    note = if_else(
+      team == allen$collegeTeam,
+      paste0(", including Josh Allen (", allen$year, ", pick ", allen$overall, ")"),
+      ""
+    )
+  )
+p <- ggplot(top, aes(picks, reorder(label, picks), fill = team)) +
   geom_col_interactive(
     aes(
-      tooltip = paste0("#", rank, " ", team, " (", conference, ", ", tier, "): ", picks, " picks"),
+      tooltip = paste0(
+        "#",
+        rank,
+        " ",
+        team,
+        " (",
+        conference,
+        ", ",
+        tier,
+        "): ",
+        picks,
+        " picks",
+        note
+      ),
       data_id = team
     ),
     width = 0.8
+  ) +
+  annotate(
+    "text",
+    x = wyo$picks + 1,
+    y = paste0(wyo$team, " (#", wyo$rank, ")"),
+    label = "Josh Allen's school",
+    hjust = 0,
+    size = 4.5,
+    fontface = "bold",
+    color = wyo_color
   ) +
   scale_fill_team(teams, guide = "none") +
   labs(
     x = "Draft picks, classes of 2014 to 2026",
     y = NULL,
-    title = "The 60 schools with the most draft picks",
+    title = "The 60 schools with the most draft picks, plus Wyoming",
     subtitle = "Team colors; hover a bar for the school's conference and tier before its latest pick"
   ) +
   theme_cfb2nfl(base_size = 12)
@@ -876,7 +1080,13 @@ stopifnot(
   n_schools == 245L,
   school_picks$team[1] == "Alabama",
   length(fbs_teams_window) == 137L,
-  identical(fbs_without_pick, "Army")
+  identical(fbs_without_pick, "Army"),
+  wyo$rank == 85L,
+  wyo$picks == 10L,
+  grepl("^#", wyo_color),
+  nrow(allen_pick) == 1L,
+  allen_pick$conference == "Mountain West",
+  allen_pick$tier == "Group of 5"
 )
 ```
 
@@ -885,7 +1095,9 @@ stopifnot(
 #| include: false
 small <- filter(window_picks, tier == "FCS and below")
 small_traced <- mean(small$traced)
-fbs_traced <- mean(window_picks$traced[window_picks$tier %in% c("Power", "Group of 5")])
+fbs_traced <- mean(window_picks$traced[
+  window_picks$tier %in% c("Power", "Group of 5")
+])
 small_schools <- small |>
   group_by(collegeTeam) |>
   summarise(
@@ -897,6 +1109,13 @@ small_schools <- small |>
   arrange(desc(picks), collegeTeam)
 ndsu <- filter(small, collegeTeam == "North Dakota State")
 ndsu_color <- team_color_values(teams)[["North Dakota State"]]
+hill_pick <- filter(small, playerId == hill$playerId, year == hill$year)
+# division in the school's latest recorded season before the draft
+hill_division <- team_season |>
+  filter(team == hill$collegeTeam, season < hill$year, !is.na(classification)) |>
+  slice_max(season, n = 1) |>
+  pull(classification)
+hill_color <- team_color_values(teams)[[hill$collegeTeam]]
 ```
 
 ### 3.5 FCS-and-below schools sent 193 players to the draft, North Dakota State 15 of them, but rosters trace fewer than half
@@ -904,7 +1123,8 @@ ndsu_color <- team_color_values(teams)[["North Dakota State"]]
 The table counts draft picks from FCS-and-below draft-day schools and how
 many the rosters trace to a final college season (`r pct(small_traced, 0)`,
 against `r pct(fbs_traced, 0)` for FBS schools), the bar chart ranks the
-schools, and the scatter shows every pick.
+schools, and the scatter shows every pick. Tyreek Hill, a fifth-round pick
+in `r hill$year`, came from Division II West Alabama.
 
 ```{r}
 #| label: s35-table
@@ -926,21 +1146,51 @@ small |>
 #| fig-height: 7
 top_small <- slice_head(small_schools, n = 12)
 bars <- bind_rows(
-  transmute(top_small, collegeTeam, picks, conference, part = "Traced to a roster", n = traced),
-  transmute(top_small, collegeTeam, picks, conference, part = "Not on any roster", n = picks - traced)
+  transmute(
+    top_small,
+    collegeTeam,
+    picks,
+    conference,
+    part = "Traced to a roster",
+    n = traced
+  ),
+  transmute(
+    top_small,
+    collegeTeam,
+    picks,
+    conference,
+    part = "Not on any roster",
+    n = picks - traced
+  )
 ) |>
   mutate(
     part = factor(part, levels = c("Not on any roster", "Traced to a roster")),
-    school = if_else(collegeTeam == "North Dakota State", collegeTeam, "Other schools")
+    school = if_else(
+      collegeTeam == "North Dakota State",
+      collegeTeam,
+      "Other schools"
+    )
   )
-ndsu_row <- nrow(top_small) - which(top_small$collegeTeam == "North Dakota State") + 1
+ndsu_row <- nrow(top_small) -
+  which(top_small$collegeTeam == "North Dakota State") +
+  1
 p <- ggplot(
   bars,
   aes(n, reorder(collegeTeam, picks), fill = school, alpha = part, group = part)
 ) +
   geom_col_interactive(
     aes(
-      tooltip = paste0(collegeTeam, " (", conference, "): ", n, " of ", picks, " picks ", tolower(part)),
+      tooltip = paste0(
+        collegeTeam,
+        " (",
+        conference,
+        "): ",
+        n,
+        " of ",
+        picks,
+        " picks ",
+        tolower(part)
+      ),
       data_id = collegeTeam
     ),
     width = 0.75
@@ -960,8 +1210,15 @@ p <- ggplot(
     x = nrow(ndsu) - 0.2,
     y = ndsu_row - 3.5,
     label = paste0(
-      "Carson Wentz (", wentz$year, ", pick ", wentz$overall, ") and Trey Lance (",
-      lance$year, ", pick ", lance$overall, ")\nare on no roster in the data"
+      "Carson Wentz (",
+      wentz$year,
+      ", pick ",
+      wentz$overall,
+      ") and Trey Lance (",
+      lance$year,
+      ", pick ",
+      lance$overall,
+      ")\nare on no roster in the data"
     ),
     hjust = 1,
     size = 4.6,
@@ -993,7 +1250,17 @@ p <- ggplot(small, aes(year, overall, color = traced)) +
   geom_point_interactive(
     aes(
       tooltip = paste0(
-        name, ", ", collegeTeam, " (", conference, ")\n", year, " draft, round ", round, ", pick ", overall,
+        name,
+        ", ",
+        collegeTeam,
+        " (",
+        conference,
+        ")\n",
+        year,
+        " draft, round ",
+        round,
+        ", pick ",
+        overall,
         if_else(traced, "\nTraced to a roster", "\nNot on any roster")
       ),
       data_id = paste(year, overall)
@@ -1001,6 +1268,47 @@ p <- ggplot(small, aes(year, overall, color = traced)) +
     size = 3.2,
     alpha = 0.85,
     position = position_jitter(width = 0.15, height = 0, seed = 1)
+  ) +
+  annotate(
+    "point",
+    x = hill_pick$year,
+    y = hill_pick$overall,
+    shape = 21,
+    size = 7,
+    stroke = 1.6,
+    color = hill_color
+  ) +
+  annotate(
+    "label",
+    x = hill_pick$year + 0.35,
+    y = hill_pick$overall + 40,
+    label = paste0(
+      "Tyreek Hill, Division II West Alabama\n", hill_pick$year,
+      ", round ", hill_pick$round, ", pick ", hill_pick$overall
+    ),
+    hjust = 0,
+    size = 4.4,
+    fontface = "bold",
+    color = hill_color
+  ) +
+  annotate(
+    "point",
+    x = c(wentz$year, lance$year),
+    y = c(wentz$overall, lance$overall),
+    shape = 21,
+    size = 7,
+    stroke = 1.6,
+    color = ndsu_color
+  ) +
+  annotate(
+    "text",
+    x = c(wentz$year, lance$year) + 0.3,
+    y = c(wentz$overall, lance$overall),
+    label = c("Carson Wentz", "Trey Lance"),
+    hjust = 0,
+    size = 4.4,
+    fontface = "bold",
+    color = ndsu_color
   ) +
   scale_y_reverse() +
   scale_x_continuous(breaks = seq(first_class, last_season + 1L, 2)) +
@@ -1029,6 +1337,10 @@ stopifnot(
   pct(small_traced, 0) == "45%",
   pct(fbs_traced, 0) == "98%",
   grepl("^#", ndsu_color),
+  grepl("^#", hill_color),
+  nrow(hill_pick) == 1L,
+  hill_pick$round == 5L,
+  identical(hill_division, "ii"),
   # the annotation sits beside bars no longer than its left edge
   all(top_small$picks[-(1:3)] <= nrow(ndsu) - 9)
 )
@@ -1042,10 +1354,10 @@ it, and the draft draws half its picks from 27 schools.
 ```{r}
 #| label: summary
 tibble::tribble(
-  ~Finding                                                  , ~Evidence ,
-  "FBS grew, and realignment moved a large share of it"      , sprintf("%d FBS teams in 2010, %d in 2025; %d schools made %d conference changes.", fbs_2010, fbs_2025, n_movers, n_moves) ,
-  "Stat lines cover FBS fully and FCS fully from 2021"       , sprintf("Every FBS team every season; %s to %s of FCS teams before 2021, every one from 2021.", fcs_lo, fcs_hi) ,
-  "Offensive linemen are drafted but rarely have stat lines" , sprintf("%s of offensive-line roster seasons have a stat line; linemen are %s of credited picks.", pct(ol$share, 0), pct(ol$pick_share, 0)) ,
+  ~Finding                                                   , ~Evidence                                                                                                                                                                                         ,
+  "FBS grew, and realignment moved a large share of it"      , sprintf("%d FBS teams in 2010, %d in 2025; %d schools made %d conference changes.", fbs_2010, fbs_2025, n_movers, n_moves)                                                                        ,
+  "Stat lines cover FBS fully and FCS fully from 2021"       , sprintf("Every FBS team every season; %s to %s of FCS teams before 2021, every one from 2021.", fcs_lo, fcs_hi)                                                                                   ,
+  "Offensive linemen are drafted but rarely have stat lines" , sprintf("%s of offensive-line roster seasons have a stat line; linemen are %s of credited picks.", pct(ol$share, 0), pct(ol$pick_share, 0))                                                       ,
   "Half of all draft picks come from 27 schools"             , sprintf("Top %d: %s of %s picks; top 10: %s; every FBS school but %s had a pick.", half_n, pct(school_picks$cum_share[half_n]), fmt(n_window), pct(school_picks$cum_share[10]), fbs_without_pick) ,
   "Small schools produce picks the rosters often miss"       , sprintf("%d picks from FCS and below, %d from North Dakota State; %s traced to a roster.", nrow(small), nrow(ndsu), pct(small_traced, 0))
 ) |>
