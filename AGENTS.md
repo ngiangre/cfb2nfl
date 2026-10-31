@@ -136,18 +136,32 @@ wrapper (`CFB2NFL_REFRESH=true` + `tar_make()`). Years 2010–2026.
   - **Snapshots, not tours.** A post shows particular snapshots of the data for
     its question, not everything the data contains about a topic. Cut any
     exhibit that serves completeness rather than the argument.
-  - **One statement per section; exhibits carry the picture.** Each section
-    heading is an **assertion** (a claim the section demonstrates). The section
-    body is a single concise sentence saying what the following table/figure
-    shows and why it is there — then the exhibit. Tables and figures are both
-    **expository** (defining the data being discussed) and **explanatory**
-    (making the section's claim); let them do the work instead of prose.
+  - **A sentence or two per section; exhibits carry the picture.** Each
+    section heading is a numbered **assertion** (`### 3.1 <claim>`, a claim
+    the section demonstrates). The body is **one or two sentences** saying
+    what the exhibits below show and why they are there, and nothing more:
+    any further detail moves into a table, a figure annotation, or a caption.
+    The prose is then followed by its supporting exhibits, in this order:
+    1. **Table** (`knitr::kable`, captioned): expository, it defines and
+       counts the data the claim rests on.
+    2. **Explanatory figure**: makes the section's claim at a glance; the
+       claim's element is highlighted (color, annotation, arrow) and the
+       rest is context.
+    3. **Exploratory figure**: an interactive `ggiraph` view of the same
+       snapshot at finer grain (every category, season, or player behind the
+       claim) with hover tooltips carrying the full detail, so the reader can
+       probe beyond the claim without leaving the question.
+    Data sections need at least the table; every Results section carries all
+    three unless the claim is a single fact (then table plus one figure). A
+    Results section that tests an expectation states it first, italicized,
+    with its verdict emoji (`*Expectation: ...* ✅`), and the one or two
+    sentences follow. The skeleton lives in `vignettes/_post-template.qmd`.
   - **Flow.** The post must read as one argument from beginning to end: each
     section's assertion should follow from the previous section's exhibits, so
     a reader can reconstruct the takeaway from headings and exhibits alone.
   - Still: `stopifnot()` where a claim could silently rot; code chunks back
-    every exhibit. Reference implementation for register/format:
-    `vignettes/2026-10-16-expectation-checks.qmd`.
+    every exhibit. Start from `vignettes/_post-template.qmd`; every dated
+    post follows this format (revised 2026-10-31).
 - **Vignette writing critiques (user review of the 2026-10-24 outcome
   prevalence post, applied going forward):**
   - Define every variable and term in the narrative (person-season, eligible

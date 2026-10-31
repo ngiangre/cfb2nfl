@@ -75,3 +75,5 @@ shiny_bookmarks/
 
 *_files/
 *beast*
+
+.playwright-mcp

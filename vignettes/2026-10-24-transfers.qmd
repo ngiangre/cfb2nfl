@@ -5,8 +5,9 @@ description: "The share of college players spending a season at a new school ros
 followups:
   - "Test whether a transfer season or its direction changes a player's draft chance, using the outcome labels (the post's own closing question)."
   - "Split the transfer population by portal era once season cutoffs are agreed; pre-2016 rates are coverage floors, not estimates."
+  - "Group of Five players drop to FCS more often than they climb to the Power conferences; check whether that holds once playing time at the old school is controlled."
 author:
-  - "An AI directed by Nick Giangreco"
+  - "AI directed by Nick Giangreco"
 freeze: auto
 vignette: >
   %\VignetteIndexEntry{One player in five now plays a college season for a new school}
@@ -65,8 +66,51 @@ wilson <- function(x, n, z = 1.96) {
   h <- (z / d) * sqrt(p * (1 - p) / n + z^2 / (4 * n^2))
   c(lo = pmax(0, c - h), hi = pmin(1, c + h))
 }
+fmt <- function(x, digits = 0) {
+  formatC(as.numeric(x), big.mark = ",", format = "f", digits = digits)
+}
+pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
 
-dir_label <- c(up = "To a higher tier", lateral = "Same tier", down = "To a lower tier")
+dir_label <- c(
+  up = "To a higher tier",
+  lateral = "Same tier",
+  down = "To a lower tier"
+)
+dir_colors <- c(
+  "To a higher tier" = "#1B9E77",
+  "Same tier" = "gray60",
+  "To a lower tier" = "#D95F02"
+)
+# Named tier_name, not tier_label: ps_change already carries a tier_label
+# column, and a same-named lookup vector is shadowed by the data mask.
+tier_name <- c(`1` = "FCS and below", `2` = "Group of Five", `3` = "Power")
+pos_group <- c(
+  QB = "Quarterback",
+  RB = "Running back",
+  FB = "Running back",
+  WR = "Receiver",
+  TE = "Tight end",
+  T = "Offensive line",
+  G = "Offensive line",
+  C = "Offensive line",
+  OL = "Offensive line",
+  OT = "Offensive line",
+  DL = "Defensive line",
+  DE = "Defensive line",
+  DT = "Defensive line",
+  NT = "Defensive line",
+  EDGE = "Defensive line",
+  LB = "Linebacker",
+  ILB = "Linebacker",
+  OLB = "Linebacker",
+  DB = "Defensive back",
+  S = "Defensive back",
+  CB = "Defensive back",
+  PK = "Special teams",
+  P = "Special teams",
+  LS = "Special teams",
+  PR = "Special teams"
+)
 ```
 
 ```{r}
@@ -74,12 +118,18 @@ dir_label <- c(up = "To a higher tier", lateral = "Same tier", down = "To a lowe
 #| include: false
 ps_change <- tbl(con, "ps_change") |> collect()
 career <- tbl(con, "career_summary") |> collect()
+dbDisconnect(con, shutdown = TRUE)
 
 # A transfer event: an observed season whose team differs from the player's
 # prior observed season. Direction compares conference tiers.
 tr <- ps_change |>
   filter(transferred) |>
-  mutate(direction_label = dir_label[transfer_direction])
+  mutate(
+    direction_label = factor(dir_label[transfer_direction], names(dir_colors)),
+    from = factor(tier_name[as.character(prev_tier)], tier_name),
+    to = factor(tier_name[as.character(tier)], tier_name),
+    group = coalesce(unname(pos_group[position]), "Position not recorded")
+  )
 
 per_season <- ps_change |>
   group_by(season) |>
@@ -89,12 +139,21 @@ per_season <- ps_change |>
     .groups = "drop"
   ) |>
   mutate(share = transfers / seasons)
+rate <- transfer_rate(career)
+ci_career <- wilson(rate$transferred, rate$players)
+share_of <- function(y) per_season$share[per_season$season == y]
 
 stopifnot(
   nrow(tr) > 10000,
   # Direction is always assigned once a transfer is observed with both tiers.
-  all(!is.na(tr$transfer_direction)),
-  all(!is.na(tr$prev_team))
+  !anyNA(tr$direction_label),
+  !anyNA(tr$from),
+  !anyNA(tr$to),
+  # Pre-rule era stays below five percent; 2026 nears one in five.
+  max(per_season$share[per_season$season <= 2020]) < 0.05,
+  share_of(2026) > 0.18,
+  rate$share > 0.12,
+  rate$share < 0.15
 )
 ```
 
@@ -104,298 +163,656 @@ stopifnot(
 
 ## 1. Introduction
 
-Every college football offseason, some players change schools. The mechanics
-have changed dramatically: before 2021 a player who transferred generally had
-to sit out a season at the new school, and after the NCAA adopted the
-one-time transfer waiver and the transfer portal opened in October 2018, moving
-became both easier and far more common. This post measures how many transfers
-happen and, when a player moves, whether the move goes to a stronger or a
-weaker level of competition.
+Since the transfer portal opened in 2018 and the one-time transfer waiver
+arrived in 2021, changing schools no longer costs a season of play, so this
+post measures how often players move and whether the move is to stronger or
+weaker competition, with Joe Burrow, Shane Buechele, Jordan Travis, and Cam
+Ward as examples.
 
-We organize the results with four expectations:
++ *Expecting transfers to have grown sharply since the 2021 one-time
+  transfer rule.*
++ *Expecting most transfers to stay within the same competition tier.*
++ *Expecting players from lower tiers to move up more often than down.*
++ *Expecting quarterbacks and running backs to move down more often than
+  other positions.*
 
-+ *Expecting transfers to have grown sharply since the 2021 one-time transfer rule*
-+ *Expecting most transfers to move within the same competition tier*
-+ *Expecting more moves upward than downward among players from lower tiers*
-+ *Expecting quarterbacks and running backs to move down more than other positions*
+## 2. Data
 
-Each expectation is stated as a claim the data can settle, and each is answered
-with a table or figure backed by an assertion.
+### 2.1 A transfer is a season played at a different school than the player's previous one
 
-## 2. Data and terms
-
-The unit of measurement is a **player-season**: one player's one college season
-with a recorded stat line. A season is a **transfer event** when the player's
-team differs from his team in his previous observed season. Two consequences of
-this definition matter:
-
-+ A transfer is only visible if both the old and the new season have a stat
-  line. A player who moved and then never appeared in a stat line again is not
-  counted.
-+ The comparison runs through each player's own season history, so a move
-  separated by a gap season (for example, a redshirt year at the new school)
-  is still caught.
-
-To describe where a player moved, each school in each season is placed in a
-**competition tier**: tier 3 is the Power conferences, tier 2 is the other
-Football Bowl Subdivision conferences, and tier 1 is Football Championship
-Subdivision and lower. The tier assignment is season-aware, so realignment
-(Pac-12 collapse, Big East to the American) is handled by the data rather than
-hard-coded. A transfer's **direction** compares the new tier to the old:
+The table defines the unit counted, the three competition tiers, and the
+three directions a move can take; rosters are thin before about 2016, so
+early transfer counts are lower bounds rather than estimates.
 
 ```{r}
 #| label: terms
-terms <- tribble(
-  ~Term             , ~Meaning                                                                                                    ,
-  "Transfer event"  , "An observed season at a school different from the player's previous observed season."                     ,
-  "Up"              , "The new school sits in a higher competition tier than the old one (for example, an FCS school to a Power conference)." ,
-  "Same tier"       , "Both schools sit in the same tier."                                                                       ,
-  "Down"            , "The new school sits in a lower tier than the old one (for example, a Power conference to a Group of Five school)." ,
-  "Share"           , "Transfers divided by observed player-seasons, with a 95 percent confidence interval: the range the true rate plausibly occupies." ,
-)
-kable(terms, caption = "Table 1: the transfer terms used throughout")
+tribble(
+  ~Term              , ~Meaning                                                                                                                                                           ,
+  "Player-season"    , "One player's college season with a recorded stat line."                                                                                                           ,
+  "Transfer event"   , "A player-season at a school different from the player's previous observed season; a gap season between the two (such as a redshirt year) does not hide the move." ,
+  "Power"            , "Tier 3: the Power conferences, assigned season by season so conference realignment is followed."                                                                  ,
+  "Group of Five"    , "Tier 2: the other Football Bowl Subdivision conferences."                                                                                                         ,
+  "FCS and below"    , "Tier 1: Football Championship Subdivision and lower divisions."                                                                                                   ,
+  "To a higher tier" , "The new school sits in a higher tier than the old one, for example FCS to a Power conference."                                                                    ,
+  "Same tier"        , "Both schools sit in the same tier."                                                                                                                               ,
+  "To a lower tier"  , "The new school sits in a lower tier, for example a Power conference to the Group of Five."                                                                        ,
+  "Share"            , "Transfers divided by player-seasons, with a 95 percent confidence interval: the range the true rate plausibly occupies (computed by Wilson's method)."
+) |>
+  kable(caption = "The transfer terms used throughout.")
 ```
-
-One data note before the numbers: roster coverage in this dataset is thin
-before roughly 2016, so early-season transfer counts reflect which seasons we
-can see rather than the true volume of movement. Rates from those years are
-lower bounds, not estimates.
 
 ## 3. Results
 
-### 3.1 How many transfers
+### 3.1 The share of players at a new school rose almost fourfold after the 2020 season
 
-*Expecting transfers to have grown sharply since the 2021 one-time transfer rule.* Before the rule, fewer than five percent of the players who took the
-field in a season were playing for a school different from their previous
-one. That share has climbed every year since 2020 and reaches 19 percent in
-2026: nearly one player in five now spends his season at a school he did not
-play for the year before. The 2020 dip and the 2021 jump bracket the rule
-change itself.
+*Expecting transfers to have grown sharply since the 2021 one-time transfer
+rule.* ✅
 
-```{r}
-#| label: trend
-per_season_lab <- per_season |>
-  mutate(
-    tooltip = paste0(
-      season, ": ", sprintf("%.1f", 100 * share), "% of players that season played for a new school (",
-      transfers, " of ", format(seasons, big.mark = ","), ")"
-    )
-  )
-
-p_trend <- ggplot(per_season_lab, aes(x = season, y = 100 * share, group = 1)) +
-  geom_line_interactive(aes(tooltip = tooltip), linewidth = 1.4) +
-  geom_point_interactive(aes(tooltip = tooltip), size = 3) +
-  labs(
-    x = "Season",
-    y = "Players playing for a new school (%)",
-    title = "Share of players whose season follows a transfer"
-  ) +
-  theme_cfb2nfl()
-
-girafe(ggobj = p_trend, width_svg = 8, height_svg = 4.5)
-```
+The table and the first figure follow the share of players whose season is
+a transfer event, from under five percent through 2020 to
+`r pct(share_of(2026))` in 2026; the second figure splits that share by the
+tier of the new school.
 
 ```{r}
-#| label: check-trend
-stopifnot(
-  # Pre-rule era stays below five percent.
-  max(per_season$share[per_season$season <= 2020]) < 0.05,
-  # Portal era: the 2026 share clears fifteen percent.
-  per_season$share[per_season$season == 2026] > 0.15
-)
+#| label: s31-table
 per_season |>
-  filter(season %in% c(2018, 2019, 2020, 2021, 2022, 2024, 2026)) |>
+  filter(season %in% c(2016, 2018, 2020, 2021, 2022, 2024, 2026)) |>
   transmute(
     Season = season,
-    `Players observed` = seasons,
-    `Changed schools` = transfers,
-    `Share (%)` = sprintf("%.1f", 100 * share)
+    `Player-seasons` = fmt(seasons),
+    `At a new school` = fmt(transfers),
+    Share = pct(share)
   ) |>
-  kable(caption = "Table 2: players changing schools per season, selected years")
+  kable(
+    caption = sprintf(
+      "Player-seasons at a new school, selected seasons. Over whole careers, %s of %s players (%s, 95%% CI %s to %s) changed schools at least once.",
+      fmt(rate$transferred),
+      fmt(rate$players),
+      pct(rate$share),
+      pct(ci_career["lo"]),
+      pct(ci_career["hi"])
+    )
+  )
 ```
 
-Over a full career the same story holds: among the 135,275 players in the
-population, 18,460 (13.6 percent, 95 percent CI 13.4 to 13.8) changed schools
-at least once.
-
 ```{r}
-#| label: career-rate
-rate <- transfer_rate(career)
-ci <- wilson(rate$transferred, rate$players)
-stopifnot(rate$share > 0.12, rate$share < 0.15)
-```
-
-### 3.2 Where transfers go
-
-*Expecting most transfers to move within the same competition tier.* Yes. Of the 14,107 players we see changing schools, 42 percent land in the same tier,
-35 percent move down, and 24 percent move up.
-
-```{r}
-#| label: direction
-dir_tab <- tr |>
-  count(direction_label, name = "Transfers") |>
-  mutate(Share = Transfers / sum(Transfers))
-
-stopifnot(
-  nrow(dir_tab) == 3,
-  max(dir_tab$Share) == dir_tab$Share[dir_tab$direction_label == "Same tier"]
-)
-
-dir_plot <- dir_tab |>
-  mutate(tooltip = paste0(
-    direction_label, ": ", Transfers, " transfers (",
-    sprintf("%.1f", 100 * Share), "%)"
-  ))
-
-p_dir <- ggplot(dir_plot, aes(x = 100 * Share, y = reorder(direction_label, Share))) +
-  geom_col_interactive(aes(tooltip = tooltip), width = 0.65) +
+#| label: s31-explain
+#| fig-height: 5
+trend <- per_season |>
+  filter(season >= 2011) |>
+  mutate(
+    era = if_else(season >= 2021, "One-time waiver era", "Before the waiver"),
+    tooltip = sprintf(
+      "%d: %.1f%% of players at a new school (%s of %s)",
+      season,
+      100 * share,
+      fmt(transfers),
+      fmt(seasons)
+    )
+  )
+p_trend <- ggplot(trend, aes(season, 100 * share)) +
+  geom_vline(xintercept = 2020.5, linetype = "dashed", color = "gray50") +
+  geom_line(linewidth = 1.2, color = "gray70") +
+  geom_point_interactive(
+    aes(color = era, tooltip = tooltip, data_id = season),
+    size = 3.4
+  ) +
+  annotate(
+    "text",
+    x = 2011.3,
+    y = 14,
+    label = sprintf(
+      "Under 5%% every season\nthrough 2020; %.1f%% in 2026",
+      100 * share_of(2026)
+    ),
+    size = 4.4,
+    hjust = 0
+  ) +
+  annotate(
+    "curve",
+    x = 2016.3,
+    y = 15,
+    xend = 2025.6,
+    yend = 100 * share_of(2026) + 0.4,
+    curvature = 0.1,
+    arrow = arrow(length = unit(0.25, "cm")),
+    linewidth = 0.7,
+    alpha = 0.6
+  ) +
+  annotate(
+    "text",
+    x = 2020.7,
+    y = 1,
+    label = "2021 rule",
+    size = 4.2,
+    hjust = 0
+  ) +
+  scale_color_manual(
+    values = c(
+      "Before the waiver" = "gray45",
+      "One-time waiver era" = "#D95F02"
+    )
+  ) +
+  scale_y_continuous(limits = c(0, 21)) +
+  scale_x_continuous(breaks = seq(2011, 2026, 3)) +
   labs(
-    x = "Share of transferred players (%)",
-    y = NULL,
-    title = "Where transferred players land, by competition tier"
+    title = "Transfers took off once moving stopped costing a season",
+    subtitle = "Share of player-seasons played at a new school",
+    x = "Season",
+    y = "Players at a new school (%)",
+    color = NULL
   ) +
   theme_cfb2nfl()
-
-girafe(ggobj = p_dir, width_svg = 8, height_svg = 3.5)
+girafe(ggobj = p_trend, width_svg = 13, height_svg = 5)
 ```
 
-The full origin-to-destination matrix shows why the aggregate hides movement
-in both directions. Players leaving tier 3 (Power) schools mostly stay in
-tier 3 or drop one level, while players leaving tier 1 schools move up nearly
-half the time.
-
 ```{r}
-#| label: matrix
-# Named tier_name, not tier_label: ps_change already carries a tier_label
-# column, and a same-named lookup vector is shadowed by the data mask.
-tier_name <- c(`1` = "FCS and below", `2` = "Group of Five", `3` = "Power")
-matrix_tab <- tr |>
-  count(From = tier_name[as.character(prev_tier)], To = tier_name[as.character(tier)]) |>
-  pivot_wider(names_from = To, values_from = n, values_fill = 0L)
-
-stopifnot(sum(as.matrix(matrix_tab[, -1])) == nrow(tr))
-kable(matrix_tab, caption = "Table 3: where transferred players land, by origin and destination tier")
+#| label: s31-explore
+#| fig-height: 5
+by_dest <- ps_change |>
+  filter(season >= 2011, !is.na(tier)) |>
+  group_by(season, to = factor(tier_name[as.character(tier)], tier_name)) |>
+  summarise(
+    seasons = n(),
+    transfers = sum(transferred, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(share = transfers / seasons)
+p_dest <- ggplot(by_dest, aes(season, 100 * share, color = to)) +
+  geom_line_interactive(aes(data_id = to, tooltip = to), linewidth = 1.2) +
+  geom_point_interactive(
+    aes(
+      data_id = to,
+      tooltip = sprintf(
+        "%s, %d: %.1f%% of its players arrived from another school (%s of %s)",
+        to,
+        season,
+        100 * share,
+        fmt(transfers),
+        fmt(seasons)
+      )
+    ),
+    size = 2.6
+  ) +
+  scale_color_brewer(palette = "Dark2") +
+  scale_x_continuous(breaks = seq(2011, 2026, 3)) +
+  labs(
+    title = "Every tier took on more transfers",
+    subtitle = "Share of each tier's player-seasons played by a newcomer from another school",
+    x = "Season",
+    y = "Players new to their school (%)",
+    color = "Tier of the new school",
+    caption = "Hover a point for the counts; hover a line to isolate one tier."
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_dest, width_svg = 13, height_svg = 5)
 ```
 
-*Expecting more moves upward than downward among players from lower tiers.* Holds, with a nuance. Players who start at a tier 1 school move up 4,927
-times against 985 moves down, about five to one. But players from tier 2
-schools also move upward or sideways more often than down to tier 1, so the
-ladder effect is strongest at the bottom and fades by tier 2.
+### 3.2 Two transfers in five stay in the same tier, and more drop a tier than climb one
+
+*Expecting most transfers to stay within the same competition tier.* ✅
+
+The table and the first figure count the `r fmt(nrow(tr))` transfer events
+by direction, with the recurring cast as named examples; the second figure
+follows each direction's share season by season.
 
 ```{r}
-#| label: check-ladder
-tier1 <- tr |> filter(prev_tier == 1) |> count(transfer_direction)
-n_up_t1 <- tier1$n[tier1$transfer_direction == "up"]
-n_down_t1 <- tier1$n[tier1$transfer_direction == "down"]
-stopifnot(n_up_t1 > 2 * n_down_t1)
-```
+#| label: s32-table
+dir_tab <- tr |>
+  count(direction_label, name = "n") |>
+  mutate(share = n / sum(n))
+dir_of <- function(d) dir_tab$share[dir_tab$direction_label == d]
+dir_tab |>
+  rowwise() |>
+  transmute(
+    Direction = as.character(direction_label),
+    Transfers = fmt(n),
+    Share = pct(share),
+    `95% CI` = sprintf(
+      "%s to %s",
+      pct(wilson(n, nrow(tr))["lo"]),
+      pct(wilson(n, nrow(tr))["hi"])
+    )
+  ) |>
+  kable(caption = "Transfer events by direction.")
 
-Four quarterbacks from the recurring cast of earlier posts illustrate the
-range of moves: Joe Burrow left Ohio State for LSU in 2018 (same tier) and won
-a national championship and the first overall pick; Shane Buechele moved from
-Texas down to SMU in 2019; Jordan Travis moved from Louisville to Florida
-State in 2019 (same tier); and Cameron Ward climbed from Incarnate Word to
-Washington State in 2022 and again to Miami in 2024, two tiers up and then
-within the top tier, before being drafted in 2025.
-
-```{r}
-#| label: examples
-ex <- ps_change |>
+ex <- tr |>
   filter(
-    ((player == "Joe Burrow" & season == 2018) |
+    (player == "Joe Burrow" & season == 2018) |
       (player == "Shane Buechele" & season == 2019) |
       (player == "Jordan Travis" & season == 2019) |
-      (player == "Cameron Ward")) &
-      transferred
+      player == "Cameron Ward"
   ) |>
-  distinct(player, season, prev_team, team, transfer_direction) |>
+  distinct(player, season, prev_team, team, direction_label) |>
+  arrange(player, season)
+ex |>
   transmute(
     Player = player,
     Season = season,
     From = prev_team,
     To = team,
-    Direction = dir_label[transfer_direction]
+    Direction = as.character(direction_label)
   ) |>
-  arrange(Player, Season)
-
-stopifnot(nrow(ex) == 5, "Cameron Ward" %in% ex$Player)
-kable(ex, caption = "Table 4: example transfers from the recurring cast")
+  kable(caption = "The recurring cast's transfers.")
 ```
-
-### 3.3 Who moves where, by position
-
-*Expecting quarterbacks and running backs to move down more than other positions.* Holds. Among positions with more than 200 transfers, quarterbacks and
-running backs who change schools move down more often than any other position
-group (41 percent each) and move up the least (17 and 19 percent), while
-punters and kickers move up the most (38 and 34 percent).
 
 ```{r}
-#| label: position
-pos_tab <- tr |>
-  filter(position %in% c("QB", "RB", "WR", "TE", "LB", "DB", "P", "PK")) |>
-  count(position, direction_label) |>
-  group_by(position) |>
-  mutate(Share = n / sum(n)) |>
-  ungroup() |>
-  select(position, direction_label, Share) |>
-  pivot_wider(names_from = direction_label, values_from = Share) |>
-  transmute(
-    Position = position,
-    `Up (%)` = sprintf("%.0f", 100 * `To a higher tier`),
-    `Same tier (%)` = sprintf("%.0f", 100 * `Same tier`),
-    `Down (%)` = sprintf("%.0f", 100 * `To a lower tier`)
-  )
-
+#| label: s32-pin
+#| include: false
 stopifnot(
-  max(pos_tab$`Down (%)`) %in% c("41"),
-  max(pos_tab$`Up (%)`) == "38"
+  nrow(dir_tab) == 3,
+  dir_of("Same tier") == max(dir_tab$share),
+  dir_of("To a lower tier") > dir_of("To a higher tier"),
+  round(100 * dir_of("Same tier")) == 42,
+  nrow(ex) == 5,
+  ex$direction_label[ex$player == "Shane Buechele"] == "To a lower tier",
+  ex$direction_label[ex$player == "Joe Burrow"] == "Same tier",
+  all(
+    ex$direction_label[ex$player == "Cameron Ward"] ==
+      c("To a higher tier", "Same tier")
+  )
 )
-kable(pos_tab, caption = "Table 5: transfer direction by position (share of that position's transfer events)")
 ```
 
-The specialist pattern is consistent with the opportunity structure: there
-are few punting and kicking jobs, and a specialist's path to the top often
-runs through a smaller program first. Quarterbacks and running backs carry
-the opposite incentive, since depth charts at big programs are long and the
-next snap may only exist one tier down.
+```{r}
+#| label: s32-explain
+#| fig-height: 4
+dir_plot <- dir_tab |>
+  mutate(direction_label = reorder(direction_label, share))
+p_dir <- ggplot(dir_plot, aes(100 * share, direction_label)) +
+  geom_col_interactive(
+    aes(
+      fill = direction_label == "Same tier",
+      tooltip = sprintf(
+        "%s: %s transfers (%.1f%%)",
+        direction_label,
+        fmt(n),
+        100 * share
+      ),
+      data_id = direction_label
+    ),
+    width = 0.65
+  ) +
+  geom_text(
+    aes(label = sprintf("%.1f%% (%s)", 100 * share, fmt(n))),
+    hjust = -0.05,
+    size = 4.4
+  ) +
+  scale_fill_manual(values = c(`TRUE` = "#1b4f8a", `FALSE` = "gray65")) +
+  guides(fill = "none") +
+  expand_limits(x = 55) +
+  scale_x_continuous(labels = function(x) sprintf("%.0f%%", x)) +
+  labs(
+    title = "The most common move is sideways",
+    subtitle = "Share of transfer events by direction",
+    x = "Share of transfer events",
+    y = NULL
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_dir, width_svg = 13, height_svg = 4)
+```
+
+```{r}
+#| label: s32-explore
+#| fig-height: 5
+dir_season <- tr |>
+  filter(season >= 2016) |>
+  count(season, direction_label, name = "n") |>
+  group_by(season) |>
+  mutate(share = n / sum(n)) |>
+  ungroup()
+p_dir_season <- ggplot(
+  dir_season,
+  aes(season, 100 * share, color = direction_label)
+) +
+  geom_line_interactive(
+    aes(data_id = direction_label, tooltip = direction_label),
+    linewidth = 1.2
+  ) +
+  geom_point_interactive(
+    aes(
+      data_id = direction_label,
+      tooltip = sprintf(
+        "%d, %s: %.1f%% of that season's transfers (%s)",
+        season,
+        direction_label,
+        100 * share,
+        fmt(n)
+      )
+    ),
+    size = 2.6
+  ) +
+  scale_color_manual(values = dir_colors) +
+  scale_x_continuous(breaks = 2016:2026) +
+  scale_y_continuous(limits = c(0, NA)) +
+  labs(
+    title = "The direction mix season by season",
+    subtitle = "Share of each season's transfer events by direction, 2016 on",
+    x = "Season",
+    y = "Share of transfer events (%)",
+    color = NULL,
+    caption = "Seasons before 2016 have too few observed transfers to split. Hover a point for the count."
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_dir_season, width_svg = 13, height_svg = 5)
+```
+
+### 3.3 FCS players climb as often as they stay, but Group of Five players drop more than they climb
+
+*Expecting players from lower tiers to move up more often than down.* ❌
+
+The table and the first figure cross each transfer's old tier with its new
+one: players leaving FCS and below cannot drop, so they climb or stay,
+while Group of Five players drop to FCS more often than they climb to the
+Power conferences; the second figure tracks each origin's direction mix by
+season.
+
+```{r}
+#| label: s33-table
+matrix_tab <- tr |>
+  count(from, to, name = "n") |>
+  group_by(from) |>
+  mutate(row_share = n / sum(n)) |>
+  ungroup()
+cell <- function(f, t, col = "n") {
+  matrix_tab[[col]][matrix_tab$from == f & matrix_tab$to == t]
+}
+matrix_tab |>
+  mutate(label = sprintf("%s (%s)", fmt(n), pct(row_share, 0))) |>
+  select(From = from, to, label) |>
+  pivot_wider(names_from = to, values_from = label, values_fill = "0") |>
+  kable(
+    caption = "Transfer events by old tier (rows) and new tier (columns); the percentage is the share of that row's transfers."
+  )
+```
+
+```{r}
+#| label: s33-pin
+#| include: false
+stopifnot(
+  sum(matrix_tab$n) == nrow(tr),
+  cell("FCS and below", "Group of Five") + cell("FCS and below", "Power") >
+    cell("FCS and below", "FCS and below"),
+  # The failed half of the expectation: Group of Five drops outnumber climbs.
+  cell("Group of Five", "FCS and below") > cell("Group of Five", "Power"),
+  cell("Power", "Power") == max(matrix_tab$n[matrix_tab$from == "Power"])
+)
+```
+
+```{r}
+#| label: s33-explain
+#| fig-height: 5.5
+heat <- matrix_tab |>
+  mutate(
+    direction = case_when(
+      as.integer(to) > as.integer(from) ~ "To a higher tier",
+      as.integer(to) < as.integer(from) ~ "To a lower tier",
+      TRUE ~ "Same tier"
+    ),
+    from = factor(from, rev(tier_name)),
+    to = factor(to, tier_name),
+    highlight = from == "Group of Five" & to %in% c("FCS and below", "Power")
+  )
+p_heat <- ggplot(heat, aes(to, from)) +
+  geom_tile_interactive(
+    aes(
+      fill = direction,
+      tooltip = sprintf(
+        "%s to %s: %s transfers, %.0f%% of transfers leaving %s",
+        from,
+        to,
+        fmt(n),
+        100 * row_share,
+        from
+      ),
+      data_id = paste(from, to)
+    ),
+    color = "white",
+    linewidth = 2,
+    alpha = 0.85
+  ) +
+  geom_tile(
+    data = filter(heat, highlight),
+    fill = NA,
+    color = "#111827",
+    linewidth = 1.4
+  ) +
+  geom_text(
+    aes(label = sprintf("%.0f%%\n(%s)", 100 * row_share, fmt(n))),
+    size = 5,
+    fontface = "bold"
+  ) +
+  scale_fill_manual(values = dir_colors) +
+  labs(
+    title = "Group of Five players drop more often than they climb",
+    subtitle = "Share of each old tier's transfers by new tier (rows sum to 100%)",
+    x = "New tier",
+    y = "Old tier",
+    fill = NULL,
+    caption = "Outlined: the Group of Five row's two moves, down to FCS and up to the Power conferences."
+  ) +
+  theme_cfb2nfl() +
+  theme(panel.grid = element_blank())
+girafe(ggobj = p_heat, width_svg = 13, height_svg = 5.5)
+```
+
+```{r}
+#| label: s33-explore
+#| fig-height: 6
+origin_season <- tr |>
+  filter(season >= 2016) |>
+  count(season, from, direction_label, name = "n") |>
+  group_by(season, from) |>
+  mutate(share = n / sum(n)) |>
+  ungroup()
+p_origin <- ggplot(
+  origin_season,
+  aes(season, 100 * share, color = direction_label)
+) +
+  geom_line(linewidth = 1) +
+  geom_point_interactive(
+    aes(
+      data_id = paste(from, direction_label),
+      tooltip = sprintf(
+        "Leaving %s, %d: %.0f%% %s (%s transfers)",
+        from,
+        season,
+        100 * share,
+        tolower(direction_label),
+        fmt(n)
+      )
+    ),
+    size = 2.2
+  ) +
+  facet_wrap(~from, nrow = 1) +
+  scale_color_manual(values = dir_colors) +
+  scale_x_continuous(breaks = c(2016, 2021, 2026)) +
+  labs(
+    title = "Each origin tier's direction mix, season by season",
+    subtitle = "Share of transfers leaving each tier, by direction, 2016 on",
+    x = "Season",
+    y = "Share of that tier's transfers (%)",
+    color = NULL,
+    caption = "Hover a point for the season's count."
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_origin, width_svg = 13, height_svg = 6)
+```
+
+### 3.4 Quarterbacks and running backs drop a tier more often than any other position
+
+*Expecting quarterbacks and running backs to move down more often than
+other positions.* ✅
+
+The table and the first figure rank the position groups by the share of
+their transfers that went to a lower tier; the second figure shows each
+group's full direction mix.
+
+```{r}
+#| label: s34-table
+pos_dir <- tr |>
+  filter(group != "Position not recorded") |>
+  count(group, direction_label, name = "n") |>
+  group_by(group) |>
+  mutate(share = n / sum(n), transfers = sum(n)) |>
+  ungroup()
+pos_tab <- pos_dir |>
+  select(group, transfers, direction_label, share) |>
+  pivot_wider(names_from = direction_label, values_from = share) |>
+  arrange(desc(`To a lower tier`))
+pos_tab |>
+  transmute(
+    `Position group` = group,
+    Transfers = fmt(transfers),
+    `To a lower tier` = pct(`To a lower tier`),
+    `Same tier` = pct(`Same tier`),
+    `To a higher tier` = pct(`To a higher tier`)
+  ) |>
+  kable(
+    caption = sprintf(
+      "Transfer direction by position group, ordered by the share moving down. Groups pool roster codes (for example, cornerbacks and safeties are defensive backs); %d transfers with no position recorded are omitted.",
+      sum(tr$group == "Position not recorded")
+    )
+  )
+down_of <- function(g) pos_tab$`To a lower tier`[pos_tab$group == g]
+```
+
+```{r}
+#| label: s34-pin
+#| include: false
+stopifnot(
+  setequal(pos_tab$group[1:2], c("Quarterback", "Running back")),
+  round(100 * down_of("Quarterback")) == 41,
+  round(100 * down_of("Running back")) == 41,
+  pos_tab$group[which.max(pos_tab$`To a higher tier`)] == "Special teams"
+)
+```
+
+```{r}
+#| label: s34-explain
+#| fig-height: 6
+down_plot <- pos_tab |>
+  mutate(
+    group = reorder(group, `To a lower tier`),
+    highlight = group %in% c("Quarterback", "Running back")
+  )
+p_down <- ggplot(down_plot, aes(100 * `To a lower tier`, group)) +
+  geom_col_interactive(
+    aes(
+      fill = highlight,
+      tooltip = sprintf(
+        "%s: %.1f%% of %s transfers moved to a lower tier",
+        group,
+        100 * `To a lower tier`,
+        fmt(transfers)
+      ),
+      data_id = group
+    ),
+    width = 0.7
+  ) +
+  geom_text(
+    aes(
+      label = sprintf("%.1f%% of %s", 100 * `To a lower tier`, fmt(transfers))
+    ),
+    hjust = -0.05,
+    size = 4.2
+  ) +
+  scale_fill_manual(values = c(`TRUE` = "#D95F02", `FALSE` = "gray65")) +
+  guides(fill = "none") +
+  expand_limits(x = 58) +
+  scale_x_continuous(labels = function(x) sprintf("%.0f%%", x)) +
+  labs(
+    title = "Quarterbacks and running backs move down most",
+    subtitle = "Share of each position group's transfers that went to a lower tier",
+    x = "Transfers to a lower tier",
+    y = NULL,
+    caption = "Offensive line counts only linemen with a stat line, a small and selected group."
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_down, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s34-explore
+#| fig-height: 6
+mix_plot <- pos_dir |>
+  mutate(
+    group = factor(group, levels = rev(pos_tab$group)),
+    direction_label = factor(direction_label, rev(names(dir_colors)))
+  )
+p_mix <- ggplot(mix_plot, aes(100 * share, group, fill = direction_label)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf(
+        "%s, %s: %.1f%% (%s of %s transfers)",
+        group,
+        tolower(direction_label),
+        100 * share,
+        fmt(n),
+        fmt(transfers)
+      ),
+      data_id = paste(group, direction_label)
+    ),
+    width = 0.7
+  ) +
+  scale_fill_manual(values = dir_colors, breaks = names(dir_colors)) +
+  scale_x_continuous(labels = function(x) sprintf("%.0f%%", x)) +
+  labs(
+    title = "Every position's full direction mix",
+    subtitle = "Share of each position group's transfers by direction",
+    x = "Share of the group's transfers",
+    y = NULL,
+    fill = NULL,
+    caption = "Hover a segment for the count."
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_mix, width_svg = 13, height_svg = 6)
+```
 
 ## 4. Summary
 
-+ *Players change schools far more often since the 2021 rule.* The per-season share rose from about 2 percent before the rule to 19 percent in 2026. ✅
-+ *Most players who transfer stay in the same tier.* 42 percent land in the same tier, against 35 percent down and 24 percent up. ✅
-+ *Players from lower tiers move up more than down.* Players starting at a tier 1 school move up about five times as often as they move down. ✅
-+ *Quarterbacks and running backs move down the most.* Both sit at 41 percent down, the highest of any position group. ✅
+Three of the four expectations hold; the one that fails shows the Group of
+Five losing more players downward than it sends up.
+
+```{r}
+#| label: summary
+tribble(
+  ~Expectation                                        , ~Verdict , ~Evidence                                                                                                                                                                                 ,
+  "Transfers grew sharply after the 2021 rule"        , "✅"      , sprintf("Under 5%% of player-seasons every season through 2020; %s in 2026.", pct(share_of(2026)))                                                                                        ,
+  "Most transfers stay in the same tier"              , "✅"      , sprintf("%s same tier, %s down, %s up.", pct(dir_of("Same tier")), pct(dir_of("To a lower tier")), pct(dir_of("To a higher tier")))                                                       ,
+  "Lower-tier players move up more often than down"   , "❌"      , sprintf("Group of Five players dropped to FCS %s times and climbed to the Power conferences %s times.", fmt(cell("Group of Five", "FCS and below")), fmt(cell("Group of Five", "Power"))) ,
+  "Quarterbacks and running backs move down the most" , "✅"      , sprintf("%s of quarterback and %s of running back transfers moved down, the two highest.", pct(down_of("Quarterback")), pct(down_of("Running back")))
+) |>
+  kable(caption = "Each expectation and what the data showed.")
+```
 
 ## 5. Discussion
 
-::: {.callout-important appearance="minimal"}
-The transfer count is a **floor**. It only sees moves where both seasons carry
-a stat line, so a player who transfers and never records another stat is
-invisible, and players whose final season precedes our roster coverage leave
-no trail at all. Early-year rates (before 2016) are lower bounds on true
-movement.
+::: {.callout-important}
+The transfer count is a floor.
+
+- A move is visible only when both seasons carry a stat line, so a player
+  who transfers and never records another statistic is not counted.
+- Roster coverage is thin before about 2016, so the early rates are lower
+  bounds, and part of the rise reflects growing coverage; the climb after
+  2020 is steep and sustained, and it lines up with the rule change.
 :::
 
-::: {.callout-important appearance="minimal"}
-Direction is measured against **competition tiers, not individual programs**.
-A move from one Power program to another is lateral here even when the new
-program is stronger, and conference realignment can shift a school's tier
-while its roster stays put. The 794 player-seasons where a team's tier
-changed between seasons without a school change are excluded from every
-count above.
+::: {.callout-important}
+Direction is measured against competition tiers, not programs.
+
+- A move between two Power programs counts as same tier even when the new
+  program is far stronger.
+- The `r fmt(sum(ps_change$tier != ps_change$prev_tier & !ps_change$transferred, na.rm = TRUE))`
+  player-seasons whose team changed tier through conference realignment,
+  without the player changing schools, are not transfers and are excluded.
 :::
 
-Finally, the trend line conflates two forces: the 2021 rule change and the
-growing coverage of the underlying roster data. The pre-2016 counts are
-certainly incomplete, but the post-2018 climb is too steep and too sustained
-to be a coverage artifact alone, and it lines up year by year with the portal's
-opening and the one-time waiver.
+::: {.callout-important}
+Depth charts plausibly explain the position pattern.
 
-A natural next question is what these moves are worth: whether a transfer
-season changes a player's chance of being drafted, which the outcome labels in
-this project can answer directly.
-
-```{r}
-#| label: session-info
-#| include: false
-```
+- Quarterbacks and running backs at large programs compete in long depth
+  charts, and the next available starting job is often one tier down.
+- Specialists climb most often: kicking and punting jobs are few, and a
+  specialist's route to a Power program often starts at a smaller one.
+:::

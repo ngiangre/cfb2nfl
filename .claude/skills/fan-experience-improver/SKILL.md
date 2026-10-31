@@ -60,8 +60,9 @@ the fan reader would, in order, and report how the read goes:
 - **Flow:** does each section's assertion follow from the previous section's
   exhibits? Could the reader reconstruct the takeaway from headings and
   tables/figures alone?
-- **Wordiness:** the style is one concise statement per section, then exhibits
-  (AGENTS.md "Blog style"). Flag every paragraph doing a table's job, every
+- **Wordiness:** the style is a sentence or two per section, then a table, an
+  explanatory figure, and an exploratory figure (AGENTS.md "Blog style").
+  Flag every paragraph doing a table's job, every
   "data tour" passage that surveys everything instead of showing the snapshot
   the argument needs, and any section with more than one idea.
 - **Reception:** where does the reader stall — an undefined term, a code name

@@ -7,7 +7,7 @@ followups:
   - "Include the eligible-season index as a model term; the entry hazard varies fourfold across it."
   - "Treat made-roster and rookie-games as a separate second-stage prediction problem, not a footnote on entry."
 author:
-  - "An AI directed by Nick Giangreco"
+  - "AI directed by Nick Giangreco"
 freeze: auto
 vignette: >
   %\VignetteIndexEntry{Most draft-eligible college seasons end without an NFL outcome}
@@ -17,6 +17,7 @@ vignette: >
 
 ```{r}
 #| label: setup
+#| include: false
 # Load the package from the checkout with pkgload; no package install is
 # required. Under altdoc the render runs in a temp dir, so resolve the root
 # first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
@@ -69,8 +70,7 @@ wilson <- function(x, n, z = 1.96) {
 
 ```{r}
 #| label: load
-# The connection message is an implementation detail; the reader sees only
-# the counts in the visible chunk below.
+#| include: false
 outcomes <- tbl(con, "outcomes") |> collect()
 dbDisconnect(con)
 
@@ -100,34 +100,40 @@ as failures.*
 
 ## 1. Introduction
 
-- A model that forecasts who reaches the NFL has to beat the trivial forecast
-  that nobody does, which is right for
-  `r pct(1 - mean(risk$outcome_nfl_entry_d))` of draft-eligible college
-  seasons.
-- This post measures that base rate and its parts: how often each outcome
-  occurs, which route into the league is larger, how the chance changes over
-  a player's eligible seasons and across draft classes, and how often the
-  players who arrive actually play, with five quarterbacks from earlier posts
-  (Joe Burrow, Cam Ward, Jordan Travis, Shane Buechele, Kyle Allen) as
-  running examples.
+A model that forecasts who reaches the NFL has to beat the trivial forecast
+that nobody does, which is right for
+`r pct(1 - mean(risk$outcome_nfl_entry_d))` of draft-eligible college
+seasons, so this post measures that base rate and its parts, with Joe
+Burrow, Cam Ward, Jordan Travis, Shane Buechele, and Kyle Allen as running
+examples.
+
++ *Expecting the draft to be rare, under five percent of eligible seasons.*
++ *Expecting undrafted free-agent entry to rival the draft as an NFL route.*
++ *Expecting exhausted eligibility to be the most common end-of-season
+  status.*
++ *Expecting the chance of NFL entry to rise over a player's eligible
+  seasons.*
++ *Expecting NFL outcome prevalence to be roughly stable across draft
+  classes.*
++ *Expecting most entrants to appear on an NFL roster in their entry year.*
 
 ## 2. Data
 
-### Every eligible season ends in exactly one of five statuses
+### 2.1 Every eligible season ends in exactly one of five statuses
 
 A **player-season** is one player's college season with a recorded stat
-line, it is **eligible** when the following draft comes at least three years
-after his high-school graduation (so a freshman season never counts), and
-the table defines the five ways an eligible season can end.
+line, **eligible** when the following draft comes at least three years after
+his high-school graduation; the table defines the five ways an eligible
+season can end.
 
 ```{r}
 #| label: status-terms
 status_terms <- tribble(
-  ~Status                             , ~`NFL entry` , ~Definition                                                                                                                                                                         ,
-  "Drafted"                           , "Yes"        , "Selected in the NFL draft held the spring after the season, reported by round: round 1, rounds 2 to 3, rounds 4 to 7."                                                         ,
-  "Signed as an undrafted free agent" , "Yes"        , "Not selected in that draft, but on an NFL roster within the entry window afterward (matched by a guarded name lookup)."                                                         ,
-  "Still playing next season"         , "No"         , "Back on a college roster the next season; the season is one more turn of the eligibility clock, not an outcome."                                                                ,
-  "Exhausted eligibility undrafted"   , "No"         , "The player's last observed college season, with no draft selection and no NFL roster appearance after it."                                                                      ,
+  ~Status                             , ~`NFL entry` , ~Definition                                                                                                                                                                            ,
+  "Drafted"                           , "Yes"        , "Selected in the NFL draft held the spring after the season, reported by round: round 1, rounds 2 to 3, rounds 4 to 7."                                                                ,
+  "Signed as an undrafted free agent" , "Yes"        , "Not selected in that draft, but on an NFL roster within the entry window afterward (matched by a guarded name lookup)."                                                               ,
+  "Still playing next season"         , "No"         , "Back on a college roster the next season; the season is one more turn of the eligibility clock, not an outcome."                                                                      ,
+  "Exhausted eligibility undrafted"   , "No"         , "The player's last observed college season, with no draft selection and no NFL roster appearance after it."                                                                            ,
   "Left the data early"               , "No"         , "Absent the next season although his record says a next season should exist (a transfer with sitting time, an injury retirement, or an unobserved departure); the outcome is unknown."
 )
 kable(
@@ -136,11 +142,11 @@ kable(
 )
 ```
 
-### The risk set counts seasons, while each NFL event falls on one season per player
+### 2.2 The risk set counts seasons, while each NFL event falls on one season per player
 
-A player usually contributes several eligible seasons, so the risk set below
-is larger in seasons than in players, and the pin after it confirms that no
-player carries more than one NFL event.
+A player usually contributes several eligible seasons, so the table counts
+more seasons than players, and each player's NFL entry, if any, falls on
+exactly one of them.
 
 ```{r}
 #| label: risk-set
@@ -148,11 +154,15 @@ risk_set <- tibble(
   Measure = c("Eligible player-seasons", "Distinct players"),
   Count = format(c(n_risk, n_players), big.mark = ",")
 )
-kable(risk_set, caption = "The risk set: eligible seasons with an observed outcome.")
+kable(
+  risk_set,
+  caption = "The risk set: eligible seasons with an observed outcome."
+)
 ```
 
 ```{r}
 #| label: grain-pin
+#| include: false
 # The draft and UDFA events are mutually exclusive, their union is the entry
 # label on every row, and no player enters twice. A violation here would
 # poison every rate below (a naive mean(na.rm = TRUE) over a partially NA flag
@@ -188,10 +198,10 @@ ci_drafted <- wilson(n_drafted, n_risk)
 *Expectation: the draft is rare, under five percent of eligible seasons.* ✅
 
 Out of every 100 eligible seasons, `r fmt(100 * p_drafted, 1)` end drafted
-and `r fmt(100 * p_entry, 1)` in NFL entry by either route, and the ledger
-lists each outcome with its 95 percent confidence interval, the range the
-true rate plausibly occupies given how many seasons were observed (computed
-by Wilson's method, which behaves well for rare events).
+and `r fmt(100 * p_entry, 1)` in NFL entry by either route; the table and
+figures give each outcome with its 95 percent confidence interval, the range
+the true rate plausibly occupies (Wilson's method), and split the draft by
+round.
 
 ```{r}
 #| label: ledger
@@ -236,12 +246,114 @@ kable(
 
 ```{r}
 #| label: ledger-pin
+#| include: false
 stopifnot(
   p_drafted < 0.04,
   ci_drafted["hi"] < 0.05,
   n_drafted == 2479,
   n_udfa == 3239
 )
+```
+
+```{r}
+#| label: ledger-explain
+#| fig-height: 5
+ledger_plot <- tibble(
+  Outcome = c(
+    "Drafted, any round",
+    "Signed as an undrafted free agent",
+    "NFL entry (drafted or undrafted)"
+  ),
+  n_event = c(n_drafted, n_udfa, n_entry)
+) |>
+  rowwise() |>
+  mutate(
+    p = n_event / n_risk,
+    lo = wilson(n_event, n_risk)["lo"],
+    hi = wilson(n_event, n_risk)["hi"]
+  ) |>
+  ungroup() |>
+  mutate(
+    Outcome = reorder(Outcome, p),
+    drafted = Outcome == "Drafted, any round"
+  )
+p_ledger <- ggplot(ledger_plot, aes(100 * p, Outcome)) +
+  geom_vline(xintercept = 5, linetype = "dashed", color = "gray50") +
+  geom_col_interactive(
+    aes(
+      fill = drafted,
+      tooltip = sprintf(
+        "%s: %s of %s eligible seasons (%.1f%%, 95%% CI %.1f%% to %.1f%%)",
+        Outcome,
+        fmt(n_event),
+        fmt(n_risk),
+        100 * p,
+        100 * lo,
+        100 * hi
+      ),
+      data_id = Outcome
+    ),
+    width = 0.65
+  ) +
+  geom_linerange(aes(xmin = 100 * lo, xmax = 100 * hi), linewidth = 0.8) +
+  geom_text(
+    aes(x = 100 * hi + 0.2, label = sprintf("%.1f%%", 100 * p)),
+    hjust = 0,
+    size = 4.4
+  ) +
+  annotate(
+    "text",
+    x = 5.1,
+    y = 0.55,
+    label = "5% line",
+    hjust = 0,
+    size = 4.2
+  ) +
+  scale_fill_manual(values = c(`TRUE` = "#1B9E77", `FALSE` = "gray65")) +
+  guides(fill = "none") +
+  expand_limits(x = 10) +
+  scale_x_continuous(labels = function(x) sprintf("%.0f%%", x)) +
+  labs(
+    title = "The draft takes fewer than four seasons in a hundred",
+    subtitle = "Share of eligible player-seasons ending in each outcome",
+    x = "Share of eligible seasons",
+    y = NULL,
+    caption = "Whiskers: 95% confidence interval."
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_ledger, width_svg = 13, height_svg = 5)
+```
+
+```{r}
+#| label: ledger-explore
+#| fig-height: 5
+by_round <- risk |>
+  filter(outcome_drafted_d) |>
+  count(round = outcome_draft_round_d, name = "n") |>
+  mutate(per100 = 100 * n / n_risk)
+p_round <- ggplot(by_round, aes(factor(round), per100)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf(
+        "Round %d: %s eligible seasons drafted, %.2f in every 100",
+        round,
+        fmt(n),
+        per100
+      ),
+      data_id = round
+    ),
+    fill = "#1B9E77",
+    width = 0.7
+  ) +
+  labs(
+    title = "Every round takes roughly the same thin slice",
+    subtitle = "Eligible seasons drafted in each round, per 100 eligible seasons",
+    x = "Draft round",
+    y = "Per 100 eligible seasons",
+    caption = "Hover a bar for the count."
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_round, width_svg = 13, height_svg = 5)
 ```
 
 ### 3.2 More NFL entrants arrive undrafted than drafted
@@ -266,10 +378,58 @@ udfa_share <- n_udfa / n_entry
 
 *Expectation: undrafted free-agent entry rivals the draft as an NFL route.* ✅
 
-Splitting the `r fmt(n_entry)` NFL entries by route, each bar a share of all
-entrants with its count in the label, shows the undrafted route alone carries
-`r pct(udfa_share)` of them, more than all seven rounds of the draft
-combined.
+The table and the first figure split the `r fmt(n_entry)` NFL entries by
+route and name the route each running example took, showing the undrafted
+route alone carries `r pct(udfa_share)` of entrants, more than all seven
+rounds combined; the second figure follows the route mix by draft class.
+
+```{r}
+#| label: routes-table
+routes |>
+  arrange(desc(share)) |>
+  transmute(
+    Route = as.character(route),
+    Entrants = fmt(n),
+    Share = pct(share)
+  ) |>
+  kable(caption = "NFL entrants by entry route.")
+```
+
+```{r}
+#| label: examples
+cast <- c(
+  "Joe Burrow",
+  "Cameron Ward",
+  "Jordan Travis",
+  "Shane Buechele",
+  "Kyle Allen"
+)
+examples <- risk |>
+  filter(player %in% cast, outcome_nfl_entry_d) |>
+  mutate(
+    Route = if_else(
+      outcome_drafted_d,
+      sprintf(
+        "Drafted, round %d, pick %d",
+        outcome_draft_round_d,
+        outcome_draft_pick_d
+      ),
+      "Undrafted free agent"
+    )
+  ) |>
+  arrange(draft_year) |>
+  select(
+    Player = player,
+    `Final college season` = season,
+    `Draft class` = draft_year,
+    Route,
+    `Eligible season` = eligible_season_index
+  )
+kable(
+  examples,
+  caption = "The running examples at their NFL entry. Eligible season counts the player's draft-eligible college seasons from one."
+)
+```
 
 ```{r}
 #| label: routes-fig
@@ -323,47 +483,52 @@ p_routes <- ggplot(routes, aes(x = 100 * share, y = route)) +
 girafe(ggobj = p_routes, width_svg = 13, height_svg = 5)
 ```
 
-The five running examples cover both routes, and the table reads each one's
-entry season straight from the data.
-
 ```{r}
-#| label: examples
-cast <- c(
-  "Joe Burrow",
-  "Cameron Ward",
-  "Jordan Travis",
-  "Shane Buechele",
-  "Kyle Allen"
-)
-examples <- risk |>
-  filter(player %in% cast, outcome_nfl_entry_d) |>
+#| label: routes-explore
+#| fig-height: 5
+route_class <- risk |>
+  filter(outcome_nfl_entry_d) |>
   mutate(
-    Route = if_else(
-      outcome_drafted_d,
-      sprintf(
-        "Drafted, round %d, pick %d",
-        outcome_draft_round_d,
-        outcome_draft_pick_d
-      ),
-      "Undrafted free agent"
-    )
+    route = if_else(outcome_drafted_d, "Drafted", "Undrafted free agent")
   ) |>
-  arrange(draft_year) |>
-  select(
-    Player = player,
-    `Final college season` = season,
-    `Draft class` = draft_year,
-    Route,
-    `Eligible season` = eligible_season_index
-  )
-kable(
-  examples,
-  caption = "The running examples at their NFL entry. Eligible season counts the player's draft-eligible college seasons from one."
-)
+  count(draft_year, route, name = "n") |>
+  group_by(draft_year) |>
+  mutate(share = n / sum(n)) |>
+  ungroup()
+p_route_class <- ggplot(route_class, aes(draft_year, n, fill = route)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf(
+        "%d class, %s: %s entrants (%.0f%% of the class's entrants)",
+        draft_year,
+        tolower(route),
+        fmt(n),
+        100 * share
+      ),
+      data_id = paste(draft_year, route)
+    ),
+    width = 0.75
+  ) +
+  scale_fill_manual(
+    values = c(Drafted = "#1B9E77", `Undrafted free agent` = "#7570B3")
+  ) +
+  scale_x_continuous(breaks = seq(2012, 2025, 2)) +
+  labs(
+    title = "The undrafted route outnumbers the draft in every class from 2016 on except 2021",
+    subtitle = "NFL entrants by entry route and draft class",
+    x = "Draft class",
+    y = "NFL entrants",
+    fill = NULL,
+    caption = "Hover a segment for the count and share."
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_route_class, width_svg = 13, height_svg = 5)
 ```
+
 
 ```{r}
 #| label: routes-pin
+#| include: false
 ex <- function(p, col) examples[[col]][examples$Player == p]
 stopifnot(
   udfa_share > 0.5,
@@ -380,7 +545,21 @@ stopifnot(
   ex("Shane Buechele", "Draft class") == 2021,
   ex("Shane Buechele", "Route") == "Undrafted free agent",
   ex("Kyle Allen", "Draft class") == 2018,
-  ex("Kyle Allen", "Route") == "Undrafted free agent"
+  ex("Kyle Allen", "Route") == "Undrafted free agent",
+  # the route-by-class figure's title
+  all(with(
+    tidyr::pivot_wider(
+      route_class,
+      id_cols = draft_year,
+      names_from = route,
+      values_from = n
+    ),
+    identical(
+      draft_year[draft_year >= 2016 & `Undrafted free agent` <= Drafted],
+      2021L
+    ) &&
+      all((`Undrafted free agent` > Drafted)[draft_year < 2016] == FALSE)
+  ))
 )
 ```
 
@@ -410,10 +589,23 @@ st <- function(s) status_tab$share[status_tab$status_end_of_season == s]
 *Expectation: exhausted eligibility is the most common end-of-season status.*
 ❌
 
-The share of eligible seasons ending in each status shows NFL outcomes fill
-only the two shortest bars, because `r pct(st("continuing"))` of eligible
-seasons are mid-career and end with the player simply returning, ahead of
-the `r pct(st("exhausted_undrafted"))` that end with eligibility exhausted.
+The table and the first figure give the share of eligible seasons ending in
+each status: `r pct(st("continuing"))` end with the player simply coming
+back, ahead of the `r pct(st("exhausted_undrafted"))` that end with
+eligibility exhausted; the second figure splits the statuses by eligible
+season.
+
+```{r}
+#| label: status-table
+status_tab |>
+  arrange(desc(share)) |>
+  transmute(
+    Status = as.character(status_label),
+    Seasons = fmt(seasons),
+    Share = pct(share)
+  ) |>
+  kable(caption = "Eligible player-seasons by end-of-season status.")
+```
 
 ```{r}
 #| label: status-fig
@@ -491,8 +683,73 @@ girafe(ggobj = p_status, width_svg = 13, height_svg = 6)
 ```
 
 ```{r}
+#| label: status-explore
+#| fig-height: 5.5
+status_idx <- risk |>
+  count(eligible_season_index, status_end_of_season, name = "n") |>
+  group_by(eligible_season_index) |>
+  mutate(share = n / sum(n), seasons = sum(n)) |>
+  ungroup() |>
+  filter(seasons >= 100) |>
+  left_join(
+    distinct(status_tab, status_end_of_season, status_label),
+    by = "status_end_of_season"
+  ) |>
+  mutate(
+    status_label = factor(
+      status_label,
+      levels = levels(status_tab$status_label)
+    )
+  )
+p_status_idx <- ggplot(
+  status_idx,
+  aes(factor(eligible_season_index), 100 * share, fill = status_label)
+) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf(
+        "Eligible season %d, %s: %.1f%% (%s of %s seasons)",
+        eligible_season_index,
+        status_label,
+        100 * share,
+        fmt(n),
+        fmt(seasons)
+      ),
+      data_id = paste(eligible_season_index, status_label)
+    ),
+    width = 0.75
+  ) +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(
+    title = "Coming back dominates early; exhausted eligibility dominates late",
+    subtitle = "Share of eligible seasons by end-of-season status, by eligible season",
+    x = "Eligible season (1 = first season the player could be drafted after)",
+    y = "Share of eligible seasons (%)",
+    fill = NULL,
+    caption = "Eligible seasons with fewer than 100 player-seasons omitted. Hover a segment for the count."
+  ) +
+  theme_cfb2nfl() +
+  theme(legend.position = "right")
+girafe(ggobj = p_status_idx, width_svg = 13, height_svg = 5.5)
+```
+
+```{r}
 #| label: status-pin
+#| include: false
+top_status <- status_idx |>
+  group_by(eligible_season_index) |>
+  slice_max(share, n = 1) |>
+  ungroup()
 stopifnot(
+  # the eligible-season figure's title
+  all(
+    top_status$status_end_of_season[top_status$eligible_season_index <= 2] ==
+      "continuing"
+  ),
+  all(
+    top_status$status_end_of_season[top_status$eligible_season_index >= 3] ==
+      "exhausted_undrafted"
+  ),
   abs(sum(status_tab$share) - 1) < 1e-8,
   st("continuing") > 0.45,
   st("exhausted_undrafted") > 0.3,
@@ -540,17 +797,38 @@ hz <- function(k, col = "outcome_nfl_entry_d") {
 *Expectation: the chance of NFL entry rises over a player's eligible
 seasons.* ✅
 
-Because most seasons are mid-career, the figure tracks the **hazard**, the
-share of players still unentered and still playing at their first, second,
-third eligible season (and so on) whose very next draft is the one that
-takes them, which rises from `r pct(hz(1))` in the first eligible season to
-`r pct(hz(4))` in the fourth.
+The **hazard** is the chance that a player still unentered and still
+playing at a given eligible season is taken by the very next draft; the
+table and the first figure show it rising from `r pct(hz(1))` in the first
+eligible season to `r pct(hz(4))` in the fourth, and the second figure
+repeats it for three eras of draft classes.
+
+```{r}
+#| label: hazard-table
+hazard |>
+  transmute(
+    `Eligible season` = eligible_season_index,
+    `Player-seasons` = fmt(seasons),
+    Drafted = pct(outcome_drafted_d),
+    `Undrafted free agent` = pct(outcome_signed_udfa_d),
+    `NFL entry` = pct(outcome_nfl_entry_d)
+  ) |>
+  kable(
+    caption = "Per-season chance of each outcome by eligible season (eligible seasons with fewer than 100 player-seasons omitted)."
+  )
+```
 
 ```{r}
 #| label: hazard-fig
 #| fig-height: 6
 hz_tip <- function(k, outcome, p, n) {
-  sprintf("Eligible season %d, %s: %.1f%% of %s seasons", k, outcome, 100 * p, fmt(n))
+  sprintf(
+    "Eligible season %d, %s: %.1f%% of %s seasons",
+    k,
+    outcome,
+    100 * p,
+    fmt(n)
+  )
 }
 p_hazard <- ggplot(
   filter(hazard_long, outcome != "NFL entry"),
@@ -647,8 +925,66 @@ girafe(ggobj = p_hazard, width_svg = 13, height_svg = 6)
 ```
 
 ```{r}
+#| label: hazard-explore
+#| fig-height: 5
+hazard_era <- risk |>
+  mutate(
+    era = cut(
+      draft_year,
+      breaks = c(2011, 2016, 2021, 2025),
+      labels = c(
+        "2012 to 2016 classes",
+        "2017 to 2021 classes",
+        "2022 to 2025 classes"
+      )
+    )
+  ) |>
+  group_by(era, eligible_season_index) |>
+  summarise(seasons = n(), p = mean(outcome_nfl_entry_d), .groups = "drop") |>
+  filter(seasons >= 100)
+p_hazard_era <- ggplot(hazard_era, aes(eligible_season_index, p, color = era)) +
+  geom_line_interactive(aes(data_id = era, tooltip = era), linewidth = 1.3) +
+  geom_point_interactive(
+    aes(
+      data_id = era,
+      tooltip = sprintf(
+        "%s, eligible season %d: %.1f%% entered the NFL (%s seasons)",
+        era,
+        eligible_season_index,
+        100 * p,
+        fmt(seasons)
+      )
+    ),
+    size = 3
+  ) +
+  scale_y_continuous(
+    labels = function(x) sprintf("%.0f%%", 100 * x),
+    limits = c(0, NA)
+  ) +
+  scale_x_continuous(breaks = 1:5) +
+  scale_color_brewer(palette = "Set2") +
+  labs(
+    title = "The chance rises through the third eligible season in every era",
+    subtitle = "Per-season chance of NFL entry by eligible season, three eras of draft classes",
+    x = "Eligible season",
+    y = "Chance the next draft\nbrings NFL entry",
+    color = NULL,
+    caption = "Era-season cells with fewer than 100 player-seasons omitted. Hover a line to isolate an era."
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_hazard_era, width_svg = 13, height_svg = 5)
+```
+
+```{r}
 #| label: hazard-pin
+#| include: false
 stopifnot(
+  # the era figure's title: rising through eligible season 3 in each era
+  all(tapply(
+    hazard_era$p[hazard_era$eligible_season_index <= 3],
+    hazard_era$era[hazard_era$eligible_season_index <= 3],
+    \(x) all(diff(x) > 0)
+  )),
   all(diff(hazard$outcome_nfl_entry_d[1:4]) > 0),
   which.max(hazard$outcome_nfl_entry_d) == 4,
   which.max(hazard$outcome_drafted_d) == 3,
@@ -688,12 +1024,27 @@ y1 <- max(trend$draft_year)
 *Expectation: NFL outcome prevalence is roughly stable across draft
 classes.* ❌
 
-Tracking the drafted and entry shares by draft class shows the drafted share
-falling from `r pct(tr(y0, "drafted"))` in the `r y0` class to
-`r pct(tr(y1, "drafted"))` in `r y1` while the pool of eligible seasons grew
-from `r fmt(tr(y0, "seasons"))` to `r fmt(tr(y1, "seasons"))`, and the entry
-share jumping with the 2016 class, when the recorded undrafted share nearly
-tripled.
+The table and the first figure follow the drafted share from
+`r pct(tr(y0, "drafted"))` of the `r y0` class to `r pct(tr(y1, "drafted"))`
+of `r y1` while the pool of eligible seasons grew more than fourfold, with
+NFL entry jumping at the 2016 class; the second figure shows the counts
+behind those shares.
+
+```{r}
+#| label: trend-table
+trend |>
+  filter(draft_year %in% c(y0, 2014, 2015, 2016, 2018, 2020, 2022, y1)) |>
+  transmute(
+    `Draft class` = draft_year,
+    `Eligible seasons` = fmt(seasons),
+    Drafted = pct(drafted),
+    `Undrafted free agent` = pct(udfa),
+    `NFL entry` = pct(entry)
+  ) |>
+  kable(
+    caption = "Share of eligible seasons ending in each outcome, selected draft classes."
+  )
+```
 
 ```{r}
 #| label: trend-fig
@@ -784,7 +1135,60 @@ girafe(ggobj = p_trend, width_svg = 13, height_svg = 6)
 ```
 
 ```{r}
+#| label: trend-explore
+#| fig-height: 5
+trend_counts <- trend |>
+  transmute(
+    draft_year,
+    `Eligible seasons` = seasons,
+    Drafted = drafted_ev,
+    `Undrafted free agent` = entry_ev - drafted_ev
+  ) |>
+  pivot_longer(-draft_year, names_to = "measure", values_to = "n") |>
+  mutate(
+    measure = factor(
+      measure,
+      c("Eligible seasons", "Drafted", "Undrafted free agent")
+    )
+  )
+p_counts <- ggplot(trend_counts, aes(draft_year, n)) +
+  geom_col_interactive(
+    aes(
+      fill = measure,
+      tooltip = sprintf(
+        "%d class, %s: %s",
+        draft_year,
+        tolower(measure),
+        fmt(n)
+      ),
+      data_id = paste(draft_year, measure)
+    ),
+    width = 0.75
+  ) +
+  facet_wrap(~measure, scales = "free_y") +
+  scale_fill_manual(
+    values = c(
+      "Eligible seasons" = "gray55",
+      Drafted = "#1B9E77",
+      `Undrafted free agent` = "#7570B3"
+    ),
+    guide = "none"
+  ) +
+  scale_x_continuous(breaks = c(2012, 2016, 2020, 2024)) +
+  labs(
+    title = "The pool grew far faster than the draft",
+    subtitle = "Eligible seasons and NFL entries by draft class (each panel on its own scale)",
+    x = "Draft class",
+    y = "Count",
+    caption = "Hover a bar for the count."
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_counts, width_svg = 13, height_svg = 5)
+```
+
+```{r}
 #| label: trend-pin
+#| include: false
 stopifnot(
   y0 == 2012,
   y1 == 2025,
@@ -829,10 +1233,24 @@ gm <- function(p) entrants$games[entrants$player == p]
 *Expectation: most entrants appear on an NFL roster in their entry year.* ✅
 
 Of the `r fmt(nrow(entrants))` entrants, `r pct(made_roster)` appear on an
-entry-year NFL roster, yet the regular-season games they played that year,
-binned with the running examples placed in their bins, show
-`r pct(zero_games)` played none and the median entrant played
-`r median(entrants$games)`.
+entry-year NFL roster, yet the table and the first figure show
+`r pct(zero_games)` played no regular-season game that year, with the
+running examples placed in their bins; the second figure splits rookie
+games by entry route.
+
+```{r}
+#| label: entry-year-table
+games_tab |>
+  arrange(desc(bin)) |>
+  transmute(
+    `Rookie games played` = as.character(bin),
+    Entrants = fmt(n),
+    Share = pct(share)
+  ) |>
+  kable(
+    caption = "NFL entrants by regular-season games played in the entry year; running examples in parentheses."
+  )
+```
 
 ```{r}
 #| label: entry-year-fig
@@ -840,7 +1258,12 @@ binned with the running examples placed in their bins, show
 p_games <- ggplot(games_tab, aes(x = 100 * share, y = bin)) +
   geom_col_interactive(
     aes(
-      tooltip = sprintf("%s games: %s entrants (%.1f%%)", bin, fmt(n), 100 * share),
+      tooltip = sprintf(
+        "%s games: %s entrants (%.1f%%)",
+        bin,
+        fmt(n),
+        100 * share
+      ),
       data_id = bin
     ),
     width = 0.7,
@@ -883,8 +1306,54 @@ girafe(ggobj = p_games, width_svg = 13, height_svg = 6)
 ```
 
 ```{r}
+#| label: entry-year-explore
+#| fig-height: 5
+games_route <- entrants |>
+  mutate(
+    route = if_else(outcome_drafted_d, "Drafted", "Undrafted free agent")
+  ) |>
+  count(route, games, name = "n") |>
+  group_by(route) |>
+  mutate(share = n / sum(n)) |>
+  ungroup()
+p_games_route <- ggplot(games_route, aes(games, 100 * share, fill = route)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf(
+        "%s, %d rookie games: %s entrants (%.1f%% of the route)",
+        route,
+        games,
+        fmt(n),
+        100 * share
+      ),
+      data_id = paste(route, games)
+    ),
+    position = position_dodge(preserve = "single"),
+    width = 0.85
+  ) +
+  scale_fill_manual(
+    values = c(Drafted = "#1B9E77", `Undrafted free agent` = "#7570B3")
+  ) +
+  scale_x_continuous(breaks = seq(0, 17, 2)) +
+  labs(
+    title = "Undrafted entrants carry most of the zero-game rookie seasons",
+    subtitle = "Share of each route's entrants by regular-season games played in the entry year",
+    x = "Rookie games played",
+    y = "Share of the route's entrants (%)",
+    fill = NULL,
+    caption = "Hover a bar for the count."
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_games_route, width_svg = 13, height_svg = 5)
+```
+
+```{r}
 #| label: entry-year-pin
+#| include: false
 stopifnot(
+  # the route figure's title: undrafted entrants hold most zero-game seasons
+  sum(games_route$n[games_route$games == 0 & games_route$route != "Drafted"]) >
+    sum(games_route$n[games_route$games == 0 & games_route$route == "Drafted"]),
   !anyNA(entrants$bin),
   made_roster > 0.95,
   zero_games > 0.45,
@@ -900,17 +1369,23 @@ stopifnot(
 
 ## 4. Summary
 
-The base rate a forecasting model has to beat is low and moving. Of
-`r fmt(n_risk)` eligible college seasons, `r pct(p_drafted)` end in a draft
-selection and `r pct(p_entry)` in NFL entry by either route, and more of
-those entrants arrive undrafted (`r pct(udfa_share)`) than drafted. Most
-eligible seasons (`r pct(st("continuing"))`) are simply followed by another
-college season, so the per-season chance of entry grows as a player waits,
-from `r pct(hz(1))` in the first eligible season to `r pct(hz(4))` in the
-fourth. Across draft classes the drafted share fell from
-`r pct(tr(y0, "drafted"))` (`r y0`) to `r pct(tr(y1, "drafted"))`
-(`r y1`). And arriving is not playing: `r pct(zero_games)` of entrants play
-no regular-season game as rookies.
+The base rate a forecasting model has to beat is low and moving: four of
+six expectations hold, and the two that fail show most seasons are
+mid-career and the drafted share is falling.
+
+```{r}
+#| label: summary
+tribble(
+  ~Expectation                                      , ~Verdict , ~Evidence                                                                                                                    ,
+  "The draft is rare, under 5% of eligible seasons" , "✅"      , sprintf("%s drafted; %s NFL entry by either route.", pct(p_drafted), pct(p_entry))                                           ,
+  "Undrafted entry rivals the draft"                , "✅"      , sprintf("%s of entrants arrive undrafted.", pct(udfa_share))                                                                 ,
+  "Exhausted eligibility is the most common status" , "❌"      , sprintf("%s of seasons end with the player returning; %s exhausted.", pct(st("continuing")), pct(st("exhausted_undrafted"))) ,
+  "The entry chance rises with waiting"             , "✅"      , sprintf("From %s in the first eligible season to %s in the fourth.", pct(hz(1)), pct(hz(4)))                                 ,
+  "Prevalence is stable across classes"             , "❌"      , sprintf("Drafted share %s (%d) to %s (%d).", pct(tr(y0, "drafted")), y0, pct(tr(y1, "drafted")), y1)                         ,
+  "Most entrants make an entry-year roster"         , "✅"      , sprintf("%s on a roster, but %s play no game.", pct(made_roster), pct(zero_games))
+) |>
+  kable(caption = "Each expectation and what the data showed.")
+```
 
 ## 5. Discussion
 
@@ -959,6 +1434,7 @@ Several caveats bound these figures.
 
 ```{r}
 #| label: caveat-pin
+#| include: false
 stopifnot(
   all(risk$hs_year_imputed[risk$player %in% c("Joe Burrow", "Cameron Ward")])
 )

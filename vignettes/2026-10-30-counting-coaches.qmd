@@ -1,7 +1,7 @@
 ---
-title: "Only 305 of 1,814 head coaches have produced a draft pick since 2014, and half of recent picks name a different coach set depending on how the counting is done"
+title: "Three in four recent head coaches have produced a draft pick, and the counting rule changes the coach set for half of recent picks"
 date: "2026-10-30"
-description: "Fewer than one in five head coaches in the college football data has produced a draft pick since 2014, ten coaches account for a fifth of recent draftees, and half of recent picks name a different coach set depending on whether every college season or only the last one is counted."
+description: "305 of the 418 head coaches active since the 2013 season produced a draft pick in the 2014 and later classes, ten coaches account for a fifth of draftee-coach pairs, and half of recent picks name a different coach set depending on whether every college season or only the last one is counted."
 followups:
   - "Position-developer archetypes: does a coach's draftee mix lean offense or defense beyond the program's baseline?"
   - "Draft output by coach tenure at a school, expressed as picks per coach-season to separate exposure from survivorship."
@@ -9,10 +9,10 @@ followups:
   - "A true apprenticeship coach tree (assistant and coordinator stints) needs a source outside CFBD; scout options and scrape terms."
   - "Separate coach from program: recruiting-talent control or the same coach at different schools."
 author:
-  - "An AI directed by Nick Giangreco"
+  - "AI directed by Nick Giangreco"
 freeze: auto
 vignette: >
-  %\VignetteIndexEntry{Only 305 of 1,814 head coaches have produced a draft pick since 2014, and half of recent picks name a different coach set depending on how the counting is done}
+  %\VignetteIndexEntry{Three in four recent head coaches have produced a draft pick, and the counting rule changes the coach set for half of recent picks}
   %\VignetteEngine{quarto::html}
   %\VignetteEncoding{UTF-8}
 ---
@@ -58,17 +58,16 @@ nfl_draft_picks <- dbReadTable(con, "nfl_draft_picks")
 fmt <- function(x, digits = 0) {
   formatC(as.numeric(x), big.mark = ",", format = "f", digits = digits)
 }
+pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
 ```
 
 ## 1. Introduction
 
-- A head coach is one voice on a staff, so what the data can support is a
-  statement about association: the head coaches under whom a future draftee
-  played.
-- This post maps that landscape: how many head coaches the data holds, how
-  many draftees they produced and at which positions, how many ran more
-  than one program, and how the position picture changes for undrafted
-  entrants, with one caveat up front about how the counting is done.
+A head coach is one voice on a staff, so what the data can support is an
+association, the head coaches under whom a future draftee played, and this
+post maps that landscape: how many coaches produced draftees, at which
+positions, how concentrated the output is, and how much the answer depends
+on the counting rule.
 
 ## 2. Data
 
@@ -79,7 +78,11 @@ the coach landscape uses classes from 2014 on, where every draftee's
 observable career is plausibly complete.*
 :::
 
-### The two counting rules differ only in how much of the pre-draft career each one covers
+### 2.1 The two counting rules differ only in how much of the pre-draft career each one covers
+
+The table defines the two rules; under either, every head coach recorded
+for a season counts, interim and midseason coaches included, and players
+whose athlete id was recycled across two careers are excluded.
 
 ```{r}
 #| label: rules-table
@@ -95,20 +98,17 @@ tibble::tribble(
   )
 ```
 
-All head coaches recorded for a season count, midseason changes and
-interim promotions included, because the claim is association rather than
-sole responsibility; players with a known recycled athlete id, the same id
-attached to two different careers, are excluded.
+### 2.2 The two rules name the same coach set for barely half of recent picks
 
-### The two rules name the same coach set for barely half of recent picks
-
-Before the coach landscape, one caveat about the counting: because
-transfers move draftees between programs, the two rules above disagree for
-about half of the recent classes, and every coach-level count in this post
-is reported under the last-school rule.
+Because transfers move draftees between programs, the table and the first
+figure show the two rules naming the identical coach set for only about
+half of picks since 2014, and the second figure ties the decline to the
+share of draftees who played for more than one school; every count after
+this section uses the last-school rule.
 
 ```{r}
 #| label: rules-compute
+#| include: false
 reused <- reused_ids(roster)
 # pool of pre-draft roster seasons for every eligible pick: reused below
 pool <- picks |>
@@ -160,6 +160,20 @@ xfer_share <- ovl |>
   mutate(transferred = n_teams > 1) |>
   group_by(year) |>
   summarise(share = mean(transferred), .groups = "drop")
+```
+
+```{r}
+#| label: rules-overlap-table
+by_class |>
+  left_join(xfer_share, by = "year") |>
+  filter(year %in% c(2011, 2014, 2017, 2020, 2023, 2024, 2025, 2026)) |>
+  transmute(
+    `Draft class` = year,
+    Picks = n_picks,
+    `Same coach set under both rules` = pct(identical_share, 0),
+    `Draftees who played for more than one school` = pct(share, 0)
+  ) |>
+  kable(caption = "Picks whose coach set is identical under both rules, and the share of draftees with a multi-school college career, selected draft classes.")
 ```
 
 ```{r}
@@ -243,16 +257,45 @@ p <- ggplot(by_class, aes(year, identical_share)) +
 girafe(ggobj = p, width_svg = 13, height_svg = 6)
 ```
 
-The slide tracks the transfer boom: draftees whose pre-draft seasons span
-more than one team were under
-`r sprintf("%.0f%%", 100 * max(xfer_share$share[xfer_share$year <= 2013]))`
-of early classes and above
-`r sprintf("%.0f%%", 100 * xfer_share$share[xfer_share$year == 2026])` of
-the class of 2026, and holding the transfer share at its 2014 through 2023
-level would erase the slide.
+```{r}
+#| label: rules-explore
+#| fig-height: 5.5
+rules_xfer <- by_class |>
+  left_join(xfer_share, by = "year")
+p_rx <- ggplot(rules_xfer, aes(100 * share, 100 * identical_share)) +
+  geom_path(color = "gray70", linewidth = 0.8) +
+  geom_point_interactive(
+    aes(
+      color = year,
+      tooltip = sprintf(
+        "%d class: %.0f%% of draftees played for more than one school; %.0f%% of %d picks name the same coaches under both rules",
+        year, 100 * share, 100 * identical_share, n_picks
+      ),
+      data_id = year
+    ),
+    size = 4
+  ) +
+  geom_text(
+    data = filter(rules_xfer, year %in% c(2011, 2014, 2020, 2026)),
+    aes(label = year),
+    nudge_y = 4,
+    size = 4.2
+  ) +
+  scale_color_viridis_c(option = "C", end = 0.85, guide = "none") +
+  labs(
+    title = "More multi-school draftees, less agreement between the rules",
+    subtitle = "Each point is a draft class",
+    x = "Draftees who played for more than one school (%)",
+    y = "Picks naming the same coach set\nunder both rules (%)",
+    caption = "Hover a point for the class."
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_rx, width_svg = 13, height_svg = 5.5)
+```
 
 ```{r}
 #| label: rules-pin
+#| include: false
 stopifnot(
   by_class$identical_share[by_class$year == 2011] == 1,
   window_mean > 0.5,
@@ -265,7 +308,7 @@ stopifnot(
 
 ## 3. Results
 
-### Fewer than one in five head coaches has produced a draftee since 2014
+### 3.1 Three in four head coaches active since 2013 produced a draftee, and the rest mostly had short tenures
 
 ```{r}
 #| label: universe-nums
@@ -278,22 +321,39 @@ active <- coaches |>
 producers <- last_school |>
   filter(year >= 2014) |>
   distinct(coach_id, coach_name)
+# seasons coached in the window whose players feed the 2014 to 2026 classes
+tenure <- coaches |>
+  filter(season >= 2013, season <= 2025) |>
+  distinct(coach_id, season) |>
+  count(coach_id, name = "seasons") |>
+  mutate(
+    produced = coach_id %in% producers$coach_id,
+    tenure_bin = cut(
+      seasons,
+      breaks = c(0, 1, 3, 6, 13),
+      labels = c("1 season", "2 to 3 seasons", "4 to 6 seasons", "7 or more seasons")
+    )
+  )
+tenure_tab <- tenure |>
+  group_by(tenure_bin) |>
+  summarise(coaches = n(), producers = sum(produced), .groups = "drop") |>
+  mutate(share = producers / coaches)
 ```
 
-The coaches table holds `r fmt(n_coach_seasons)` head-coach seasons
-covering `r fmt(n_coaches_all)` distinct coaches back to
-`r min(coaches$season)`; narrowing to the coaches active in the 2014 and
-later draft classes shows how few of them ever produced a draftee.
+Of the `r fmt(n_coaches_all)` head coaches in the data, back to
+`r min(coaches$season)`, the table counts the `r fmt(nrow(active))` active
+since 2013 and the `r fmt(nrow(producers))` (`r pct(nrow(producers) / nrow(active), 0)`)
+who produced a draftee in the 2014 and later classes; the figure shows the
+share rising with the number of seasons a coach held the job.
 
 ```{r}
 #| label: universe
-universe <- tibble::tribble(
-  ~group                                        , ~coaches        ,
-  "Head coaches in the data, 1886 to 2026"      , n_coaches_all   ,
-  "Head coaches active in the 2014 classes on"  , nrow(active)    ,
-  "Of those, coaches with at least one draftee" , nrow(producers)
-)
-universe |>
+tibble::tribble(
+  ~group                                                  , ~coaches        ,
+  "Head coaches in the data, 1886 to 2026"                , n_coaches_all   ,
+  "Head coaches active from the 2013 season on"           , nrow(active)    ,
+  "Of those, coaches with a draftee in the 2014 classes on" , nrow(producers)
+) |>
   kable(
     col.names = c("Group", "Coaches"),
     caption = "The head-coach universe and the draftee-producing subset."
@@ -301,15 +361,54 @@ universe |>
 ```
 
 ```{r}
+#| label: universe-fig
+#| fig-height: 4.5
+p_tenure <- ggplot(tenure_tab, aes(100 * share, tenure_bin)) +
+  geom_col_interactive(
+    aes(
+      fill = tenure_bin == "1 season",
+      tooltip = sprintf(
+        "%s: %d of %d coaches produced a draftee (%.0f%%)",
+        tenure_bin, producers, coaches, 100 * share
+      ),
+      data_id = tenure_bin
+    ),
+    width = 0.65
+  ) +
+  geom_text(
+    aes(label = sprintf("%.0f%% (%d of %d)", 100 * share, producers, coaches)),
+    hjust = -0.05,
+    size = 4.4
+  ) +
+  scale_fill_manual(values = c(`TRUE` = "#D95F02", `FALSE` = "#1b4f8a"), guide = "none") +
+  expand_limits(x = 118) +
+  scale_x_continuous(labels = function(x) sprintf("%.0f%%", x), breaks = seq(0, 100, 25)) +
+  labs(
+    title = "Coaches without a draftee mostly held the job briefly",
+    subtitle = "Share of head coaches active from 2013 on who produced a draftee, by seasons coached through 2025",
+    x = "Coaches with at least one draftee",
+    y = NULL
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_tenure, width_svg = 13, height_svg = 4.5)
+```
+
+```{r}
 #| label: universe-pin
+#| include: false
 stopifnot(
   n_coaches_all == 1814,
   nrow(producers) == 305,
-  nrow(producers) / nrow(active) < 0.75
+  all(producers$coach_id %in% active$coach_id),
+  round(100 * nrow(producers) / nrow(active)) == 73,
+  # the figure's title and heading: the share rises with tenure, and most
+  # coaches without a draftee coached three seasons or fewer
+  all(diff(tenure_tab$share) > 0),
+  with(tenure, mean(seasons[!produced] <= 3)) > 0.75
 )
 ```
 
-### Quarterback draftees are the smallest share of the draft among field positions
+### 3.2 Quarterback draftees are the smallest share of the draft among field positions
 
 ```{r}
 #| label: position-groups
@@ -357,14 +456,31 @@ qb_share <- qb_row$share
 qb_per_coach <- qb_row$per_coach
 ```
 
-Each draftee position group has its own supply of coaches, and raw counts
-mostly track how many college players the position fields, so the groups
-are compared as shares of all draftees: the quarterback group is the
-smallest among field positions, `r fmt(qb_draftees)` draftees,
-`r sprintf("%.1f%%", 100 * qb_share)` of the total, from only
+The table and the first figure compare position groups as shares of all
+draftees: quarterbacks are the smallest field-position group,
+`r fmt(qb_draftees)` draftees (`r sprintf("%.1f%%", 100 * qb_share)`) from
 `r fmt(qb_coaches)` coaches, about `r sprintf("%.1f", qb_per_coach)` per
-coach, against roughly 3 per coach for the defensive back and receiver
-groups.
+coach against roughly 3 for defensive backs and receivers; the second
+figure shows every coach's count in each group.
+
+```{r}
+#| label: position-table
+group_names <- c(
+  QB = "Quarterback", RB = "Running back", `WR/TE` = "Receiver or tight end",
+  OL = "Offensive line", DL = "Defensive line", LB = "Linebacker",
+  DB = "Defensive back", ST = "Special teams"
+)
+pos_grp_summary |>
+  arrange(desc(share)) |>
+  transmute(
+    `Position group` = unname(group_names[as.character(pos_grp)]),
+    Draftees = draftees,
+    Coaches = coaches,
+    `Draftees per coach` = sprintf("%.1f", per_coach),
+    `Share of all draftees` = pct(share)
+  ) |>
+  kable(caption = "Draftees by position group, 2014 classes on, last-school rule. A draftee counts once per head coach of his final college season.")
+```
 
 ```{r}
 #| label: position-fig
@@ -416,6 +532,7 @@ p_grp <- ggplot(pos_grp_summary, aes(y = pos_grp, x = 100 * share)) +
     hjust = 0
   ) +
   expand_limits(x = 44) +
+  scale_y_discrete(labels = group_names) +
   scale_x_continuous(labels = function(x) sprintf("%.0f%%", x)) +
   labs(
     title = "Receivers and defensive backs give the draft its volume",
@@ -429,7 +546,39 @@ girafe(ggobj = p_grp, width_svg = 13, height_svg = 6)
 ```
 
 ```{r}
+#| label: position-explore
+#| fig-height: 6
+coach_pos <- pos_links |>
+  distinct(year, overall, coach_id, coach_name, pos_grp) |>
+  count(coach_name, pos_grp, name = "draftees") |>
+  mutate(pos_grp = factor(pos_grp, levels = levels(pos_grp_summary$pos_grp)))
+p_coach_pos <- ggplot(coach_pos, aes(draftees, pos_grp)) +
+  geom_point_interactive(
+    aes(
+      color = pos_grp == "QB",
+      tooltip = sprintf("%s: %d %s draftees", coach_name, draftees, group_names[as.character(pos_grp)]),
+      data_id = coach_name
+    ),
+    position = position_jitter(height = 0.25, width = 0.15, seed = 1),
+    size = 2,
+    alpha = 0.7
+  ) +
+  scale_color_manual(values = c(`TRUE` = "#D95F02", `FALSE` = "gray50"), guide = "none") +
+  scale_y_discrete(labels = group_names) +
+  labs(
+    title = "Each coach's draftees at each position",
+    subtitle = "One point per coach and position group, 2014 classes on",
+    x = "Draftees",
+    y = NULL,
+    caption = "Last-school rule. Hover a point for the coach; hovering highlights the same coach in every group."
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_coach_pos, width_svg = 13, height_svg = 6)
+```
+
+```{r}
 #| label: position-pin
+#| include: false
 stopifnot(
   pos_grp_summary$draftees[pos_grp_summary$pos_grp == "DB"] == 665,
   pos_grp_summary$coaches[pos_grp_summary$pos_grp == "DB"] == 200,
@@ -444,7 +593,7 @@ stopifnot(
 )
 ```
 
-### Undrafted entry shrinks the quarterback share, it does not grow it
+### 3.3 Undrafted entry shrinks the quarterback share, it does not grow it
 
 ```{r}
 #| label: udfa
@@ -511,13 +660,23 @@ entry_shares <- entry_shares |>
   mutate(g = factor(g, levels = rev(pick_order)))
 ```
 
-The same position comparison among undrafted entrants, players on an NFL
-roster in their rookie season whose id never appears in the draft record,
-shows the drafted quarterback share is not an artifact of who gets
-drafted: the quarterback share falls by half, from
-`r sprintf("%.1f%%", qb_share_dr)` of drafted rookies to
-`r sprintf("%.1f%%", qb_share_ud)` of undrafted entrants, while receivers
-and special teams take larger undrafted shares.
+Among NFL rookies (an undrafted entrant is a rookie-roster player whose id
+never appears in the draft record), the table and the first figure show the
+quarterback share falling from `r sprintf("%.1f%%", qb_share_dr)` of
+drafted rookies to `r sprintf("%.1f%%", qb_share_ud)` of undrafted ones,
+while receivers and specialists take larger undrafted shares; the second
+figure follows the quarterback share rookie class by rookie class.
+
+```{r}
+#| label: udfa-table
+entry_shares |>
+  mutate(cell = sprintf("%s (%.1f%%)", fmt(n), share)) |>
+  select(g, route, cell) |>
+  tidyr::pivot_wider(names_from = route, values_from = cell) |>
+  arrange(desc(g)) |>
+  transmute(`Position group` = unname(group_names[as.character(g)]), Drafted, Undrafted) |>
+  kable(caption = "NFL rookies by position group and entry route, 2014 rookie classes on; the percentage is the share of that route's rookies.")
+```
 
 ```{r}
 #| label: udfa-fig
@@ -574,9 +733,46 @@ girafe(ggobj = p_udfa, width_svg = 13, height_svg = 6)
 ```
 
 ```{r}
+#| label: udfa-explore
+#| fig-height: 5
+qb_class <- entry_split |>
+  count(rookie_year, route, qb = g == "QB", name = "n") |>
+  group_by(rookie_year, route) |>
+  mutate(total = sum(n), share = n / total) |>
+  ungroup() |>
+  filter(qb)
+p_qb_class <- ggplot(qb_class, aes(rookie_year, 100 * share, color = route)) +
+  geom_line_interactive(aes(data_id = route, tooltip = route), linewidth = 1.2) +
+  geom_point_interactive(
+    aes(
+      data_id = route,
+      tooltip = sprintf(
+        "%d rookies, %s: %d quarterbacks of %d (%.1f%%)",
+        rookie_year, tolower(route), n, total, 100 * share
+      )
+    ),
+    size = 2.6
+  ) +
+  scale_color_brewer(palette = "Dark2") +
+  scale_y_continuous(limits = c(0, NA)) +
+  scale_x_continuous(breaks = seq(2014, 2026, 2)) +
+  labs(
+    title = "The quarterback share by rookie class and route",
+    subtitle = "Share of each route's NFL rookies who are quarterbacks",
+    x = "Rookie class",
+    y = "Quarterbacks (%)",
+    color = "Entry route",
+    caption = "Hover a point for the counts."
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_qb_class, width_svg = 13, height_svg = 5)
+```
+
+```{r}
 #| label: udfa-pin
+#| include: false
 stopifnot(
-  n_undrafted == 4188,
+  n_undrafted == 4191,
   n_drafted == 2756,
   qb_share_ud < qb_share_dr / 1.8,
   entry_shares$share[
@@ -592,7 +788,7 @@ stopifnot(
 )
 ```
 
-### A fifth of recent draftees belong to ten coaches
+### 3.4 A fifth of recent draftees belong to ten coaches
 
 ```{r}
 #| label: top-coaches
@@ -606,11 +802,23 @@ top10_share <- top10_n / total_pairs
 saban_total <- coach_totals$draftees[coach_totals$coach_name == "Nick Saban"]
 ```
 
-Draftee production is top-heavy: the ten coaches with the most draftees
-account for `r fmt(top10_n)` of `r fmt(total_pairs)` draftee-coach pairs,
-about `r sprintf("%.0f%%", 100 * top10_share)`, while half of the
-`r fmt(nrow(coach_totals))` producing coaches account for five or fewer
-each.
+The table and the first figure list the coaches with the most draftees,
+the top ten holding `r fmt(top10_n)` of `r fmt(total_pairs)` draftee-coach
+pairs (`r sprintf("%.0f%%", 100 * top10_share)`); the second figure places
+all `r fmt(nrow(coach_totals))` producing coaches on one curve, where half
+have five or fewer draftees.
+
+```{r}
+#| label: top-coaches-table
+coach_schools <- pos_links |>
+  distinct(coach_id, team) |>
+  group_by(coach_id) |>
+  summarise(schools = paste(sort(unique(team)), collapse = ", "), .groups = "drop")
+top_coach |>
+  left_join(coach_schools, by = "coach_id") |>
+  transmute(Coach = coach_name, Draftees = draftees, `Schools with a draftee` = schools) |>
+  kable(caption = "The twelve coaches with the most draftees, 2014 classes on, last-school rule.")
+```
 
 ```{r}
 #| label: top-coaches-fig
@@ -648,7 +856,40 @@ girafe(ggobj = p_top, width_svg = 13, height_svg = 6)
 ```
 
 ```{r}
+#| label: top-coaches-explore
+#| fig-height: 5
+curve <- coach_totals |>
+  arrange(desc(draftees)) |>
+  mutate(rank = row_number(), cum_share = cumsum(draftees) / sum(draftees))
+p_curve <- ggplot(curve, aes(rank, 100 * cum_share)) +
+  geom_line(color = "gray60", linewidth = 1) +
+  geom_point_interactive(
+    aes(
+      color = rank <= 10,
+      tooltip = sprintf(
+        "#%d %s: %d draftees; the top %d coaches hold %.0f%% of all pairs",
+        rank, coach_name, draftees, rank, 100 * cum_share
+      ),
+      data_id = coach_name
+    ),
+    size = 2
+  ) +
+  scale_color_manual(values = c(`TRUE` = "#D95F02", `FALSE` = "#1b4f8a"), guide = "none") +
+  scale_y_continuous(limits = c(0, 100)) +
+  labs(
+    title = "Every producing coach on one curve",
+    subtitle = "Cumulative share of draftee-coach pairs, coaches ranked by draftees",
+    x = "Coach rank (1 = most draftees)",
+    y = "Cumulative share of pairs (%)",
+    caption = "Orange: the top ten. Hover any point for the coach."
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_curve, width_svg = 13, height_svg = 5)
+```
+
+```{r}
 #| label: top-coaches-pin
+#| include: false
 stopifnot(
   coach_totals$draftees[coach_totals$coach_name == "Nick Saban"] == 99,
   coach_totals$draftees[coach_totals$coach_name == "Kirby Smart"] == 84,
@@ -658,15 +899,11 @@ stopifnot(
 )
 ```
 
-### Each top coach's draftee mix leans a different direction
-
-The totals hide what kind of players leave each program, so the nineteen
-recorded positions are grouped into eight and stacked for the twelve
-coaches with the most draftees.
+### 3.5 Each top coach's draftee mix leans a different direction
 
 ```{r}
-#| label: positions-fig
-#| fig-height: 7
+#| label: positions-nums
+#| include: false
 pos_totals <- pos_links |>
   count(coach_id, coach_name, name = "n_total")
 top12 <- pos_totals |>
@@ -677,7 +914,7 @@ pos_mix <- pos_links |>
   filter(coach_name %in% top12) |>
   count(coach_name, pos_grp, name = "n") |>
   left_join(pos_totals, by = "coach_name") |>
-  mutate(coach_name = reorder(coach_name, n_total))
+  mutate(coach_name = reorder(coach_name, n_total), share = n / n_total)
 mix_get <- function(coach, grp) {
   pos_mix$n[pos_mix$coach_name == coach & pos_mix$pos_grp == grp]
 }
@@ -687,6 +924,29 @@ saban_qb <- mix_get("Nick Saban", "QB")
 ferentz_total <- pos_totals$n_total[pos_totals$coach_name == "Kirk Ferentz"]
 ferentz_ol <- mix_get("Kirk Ferentz", "OL")
 kelly_wrte <- mix_get("Brian Kelly", "WR/TE")
+```
+
+The table and the first figure stack the twelve leading coaches' draftees
+by position group: Nick Saban's `r fmt(saban_total)` include
+`r fmt(saban_db)` defensive backs and `r fmt(saban_dl)` defensive linemen
+but `r fmt(saban_qb)` quarterbacks, and Kirk Ferentz's lean to the
+offensive line (`r fmt(ferentz_ol)` of `r fmt(ferentz_total)`); the second
+figure puts every mix on a common percentage scale.
+
+```{r}
+#| label: positions-table
+pos_mix |>
+  select(Coach = coach_name, pos_grp, n, n_total) |>
+  tidyr::pivot_wider(names_from = pos_grp, values_from = n, values_fill = 0L) |>
+  arrange(desc(n_total)) |>
+  rename(Total = n_total) |>
+  mutate(Coach = as.character(Coach)) |>
+  kable(caption = "Draftees by position group for the twelve coaches with the most draftees (QB quarterback, RB running back, WR/TE receiver or tight end, OL offensive line, DL defensive line, LB linebacker, DB defensive back, ST special teams).")
+```
+
+```{r}
+#| label: positions-fig
+#| fig-height: 7
 p_pos <- ggplot(pos_mix, aes(y = coach_name, x = n, fill = pos_grp)) +
   geom_col_interactive(aes(
     tooltip = sprintf("%s: %d %s draftees", coach_name, n, pos_grp),
@@ -699,21 +959,40 @@ p_pos <- ggplot(pos_mix, aes(y = coach_name, x = n, fill = pos_grp)) +
     x = "Draftees",
     y = NULL,
     fill = "Position group",
-    caption = "Last-school rule. Read each bar left to right: the segments are the position groups behind the coach's total."
+    caption = "Last-school rule. Hover a segment to highlight that position group for every coach."
   ) +
   theme_cfb2nfl()
 girafe(ggobj = p_pos, width_svg = 13, height_svg = 7)
 ```
 
-Nick Saban's `r fmt(saban_total)` draftees include `r fmt(saban_db)`
-defensive backs and `r fmt(saban_dl)` defensive linemen but only
-`r fmt(saban_qb)` quarterbacks, while Kirk Ferentz's
-`r fmt(ferentz_total)` lean offensive line, `r fmt(ferentz_ol)` of
-`r fmt(ferentz_total)`, and Brian Kelly's `r fmt(kelly_wrte)` receivers
-and tight ends are the largest offensive group count among the top twelve.
+```{r}
+#| label: positions-explore
+#| fig-height: 7
+p_pos_share <- ggplot(pos_mix, aes(y = coach_name, x = 100 * share, fill = pos_grp)) +
+  geom_col_interactive(aes(
+    tooltip = sprintf(
+      "%s: %d of %d draftees are %s (%.0f%%)",
+      coach_name, n, n_total, pos_grp, 100 * share
+    ),
+    data_id = paste(coach_name, pos_grp)
+  )) +
+  scale_fill_brewer(palette = "Dark2") +
+  scale_x_continuous(labels = function(x) sprintf("%.0f%%", x)) +
+  labs(
+    title = "Every mix on a common scale",
+    subtitle = "Share of each coach's draftees by position group",
+    x = "Share of the coach's draftees",
+    y = NULL,
+    fill = "Position group",
+    caption = "Hover a segment for the count."
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_pos_share, width_svg = 13, height_svg = 7)
+```
 
 ```{r}
 #| label: positions-pin
+#| include: false
 stopifnot(
   pos_totals$n_total[pos_totals$coach_name == "Nick Saban"] == 99,
   pos_mix$n[pos_mix$coach_name == "Nick Saban" & pos_mix$pos_grp == "DB"] == 20,
@@ -724,29 +1003,17 @@ stopifnot(
 )
 ```
 
-### Most draftee-producing coaches ran a single program
-
-A coach's total spans schools, so whether the draftees followed the coach
-or the program depends on how many programs he ran, and for most producing
-coaches the answer is one.
+### 3.6 Most draftee-producing coaches ran a single program
 
 ```{r}
-#| label: teams-coached
+#| label: movers-nums
+#| include: false
 teams_per_coach <- coaches |>
   distinct(coach_id, school) |>
   count(coach_id, name = "n_teams") |>
   left_join(producers, by = "coach_id") |>
   filter(coach_name %in% coach_totals$coach_name) |>
   count(n_teams, name = "coaches")
-teams_per_coach |>
-  kable(
-    col.names = c("Programs coached", "Draftee-producing coaches"),
-    caption = "Programs coached per draftee-producing coach, 2014 classes on."
-  )
-```
-
-```{r}
-#| label: movers
 movers <- c(
   "Lincoln Riley",
   "Brian Kelly",
@@ -772,28 +1039,94 @@ mover_get <- function(coach, team) {
     mover_detail$coach_name == coach & mover_detail$team == team
   ]
 }
-kelly_total <- sum(mover_detail$draftees[
-  mover_detail$coach_name == "Brian Kelly"
-])
+kelly_total <- sum(mover_detail$draftees[mover_detail$coach_name == "Brian Kelly"])
 kelly_nd <- mover_get("Brian Kelly", "Notre Dame")
 kelly_lsu <- mover_get("Brian Kelly", "LSU")
 kiffin_om <- mover_get("Lane Kiffin", "Ole Miss")
 kiffin_fa <- mover_get("Lane Kiffin", "Florida Atlantic")
 kiffin_usc <- mover_get("Lane Kiffin", "USC")
-mover_detail |>
+team_colors <- dbReadTable(con, "teams") |>
+  distinct(team, color)
+```
+
+The first table shows `r teams_per_coach$coaches[teams_per_coach$n_teams == 1]`
+of `r sum(teams_per_coach$coaches)` producing coaches ran a single program,
+so a coach's count is usually a program's count; the second table and the
+figure split eight multi-program coaches by school, where Brian Kelly's
+draftees divide `r kelly_nd` and `r kelly_lsu` between Notre Dame and LSU
+while Lane Kiffin's `r kiffin_om` at Ole Miss dwarf his
+`r kiffin_fa` each at Florida Atlantic and USC.
+
+```{r}
+#| label: teams-coached
+teams_per_coach |>
   kable(
-    caption = "Draftees by school for selected multi-program coaches, 2014 classes on. First and last draft class with a draftee under that coach at that school."
+    col.names = c("Programs coached", "Draftee-producing coaches"),
+    caption = "Programs coached per draftee-producing coach, 2014 classes on."
+  )
+mover_detail |>
+  transmute(
+    Coach = coach_name,
+    School = team,
+    Draftees = draftees,
+    `First class` = first_class,
+    `Last class` = last_class
+  ) |>
+  kable(
+    caption = "Draftees by school for selected multi-program coaches, 2014 classes on; first and last draft class with a draftee under that coach at that school."
   )
 ```
 
-The splits differ sharply: Kelly's `r fmt(kelly_total)` draftees divide
-`r fmt(kelly_nd)`/`r fmt(kelly_lsu)` between Notre Dame and LSU while
-Kiffin's Ole Miss total of `r fmt(kiffin_om)` dwarfs his
-`r fmt(kiffin_fa)` each at Florida Atlantic and USC, the pattern that
-motivates the coach-versus-program followup.
+```{r}
+#| label: movers-fig
+#| fig-height: 6
+mover_plot <- mover_detail |>
+  left_join(team_colors, by = "team") |>
+  group_by(coach_name) |>
+  arrange(first_class, .by_group = TRUE) |>
+  mutate(total = sum(draftees), team_order = row_number()) |>
+  ungroup() |>
+  mutate(
+    color = coalesce(color, "#9CA3AF"),
+    coach_name = reorder(coach_name, total)
+  )
+p_movers <- ggplot(mover_plot, aes(draftees, coach_name, group = team_order)) +
+  geom_col_interactive(
+    aes(
+      fill = color,
+      tooltip = sprintf(
+        "%s at %s: %d draftees (classes %d to %d)",
+        coach_name, team, draftees, first_class, last_class
+      ),
+      data_id = paste(coach_name, team)
+    ),
+    position = position_stack(reverse = TRUE),
+    color = "white",
+    width = 0.7
+  ) +
+  geom_text(
+    data = filter(mover_plot, draftees >= 10),
+    aes(label = team),
+    position = position_stack(vjust = 0.5, reverse = TRUE),
+    color = "white",
+    size = 3.8,
+    fontface = "bold"
+  ) +
+  scale_fill_identity() +
+  labs(
+    title = "Some coaches' draftees split evenly, others pile up at one school",
+    subtitle = "Draftees by school for eight multi-program coaches, earliest school first",
+    x = "Draftees",
+    y = NULL,
+    caption = "Last-school rule, 2014 classes on. Hover a segment for the school and classes."
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p_movers, width_svg = 13, height_svg = 6)
+```
 
 ```{r}
 #| label: movers-pin
+#| include: false
 stopifnot(
   teams_per_coach$coaches[teams_per_coach$n_teams == 1] == 162,
   mover_detail$draftees[
@@ -811,24 +1144,22 @@ stopifnot(
 
 ## 4. Summary
 
-The head-coach landscape behind recent draft picks is narrow at the top.
-Of `r fmt(n_coaches_all)` head coaches in the data, `r fmt(nrow(producers))`
-produced a draftee in the 2014 and later classes, and ten of those
-`r fmt(nrow(producers))` account for about
-`r sprintf("%.0f%%", 100 * top10_share)` of all draftee-coach pairs. The
-supply differs by position: the quarterback group is the smallest share
-of the draft among field positions,
-`r sprintf("%.1f%%", 100 * qb_share)`, and its `r fmt(qb_coaches)`
-coaches produced about `r sprintf("%.1f", qb_per_coach)` draftees each,
-against roughly 3 per coach for the volume groups. The undrafted route
-shrinks that quarterback share rather than growing it, from
-`r sprintf("%.1f%%", qb_share_dr)` of drafted rookies to
-`r sprintf("%.1f%%", qb_share_ud)` of undrafted entrants. Most producing
-coaches ran a single program, so a coach's draftee count is usually a
-program count, with movers like Brian Kelly splitting evenly and Lane
-Kiffin piling up at one school. And every count above is one of two
-possible countings: half of recent picks name a different coach set when
-every college season counts instead of only the last.
+The head-coach landscape behind recent draft picks is broad at the base and
+narrow at the top, and every count in it depends on the counting rule.
+
+```{r}
+#| label: summary
+tibble::tribble(
+  ~Finding                                              , ~Evidence                                                                                                                               ,
+  "The counting rule matters for half of recent picks"  , sprintf("%s of picks since 2014 name the same coaches under both rules.", pct(window_mean, 0))                                       ,
+  "Most active coaches produced a draftee"              , sprintf("%s of %s head coaches active from 2013 on.", fmt(nrow(producers)), fmt(nrow(active)))                                      ,
+  "Quarterbacks are the smallest field-position share"  , sprintf("%s of draftees, about %.1f per coach.", pct(qb_share), qb_per_coach)                                                        ,
+  "Undrafted entry shrinks the quarterback share"       , sprintf("%.1f%% of drafted rookies, %.1f%% of undrafted ones.", qb_share_dr, qb_share_ud)                                            ,
+  "Ten coaches hold a fifth of draftees"                , sprintf("%s of %s draftee-coach pairs; Saban leads with %d.", fmt(top10_n), fmt(total_pairs), saban_total)                          ,
+  "Most producing coaches ran one program"              , sprintf("%d of %d.", teams_per_coach$coaches[teams_per_coach$n_teams == 1], sum(teams_per_coach$coaches))
+) |>
+  kable(caption = "The findings and the numbers behind them.")
+```
 
 ## 5. Discussion
 
