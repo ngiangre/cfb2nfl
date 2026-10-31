@@ -223,3 +223,85 @@ build_team_season <- function(roster, games, tiers, player_season, coaches) {
     ) |>
     dplyr::arrange(.data$season, .data$team)
 }
+
+#' Each player's college exit: the team that gets credit and the outcome
+#'
+#' A drafted player is credited to the team of their final roster season
+#' before the draft year (one pick per player, the earliest, decision 0011);
+#' an undrafted player to their final roster season, feeding the next draft
+#' class. Undrafted players still on the latest roster are excluded (their
+#' outcome is not yet known). "Eligible" is a roster-based proxy for the NFL's
+#' three-years-out-of-high-school rule: three or more roster seasons, or
+#' drafted, or signed as a UDFA.
+#'
+#' @param roster Cleaned roster with `playerId`, `season`, `team`, `position`.
+#' @param picks Cleaned picks with `playerId`, `year`, `round`.
+#' @param udfa_ids Character vector of player ids who signed as undrafted
+#'   free agents (from `outcomes`).
+#' @param reused Reused athlete ids to exclude ([reused_ids()]).
+#' @param last_roster_season Latest roster season in the data.
+#' @return One row per player: `playerId`, `team`, `last_season`,
+#'   `first_season`, `seasons`, `position`, `position_group`, `draft_class`,
+#'   `drafted`, `draft_round`, `udfa`, `eligible`.
+#' @export
+exit_cohort <- function(
+  roster,
+  picks,
+  udfa_ids,
+  reused,
+  last_roster_season = max(roster$season)
+) {
+  pk <- picks |>
+    dplyr::filter(!is.na(.data$playerId), !.data$playerId %in% reused) |>
+    dplyr::group_by(.data$playerId) |>
+    dplyr::slice_min(.data$year, with_ties = FALSE) |>
+    dplyr::ungroup() |>
+    dplyr::select("playerId", draft_year = "year", draft_round = "round")
+  roster |>
+    dplyr::filter(!.data$playerId %in% reused, !is.na(.data$team)) |>
+    # One team per player-season; alphabetical tie-break for the rare
+    # same-season duplicate.
+    dplyr::arrange(.data$playerId, .data$season, .data$team) |>
+    dplyr::distinct(.data$playerId, .data$season, .keep_all = TRUE) |>
+    dplyr::left_join(pk, by = "playerId") |>
+    dplyr::filter(is.na(.data$draft_year) | .data$season < .data$draft_year) |>
+    dplyr::group_by(.data$playerId) |>
+    dplyr::summarise(
+      team = .data$team[which.max(.data$season)],
+      position = .data$position[which.max(.data$season)],
+      first_season = .data$season[which.min(.data$season)],
+      last_season = .data$season[which.max(.data$season)],
+      seasons = dplyr::n_distinct(.data$season),
+      draft_year = dplyr::first(.data$draft_year),
+      draft_round = dplyr::first(.data$draft_round),
+      .groups = "drop"
+    ) |>
+    dplyr::mutate(
+      drafted = !is.na(.data$draft_year),
+      udfa = !.data$drafted & .data$playerId %in% udfa_ids,
+      draft_class = dplyr::if_else(
+        .data$drafted,
+        .data$draft_year,
+        .data$last_season + 1L
+      ),
+      eligible = .data$drafted | .data$udfa | .data$seasons >= 3L,
+      position_group = position_group(.data$position)
+    ) |>
+    dplyr::filter(
+      .data$drafted | .data$last_season < .env$last_roster_season
+    ) |>
+    dplyr::select(
+      "playerId",
+      "team",
+      "last_season",
+      "first_season",
+      "seasons",
+      "position",
+      "position_group",
+      "draft_class",
+      "drafted",
+      "draft_round",
+      "udfa",
+      "eligible"
+    )
+}

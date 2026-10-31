@@ -158,3 +158,103 @@ test_that("build_team_season unions games and roster team-seasons", {
   expect_true(is.na(tul$tier))
   expect_equal(ts$n_roster[ts$team == "Montana"], 0L)
 })
+
+test_that("exit_cohort credits the last pre-draft roster team", {
+  roster <- tibble::tibble(
+    playerId = c("1", "1", "1", "2", "2", "3", "4", "4", "4", "5", "5"),
+    season = c(
+      2017L,
+      2018L,
+      2019L,
+      2018L,
+      2019L,
+      2021L,
+      2015L,
+      2016L,
+      2017L,
+      2019L,
+      2019L
+    ),
+    team = c(
+      "Ohio State",
+      "LSU",
+      "LSU",
+      "Troy",
+      "Troy",
+      "Troy",
+      "Tulane",
+      "Tulane",
+      "Tulane",
+      "Zed",
+      "Alpha"
+    ),
+    position = c(
+      "QB",
+      "QB",
+      "QB",
+      "WR",
+      "WR",
+      "OL",
+      "OT",
+      "OT",
+      "OT",
+      "S",
+      "CB"
+    )
+  )
+  picks <- tibble::tibble(
+    playerId = c("1", "1", NA),
+    year = c(2020L, 2021L, 2020L),
+    round = c(1L, 2L, 3L)
+  )
+  out <- exit_cohort(
+    roster,
+    picks,
+    udfa_ids = "4",
+    reused = character(),
+    last_roster_season = 2021L
+  )
+
+  p1 <- out[out$playerId == "1", ]
+  expect_equal(p1$team, "LSU")
+  expect_equal(p1$last_season, 2019L)
+  expect_equal(p1$draft_class, 2020L)
+  expect_true(p1$drafted && p1$eligible)
+  expect_equal(p1$draft_round, 1L) # earliest pick wins (decision 0011)
+  expect_equal(p1$position_group, "Quarterback")
+
+  # Undrafted, 2 seasons, not UDFA: an exit but not eligible.
+  p2 <- out[out$playerId == "2", ]
+  expect_equal(p2$draft_class, 2020L)
+  expect_false(p2$eligible)
+  # Still on the latest roster and undrafted: censored, excluded.
+  expect_false("3" %in% out$playerId)
+  # UDFA lineman with 3 seasons.
+  p4 <- out[out$playerId == "4", ]
+  expect_true(p4$udfa && p4$eligible && !p4$drafted)
+  expect_equal(p4$position_group, "Offensive line")
+  # Same-season duplicate resolves to the alphabetical team.
+  expect_equal(out$team[out$playerId == "5"], "Alpha")
+  expect_false(anyDuplicated(out$playerId) > 0)
+})
+
+test_that("exit_cohort drops reused ids", {
+  roster <- tibble::tibble(
+    playerId = "9",
+    season = 2015L,
+    team = "A",
+    position = "QB"
+  )
+  out <- exit_cohort(
+    roster,
+    picks = tibble::tibble(
+      playerId = character(),
+      year = integer(),
+      round = integer()
+    ),
+    udfa_ids = character(),
+    reused = "9",
+    last_roster_season = 2020L
+  )
+  expect_equal(nrow(out), 0L)
+})
