@@ -1,25 +1,30 @@
 ---
-# Blog post template (decision 0015). Copy to vignettes/YYYY-MM-DD-slug.qmd.
-# The leading underscore keeps Quarto from rendering this template as a page.
-title: "TITLE — a short, human headline"
+# Blog post template (decision 0015; style per AGENTS.md "Blog style").
+# Copy to vignettes/YYYY-MM-DD-slug.qmd. The leading underscore keeps Quarto
+# from rendering this template as a page.
+#
+# title: one declarative sentence, subject first, then the observed takeaway;
+# never two fragments joined by a colon. Keep it in sync with
+# VignetteIndexEntry below.
+title: "SUBJECT does WHAT THE DATA SHOWED"
 date: "YYYY-MM-DD"
 # description states the FINDING (one declarative sentence), not the topic;
 # shown in the blog index and used for meta description tags.
-description: "DESCRIPTION — what the data showed"
+description: "DESCRIPTION, the finding in one sentence"
 # followups feed later investigations and pipeline work; scan with grep across
 # vignettes/ to find open threads.
 followups:
-  - "FOLLOWUP — open question or next analysis"
+  - "FOLLOWUP, an open question or next analysis"
 # Default authorship unless the user says otherwise (project convention).
 author:
-  - "An AI directed by Nick Giangreco"
+  - "AI directed by Nick Giangreco"
 # freeze: auto re-executes only when this post's source changes, so committed
 # _freeze/ results keep data refreshes from re-running the chunk (dec 0015)
 # while deliberate edits still propagate. Never use freeze: true: it serves
 # the cached output even after the source is edited, so edits never deploy.
 freeze: auto
 vignette: >
-  %\VignetteIndexEntry{TITLE — a short, human headline}
+  %\VignetteIndexEntry{SUBJECT does WHAT THE DATA SHOWED}
   %\VignetteEngine{quarto::html}
   %\VignetteEncoding{UTF-8}
 ---
@@ -27,68 +32,192 @@ vignette: >
 ```{r}
 #| label: setup
 #| include: false
-# Load cfb2nfl from the checkout when the package is not installed, so the
-# site build does not require a package install (decision 0030).
-if (requireNamespace("cfb2nfl", quietly = TRUE)) {
-  # vignettes render in a fresh quarto R session: attach the installed package
-  # (CI installs it via local::.) or source the checkout fallback below.
-  library(cfb2nfl)
-} else {
+# Load the package from the checkout with pkgload; no package install is
+# required. Under altdoc the render runs in a temp dir, so resolve the root
+# first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
+root <- Sys.getenv("CFB2NFL_ROOT", "")
+if (!nzchar(root)) {
   dir <- getwd()
   while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
     dir <- dirname(dir)
   }
-  for (src in sort(list.files(file.path(dir, "R"), pattern = "[.]R$", full.names = TRUE))) {
-    source(src, local = FALSE, encoding = "UTF-8")
-  }
+  root <- if (file.exists(file.path(dir, "_targets"))) dir else getwd()
 }
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+library(DBI)
 library(dplyr)
-library(targets)
-# altdoc renders in a temp dir; point the knit wd at the project root so
-# tar_read() and inst/ paths resolve (set by CFB2NFL_ROOT in CI/site build).
-root <- cfb2nfl_root()
-if (nzchar(root)) knitr::opts_knit$set(root.dir = root)
+library(duckdb)
+library(ggiraph)
+library(ggplot2)
+library(knitr)
+
+# One interaction style for every girafe figure: a clear hover pop, dimming
+# of non-hovered marks, a dark tooltip, and toolbar zoom + PNG download.
+set_girafe_defaults(
+  opts_hover = opts_hover(
+    css = "stroke:#111827;stroke-width:2.5px;filter:brightness(1.12);"
+  ),
+  opts_hover_inv = opts_hover_inv(css = "opacity:0.45;"),
+  opts_tooltip = opts_tooltip(
+    css = "background:#111827;color:#fff;padding:6px 9px;border-radius:5px;font-weight:bold;font-size:15px;"
+  ),
+  opts_zoom = opts_zoom(min = 1, max = 5),
+  opts_toolbar = opts_toolbar(saveaspng = TRUE, position = "topright"),
+  opts_sizing = opts_sizing(rescale = TRUE)
+)
+
+# thousands-separated and percent formatters for inline numbers
+fmt <- function(x, digits = 0) {
+  formatC(as.numeric(x), big.mark = ",", format = "f", digits = digits)
+}
+pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
 ```
 
 ```{r}
 #| label: registry
 #| include: false
-# Standard: key on athlete id, never name (recruiting ids collide — decision
-# 0013). Declare every subject's ids here so the prose below never hard-codes a
-# name-based lookup.
+# Key on athlete id, never name (recruiting ids collide, decision 0013).
+# Declare every named subject's ids here so no exhibit hard-codes a name
+# lookup.
 subjects <- tibble::tribble(
-  ~who,          ~cfb_athlete_id, ~gsis_id,
-  "Example One", "0000000",       "00-0000000"
+  ~who          , ~cfb_athlete_id , ~gsis_id     ,
+  "Example One" , "0000000"       , "00-0000000"
 )
 ```
 
-::: {.callout-note appearance="minimal"}
-*Data as of the `data-latest` release, retrieved YYYY-MM-DD. Careers of recent
-classes are right-censored — later seasons may not yet be present.*
-:::
-
-<!-- Opening hook: why this post, why now. One or two paragraphs. -->
-
-## The data spine
-
-<!--
-Prefer a tested package helper (e.g. player_trajectory()) over ad-hoc parquet
-reads, so a silent join change fails a unit test rather than a reader. Guard
-every query so a broken pull errors at authoring time, before this post is
-frozen.
--->
-
 ```{r}
-#| label: build-spine
-# Example: pull each subject's trajectory by id, then assert non-empty.
-# spine <- purrr::map_dfr(subjects$cfb_athlete_id, player_trajectory)
+#| label: load
+#| include: false
+# Prefer a tested package helper (e.g. player_trajectory()) over ad-hoc
+# queries, so a silent join change fails a unit test rather than a reader.
+# Guard every pull so a broken query errors at authoring time, before the
+# post is frozen. Disconnect only after the last query.
+# spine <- player_trajectory(subjects, roster = tbl(con, "roster"), ...)
 # stopifnot(nrow(spine) > 0)
 ```
 
-## Section
+::: {.callout-note appearance="minimal"}
+*Data as of the `data-latest` release, retrieved YYYY-MM-DD. Careers of
+recent classes are right-censored; later seasons may not yet be present.*
+:::
 
-<!-- Body sections. Reference figures/tables produced inline in chunks above. -->
+## 1. Introduction
 
-## Where they are now
+<!--
+One or two sentences: the question and why a fan cares, naming the recurring
+cast where they fit (Burrow, Cam Ward, Jordan Travis, Buechele, Kyle Allen).
+Then the expectations the Results sections test, one per line.
+-->
 
-<!-- Closing reflection. State any data caveats explicitly (gaps, censoring). -->
+QUESTION IN ONE OR TWO SENTENCES.
+
++ *Expectation one, as a claim the data can settle.*
++ *Expectation two.*
+
+## 2. Data
+
+### 2.1 ASSERTION ABOUT THE DATA (e.g. "Every eligible season ends in one of five statuses")
+
+<!--
+Sections follow one shape: an assertion heading, ONE OR TWO sentences saying
+what the exhibits below show and why, then the exhibits. Every term a reader
+meets later (unit of observation, statuses, groups) is defined here in a
+table, in plain language, with reader-facing labels rather than column names.
+-->
+
+ONE OR TWO SENTENCES.
+
+```{r}
+#| label: terms
+tibble::tribble(
+  ~Term   , ~Meaning                  ,
+  "TERM"  , "Plain-language meaning."
+) |>
+  kable(caption = "The terms used throughout.")
+```
+
+## 3. Results
+
+### 3.1 ASSERTION THE SECTION DEMONSTRATES
+
+*Expectation: the claim being tested.* ✅
+
+<!--
+ONE OR TWO sentences: what the exhibits show and why they are here. Any
+further detail belongs in the table, a figure annotation, or a caption.
+Exhibits follow in this order:
+  1. table: expository, defines and counts what the claim rests on;
+  2. explanatory figure: makes the claim at a glance, the claim's element
+     highlighted (color, annotation, arrow), the rest context;
+  3. exploratory figure: interactive view of the same snapshot at finer grain
+     (every category, season, or player behind the claim), hover tooltips with
+     the full detail.
+A single-fact claim may drop to table plus one figure. Pin every number the
+prose, captions, or annotations state.
+-->
+
+ONE OR TWO SENTENCES.
+
+```{r}
+#| label: s31-table
+# kable(..., caption = "What the table counts.")
+```
+
+```{r}
+#| label: s31-explain
+#| fig-height: 6
+# p <- ggplot(...) + geom_col_interactive(aes(fill = is_claim, tooltip = ...)) +
+#   annotate("text", ...) + annotate("curve", ...) + theme_cfb2nfl()
+# girafe(ggobj = p, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s31-explore
+#| fig-height: 6
+# p <- ggplot(...finer grain...) + geom_point_interactive(aes(tooltip = ...)) +
+#   theme_cfb2nfl()
+# girafe(ggobj = p, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s31-pin
+#| include: false
+# stopifnot(...)
+```
+
+## 4. Summary
+
+<!-- One sentence, then the expectation ledger. -->
+
+ONE SENTENCE.
+
+```{r}
+#| label: summary
+tibble::tribble(
+  ~Expectation       , ~Verdict , ~Evidence          ,
+  "Expectation one"  , "✅"      , "The number behind it"
+) |>
+  kable(caption = "Each expectation and what the data showed.")
+```
+
+## 5. Discussion
+
+::: {.callout-important}
+ONE IMPLICATION, stated as what happened and the mechanism, not a verdict.
+
+- Supporting point.
+:::
+
+Caveats: gaps, right-censoring, and any population restriction, briefly.
+
+```{r}
+#| label: teardown
+#| include: false
+dbDisconnect(con, shutdown = TRUE)
+```

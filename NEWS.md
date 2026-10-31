@@ -1,5 +1,20 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Blog posts follow a revised section format
+  ([decision 0025](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0025-blog-post-writing-style.md)):
+  each section is a numbered assertion heading, one or two sentences, then a
+  table, an explanatory figure, and an interactive exploratory figure. The
+  post template and all six posts are rewritten to it, with figures and
+  tables carrying the detail prose used to. Corrections made along the way:
+  - The transfers post's lower-tier finding was wrong. Group of Five players
+    drop to FCS more often than they climb to the Power conferences, so that
+    expectation now fails.
+  - The coaches post's title now counts the 418 head coaches active in the
+    era (305 produced a draftee) rather than every coach since 1886.
+  - The position post counts roster code `OT` as offensive line (the
+    offensive-line drafted rate is now 8.4%).
+  - Every post's pinned counts match the current `data-latest` release.
+
 - New blog post: "Counting every college season instead of only the last
   changes the named head coaches for nearly half of recent draft picks"
   ([vignettes/2026-10-30-counting-coaches.qmd](https://github.com/ngiangre/cfb2nfl/blob/main/vignettes/2026-10-30-counting-coaches.qmd)),

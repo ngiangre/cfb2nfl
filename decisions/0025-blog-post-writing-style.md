@@ -62,6 +62,24 @@ these posts warrant).
 - Existing posts are not grandfathered; the expectation-checks post is the
   reference implementation.
 
+## Revision (2026-10-31): section format
+
+Each section is a numbered assertion heading (`### 3.1 <claim>`), the
+expectation with its verdict where one is tested, then **one or two
+sentences** saying what the exhibits show and why. Any further detail moves
+into an exhibit, an annotation, or a caption. Exhibits follow in a fixed
+order:
+
+1. a captioned table (expository: defines and counts the data);
+2. an explanatory figure (makes the claim at a glance, the claim's element
+   highlighted);
+3. an exploratory figure (interactive `ggiraph` view of the same snapshot at
+   finer grain, with hover tooltips carrying the full detail).
+
+A single-fact section may drop to a table plus one figure. Summary is one
+sentence plus a ledger table. The skeleton lives in
+`vignettes/_post-template.qmd`, and all existing posts were converted.
+
 ## Outcome / what we learned
 
 _Filled in later._
