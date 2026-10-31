@@ -80,19 +80,6 @@ player_stats_seasons <- dbGetQuery(
 )
 stopifnot(nrow(team_season) > 0, nrow(team_draft) > 0, nrow(picks) > 0)
 
-# Decision 0003 places Notre Dame in the Power tier, but the season-aware
-# lookup tiers every FBS independent as Group of 5; apply the team override
-# here so the exhibits match the tier definitions in section 2.1.
-nd_power <- function(df) {
-  mutate(
-    df,
-    tier_label = if_else(
-      team == "Notre Dame" & tier_label == "Group of 5",
-      "Power",
-      tier_label
-    )
-  )
-}
 tier_order <- c("Power", "Group of 5", "FCS and below")
 tier_colors <- c(
   "Power" = "#1d4ed8",
@@ -100,11 +87,12 @@ tier_colors <- c(
   "FCS and below" = "#6b7280"
 )
 team_season <- team_season |>
-  nd_power() |>
   mutate(tier_label = factor(tier_label, levels = tier_order))
-team_draft <- nd_power(team_draft)
+# Notre Dame is Power (decision 0003) though it plays as an FBS independent;
+# fail the render if the pipeline override regresses.
 stopifnot(
-  all(team_season$tier_label[team_season$team == "Notre Dame"] == "Power")
+  all(team_season$tier_label[team_season$team == "Notre Dame"] == "Power"),
+  all(team_draft$tier_label[team_draft$team == "Notre Dame"] == "Power")
 )
 
 first_class <- 2014L # full observable careers (roster starts 2010)
