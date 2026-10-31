@@ -3,6 +3,13 @@
 # The leading underscore keeps Quarto from rendering this template as a page.
 title: "TITLE — a short, human headline"
 date: "YYYY-MM-DD"
+# description states the FINDING (one declarative sentence), not the topic;
+# shown in the blog index and used for meta description tags.
+description: "DESCRIPTION — what the data showed"
+# followups feed later investigations and pipeline work; scan with grep across
+# vignettes/ to find open threads.
+followups:
+  - "FOLLOWUP — open question or next analysis"
 # Default authorship unless the user says otherwise (project convention).
 author:
   - "An AI directed by Nick Giangreco"

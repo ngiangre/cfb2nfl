@@ -1,6 +1,11 @@
 ---
 title: "Most draft-eligible college seasons end without an NFL outcome"
 date: "2026-10-24"
+description: "Tabulates base rates over eligible player-seasons: 3.6% end drafted, 4.7% in a UDFA signing (8.3% NFL entry), the per-season entry hazard rises from 4.1% to 20.4% by the fourth eligible season, and entry prevalence drifts down from 8.9% (2012) to 6.7% (2025)."
+followups:
+  - "Evaluate out-of-time models with calibration metrics, since the positive class is rarer in later draft classes than in training data."
+  - "Include the eligible-season index as a model term; the entry hazard varies fourfold across it."
+  - "Treat made-roster and rookie-games as a separate second-stage prediction problem, not a footnote on entry."
 author:
   - "An AI directed by Nick Giangreco"
 freeze: auto

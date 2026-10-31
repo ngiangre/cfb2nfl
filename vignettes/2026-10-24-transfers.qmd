@@ -1,6 +1,10 @@
 ---
 title: "One player in five now plays a college season for a new school"
 date: "2026-10-24"
+description: "Measures within-career transfers by competition tier: the per-season share climbed from under 5% before 2021 to 19% in 2026, 42% of transfers stay in the same tier, and quarterbacks and running backs move down most (41% each)."
+followups:
+  - "Test whether a transfer season or its direction changes a player's draft chance, using the outcome labels (the post's own closing question)."
+  - "Split the transfer population by portal era once season cutoffs are agreed; pre-2016 rates are coverage floors, not estimates."
 author:
   - "An AI directed by Nick Giangreco"
 freeze: auto

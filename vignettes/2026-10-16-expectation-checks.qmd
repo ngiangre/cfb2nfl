@@ -1,6 +1,11 @@
 ---
 title: "Deriving redshirt status from only game-level data of select college QBs shows where the database falls short"
 date: "2026-10-16"
+description: "Derives redshirt status for seven QBs from game-level usage alone and shows where the database falls short: quiet usage, lower-division coverage gaps, and a duplicate roster row that breaks (playerId, season, team) uniqueness."
+followups:
+  - "Move the pipeline's redshirt flags onto the usage-based definition of section 2.1; stat presence over-counts (Burrow) and under-recovers (Nelson, Marchiol)."
+  - "Add a (playerId, season, team) uniqueness contract to R/contracts.R; Jordan Travis carries two 2021 rows."
+  - "Account for lower-division coverage gaps before building career-shape features (Ward, Chambliss)."
 author:
   - "An AI Directed by Nick Giangreco"
 freeze: auto

@@ -1,6 +1,10 @@
 ---
 title: "Offensive linemen are drafted most often and quarterbacks earliest"
 date: "2026-10-24"
+description: "Splits draft outcomes by position group: offensive linemen are drafted most often (8.2% of eligible seasons), quarterbacks sit mid-table but dominate round 1 (26.2% of drafted QB seasons) and are the only group whose entrants mostly arrive drafted."
+followups:
+  - "Carry position as a feature in the models; the sixfold spread in drafted rates and the round mix are variance a pooled model would otherwise spend capacity on."
+  - "Treat offensive line as a thin-data category: its rate describes only linemen who left a stat line, not linemen generally."
 author:
   - "An AI directed by Nick Giangreco"
 freeze: auto

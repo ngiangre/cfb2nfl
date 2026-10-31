@@ -1,5 +1,12 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Blog posts now declare `description:` (a one-sentence statement of the
+  finding, also used for `<meta name="description">`) and `followups:` (open
+  questions feeding later investigations and pipeline work) in their YAML;
+  both are backfilled on the five existing posts, stubbed in
+  `vignettes/_post-template.qmd`, displayed in the `blog.qmd` index table,
+  and documented in [AGENTS.md](https://github.com/ngiangre/cfb2nfl/blob/main/AGENTS.md).
+
 - Removed the stale `test-beast.R` suite (it referenced parser functions that
   no longer exist) and fixed the two `R CMD check` notes: top-level
   `shiny_bookmarks/` and `the-beast-2026.txt` are now `.Rbuildignore`d, and

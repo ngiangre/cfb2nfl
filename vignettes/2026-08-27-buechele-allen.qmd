@@ -1,6 +1,9 @@
 ---
 title: "Looking at the college trajectory of the Buffalo Bills' backup QBs as the 2026 season begins shows two transfers who reached the NFL without being drafted"
 date: "2026-08-27"
+description: "Traces Shane Buechele and Kyle Allen through recruiting, transfers, and NFL entry; both Bills backup QBs reached the NFL undrafted, and neither appears in the draft-pick records."
+followups:
+  - "Add more backup-QB career case studies to build a recurring cast for later posts."
 author:
   - "Nick Giangreco"
 freeze: auto
