@@ -1,0 +1,30 @@
+dataset: team_season
+source: derived in-pipeline (build_team_season(roster, games, tiers, player_season, coaches))
+grain: one team in one season (every division)
+key: team, season
+description: >
+  One row per team per season for every team that played a game in `games`
+  or appears on a roster: conference and season-aware tier, win-loss record
+  from completed games, FBS ratings (SRS, SP+) from the coaches table, roster
+  size, and how many players carry a stat line. Conferences absent from the
+  tier lookup fall back to tier 1 for non-FBS teams. The current season's
+  record is partial. A DERIVED table (decision 0021): in the DuckDB bundle,
+  not published as parquet. Contract: `contract_team_season()`.
+columns:
+  - {name: team, type: string, description: School name (joins teams/roster/games by name)., provenance: games / roster}
+  - {name: season, type: int32, description: Season., provenance: games / roster}
+  - {name: conference, type: string, description: "Conference that season (most frequent in games; NA if the team has no games).", provenance: games}
+  - {name: classification, type: string, description: "Division: fbs, fcs, ii, iii (filled from the nearest season when the team has no games; NA if never in games).", provenance: games}
+  - {name: conference_filled, type: logical, description: "TRUE when conference/classification were filled from the team's nearest season because it played no games that season (e.g. UAB 2015-16, COVID opt-outs 2020).", provenance: derived}
+  - {name: tier, type: int32, description: "3 Power, 2 Group of 5, 1 FCS and below (decision 0003); non-FBS teams outside the lookup get 1.", provenance: derived (conference_tiers)}
+  - {name: tier_label, type: string, description: Tier label., provenance: derived}
+  - {name: games_played, type: int32, description: Completed games with a score., provenance: derived (games)}
+  - {name: wins, type: int32, description: Wins in completed games., provenance: derived (games)}
+  - {name: losses, type: int32, description: Losses in completed games., provenance: derived (games)}
+  - {name: ties, type: int32, description: Ties in completed games., provenance: derived (games)}
+  - {name: win_pct, type: double, description: "(wins + ties / 2) / games_played; NA with no completed games.", provenance: derived}
+  - {name: srs, type: double, description: Simple Rating System (FBS only)., provenance: coaches}
+  - {name: sp_overall, type: double, description: SP+ overall rating (FBS only)., provenance: coaches}
+  - {name: n_roster, type: int32, description: Distinct players on the roster that season (0 if no roster)., provenance: derived (roster)}
+  - {name: n_stat_players, type: int32, description: Distinct players with a stat line that season., provenance: derived (player_season)}
+  - {name: has_stat_lines, type: logical, description: n_stat_players > 0., provenance: derived}

@@ -140,3 +140,72 @@ test_that("player_season_stats dict matches build_player_season_stats() output s
   )
   expect_equal(typeof(wide$passing_completions), "double")
 })
+
+team_fixture_dict <- function() {
+  list(
+    games = tibble::tibble(
+      season = 2019L,
+      completed = TRUE,
+      homeTeam = "LSU",
+      homeConference = "SEC",
+      homeClassification = "fbs",
+      homePoints = 42L,
+      awayTeam = "Alabama",
+      awayConference = "SEC",
+      awayClassification = "fbs",
+      awayPoints = 25L
+    ),
+    roster = tibble::tibble(
+      playerId = c("1", "2"),
+      season = 2019L,
+      team = "LSU",
+      position = c("QB", "OT")
+    ),
+    tiers = tibble::tibble(
+      season = 2019L,
+      conference = "SEC",
+      tier = 3L,
+      tier_label = "Power"
+    ),
+    player_season = tibble::tibble(
+      playerId = "1",
+      season = 2019L,
+      team = "LSU"
+    ),
+    coaches = tibble::tibble(
+      school = "LSU",
+      season = 2019L,
+      srs = 34.2,
+      sp_overall = 30.1
+    )
+  )
+}
+
+test_that("team_season dict matches build_team_season() output schema", {
+  skip_if_not_installed("yaml")
+  f <- team_fixture_dict()
+  check_dict(
+    "team_season",
+    build_team_season(f$roster, f$games, f$tiers, f$player_season, f$coaches)
+  )
+})
+
+test_that("team_draft dict matches build_team_draft() output schema", {
+  skip_if_not_installed("yaml")
+  f <- team_fixture_dict()
+  ts <- build_team_season(
+    f$roster,
+    f$games,
+    f$tiers,
+    f$player_season,
+    f$coaches
+  )
+  cohort <- exit_cohort(
+    f$roster,
+    tibble::tibble(playerId = "1", year = 2020L, round = 1L),
+    udfa_ids = character(),
+    reused = character(),
+    last_roster_season = 2020L
+  )
+  check_dict("team_draft", build_team_draft(cohort, ts))
+})
