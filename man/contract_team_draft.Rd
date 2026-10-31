@@ -11,6 +11,7 @@ contract_team_draft(
   reused,
   min_class = 2014L,
   min_coverage = 0.93,
+  draft_window = 2010:2027,
   stop_on_fail = TRUE
 )
 }
@@ -27,6 +28,9 @@ contract_team_draft(
 
 \item{min_coverage}{Minimum attributed share (default 0.93; 94.6\% observed
 2026-10-31).}
+
+\item{draft_window}{Plausible draft years; picks after \code{max(draft_window)}
+are outside the cohort and not counted in the coverage denominator.}
 
 \item{stop_on_fail}{Abort on failure (default \code{TRUE})?}
 }

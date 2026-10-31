@@ -16,6 +16,6 @@ The interrogated pointblank agent, invisibly.
 }
 \description{
 Guards \code{\link[=build_team_season]{build_team_season()}}: one row per \verb{(team, season)}, a record that
-adds up, \code{win_pct} in \link{0, 1}, non-negative counts, and a tier on every FBS
+adds up, \code{win_pct} in 0 to 1 (NA exactly when no games), non-negative counts, and a tier on every FBS
 team-season (an untiered FBS conference means the tier lookup is stale).
 }
