@@ -1,0 +1,165 @@
+---
+title: "College football's draft picks come from a few dozen schools, and the data sees every FBS team but only part of the rest"
+date: "2026-10-31"
+description: "DRAFT, rewritten with the measured numbers once the Results are in."
+followups:
+  - "Which conferences and schools produce draftees above expectation, by position? (Post 2)"
+  - "Do teams that win more produce more draftees? (Post 3)"
+  - "Recover offensive-line careers from rosters alone so the model population can include them."
+  - "Fill FCS-and-below rosters (2020 especially) from another source."
+author:
+  - "AI directed by Nick Giangreco"
+freeze: auto
+vignette: >
+  %\VignetteIndexEntry{College football's draft picks come from a few dozen schools, and the data sees every FBS team but only part of the rest}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r}
+#| label: setup
+#| include: false
+# Load the package from the checkout with pkgload; no package install is
+# required. Under altdoc the render runs in a temp dir, so resolve the root
+# first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
+root <- Sys.getenv("CFB2NFL_ROOT", "")
+if (!nzchar(root)) {
+  dir <- getwd()
+  while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
+    dir <- dirname(dir)
+  }
+  root <- if (file.exists(file.path(dir, "_targets"))) dir else getwd()
+}
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+library(DBI)
+library(dplyr)
+library(duckdb)
+library(ggiraph)
+library(ggplot2)
+library(knitr)
+
+# One interaction style for every girafe figure: a clear hover pop, dimming
+# of non-hovered marks, a dark tooltip, and toolbar zoom + PNG download.
+set_girafe_defaults(
+  opts_hover = opts_hover(
+    css = "stroke:#111827;stroke-width:2.5px;filter:brightness(1.12);"
+  ),
+  opts_hover_inv = opts_hover_inv(css = "opacity:0.45;"),
+  opts_tooltip = opts_tooltip(
+    css = "background:#111827;color:#fff;padding:6px 9px;border-radius:5px;font-weight:bold;font-size:15px;"
+  ),
+  opts_zoom = opts_zoom(min = 1, max = 5),
+  opts_toolbar = opts_toolbar(saveaspng = TRUE, position = "topright"),
+  opts_sizing = opts_sizing(rescale = TRUE)
+)
+
+# thousands-separated and percent formatters for inline numbers
+fmt <- function(x, digits = 0) {
+  formatC(as.numeric(x), big.mark = ",", format = "f", digits = digits)
+}
+pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
+```
+
+```{r}
+#| label: load
+#| include: false
+team_season <- dbReadTable(con, "team_season")
+team_draft <- dbReadTable(con, "team_draft")
+teams <- dbReadTable(con, "teams")
+roster <- dbReadTable(con, "roster")
+picks <- dbReadTable(con, "picks")
+player_stats_seasons <- dbGetQuery(
+  con,
+  "SELECT DISTINCT playerId, season FROM player_stats"
+)
+stopifnot(nrow(team_season) > 0, nrow(team_draft) > 0, nrow(picks) > 0)
+
+# Decision 0003 places Notre Dame in the Power tier, but the season-aware
+# lookup tiers every FBS independent as Group of 5; apply the team override
+# here so the exhibits match the tier definitions in section 2.1.
+nd_power <- function(df) {
+  mutate(
+    df,
+    tier_label = if_else(
+      team == "Notre Dame" & tier_label == "Group of 5",
+      "Power",
+      tier_label
+    )
+  )
+}
+tier_order <- c("Power", "Group of 5", "FCS and below")
+tier_colors <- c(
+  "Power" = "#1d4ed8",
+  "Group of 5" = "#f59e0b",
+  "FCS and below" = "#6b7280"
+)
+team_season <- team_season |>
+  nd_power() |>
+  mutate(tier_label = factor(tier_label, levels = tier_order))
+team_draft <- nd_power(team_draft)
+stopifnot(
+  all(team_season$tier_label[team_season$team == "Notre Dame"] == "Power")
+)
+
+first_class <- 2014L # full observable careers (roster starts 2010)
+last_season <- 2025L # the 2026 season is in progress
+played <- filter(team_season, games_played > 0, season <= last_season)
+n_played_2025 <- n_distinct(played$team[played$season == 2025L])
+stopifnot(n_played_2025 > 600)
+```
+
+::: {.callout-note appearance="minimal"}
+*Data as of the `data-latest` release, retrieved 2026-10-31. Rosters and
+stat lines start with the 2010 season; the 2026 season is still being
+played, so every season-level exhibit stops at 2025, and draft counts cover
+the classes of 2014 through 2026.*
+:::
+
+## 1. Introduction
+
+In 2025, `r fmt(n_played_2025)` college programs played at least one
+recorded football game, from Alabama and Ohio State down to Division III,
+and this post maps how they are grouped, what the data records about each,
+and how unevenly the NFL draft draws from them. The answers set up two
+later posts: which schools produce draftees at each position, and whether
+winning explains it.
+
+## 2. Data
+
+### 2.1 Teams are grouped into conferences, and conferences into three tiers
+
+The table defines every term the post uses; a tier is set season by
+season, so a school that changes conference can change tier.
+
+```{r}
+#| label: terms
+tibble::tribble(
+  ~Term                   , ~Meaning                                                                                                                                                                                                                        ,
+  "Division"              , "The NCAA level a school plays at: FBS (the top division), FCS (the next level down), Division II, and Division III."                                                                                                         ,
+  "Conference"            , "A league of schools that schedule each other and share a championship, such as the SEC or the Big Sky. A few FBS schools are independents and belong to no football conference."                                         ,
+  "Tier"                  , "Our three-level grouping of conferences by competitive level, set season by season because schools change conferences."                                                                                                     ,
+  "Power"                 , "The top tier: the SEC, Big Ten, ACC, and Big 12; the Pac-12 through 2023 (the Pac-10 before 2011); the Big East through 2012; and Notre Dame."                                                                               ,
+  "Group of 5"            , "The rest of FBS: the American Athletic (from 2013), Conference USA, Mid-American, Mountain West, Sun Belt, Western Athletic (through 2012), the two-school Pac-12 from 2024, and the independents other than Notre Dame." ,
+  "FCS and below"         , "Every school outside FBS: the FCS (such as the Big Sky or Missouri Valley), Division II, and Division III."                                                                                                                  ,
+  "Team-season"           , "One school in one season."                                                                                                                                                                                                   ,
+  "Roster player-season"  , "One player listed on one school's roster in one season."                                                                                                                                                                     ,
+  "Stat line"             , "At least one recorded statistic (a carry, catch, tackle, or kick) for a player in a season."                                                                                                                                ,
+  "Position group"        , "The roster position, grouped: quarterback, running back (fullbacks included), receiver, tight end, offensive line, defensive line, linebacker, defensive back, and special teams. A roster with no position, or a generic one such as athlete, is 'Position not recorded'." ,
+  "Draft class"           , "The players picked in one year's NFL draft; the class of 2016 was drafted in April 2016, after the 2015 college season."                                                                                                    ,
+  "Draft-day school"      , "The college the NFL draft lists for a player."                                                                                                                                                                               ,
+  "Credited pick"         , "A draft pick traced to the last college roster the player was on before the draft. A pick whose player appears on no roster cannot be credited."
+) |>
+  kable(caption = "Terms used throughout.")
+```
+
+```{r}
+#| label: teardown
+#| include: false
+dbDisconnect(con, shutdown = TRUE)
+```
