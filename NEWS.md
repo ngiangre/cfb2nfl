@@ -1,5 +1,12 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- New blog post testing whether schools that win more produce more
+  draftees. The link is strong among Power schools and moderate in the
+  Group of 5. The post also names the programs that draft more or fewer
+  players than their record predicts, and checks that the result holds with
+  SP+ and without transfer-ins
+  ([vignettes/2026-10-31-winning-and-draftees.qmd](https://github.com/ngiangre/cfb2nfl/blob/main/vignettes/2026-10-31-winning-and-draftees.qmd)).
+
 - New blog post on which conferences, schools and positions produce
   draftees and undrafted signings, including a check of fan nicknames
   such as DBU and Linebacker U

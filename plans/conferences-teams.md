@@ -125,7 +125,7 @@ Sketch of assertions (refine on real numbers):
 4. UDFAs come from a broader set of schools than draft picks? (overlap of
    top producers; rank comparison).
 
-## Post 3: Do good teams produce more draftees?
+## Post 3: Do good teams produce more draftees? (done: vignettes/2026-10-31-winning-and-draftees.qmd)
 
 *Expectation: teams that win more produce more draftees.* (verdict TBD)
 
