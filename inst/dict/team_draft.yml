@@ -1,0 +1,27 @@
+dataset: team_draft
+source: derived in-pipeline (build_team_draft(exit_cohort(...), team_season))
+grain: one team x final college season x position group
+key: team, season, position_group
+description: >
+  Players whose college career ended at a team, counted in the season they
+  left (decision 0033). A drafted player is credited to their final roster
+  season before the draft (most recent in-window pick, decision 0011); an
+  undrafted player to their final roster season. Undrafted players still on
+  the latest roster are excluded (outcome unknown); reused ids excluded
+  (decision 0022). Position group from the final-season roster position
+  (`position_group()`). Eligible is a roster proxy: 3+ roster seasons, or
+  drafted, or UDFA. UDFAs are only linked for players with a stat line, so
+  offensive-line UDFAs are undercounted. A DERIVED table: DuckDB bundle only.
+  Contract: `contract_team_draft()`.
+columns:
+  - {name: team, type: string, description: Team the player left., provenance: roster}
+  - {name: season, type: int32, description: The player's final college season at the team., provenance: roster}
+  - {name: conference, type: string, description: Team's conference that season., provenance: team_season}
+  - {name: tier, type: int32, description: Team's tier that season., provenance: team_season}
+  - {name: tier_label, type: string, description: Tier label., provenance: team_season}
+  - {name: position_group, type: string, description: Reader-facing position group., provenance: derived (position_group())}
+  - {name: n_exits, type: int32, description: Players whose college career ended here that season., provenance: derived}
+  - {name: n_eligible, type: int32, description: Exits meeting the eligibility proxy., provenance: derived}
+  - {name: n_drafted, type: int32, description: Exits drafted into the NFL., provenance: derived (picks)}
+  - {name: n_round1, type: int32, description: Exits drafted in round 1., provenance: derived (picks)}
+  - {name: n_udfa, type: int32, description: Undrafted exits who signed with an NFL team., provenance: derived (outcomes)}

@@ -379,6 +379,24 @@ list(
       contract_outcomes(outcomes, ps_pop, stop_on_fail = FALSE)
     )
   ),
+  tar_target(
+    ok_team_season,
+    pointblank::all_passed(
+      contract_team_season(team_season, stop_on_fail = FALSE)
+    )
+  ),
+  tar_target(
+    ok_team_draft,
+    pointblank::all_passed(
+      contract_team_draft(
+        team_draft,
+        exits,
+        picks,
+        reused,
+        stop_on_fail = FALSE
+      )
+    )
+  ),
   # Contract gate (decision 0023): a FALSE anywhere stops tar_make() (the
   # default error = "stop" aborts the run, so CI never publishes a failing
   # build). NA (steps without a contract yet) is not a failure.
@@ -411,7 +429,9 @@ list(
       redshirt = ok_roster_flags,
       stat_taxonomy = ok_stat_taxonomy,
       player_season_stats = ok_player_season_stats,
-      outcomes = ok_outcomes
+      outcomes = ok_outcomes,
+      team_season = ok_team_season,
+      team_draft = ok_team_draft
     ))
   ),
   # ---- link-step contracts (audit-hygiene workstream C) ----------------------
@@ -485,6 +505,25 @@ list(
   # Wide player-season stats for the DuckDB bundle (decision 0026): a derived
   # convenience table, like career/roster_flags above.
   tar_target(player_season_stats, build_player_season_stats(player_stats)),
+  # Team- and conference-grain derived tables (plans/conferences-teams.md,
+  # decision 0033): credit each player's exit to their final pre-draft
+  # roster team; derived like career/roster_flags, not published parquet.
+  tar_target(
+    team_season,
+    build_team_season(roster, games, tiers, player_season, coaches)
+  ),
+  tar_target(
+    exits,
+    exit_cohort(
+      roster,
+      picks,
+      udfa_ids = unique(outcomes$playerId[
+        outcomes$outcome_signed_udfa_d %in% TRUE
+      ]),
+      reused = reused
+    )
+  ),
+  tar_target(team_draft, build_team_draft(exits, team_season)),
   # Person-period outcome table (decision 0032): the modeling dependent
   # variables. Derived from cleaned tables (no new API calls), but PUBLISHED
   # as parquet on data-latest per plan (user request), alongside the DuckDB
@@ -537,6 +576,8 @@ list(
         roster_flags = roster_flags,
         career_summary = career,
         player_season_stats = player_season_stats,
+        team_season = team_season,
+        team_draft = team_draft,
         nfl_pick_link = picks_nfl,
         outcomes = outcomes,
         audit_log = db_audit_log
@@ -748,6 +789,22 @@ list(
         ps_pop,
         keys = c("playerId", "season"),
         contract_passed = ok_outcomes
+      ),
+      audit_step(
+        team_season,
+        "build_team_season",
+        "features",
+        roster,
+        keys = c("team", "season"),
+        contract_passed = ok_team_season
+      ),
+      audit_step(
+        team_draft,
+        "build_team_draft",
+        "features",
+        exits,
+        keys = c("team", "season", "position_group"),
+        contract_passed = ok_team_draft
       )
     )
   ),

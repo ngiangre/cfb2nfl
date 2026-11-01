@@ -619,6 +619,136 @@ contract_career_summary <- function(career, stop_on_fail = TRUE) {
   enforce_contract(agent, "career_summary", stop_on_fail)
 }
 
+#' Data contract for the team-season table
+#'
+#' Guards [build_team_season()]: one row per `(team, season)`, a record that
+#' adds up, `win_pct` in 0 to 1 (NA exactly when no games), non-negative counts, and a tier on every FBS
+#' team-season (an untiered FBS conference means the tier lookup is stale).
+#'
+#' @param team_season Output of [build_team_season()].
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_team_season <- function(team_season, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  agent <- pointblank::create_agent(team_season, label = "team_season") |>
+    pointblank::col_exists(c(
+      "team",
+      "season",
+      "conference",
+      "tier",
+      "games_played",
+      "wins",
+      "losses",
+      "ties",
+      "win_pct",
+      "n_roster",
+      "n_stat_players"
+    )) |>
+    pointblank::col_vals_not_null(pointblank::vars(team, season)) |>
+    pointblank::rows_distinct(pointblank::vars(team, season)) |>
+    pointblank::col_vals_expr(rlang::expr(
+      wins + losses + ties == games_played
+    )) |>
+    pointblank::col_vals_between("win_pct", 0, 1, na_pass = TRUE) |>
+    pointblank::col_vals_expr(rlang::expr(
+      is.na(win_pct) == (games_played == 0L)
+    )) |>
+    # Row floor: an empty table must not pass vacuously.
+    pointblank::col_vals_gt(
+      "n",
+      0L,
+      preconditions = function(x) tibble::tibble(n = nrow(x))
+    ) |>
+    pointblank::col_vals_gte(
+      pointblank::vars(games_played, n_roster, n_stat_players),
+      0L
+    ) |>
+    pointblank::col_vals_not_null(
+      pointblank::vars(tier),
+      preconditions = function(x) {
+        dplyr::filter(x, .data$classification %in% "fbs")
+      }
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "team_season", stop_on_fail)
+}
+
+#' Data contract for the team draft table
+#'
+#' Guards [build_team_draft()]: one row per `(team, season, position_group)`;
+#' drafted + UDFA <= eligible <= exits; exit totals equal the cohort (no
+#' silent loss in aggregation); and at least `min_coverage` of id-bearing,
+#' non-reused picks from `min_class` on are attributed to a team (picks with
+#' no roster season before the draft cannot be credited).
+#'
+#' @param team_draft Output of [build_team_draft()].
+#' @param cohort Output of [exit_cohort()].
+#' @param picks Cleaned picks.
+#' @param reused Reused athlete ids ([reused_ids()]).
+#' @param min_class First draft class in the coverage check.
+#' @param draft_window Plausible draft years; picks after `max(draft_window)`
+#'   are outside the cohort and not counted in the coverage denominator.
+#' @param min_coverage Minimum attributed share (default 0.93; 94.6% observed
+#'   2026-10-31).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_team_draft <- function(
+  team_draft,
+  cohort,
+  picks,
+  reused,
+  min_class = 2014L,
+  min_coverage = 0.93,
+  draft_window = 2010:2027,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  n_picks <- picks |>
+    dplyr::filter(
+      !is.na(.data$playerId),
+      !.data$playerId %in% reused,
+      .data$year >= min_class,
+      .data$year <= max(draft_window)
+    ) |>
+    dplyr::distinct(.data$playerId) |>
+    nrow()
+  n_attributed <- sum(cohort$drafted & cohort$draft_class >= min_class)
+  coverage <- if (n_picks > 0) n_attributed / n_picks else 1
+  n_cohort <- nrow(cohort)
+  agent <- pointblank::create_agent(team_draft, label = "team_draft") |>
+    pointblank::rows_distinct(pointblank::vars(team, season, position_group)) |>
+    pointblank::col_vals_not_null(pointblank::vars(tier, tier_label)) |>
+    # Row floor: an empty table must not pass vacuously.
+    pointblank::col_vals_gt(
+      "n",
+      0L,
+      preconditions = function(x) tibble::tibble(n = nrow(x))
+    ) |>
+    pointblank::col_vals_in_set(
+      "position_group",
+      c(position_group_levels(), "Position not recorded")
+    ) |>
+    pointblank::col_vals_expr(rlang::expr(n_drafted + n_udfa <= n_eligible)) |>
+    pointblank::col_vals_expr(rlang::expr(n_eligible <= n_exits)) |>
+    pointblank::col_vals_expr(rlang::expr(n_round1 <= n_drafted)) |>
+    pointblank::col_vals_equal(
+      "total_exits",
+      n_cohort,
+      preconditions = function(x) {
+        tibble::tibble(total_exits = sum(x$n_exits))
+      }
+    ) |>
+    pointblank::col_vals_gte(
+      "coverage",
+      min_coverage,
+      preconditions = function(x) tibble::tibble(coverage = .env$coverage)
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "team_draft", stop_on_fail)
+}
+
 #' Data contract for cleaned recruiting ratings
 #'
 #' Validates the per-athlete recruiting-rating table ([clean_recruiting()]):

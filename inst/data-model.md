@@ -27,6 +27,8 @@ dictionaries next to this file, one YAML per table:
 | `ps_change` | one player-season (stat-line grain) + change features | [`dict/ps_change.yml`](dict/ps_change.yml) |
 | `roster_flags` | roster player-season + eligibility flags | [`dict/roster_flags.yml`](dict/roster_flags.yml) |
 | `career_summary` | one player's college career | [`dict/career_summary.yml`](dict/career_summary.yml) |
+| `team_season` | one team in one season (every division) | [`dict/team_season.yml`](dict/team_season.yml) |
+| `team_draft` | team × final college season × position group | [`dict/team_draft.yml`](dict/team_draft.yml) |
 | `player_season_stats` | **wide**: player-season-team stat columns | [`dict/player_season_stats.yml`](dict/player_season_stats.yml) |
 | `nfl_pick_link` | one draft pick + name-guarded nflverse id | [`dict/nfl_pick_link.yml`](dict/nfl_pick_link.yml) |
 | `outcomes` | one player-season in the model population (person-period labels) | [`dict/outcomes.yml`](dict/outcomes.yml) |
@@ -116,6 +118,9 @@ erDiagram
     nfl_draft_picks ||--o{ nfl_player_stats : "gsis_id, season"
     ps_change }o--|| roster_flags : "playerId, season (flags/weights attach here)"
     roster |o--o{ career_summary : "playerId (collapsed)"
+    roster |o--o{ team_season : "team, season (aggregated)"
+    games |o--o{ team_season : "team, season (aggregated)"
+    team_season ||--o{ team_draft : "team, season"
 }
 ```
 
