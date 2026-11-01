@@ -95,7 +95,7 @@ attribution rule. Keep both pure functions in `R/features.R` (or a new
   `inst/data-model.md`. No new ingest, so no release-asset ordering issue.
 - Decision record (next number) for the attribution + denominator rules.
 
-## Post 1: The college football landscape and what the data can see
+## Post 1: The college football landscape and what the data can see (done: vignettes/2026-10-31-conferences-landscape.qmd)
 
 Questions: what conferences and tiers are, how many teams each has, how
 realignment changed membership; which teams have stat lines over time; how
@@ -116,7 +116,7 @@ Sketch of assertions (refine on real numbers):
 4. Small schools still send players to the NFL (FCS-and-below pick counts,
    named examples verified in data).
 
-## Post 2: Which conferences and schools produce draftees, by position
+## Post 2: Which conferences and schools produce draftees, by position (done: vignettes/2026-10-31-who-produces-draftees.qmd)
 
 1. Draftee and UDFA rates by conference and tier (per eligible player).
 2. Position-group rates by conference (heatmap; highlight the leaders).
