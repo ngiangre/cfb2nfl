@@ -1,7 +1,7 @@
 ---
 title: "Schools that win more produce more draftees, strongly in the Power conferences and moderately in the Group of 5"
 date: "2026-10-31"
-description: "From 2013 to 2025, win percentage tracked draft rate with a correlation of 0.82 among Power schools and 0.40 in the Group of 5, and a Power school winning 60% of its games was expected to see 14.2% of its eligible players drafted against 3.9% at a Group of 5 school."
+description: "From 2013 to 2025, a school's win percentage tracked its draft rate with a correlation of 0.82 among Power schools and 0.40 in the Group of 5."
 followups:
   - "Does recruited talent drive both winning and drafting? Add team recruiting ratings at entry as a common cause."
   - "Do head coaches carry draft production with them when they change schools?"
@@ -167,6 +167,28 @@ stopifnot(
   !anyNA(school$win_pct)
 )
 
+# Tier totals place each player in the tier of their final season, as in
+# the previous post; school comparisons use the school's majority tier.
+tier_tot <- credited |>
+  group_by(tier = factor(tier_label, levels = tier_order)) |>
+  summarise(
+    eligible = sum(n_eligible),
+    drafted = sum(n_drafted),
+    .groups = "drop"
+  ) |>
+  mutate(draft_rate = drafted / eligible)
+tt <- function(t, col) tier_tot[[col]][tier_tot$tier == t]
+xfive <- round(tt("Power", "draft_rate") / tt("Group of 5", "draft_rate"))
+stopifnot(
+  xfive == 5,
+  tt("Power", "eligible") == 18611L,
+  tt("Power", "drafted") == 2561L,
+  pct(tt("Power", "draft_rate")) == "13.8%",
+  tt("Group of 5", "eligible") == 17590L,
+  tt("Group of 5", "drafted") == 483L,
+  pct(tt("Group of 5", "draft_rate")) == "2.7%"
+)
+
 # Expected draftees: within each tier, a logistic regression turns a win
 # percentage into an expected draft rate (kept between 0 and 1), times the
 # school's eligible players.
@@ -263,10 +285,10 @@ classes of 2014 through 2026.*
 ## 1. Introduction
 
 The [first post](2026-10-31-conferences-landscape.html) found draft picks
-concentrated in a short list of schools and the
+concentrated in a short list of schools, and the
 [second](2026-10-31-who-produces-draftees.html) found Power-conference
-players drafted at five times the Group of 5 rate; this one asks whether the
-schools that win, like Joe Burrow's `r burrow$season_wins`-`r burrow$season_losses`
+players drafted at five times the Group of 5 rate. This post asks
+whether the schools that win, like Joe Burrow's `r burrow$season_wins`-`r burrow$season_losses`
 LSU of `r burrow$last_season` or Jordan Travis's
 `r travis$season_wins`-`r travis$season_losses` Florida State of
 `r travis$last_season`, are the schools whose players get drafted.
@@ -300,13 +322,14 @@ drafted, in final seasons 2013 to 2025.
 #| label: terms
 tibble::tribble(
   ~Term                  , ~Meaning                                                                                                                                                                                                                                                                                                                                   ,
+  "FBS"                  , "The Football Bowl Subdivision, the top division of college football."                                                                                                                                                                                                                                                                          ,
   "School"               , "An FBS program with at least one player whose college career ended there in a Power or Group of 5 season from 2013 to 2025."                                                                                                                                                                                                            ,
-  "Tier"                 , "Power (the SEC, Big Ten, ACC, Big 12, the Pac-12 through 2023, and Notre Dame) or Group of 5 (the other FBS conferences and independents). A school's tier is the one it held in most of its FBS seasons from 2010 to 2025, so Cincinnati, which joined the Big 12 in 2023, is Group of 5."                                        ,
+  "Tier"                 , "Power (the SEC, Big Ten, ACC, Big 12, the Pac-12 through 2023, the Big East through 2012, and Notre Dame) or Group of 5 (the American Athletic, Conference USA, Mid-American, Mountain West, Sun Belt, the Western Athletic through 2012, the two-school Pac-12 of 2024 and 2025, and the other independents). Counts and draft rates by tier place each player in the tier of their final season, as in the previous post. Comparisons between schools place each school in the tier it held in most of its FBS seasons from 2010 to 2025, so Cincinnati, which joined the Big 12 in 2023, is Group of 5."                                        ,
   "Win %"                , "Wins divided by completed games over all of a school's FBS seasons from 2010 to 2025, bowls and playoffs included. A school that wins six of every ten games has a win % of 60%."                                                                                                                                                    ,
   "SP+"                  , "A rating of how strong a team was in a season that adjusts each game for the opponent's strength, so a win over a strong team counts for more than a win over a weak one; higher is better. A school's SP+ is the average over its FBS seasons from 2010 to 2025."                                                                   ,
   "Eligible player"      , "A player whose college career ended at the school and who had a real shot at the NFL: at least three seasons on college rosters, or drafted, or signed with an NFL team undrafted (the same definition as the previous post)."                                                                                                          ,
   "Draft rate"           , "Drafted players divided by eligible players, counting each player once, for the last school they played for, in final seasons 2013 to 2025."                                                                                                                                                                                           ,
-  "Correlation (r)"      , "How closely two numbers rise and fall together across schools, on a scale where 0 means no relationship and 1 means the schools sit on a perfect rising line. The plausible range is the span the true correlation likely falls in, given how many schools there are (a 95% confidence interval)."                                ,
+  "Correlation (r)"      , "How closely two numbers rise and fall together across schools, on a scale where 0 means no relationship and 1 means the schools sit on a perfect rising line. The plausible range shows how far r could move by chance with this few schools: the span the true correlation likely falls in (a 95% confidence interval)."                                ,
   "Expected draftees"    , "For a school with this record in its tier, how many draftees we would expect: a curve fitted to the schools of each tier turns a win % into an expected draft rate, which is multiplied by the school's eligible players. The curve is a logistic regression, chosen because its expected rates stay between 0% and 100%."            ,
   "Over- or under-producer", "A school with more (over) or fewer (under) draftees than expected for its record."                                                                                                                                                                                                                                    ,
   "Transfer-in"          , "An eligible player who was on a different school's roster in an earlier season before finishing at the school that gets the credit."
@@ -336,30 +359,34 @@ cor_tier <- function(d, x, y = "draft_rate") {
 win_cor <- cor_tier(school, "win_pct")
 wc <- function(t, col) win_cor[[col]][win_cor$tier == t]
 at60 <- curve_at(win_fits, "win_pct", 0.6)
-tier_tot <- school |>
+# each school weighted by its eligible players, a check on small schools
+wtd_cor <- school |>
   group_by(tier) |>
   summarise(
-    eligible = sum(eligible),
-    drafted = sum(drafted),
+    r_wtd = cov.wt(cbind(win_pct, draft_rate), wt = eligible, cor = TRUE)$cor[1, 2],
     .groups = "drop"
-  ) |>
-  mutate(draft_rate = drafted / eligible)
+  )
+wtd <- function(t) wtd_cor$r_wtd[wtd_cor$tier == t]
+jmu <- filter(school, team == "James Madison")
 ```
 
-### 3.1 Within each tier, schools that win more have higher draft rates, and a Power school winning 60% of its games is expected to see 14.2% of its players drafted against 3.9% in the Group of 5
+### 3.1 Within each tier, schools that win more have higher draft rates
 
 *Expectation: teams that win more produce more draftees.* ✅
 
-The table gives the correlation of win % with draft rate in each tier,
-`r r2(wc("Power", "r"))` for Power schools and `r r2(wc("Group of 5", "r"))`
-for the Group of 5, both clearly above zero, and the scatter shows that the
-two tiers sit on separate curves, so a Group of 5 school with a Power
-school's record is still expected to send far fewer players to the draft.
+Win % tracks draft rate closely for Power schools (r = `r r2(wc("Power", "r"))`)
+and moderately for the Group of 5 (`r r2(wc("Group of 5", "r"))`), where
+small schools new to FBS pull the correlation down, such as James Madison
+with `r pct(jmu$win_pct, 0)` wins and `r jmu$drafted` of `r jmu$eligible`
+eligible players drafted. The tiers sit on separate curves: at 60% wins, a
+Power school is expected to see `r pct(at60[["Power"]])` of its eligible
+players drafted and a Group of 5 school `r pct(at60[["Group of 5"]])`.
 
 ```{r}
 #| label: s31-table
 win_cor |>
   left_join(tier_tot, by = "tier") |>
+  left_join(wtd_cor, by = "tier") |>
   mutate(at60 = at60[as.character(tier)]) |>
   transmute(
     Tier = tier,
@@ -369,10 +396,11 @@ win_cor |>
     `Draft rate` = pct(draft_rate),
     `Correlation of win % with draft rate (r)` = r2(r),
     `Plausible range of r` = paste(r2(lo), "to", r2(hi)),
+    `r, each school weighted by its eligible players` = r2(r_wtd),
     `Expected draft rate at a 60% win %` = pct(at60)
   ) |>
   kable(
-    caption = "School win % (FBS seasons 2010 to 2025) against draft rate (final seasons 2013 to 2025), by tier. Players are counted in their school's tier, the one it held in most seasons. The expected draft rate comes from each tier's fitted curve."
+    caption = "School win % (FBS seasons 2010 to 2025) against draft rate (final seasons 2013 to 2025), by tier. Eligible players and draftees are counted in the tier of their final season; the correlations and fitted curves group schools by the tier they held in most seasons, and the weighted correlation lets schools with more eligible players count for more."
   )
 ```
 
@@ -525,6 +553,15 @@ stopifnot(
   wc("Group of 5", "lo") > 0,
   r2(wc("Group of 5", "lo")) == "0.19",
   r2(wc("Group of 5", "hi")) == "0.58",
+  r2(wc("Power", "lo")) == "0.73",
+  r2(wc("Power", "hi")) == "0.89",
+  r2(wtd("Power")) == "0.83",
+  r2(wtd("Group of 5")) == "0.49",
+  jmu$tier == "Group of 5",
+  jmu$fbs_seasons <= 4L,
+  pct(jmu$win_pct, 0) == "78%",
+  jmu$drafted == 0L,
+  jmu$eligible == 72L,
   pct(at60[["Power"]]) == "14.2%",
   pct(at60[["Group of 5"]]) == "3.9%",
   # both fitted curves rise
@@ -554,14 +591,17 @@ named <- c(
 fl <- filter(school, team == "Florida")
 oks <- filter(school, team == "Oklahoma State")
 lsu <- filter(school, team == "LSU")
+bama <- filter(school, team == "Alabama")
 ```
 
 ### 3.2 Florida and LSU produced 34 and 28 more draftees than their records predict, and Oklahoma State and Kansas State 23 and 22 fewer
 
-The table and bars rank each tier's five furthest over and under their
-expected draftees: LSU, where Burrow finished after starting at Ohio State,
-is second among Power schools, and in the Group of 5 Cincinnati leads while
-the three service academies sit among the four furthest under.
+The table and bars rank each tier's five schools furthest above and below
+their expected draftees: LSU, where Burrow finished after starting at Ohio
+State, is second among Power schools, while Alabama's record already
+predicts so many draftees that it sits at `r signed(bama$above, 1)`. In the
+Group of 5, Cincinnati leads, and the three service academies sit among
+the four schools furthest under.
 
 ```{r}
 #| label: s32-table
@@ -658,6 +698,8 @@ stopifnot(
   ),
   fmt(-od("Power", "above", arrange(under, rank_under))[1:2]) == c("23", "22"),
   od("Group of 5")[1] == "Cincinnati",
+  signed(bama$above, 1) == "+15.8",
+  !"Alabama" %in% over$team,
   all(academies %in% g5_bottom4$team),
   burrow$last_team == "LSU",
   burrow$first_team == "Ohio State",
@@ -717,6 +759,10 @@ win_cor |>
 ```{r}
 #| label: s33-explain
 #| fig-height: 8
+sp_lab <- win_cor |>
+  select(tier, r_win = r) |>
+  left_join(select(sp_cor, tier, r_sp = r), by = "tier") |>
+  mutate(label = paste0("r with SP+: ", r2(r_sp), "\nr with win %: ", r2(r_win)))
 p <- ggplot(school, aes(sp, draft_rate)) +
   geom_line(
     data = sp_grid,
@@ -730,18 +776,24 @@ p <- ggplot(school, aes(sp, draft_rate)) +
     color = "white",
     stroke = 0.6
   ) +
+  geom_label(
+    data = sp_lab,
+    aes(x = -Inf, y = Inf, label = label, color = tier),
+    hjust = -0.05,
+    vjust = 1.2,
+    size = 5,
+    fontface = "bold",
+    linewidth = 0,
+    inherit.aes = FALSE
+  ) +
   facet_wrap(~tier, scales = "free") +
   scale_fill_team(teams, guide = "none") +
-  scale_color_manual(values = tier_colors, guide = "none") +
+  scale_color_manual(values = c("Power" = tier_colors[["Power"]], "Group of 5" = "#b45309"), guide = "none") +
   scale_y_continuous(labels = scales::percent) +
   labs(
     x = "Average SP+ (FBS seasons 2010 to 2025)",
     y = "Draft rate",
-    title = sprintf(
-      "SP+ against draft rate: r = %s for Power schools, %s for the Group of 5",
-      r2(sc("Power")),
-      r2(sc("Group of 5"))
-    ),
+    title = "SP+ tracks draft rate more closely than win % in both tiers",
     subtitle = "Team colors; lines are each tier's fitted curve; each panel has its own scales; hover a dot for counts"
   ) +
   theme_cfb2nfl()
@@ -755,6 +807,10 @@ stopifnot(
   r2(sc("Power")) == "0.87",
   r2(sc("Group of 5")) == "0.61",
   sc("Power") > wc("Power", "r"),
+  r2(sc("Power", "lo")) == "0.80",
+  r2(sc("Power", "hi")) == "0.92",
+  r2(sc("Group of 5", "lo")) == "0.43",
+  r2(sc("Group of 5", "hi")) == "0.73",
   sc("Group of 5") > wc("Group of 5", "r"),
   sc("Group of 5") - wc("Group of 5", "r") > sc("Power") - wc("Power", "r"),
   all(win_sp$r_win_sp > 0.9)
@@ -805,19 +861,19 @@ fallers <- slice_min(windows, change, n = 2)
 movers <- bind_rows(risers, fallers)
 ```
 
-### 3.4 A Power school's draft rate carries over from one five-year window to the next, and early winning and early drafting each predict the other equally well
+### 3.4 A Power school's draft rate carries over from one five-year window to the next
 
 Across the `r nrow(windows)` Power schools, the draft rate of final seasons
-2013 to 2017 correlates `r r2(wr[1])` with that of 2019 to 2023, and early
-win % tracks later draft rate exactly as closely as early draft rate tracks
-later win % (`r r2(wr[3])` each), so the data cannot say which comes first.
+2013 to 2017 correlates `r r2(wr[1])` with that of 2019 to 2023. Early win %
+tracks later draft rate about as closely as early draft rate tracks later
+win % (`r r2(wr[3])` each), so the data cannot say which comes first.
 
 ```{r}
 #| label: s34-table
 window_cor |>
   transmute(`Earlier window with later window` = measure, r = r2(r)) |>
   kable(
-    caption = "Correlations across the 65 Power schools between an earlier window (2013 to 2017) and a later one (2019 to 2023), leaving 2018 out so no player's career spans both. Win % uses FBS seasons in each window; draft rate uses final seasons in it."
+    caption = "Correlations across the 65 Power schools between an earlier window (2013 to 2017) and a later one (2019 to 2023), leaving 2018 out so no player's final season falls in both windows, though players from the later window's first years were on rosters during the earlier one. Win % uses FBS seasons in each window; draft rate uses final seasons in it."
   )
 ```
 
@@ -861,19 +917,19 @@ p <- ggplot(windows, aes(rate_a, rate_b)) +
     size = 5.5,
     color = "#111827"
   ) +
-  # hand-placed labels: Penn State to the left of a neighbouring dot,
-  # Arkansas above and Louisville below their near-identical points
+  # hand-placed labels: Penn State below a neighbouring dot, Arkansas
+  # above and Louisville below their near-identical points
   geom_label(
     data = mutate(
       movers,
-      lx = rate_a + c(0.012, -0.012, 0.012, 0.012),
-      ly = rate_b + c(0, 0, 0.015, -0.015),
-      hj = c(0, 1, 0, 0)
+      lx = rate_a + c(0.012, 0, 0.012, 0.012),
+      ly = rate_b + c(0, -0.025, 0.015, -0.015),
+      hj = c(0, 0.5, 0, 0)
     ),
     aes(
       lx,
       ly,
-      label = paste0(team, " ", signed(100 * change), " points"),
+      label = paste0(team, " ", signed(100 * change), " percentage points"),
       color = team,
       hjust = hj
     ),
@@ -1059,14 +1115,14 @@ cast_tin <- setNames(
 )
 ```
 
-### 3.5 Leaving out transfer-ins barely changes the link, though transfer-ins made up nearly half of the Power draftees in the class of 2026
+### 3.5 Leaving out transfer-ins barely changes how closely win % tracks draft rate
 
-Recomputing each school's draft rate without its transfer-ins (Burrow, Cam
-Ward and Jordan Travis among them; Josh Allen, on Wyoming rosters only, is
-not) leaves the correlation with win % at `r r2(hc("Power"))` for Power
-schools and `r r2(hc("Group of 5"))` for the Group of 5, even as Power
-transfer-in draftees grew from at most `r p_early_max` a class through 2019
-to `r p_last$transfer_ins` of `r p_last$draftees` in `r p_last$draft_class`.
+Without transfer-ins (Burrow, Cam Ward and Jordan Travis among them, but
+not Josh Allen, on Wyoming rosters only), the correlation with win % is
+`r r2(hc("Power"))` for Power schools and `r r2(hc("Group of 5"))` for the
+Group of 5. That holds even though Power transfer-in draftees grew from at
+most `r p_early_max` a class through 2019 to `r p_last$transfer_ins` of
+`r p_last$draftees` in the class of `r p_last$draft_class`.
 
 ```{r}
 #| label: s35-table
@@ -1089,6 +1145,57 @@ transfer_tier |>
 
 ```{r}
 #| label: s35-explain
+#| fig-height: 6
+r_bars <- bind_rows(
+  mutate(select(win_cor, tier, r, lo, hi), version = "All eligible players"),
+  mutate(select(home_cor, tier, r, lo, hi), version = "Without transfer-ins")
+) |>
+  mutate(version = factor(version, levels = c("All eligible players", "Without transfer-ins")))
+p <- ggplot(r_bars, aes(r, tier, fill = version)) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(
+        tier,
+        ", ",
+        tolower(version),
+        ": r = ",
+        r2(r),
+        " (plausible range ",
+        r2(lo),
+        " to ",
+        r2(hi),
+        ")"
+      ),
+      data_id = paste(tier, version)
+    ),
+    position = position_dodge(width = 0.8, reverse = TRUE),
+    width = 0.75
+  ) +
+  geom_text(
+    aes(label = r2(r)),
+    position = position_dodge(width = 0.8, reverse = TRUE),
+    hjust = -0.2,
+    size = 5.5,
+    fontface = "bold"
+  ) +
+  scale_fill_manual(
+    values = c("All eligible players" = "#1f2937", "Without transfer-ins" = "#9ca3af"),
+    name = NULL
+  ) +
+  scale_y_discrete(limits = rev(tier_order)) +
+  scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.25)) +
+  labs(
+    x = "Correlation of school win % with draft rate (r)",
+    y = NULL,
+    title = "Dropping transfer-ins leaves both correlations almost where they were",
+    subtitle = "Hover a bar for the plausible range"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s35-explore
 #| fig-height: 7
 p <- ggplot(by_class, aes(draft_class, transfer_ins, fill = credit_tier)) +
   geom_col_interactive(
@@ -1141,53 +1248,6 @@ girafe(ggobj = p, width_svg = 13, height_svg = 7)
 ```
 
 ```{r}
-#| label: s35-explore
-#| fig-height: 8
-p <- ggplot(school, aes(draft_rate, rate_home)) +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "#6b7280") +
-  geom_point_interactive(
-    aes(
-      fill = team,
-      tooltip = paste0(
-        team,
-        " (",
-        tier,
-        ")\nAll eligible: ",
-        drafted,
-        " drafted of ",
-        eligible,
-        " (",
-        pct(draft_rate),
-        ")\nWithout transfer-ins: ",
-        drafted_home,
-        " of ",
-        eligible_home,
-        " (",
-        pct(rate_home),
-        ")"
-      ),
-      data_id = team
-    ),
-    shape = 21,
-    size = 4.2,
-    color = "white",
-    stroke = 0.6
-  ) +
-  facet_wrap(~tier, scales = "free") +
-  scale_fill_team(teams, guide = "none") +
-  scale_x_continuous(labels = scales::percent) +
-  scale_y_continuous(labels = scales::percent) +
-  labs(
-    x = "Draft rate, all eligible players",
-    y = "Draft rate without transfer-ins",
-    title = "Every school's draft rate with and without its transfer-ins",
-    subtitle = "On the dashed line: no change; hover a dot for counts"
-  ) +
-  theme_cfb2nfl()
-girafe(ggobj = p, width_svg = 13, height_svg = 8)
-```
-
-```{r}
 #| label: s35-pin
 #| include: false
 stopifnot(
@@ -1202,6 +1262,13 @@ stopifnot(
   p_last$share > 0.45,
   p_last$share < 0.5,
   p_early_max == 10L,
+  # the table counts
+  identical(transfer_tier$eligible_tin, c(3235L, 3435L)),
+  identical(transfer_tier$drafted_tin, c(387L, 55L)),
+  identical(transfer_tier$eligible, c(18611L, 17590L)),
+  identical(transfer_tier$drafted, c(2561L, 483L)),
+  identical(pct(transfer_tier$eligible_tin / transfer_tier$eligible, 0), c("17%", "20%")),
+  identical(pct(transfer_tier$drafted_tin / transfer_tier$drafted, 0), c("15%", "11%")),
   # the figure title: totals rise every class from 2021, Power the larger part
   all(diff(class_tot$transfer_ins[class_tot$draft_class >= 2021L]) > 0),
   all(class_wide$Power > class_wide$g5)
@@ -1211,7 +1278,7 @@ stopifnot(
 ## 4. Summary
 
 Schools that win more produce more draftees within each tier, closely among
-Power schools and loosely in the Group of 5, and the link holds with SP+ in
+Power schools and moderately in the Group of 5, and the link holds with SP+ in
 place of win %, across two separate five-year windows, and without
 transfer-ins.
 
@@ -1255,59 +1322,66 @@ stopifnot(
 Winning and drafting rise together, but this data cannot say which drives
 which.
 
-- Early winning tracks later drafting exactly as closely as early drafting
+- Early winning tracks later drafting about as closely as early drafting
   tracks later winning (`r r2(wr[3])` each, Power schools).
-- Recruited talent likely drives both, since the players a school signs
-  shape both its record and its draft class; testing that needs recruiting
+- Recruited talent may drive both, since the players a school signs shape
+  both its record and its draft class; testing that needs recruiting
   ratings at entry.
 :::
 
 ::: {.callout-important}
-A record leaves large differences between programs.
+Schools with similar records can differ widely in draftees.
 
 - Oklahoma State won `r pct(oks$win_pct, 0)` of its games and had
   `r oks$drafted` of `r oks$eligible` eligible players drafted; Florida won
   `r pct(fl$win_pct, 0)` and had `r fl$drafted` of `r fl$eligible`.
-- The three service academies, whose graduates owe military service, are
-  among the four Group of 5 schools furthest below expectation.
+- The three service academies are among the four Group of 5 schools
+  furthest below expectation, likely because their graduates owe military
+  service.
 :::
 
-::: {.callout-important}
-In the Group of 5, a rating that adjusts for opponents tracks draft rate better than the record does.
-
-- SP+, which adjusts for opponents, raises the Group of 5 correlation from
-  `r r2(wc("Group of 5", "r"))` to `r r2(sc("Group of 5"))`, consistent
-  with Group of 5 records being earned against schedules of uneven
-  strength.
-:::
-
-Each school is summarized over many seasons, so changes within the period,
-such as a new coach, are averaged away, and a school's tier is the one it
-held most often, so Cincinnati, Houston, UCF and BYU count as Group of 5
-despite their Big 12 seasons. Schools scatter around the fitted curves
-more than chance alone would produce, so expected draftees are a benchmark
-rather than a forecast. Eligibility is a roster-based stand-in for a real
-shot at the NFL, and a transfer-in is detected only through rosters, which
-start in 2010 and cover more schools from 2022.
 
 ```{r}
 #| label: discussion-pin
 #| include: false
-big12_g5 <- team_season |>
+power_g5 <- c("Cincinnati", "Houston", "UCF", "BYU", "SMU")
+power_seasons <- fbs_seasons |>
+  filter(team %in% power_g5, tier_label == "Power") |>
+  distinct(team)
+big12_credit <- credited |>
   filter(
-    team %in% c("Cincinnati", "Houston", "UCF", "BYU"),
+    team %in% c("Cincinnati", "Houston", "UCF"),
     conference == "Big 12"
   ) |>
   distinct(team)
+roster_teams <- roster |>
+  filter(season %in% 2021:2022) |>
+  distinct(season, team) |>
+  count(season) |>
+  (\(d) setNames(d$n, d$season))()
 cincy_big12 <- min(team_season$season[
   team_season$team == "Cincinnati" & team_season$conference == "Big 12"
 ])
 stopifnot(
   cincy_big12 == 2023L,
-  nrow(big12_g5) == 4L,
-  all(school$tier[school$team %in% big12_g5$team] == "Group of 5")
+  nrow(power_seasons) == 5L,
+  all(school$tier[school$team %in% power_g5] == "Group of 5"),
+  nrow(big12_credit) == 3L,
+  all(c("Cincinnati", "Houston", "UCF") %in% od("Group of 5")),
+  roster_teams[["2021"]] == 227L,
+  roster_teams[["2022"]] == 307L,
+  "SMU" %in% team_season$team[team_season$conference == "ACC" & team_season$season == 2024L]
 )
 ```
+
+A school's tier is the one it held most often, so Cincinnati, Houston, UCF,
+BYU and SMU count as Group of 5 despite their Power seasons, and the totals
+of the Group of 5 over-producers Cincinnati, Houston and UCF include
+seasons after their move to the Big 12. Schools scatter around the fitted
+curves more than chance alone would produce, so expected draftees are a
+benchmark rather than a forecast. Transfer-ins are detected only through
+rosters, which start in 2010 and grow from `r roster_teams[["2021"]]`
+schools in 2021 to `r roster_teams[["2022"]]` in 2022.
 
 ```{r}
 #| label: teardown
