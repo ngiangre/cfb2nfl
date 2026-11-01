@@ -663,6 +663,549 @@ stopifnot(
 ```
 
 ```{r}
+#| label: s33-compute
+#| include: false
+sp_cor <- cor_tier(school, "sp")
+sc <- function(t, col = "r") sp_cor[[col]][sp_cor$tier == t]
+win_sp <- school |>
+  group_by(tier) |>
+  summarise(r_win_sp = cor(win_pct, sp), .groups = "drop")
+sp_fits <- fit_tier(school, "sp")
+sp_grid <- school |>
+  group_by(tier) |>
+  reframe(sp = seq(min(sp), max(sp), length.out = 100)) |>
+  group_by(tier) |>
+  mutate(
+    fit = predict(
+      sp_fits[[as.character(first(tier))]],
+      newdata = pick(everything()),
+      type = "response"
+    )
+  ) |>
+  ungroup()
+```
+
+### 3.3 SP+, which adjusts for opponents, tracks draft rate more closely than win %, most of all in the Group of 5
+
+Replacing win % with SP+ raises the correlation from
+`r r2(wc("Power", "r"))` to `r r2(sc("Power"))` for Power schools and from
+`r r2(wc("Group of 5", "r"))` to `r r2(sc("Group of 5"))` for the Group of
+5, as the table and scatter show.
+
+```{r}
+#| label: s33-table
+win_cor |>
+  select(tier, schools, r_win = r) |>
+  left_join(select(sp_cor, tier, r_sp = r, lo, hi), by = "tier") |>
+  left_join(win_sp, by = "tier") |>
+  transmute(
+    Tier = tier,
+    Schools = schools,
+    `r, win % with draft rate` = r2(r_win),
+    `r, SP+ with draft rate` = r2(r_sp),
+    `Plausible range, SP+` = paste(r2(lo), "to", r2(hi)),
+    `r, win % with SP+` = r2(r_win_sp)
+  ) |>
+  kable(
+    caption = "Correlations with school draft rate (final seasons 2013 to 2025) of win % and of average SP+ (FBS seasons 2010 to 2025), by tier, and of the two measures with each other."
+  )
+```
+
+```{r}
+#| label: s33-explain
+#| fig-height: 8
+p <- ggplot(school, aes(sp, draft_rate)) +
+  geom_line(
+    data = sp_grid,
+    aes(y = fit, color = tier),
+    linewidth = 1.6
+  ) +
+  geom_point_interactive(
+    aes(fill = team, tooltip = tip, data_id = team),
+    shape = 21,
+    size = 4.2,
+    color = "white",
+    stroke = 0.6
+  ) +
+  facet_wrap(~tier, scales = "free") +
+  scale_fill_team(teams, guide = "none") +
+  scale_color_manual(values = tier_colors, guide = "none") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    x = "Average SP+ (FBS seasons 2010 to 2025)",
+    y = "Draft rate",
+    title = sprintf(
+      "SP+ against draft rate: r = %s for Power schools, %s for the Group of 5",
+      r2(sc("Power")),
+      r2(sc("Group of 5"))
+    ),
+    subtitle = "Team colors; lines are each tier's fitted curve; each panel has its own scales; hover a dot for counts"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 8)
+```
+
+```{r}
+#| label: s33-pin
+#| include: false
+stopifnot(
+  r2(sc("Power")) == "0.87",
+  r2(sc("Group of 5")) == "0.61",
+  sc("Power") > wc("Power", "r"),
+  sc("Group of 5") > wc("Group of 5", "r"),
+  sc("Group of 5") - wc("Group of 5", "r") > sc("Power") - wc("Power", "r"),
+  all(win_sp$r_win_sp > 0.9)
+)
+```
+
+```{r}
+#| label: s34-compute
+#| include: false
+window_a <- 2013:2017
+window_b <- 2019:2023
+win_in <- function(yrs) {
+  fbs_seasons |>
+    filter(season %in% yrs) |>
+    group_by(team) |>
+    summarise(win = sum(wins) / sum(games_played), .groups = "drop")
+}
+draft_in <- function(yrs) {
+  credited |>
+    filter(season %in% yrs) |>
+    group_by(team) |>
+    summarise(
+      eligible = sum(n_eligible),
+      drafted = sum(n_drafted),
+      .groups = "drop"
+    ) |>
+    mutate(rate = drafted / eligible)
+}
+windows <- school |>
+  filter(tier == "Power") |>
+  select(team) |>
+  inner_join(win_in(window_a), by = "team") |>
+  inner_join(win_in(window_b), by = "team", suffix = c("_a", "_b")) |>
+  inner_join(draft_in(window_a), by = "team") |>
+  inner_join(draft_in(window_b), by = "team", suffix = c("_a", "_b")) |>
+  mutate(change = rate_b - rate_a)
+stopifnot(nrow(windows) == 65L)
+window_cor <- tibble::tribble(
+  ~measure                                                   , ~r                                           ,
+  "Draft rate 2013 to 2017 with draft rate 2019 to 2023"     , cor(windows$rate_a, windows$rate_b)          ,
+  "Win % 2013 to 2017 with win % 2019 to 2023"               , cor(windows$win_a, windows$win_b)            ,
+  "Win % 2013 to 2017 with draft rate 2019 to 2023"          , cor(windows$win_a, windows$rate_b)           ,
+  "Draft rate 2013 to 2017 with win % 2019 to 2023"          , cor(windows$rate_a, windows$win_b)
+)
+wr <- window_cor$r
+risers <- slice_max(windows, change, n = 2)
+fallers <- slice_min(windows, change, n = 2)
+movers <- bind_rows(risers, fallers)
+```
+
+### 3.4 A Power school's draft rate carries over from one five-year window to the next, and early winning and early drafting each predict the other equally well
+
+Across the `r nrow(windows)` Power schools, the draft rate of final seasons
+2013 to 2017 correlates `r r2(wr[1])` with that of 2019 to 2023, and early
+win % tracks later draft rate exactly as closely as early draft rate tracks
+later win % (`r r2(wr[3])` each), so the data cannot say which comes first.
+
+```{r}
+#| label: s34-table
+window_cor |>
+  transmute(`Earlier window with later window` = measure, r = r2(r)) |>
+  kable(
+    caption = "Correlations across the 65 Power schools between an earlier window (2013 to 2017) and a later one (2019 to 2023), leaving 2018 out so no player's career spans both. Win % uses FBS seasons in each window; draft rate uses final seasons in it."
+  )
+```
+
+```{r}
+#| label: s34-explain
+#| fig-height: 8
+lim <- c(0, max(c(windows$rate_a, windows$rate_b)) * 1.05)
+p <- ggplot(windows, aes(rate_a, rate_b)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "#6b7280") +
+  geom_point_interactive(
+    data = filter(windows, !team %in% movers$team),
+    aes(
+      tooltip = paste0(
+        team,
+        ": ",
+        pct(rate_a),
+        " drafted in 2013 to 2017, ",
+        pct(rate_b),
+        " in 2019 to 2023"
+      ),
+      data_id = team
+    ),
+    size = 3.6,
+    color = "#9ca3af"
+  ) +
+  geom_point_interactive(
+    data = movers,
+    aes(
+      fill = team,
+      tooltip = paste0(
+        team,
+        ": ",
+        pct(rate_a),
+        " drafted in 2013 to 2017, ",
+        pct(rate_b),
+        " in 2019 to 2023"
+      ),
+      data_id = team
+    ),
+    shape = 21,
+    size = 5.5,
+    color = "#111827"
+  ) +
+  # hand-placed labels: Penn State to the left of a neighbouring dot,
+  # Arkansas above and Louisville below their near-identical points
+  geom_label(
+    data = mutate(
+      movers,
+      lx = rate_a + c(0.012, -0.012, 0.012, 0.012),
+      ly = rate_b + c(0, 0, 0.015, -0.015),
+      hj = c(0, 1, 0, 0)
+    ),
+    aes(
+      lx,
+      ly,
+      label = paste0(team, " ", signed(100 * change), " points"),
+      color = team,
+      hjust = hj
+    ),
+    size = 4.8,
+    fontface = "bold",
+    linewidth = 0
+  ) +
+  annotate(
+    "text",
+    x = lim[2],
+    y = 0.005,
+    label = sprintf("r = %s; above the dashed line, the rate rose", r2(wr[1])),
+    hjust = 1,
+    vjust = 0,
+    size = 5,
+    fontface = "bold",
+    color = "#374151"
+  ) +
+  scale_fill_team(teams, guide = "none") +
+  scale_color_team(teams, guide = "none") +
+  scale_x_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = scales::percent) +
+  coord_equal(xlim = lim, ylim = lim) +
+  labs(
+    x = "Draft rate, final seasons 2013 to 2017",
+    y = "Draft rate, final seasons 2019 to 2023",
+    title = "Power schools mostly keep their draft rate",
+    subtitle = "The two largest rises and falls in team colors"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 11, height_svg = 9)
+```
+
+```{r}
+#| label: s34-explore
+#| fig-height: 15
+slopes <- windows |>
+  mutate(
+    team = reorder(team, rate_b),
+    tip = paste0(
+      team,
+      "\n2013 to 2017: ",
+      drafted_a,
+      " drafted of ",
+      eligible_a,
+      " (",
+      pct(rate_a),
+      "), win % ",
+      pct(win_a),
+      "\n2019 to 2023: ",
+      drafted_b,
+      " drafted of ",
+      eligible_b,
+      " (",
+      pct(rate_b),
+      "), win % ",
+      pct(win_b)
+    )
+  )
+p <- ggplot(slopes, aes(y = team)) +
+  geom_segment(
+    aes(x = rate_a, xend = rate_b, yend = team),
+    color = "#9ca3af",
+    linewidth = 1.2,
+    arrow = arrow(length = unit(0.15, "cm"))
+  ) +
+  geom_point_interactive(
+    aes(x = rate_a, tooltip = tip, data_id = team),
+    size = 2.8,
+    color = "#9ca3af"
+  ) +
+  geom_point_interactive(
+    aes(x = rate_b, fill = team, tooltip = tip, data_id = team),
+    shape = 21,
+    size = 3.8,
+    color = "white"
+  ) +
+  scale_fill_team(teams, guide = "none") +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    x = "Draft rate",
+    y = NULL,
+    title = "Every Power school's draft rate, 2013 to 2017 to 2019 to 2023",
+    subtitle = "Grey dot: earlier window; colored dot: later window; hover for counts and win %"
+  ) +
+  theme_cfb2nfl(base_size = 13)
+girafe(ggobj = p, width_svg = 11, height_svg = 15)
+```
+
+```{r}
+#| label: s34-pin
+#| include: false
+stopifnot(
+  r2(wr[1]) == "0.68",
+  r2(wr[3]) == "0.57",
+  r2(wr[4]) == "0.57",
+  r2(wr[2]) == "0.61",
+  identical(risers$team, c("Georgia", "Penn State")),
+  identical(fallers$team, c("Arkansas", "Louisville")),
+  identical(signed(100 * movers$change), c("+31", "+18", "-8", "-8")),
+  abs(wr[3] - wr[4]) < 0.05,
+  all(wr > 0.5)
+)
+```
+
+```{r}
+#| label: s35-compute
+#| include: false
+exits <- exit_cohort(roster, picks, udfa_ids, reused_ids(roster))
+# a transfer-in had an earlier roster season at a school other than the
+# one they finished at
+transfer_ids <- exits |>
+  select(playerId, final_team = team, last_season) |>
+  inner_join(distinct(roster, playerId, season, team), by = "playerId") |>
+  filter(season < last_season, team != final_team) |>
+  distinct(playerId) |>
+  pull(playerId)
+fbs_exits <- exits |>
+  filter(
+    eligible,
+    # exits carries its own first_season/last_season columns
+    last_season >= .env$first_season,
+    last_season <= .env$last_season
+  ) |>
+  left_join(
+    select(team_season, team, last_season = season, credit_tier = tier_label),
+    by = c("team", "last_season")
+  ) |>
+  filter(credit_tier %in% tier_order) |>
+  mutate(
+    transfer_in = playerId %in% transfer_ids,
+    credit_tier = factor(credit_tier, levels = tier_order)
+  )
+# the exit cohort reproduces the credited counts used above
+stopifnot(
+  nrow(fbs_exits) == n_eligible,
+  sum(fbs_exits$drafted) == n_drafted
+)
+home <- fbs_exits |>
+  filter(!transfer_in) |>
+  group_by(team) |>
+  summarise(
+    eligible_home = n(),
+    drafted_home = sum(drafted),
+    .groups = "drop"
+  )
+school <- school |>
+  left_join(home, by = "team") |>
+  mutate(rate_home = drafted_home / eligible_home)
+stopifnot(!anyNA(school$rate_home))
+home_cor <- cor_tier(school, "win_pct", "rate_home")
+hc <- function(t) home_cor$r[home_cor$tier == t]
+transfer_tier <- fbs_exits |>
+  group_by(credit_tier) |>
+  summarise(
+    eligible = n(),
+    eligible_tin = sum(transfer_in),
+    drafted_tin = sum(drafted & transfer_in),
+    drafted = sum(drafted),
+    .groups = "drop"
+  )
+by_class <- fbs_exits |>
+  filter(drafted) |>
+  group_by(draft_class, credit_tier) |>
+  summarise(
+    draftees = n(),
+    transfer_ins = sum(transfer_in),
+    .groups = "drop"
+  ) |>
+  mutate(share = transfer_ins / draftees)
+power_class <- filter(by_class, credit_tier == "Power")
+p_last <- filter(power_class, draft_class == max(draft_class))
+class_tot <- count(by_class, draft_class, wt = transfer_ins, name = "transfer_ins")
+class_wide <- by_class |>
+  filter(draft_class >= 2021L) |>
+  select(draft_class, credit_tier, transfer_ins) |>
+  tidyr::pivot_wider(names_from = credit_tier, values_from = transfer_ins) |>
+  rename(g5 = `Group of 5`)
+p_early_max <- max(power_class$transfer_ins[power_class$draft_class <= 2019L])
+cast_tin <- setNames(
+  c(burrow$playerId, ward$playerId, travis$playerId, allen$playerId) %in% transfer_ids,
+  c("Burrow", "Ward", "Travis", "Allen")
+)
+```
+
+### 3.5 Leaving out transfers barely changes the link, though transfers made up nearly half of the 2026 Power draft class
+
+Recomputing each school's draft rate without its transfer-ins (Burrow, Cam
+Ward and Jordan Travis among them; Josh Allen, on Wyoming rosters only, is
+not) leaves the correlation with win % at `r r2(hc("Power"))` for Power
+schools and `r r2(hc("Group of 5"))` for the Group of 5, even as Power
+transfer-in draftees grew from at most `r p_early_max` a class through 2019
+to `r p_last$transfer_ins` of `r p_last$draftees` in `r p_last$draft_class`.
+
+```{r}
+#| label: s35-table
+transfer_tier |>
+  left_join(select(win_cor, credit_tier = tier, r_all = r), by = "credit_tier") |>
+  left_join(select(home_cor, credit_tier = tier, r_home = r), by = "credit_tier") |>
+  transmute(
+    Tier = credit_tier,
+    `Eligible players` = fmt(eligible),
+    `Transfer-ins among them` = paste0(fmt(eligible_tin), " (", pct(eligible_tin / eligible, 0), ")"),
+    Drafted = fmt(drafted),
+    `Transfer-ins among draftees` = paste0(fmt(drafted_tin), " (", pct(drafted_tin / drafted, 0), ")"),
+    `r, win % with draft rate` = r2(r_all),
+    `r, without transfer-ins` = r2(r_home)
+  ) |>
+  kable(
+    caption = "Transfer-ins and the win % correlation with and without them, by tier, final seasons 2013 to 2025. Eligible players and draftees are counted in the tier of their final season; the correlations group schools by the tier they held in most seasons."
+  )
+```
+
+```{r}
+#| label: s35-explain
+#| fig-height: 7
+p <- ggplot(by_class, aes(draft_class, transfer_ins, fill = credit_tier)) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(
+        "Class of ",
+        draft_class,
+        ", ",
+        credit_tier,
+        ": ",
+        transfer_ins,
+        " transfer-ins of ",
+        draftees,
+        " draftees (",
+        pct(share, 0),
+        ")"
+      ),
+      data_id = paste(draft_class, credit_tier)
+    ),
+    width = 0.75
+  ) +
+  annotate(
+    "label",
+    x = p_last$draft_class - 0.5,
+    y = p_last$transfer_ins + 25,
+    label = sprintf(
+      "Class of %d: %d of %d Power draftees\n(%s) were transfer-ins",
+      p_last$draft_class,
+      p_last$transfer_ins,
+      p_last$draftees,
+      pct(p_last$share, 0)
+    ),
+    hjust = 1,
+    size = 5,
+    fontface = "bold",
+    color = tier_colors[["Power"]],
+    linewidth = 0
+  ) +
+  scale_fill_manual(values = tier_colors, name = NULL) +
+  scale_x_continuous(breaks = seq(2014, 2026, 2)) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(
+    x = "Draft class",
+    y = "Transfer-in draftees",
+    title = "Transfer-in draftees rose with every class from 2021, mostly at Power schools",
+    subtitle = "Draftees who finished at a school other than their first college roster; hover a bar for the share"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: s35-explore
+#| fig-height: 8
+p <- ggplot(school, aes(draft_rate, rate_home)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "#6b7280") +
+  geom_point_interactive(
+    aes(
+      fill = team,
+      tooltip = paste0(
+        team,
+        " (",
+        tier,
+        ")\nAll eligible: ",
+        drafted,
+        " drafted of ",
+        eligible,
+        " (",
+        pct(draft_rate),
+        ")\nWithout transfer-ins: ",
+        drafted_home,
+        " of ",
+        eligible_home,
+        " (",
+        pct(rate_home),
+        ")"
+      ),
+      data_id = team
+    ),
+    shape = 21,
+    size = 4.2,
+    color = "white",
+    stroke = 0.6
+  ) +
+  facet_wrap(~tier, scales = "free") +
+  scale_fill_team(teams, guide = "none") +
+  scale_x_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    x = "Draft rate, all eligible players",
+    y = "Draft rate without transfer-ins",
+    title = "Every school's draft rate with and without its transfer-ins",
+    subtitle = "On the dashed line: no change; hover a dot for counts"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 8)
+```
+
+```{r}
+#| label: s35-pin
+#| include: false
+stopifnot(
+  identical(unname(cast_tin), c(TRUE, TRUE, TRUE, FALSE)),
+  r2(hc("Power")) == "0.82",
+  r2(hc("Group of 5")) == "0.36",
+  abs(hc("Power") - wc("Power", "r")) < 0.01,
+  abs(hc("Group of 5") - wc("Group of 5", "r")) < 0.05,
+  p_last$draft_class == 2026L,
+  p_last$transfer_ins == 113L,
+  p_last$draftees == 237L,
+  p_last$share > 0.45,
+  p_last$share < 0.5,
+  p_early_max == 10L,
+  # the figure title: totals rise every class from 2021, Power the larger part
+  all(diff(class_tot$transfer_ins[class_tot$draft_class >= 2021L]) > 0),
+  all(class_wide$Power > class_wide$g5)
+)
+```
+
+```{r}
 #| label: teardown
 #| include: false
 dbDisconnect(con, shutdown = TRUE)
