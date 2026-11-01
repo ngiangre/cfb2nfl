@@ -1,7 +1,7 @@
 ---
 title: "Power-conference players are drafted at five times the Group of 5 rate, and Alabama leads four positions"
 date: "2026-10-31"
-description: "Players who finished at Power-conference schools from 2013 to 2025 were drafted at five times the Group of 5 rate (13.8% against 2.7%), Alabama led four positions, and only LSU's WRU of six fan nicknames matched the data's leader."
+description: "Players who finished their college careers at Power-conference schools from 2013 to 2025 were drafted at five times the Group of 5 rate, 13.8% against 2.7%, and the gap held at every position."
 followups:
   - "Do teams that win more produce more draftees, once position mix is accounted for? (Post 3)"
   - "Is the falling Group of 5 draft rate a transfer effect? Credit draftees to every school they played for, weighted by seasons or snaps."
@@ -76,7 +76,8 @@ subjects <- tibble::tribble(
   ~who         , ~cfb_athlete_id ,
   "Joe Burrow" , "3915511"       ,
   "Cam Ward"   , "4688380"       ,
-  "Josh Allen" , "3918298"
+  "Josh Allen" , "3918298"       ,
+  "Jordan Travis" , "4360799"
 )
 ```
 
@@ -161,7 +162,14 @@ star <- function(who) {
 burrow <- star("Joe Burrow")
 ward <- star("Cam Ward")
 allen <- star("Josh Allen")
+travis <- star("Jordan Travis")
+ward_teams <- unique(roster$team[roster$playerId == ward$playerId])
 stopifnot(
+  nrow(travis) == 1L,
+  travis$name == "Jordan Travis",
+  travis$year == 2024L,
+  travis$last_team == "Florida State",
+  "Washington State" %in% ward_teams,
   nrow(burrow) == 1L,
   burrow$name == "Joe Burrow",
   burrow$year == 2020L,
@@ -190,13 +198,14 @@ approximately the draft classes of 2014 through 2026.*
 ## 1. Introduction
 
 The [previous post](2026-10-31-conferences-landscape.html) found half of
-all draft picks coming from a short list of schools; this one asks how often a player
-who finishes his career at a conference, school, or position gets drafted,
-crediting each draftee to his last school (Joe Burrow to LSU, not Ohio
-State; Cam Ward to Miami, not Washington State; Josh Allen to Wyoming).
-Along the way it checks the nicknames fans give schools: is LSU still DBU,
-Penn State still Linebacker U, USC still Tailback U, BYU still QBU, and
-Iowa still Tight End U?
+all draft picks coming from a short list of schools; this one asks how
+often players who finish their careers at a conference, school, or position
+get drafted, counting each draftee for the last school they played for (Joe
+Burrow for LSU, not Ohio State; Cam Ward for Miami, not Washington State;
+Jordan Travis for Florida State; Josh Allen for Wyoming). It also checks
+the nicknames fans give schools: is LSU still DBU, Penn State still
+Linebacker U, USC still Tailback U, BYU still QBU, and Iowa still Tight End
+U?
 
 ## 2. Data
 
@@ -226,15 +235,15 @@ careers ended from 2013 to 2025, `r fmt(n_eligible)` were eligible,
 #| label: terms
 tibble::tribble(
   ~Term                    , ~Meaning                                                                                                                                                                                                                                                                                                                                                  ,
-  "Final season"           , "A player's last season on a college roster before the draft. He is counted once, for the school and conference he played for that season, so a transfer counts for his last stop."                                                                                                                                                                       ,
-  "Eligible player"        , "A player whose college career has ended and who had a real shot at the NFL: he spent at least three seasons on college rosters, or he was drafted, or he signed with an NFL team undrafted. Players who left after one or two seasons without reaching the NFL are not counted, and neither are undrafted players still on a 2026 roster, whose outcome is not yet known." ,
+  "Final season"           , "A player's last season on a college roster before the draft. Each player is counted once, for the school and conference of that season, so a transfer counts for the last stop."                                                                                                                                                                       ,
+  "Eligible player"        , "A player whose college career has ended and who had a real shot at the NFL: at least three seasons on college rosters, or drafted, or signed with an NFL team undrafted. Players who left after one or two seasons without reaching the NFL are not counted, and neither are undrafted players still on a 2026 roster, whose outcome is not yet known." ,
   "Draft rate"             , "Drafted players divided by eligible players. A draft rate of 10% means 10 of every 100 eligible players were drafted."                                                                                                                                                                                                                          ,
-  "Undrafted free agent"   , "An eligible player who was not drafted but later appears on an NFL roster. Offensive linemen are undercounted, because an undrafted player is only matched to the NFL when he has a college stat line, which linemen rarely do."                                                                                                                   ,
+  "Undrafted free agent"   , "An eligible player who was not drafted but later appears on an NFL roster. Offensive linemen are undercounted, because an undrafted player is only matched to the NFL through a college stat line, which linemen rarely have."                                                                                                                   ,
   "Undrafted rate"         , "Undrafted free agents divided by eligible players."                                                                                                                                                                                                                                                                                            ,
-  "Tier"                   , "Power (the SEC, Big Ten, ACC, Big 12, the Pac-12 through 2023, and Notre Dame), Group of 5 (the other FBS conferences and independents), and FCS and below. FCS-and-below rosters are incomplete, so that tier appears only as one total."                                                                                                         ,
-  "2025 conference"        , "The conference a school played in during 2025, used to group schools for side-by-side comparison. Conference-level rates instead use the conference of each player's final season."                                                                                                                                                               ,
+  "Tier"                   , "Power (the SEC, Big Ten, ACC, Big 12, the Pac-12 through 2023, and Notre Dame), Group of 5 (the other FBS conferences and independents), and FCS and below. FCS-and-below rosters are incomplete, so that tier appears only as one total. A school's tier is the one most of its eligible players finished in."                                                                                                         ,
+  "2025 conference"        , "The conference a school played in during 2025, used only to group schools side by side in one figure (section 3.4). Conference and tier rates use the conference of each player's final season."                                                                                                                                                               ,
   "Position group"         , "The player's final-season roster position, grouped: quarterback, running back, receiver, tight end, offensive line, defensive line, linebacker, defensive back, and special teams."                                                                                                                                                                 ,
-  "Expected draftees"      , "How many draftees a school would have produced if each of its eligible players were drafted at the FBS-wide rate for his position. A school heavy at positions the NFL drafts often is not credited for its position mix."                                                                                                                         ,
+  "Expected draftees"      , "How many draftees an average FBS school would have produced with as many eligible players at the same positions: each position's FBS-wide draft rate times the school's eligible players there, summed. The within-tier version uses the rates of the school's own tier instead."                                                                                                                         ,
   "Draftees above expected", "Drafted players minus expected draftees."                                                                                                                                                                                                                                                                                                      ,
   "Adjusted rate"          , "A school's draft rate pulled toward its group's average, more strongly the fewer eligible players it has, so a small sample cannot top a ranking by luck (section 3.4)."
 ) |>
@@ -442,7 +451,10 @@ stopifnot(
   pct(g5_last) == "0.9%",
   pct(min(power_season$draft_rate)) == "11.9%",
   pct(max(power_season$draft_rate)) == "19.1%",
-  nrow(conf_rates) == 12L
+  nrow(conf_rates) == 12L,
+  pct(tr("FCS and below", "draft_rate")) == "1.1%",
+  # the caption's "two schools that remained" in the Pac-12
+  n_distinct(fbs_cr$team[fbs_cr$league == "Pac-12" & fbs_cr$season >= 2024L]) == 2L
 )
 ```
 
@@ -474,18 +486,24 @@ udfa_heavy <- school_rates |>
   filter(school_tier == "Power", udfa > drafted) |>
   arrange(desc(udfa - drafted), team)
 n_power_schools <- sum(school_rates$school_tier == "Power")
+# the 25 schools with the most draftees and with the most undrafted
+# signings (ties broken alphabetically)
+top_drafted <- school_rates |> arrange(desc(drafted), team) |> slice_head(n = 25)
+top_udfa <- school_rates |> arrange(desc(udfa), team) |> slice_head(n = 25)
+n_overlap <- length(intersect(top_drafted$team, top_udfa$team))
 ```
 
 ### 3.2 Undrafted signings are spread far more evenly, with Power players signing at under twice the Group of 5 rate
 
 Power schools had `r pct(power_share_eligible, 0)` of FBS eligible players
 and `r pct(power_share_drafted, 0)` of FBS draftees but only
-`r pct(power_share_udfa, 0)` of FBS undrafted free agents; the table and
-the paired dots compare the two rates by conference, and the scatter places
-every FBS school, where `r nrow(udfa_heavy)` of the `r n_power_schools`
-mostly Power schools, led by `r udfa_heavy$team[1]`,
-`r udfa_heavy$team[2]` and `r udfa_heavy$team[3]`, sent more players to
-the NFL undrafted than drafted.
+`r pct(power_share_udfa, 0)` of FBS undrafted free agents, as the table and
+paired dots show conference by conference. In the scatter of every FBS
+school, `r nrow(udfa_heavy)` of the `r n_power_schools` Power schools, led
+by `r udfa_heavy$team[1]`, `r udfa_heavy$team[2]` and
+`r udfa_heavy$team[3]`, sent more players to the NFL undrafted than
+drafted, and only `r n_overlap` of the 25 schools with the most undrafted
+signings are among the 25 with the most draftees.
 
 ```{r}
 #| label: s32-table
@@ -663,6 +681,7 @@ stopifnot(
   pct(power_share_udfa, 0) == "66%",
   g5_more_udfa,
   nrow(udfa_heavy) == 26L,
+  n_overlap == 14L,
   n_power_schools == 65L,
   identical(udfa_heavy$team[1:3], c("Rutgers", "Vanderbilt", "Colorado")),
   # the shaded band holds exactly the Group of 5 conferences
@@ -849,7 +868,12 @@ stopifnot(
   n_sec_leads == 8L,
   nrow(pos_leaders) == 9L,
   non_sec$league == "Big Ten",
-  non_sec$position_group == "Tight end"
+  non_sec$position_group == "Tight end",
+  # the summary ledger's ratios
+  sprintf("%.1f", min(pos_tier$ratio)) == "4.0",
+  pos_tier$position_group[which.min(pos_tier$ratio)] == "Receiver",
+  sprintf("%.1f", max(pos_tier$ratio)) == "6.1",
+  pos_tier$position_group[which.max(pos_tier$ratio)] == "Offensive line"
 )
 ```
 
@@ -858,7 +882,18 @@ stopifnot(
 #| include: false
 pos_rate <- rates(group_by(fbs_pos, position_group)) |>
   select(position_group, pos_rate = draft_rate)
-school_pos <- rates(group_by(fbs_pos, team, position_group)) |>
+# the same benchmark within each tier, applied to each final season's tier
+pos_tier_rate <- rates(group_by(fbs_pos, position_group, tier_label)) |>
+  select(position_group, tier_label, tier_pos_rate = draft_rate)
+school_pos <- fbs_pos |>
+  left_join(pos_tier_rate, by = c("position_group", "tier_label")) |>
+  group_by(team, position_group) |>
+  summarise(
+    eligible = sum(n_eligible),
+    drafted = sum(n_drafted),
+    expected_tier = sum(n_eligible * tier_pos_rate),
+    .groups = "drop"
+  ) |>
   left_join(pos_rate, by = "position_group") |>
   mutate(expected = eligible * pos_rate, above = drafted - expected)
 school <- school_pos |>
@@ -867,12 +902,20 @@ school <- school_pos |>
     eligible = sum(eligible),
     drafted = sum(drafted),
     expected = sum(expected),
+    expected_tier = sum(expected_tier),
     .groups = "drop"
   ) |>
-  mutate(above = drafted - expected, draft_rate = drafted / eligible) |>
+  mutate(
+    above = drafted - expected,
+    above_tier = drafted - expected_tier,
+    draft_rate = drafted / eligible
+  ) |>
   left_join(fbs_schools, by = "team") |>
+  left_join(school_tier, by = "team") |>
   mutate(adjusted = shrink_rate(drafted, eligible, group = conf_now)) |>
   arrange(desc(above))
+non_st <- filter(pos_rate, position_group != "Special teams")
+st_rate <- pos_rate$pos_rate[pos_rate$position_group == "Special teams"]
 conf_avg <- school |>
   group_by(conf_now) |>
   summarise(
@@ -888,55 +931,154 @@ conf_leader <- school |>
   group_by(conf_now) |>
   slice_head(n = 1) |>
   ungroup()
-sch <- function(t) filter(school, team == t)
-bama <- sch("Alabama")
-g5_now <- filter(school, conf_now_tier == "Group of 5")
-g5_best <- slice_max(g5_now, above, n = 1)
-smallest <- slice_min(school, eligible, n = 1)
+bama <- filter(school, team == "Alabama")
+g5 <- filter(school, school_tier == "Group of 5")
+g5_best <- slice_max(g5, above_tier, n = 1)
+n_g5_above_tier <- sum(g5$above_tier > 0)
+g5_fbs_beaters <- g5$team[g5$above > 0]
 n_above <- sum(school$above > 0)
+smallest <- slice_min(school, eligible, n = 1)
+boise_color <- team_colors[[g5_best$team]]
+bama_color <- team_colors[["Alabama"]]
 ```
 
-### 3.4 Alabama produced 92 more draftees than its position mix predicts, and no school now in the Group of 5 beat its prediction
+### 3.4 Alabama produced 92 more draftees than an average FBS school with as many eligible players at the same positions, and Boise State led the Group of 5 against its own tier's rates
 
-The table ranks the 15 schools furthest above their expected draftees, the
-dots set every school's adjusted rate against its 2025 conference's
-average, and the scatter shows how far the adjustment moved each school;
-`r n_above` of `r nrow(school)` FBS schools beat their prediction, all of
-them in a 2025 Power conference or Notre Dame, and the closest Group of 5
-school was `r g5_best$team` (`r g5_best$drafted` drafted,
-`r fmt(g5_best$expected, 1)` expected). A school with few eligible players
-can post a high or low rate by luck, so each school's rate is pulled toward
-its 2025 conference's average, more strongly the fewer players it has (a
-method called empirical Bayes shrinkage): `r smallest$team`, with
-`r smallest$eligible` eligible players and `r smallest$drafted` drafted,
-moves from `r pct(smallest$draft_rate)` to `r pct(smallest$adjusted)`.
+Out of every 100 eligible Alabama players, `r round(100 * bama$draft_rate)`
+were drafted, `r fmt(bama$above)` more draftees than the
+`r fmt(bama$expected, 1)` an average FBS school would have produced with
+the same players by position, an adjustment that matters little because
+position draft rates range only from `r pct(min(non_st$pos_rate))` to
+`r pct(max(non_st$pos_rate))` (special teams `r pct(st_rate)`). Of the
+`r nrow(g5)` Group of 5 schools only `r g5_fbs_beaters`, now in the Big 12,
+beat that FBS-wide mark, but against Group of 5 rates `r n_g5_above_tier`
+did, led by `r g5_best$team` with `r g5_best$drafted` drafted against
+`r fmt(g5_best$expected_tier, 1)` expected.
 
 ```{r}
 #| label: s34-table
-school |>
-  slice_head(n = 15) |>
+bind_rows(
+  slice_head(school, n = 10),
+  g5 |> arrange(desc(above_tier)) |> slice_head(n = 5)
+) |>
   transmute(
     School = team,
-    `2025 conference` = conf_now,
+    Tier = school_tier,
     `Eligible players` = eligible,
     Drafted = drafted,
-    `Expected draftees` = fmt(expected, 1),
-    `Above expected` = fmt(above, 1),
-    `Draft rate` = pct(draft_rate),
-    `Adjusted rate` = pct(adjusted)
+    `Out of 100 eligible, drafted` = round(100 * draft_rate),
+    `Expected, FBS average` = fmt(expected, 1),
+    `Above FBS average` = fmt(above, 1),
+    `Expected, own tier` = fmt(expected_tier, 1),
+    `Above own tier` = fmt(above_tier, 1)
   ) |>
   kable(
-    caption = "The 15 FBS schools with the most draftees above expected, final seasons 2013 to 2025. Expected draftees apply the FBS draft rate for each position group to the school's eligible players at that position. The adjusted rate pulls each school toward its 2025 conference's average."
+    caption = "The 10 FBS schools furthest above the FBS-wide expectation, then the 5 Group of 5 schools furthest above their own tier's expectation, final seasons 2013 to 2025. Expected draftees multiply each position's draft rate (FBS-wide, or the tier's rate in each player's final season) by the school's eligible players there. A school's tier is the one most of its eligible players finished in."
   )
 ```
 
 ```{r}
 #| label: s34-explain
+#| fig-height: 9
+rank_bars <- bind_rows(
+  slice_head(school, n = 15) |>
+    mutate(panel = "Top 15 FBS schools, above the FBS average", value = above),
+  g5 |>
+    arrange(desc(above_tier)) |>
+    slice_head(n = 15) |>
+    mutate(panel = "Top 15 Group of 5 schools, above the Group of 5 average", value = above_tier)
+) |>
+  mutate(
+    key = paste(panel, team, sep = "___"),
+    highlight = if_else(team %in% c("Alabama", g5_best$team), team, "Other")
+  )
+p <- ggplot(rank_bars, aes(value, reorder(key, value), fill = highlight)) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(
+        team,
+        ": ",
+        drafted,
+        " drafted of ",
+        eligible,
+        " eligible; ",
+        fmt(drafted - value, 1),
+        " expected, ",
+        fmt(value, 1),
+        " above"
+      ),
+      data_id = paste(panel, team)
+    ),
+    width = 0.75
+  ) +
+  geom_text(
+    data = filter(rank_bars, highlight != "Other"),
+    aes(label = paste0("+", fmt(value)), color = highlight),
+    hjust = -0.15,
+    size = 5,
+    fontface = "bold"
+  ) +
+  facet_wrap(~panel, scales = "free", ncol = 2) +
+  scale_y_discrete(labels = function(x) sub(".*___", "", x)) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.18))) +
+  scale_fill_manual(
+    values = c(
+      "Alabama" = bama_color,
+      setNames(boise_color, g5_best$team),
+      "Other" = "#9ca3af"
+    ),
+    guide = "none"
+  ) +
+  scale_color_manual(
+    values = c("Alabama" = bama_color, setNames(boise_color, g5_best$team)),
+    guide = "none"
+  ) +
+  labs(
+    x = "Draftees above expected",
+    y = NULL,
+    title = "Alabama leads FBS, and Boise State leads the Group of 5 against its own tier",
+    subtitle = "Expected: an average school (FBS-wide, or same tier) with the same eligible players by position"
+  ) +
+  theme_cfb2nfl(base_size = 14)
+girafe(ggobj = p, width_svg = 13, height_svg = 9)
+```
+
+The dot chart groups schools by their 2025 conference, used only here.
+Because a school with few eligible players can post a high or low rate by
+luck, each rate is pulled toward the conference average, more strongly the
+fewer players behind it (a method called empirical Bayes shrinkage), which
+moves `r smallest$team`, with `r smallest$eligible` eligible players and
+none drafted, from `r pct(smallest$draft_rate)` to `r pct(smallest$adjusted)`.
+
+```{r}
+#| label: s34-explore
 #| fig-height: 8
 dots <- school |>
   mutate(
     conf_now = factor(conf_now, levels = conf_avg$conf_now),
-    is_leader = team %in% conf_leader$team
+    is_leader = team %in% conf_leader$team,
+    tip = paste0(
+      team,
+      " (2025: ",
+      conf_now,
+      ")\n",
+      drafted,
+      " drafted of ",
+      eligible,
+      " eligible; adjusted rate ",
+      pct(adjusted),
+      "\nExpected ",
+      fmt(expected, 1),
+      " at the FBS average (",
+      if_else(above >= 0, "+", ""),
+      fmt(above, 1),
+      "), ",
+      fmt(expected_tier, 1),
+      " at its tier's (",
+      if_else(above_tier >= 0, "+", ""),
+      fmt(above_tier, 1),
+      ")"
+    )
   )
 lead_dots <- filter(dots, is_leader)
 p <- ggplot(dots, aes(adjusted, conf_now)) +
@@ -949,43 +1091,14 @@ p <- ggplot(dots, aes(adjusted, conf_now)) +
   ) +
   geom_point_interactive(
     data = filter(dots, !is_leader),
-    aes(
-      tooltip = paste0(
-        team,
-        " (",
-        conf_now,
-        "): adjusted rate ",
-        pct(adjusted),
-        "; ",
-        drafted,
-        " drafted of ",
-        eligible,
-        " eligible"
-      ),
-      data_id = team
-    ),
+    aes(tooltip = tip, data_id = team),
     size = 3.6,
     color = "#9ca3af",
     alpha = 0.8
   ) +
   geom_point_interactive(
     data = lead_dots,
-    aes(
-      fill = team,
-      tooltip = paste0(
-        team,
-        " leads the ",
-        conf_now,
-        ": adjusted rate ",
-        pct(adjusted),
-        "; ",
-        drafted,
-        " drafted of ",
-        eligible,
-        " eligible"
-      ),
-      data_id = team
-    ),
+    aes(fill = team, tooltip = tip, data_id = team),
     shape = 21,
     size = 6,
     color = "#111827",
@@ -1005,64 +1118,11 @@ p <- ggplot(dots, aes(adjusted, conf_now)) +
   labs(
     x = "Adjusted draft rate",
     y = "2025 conference",
-    title = "Each conference's leader, against the conference average",
-    subtitle = "Black tick: conference average; colored dot: the school with the highest adjusted rate; grey: every other school"
+    title = "Every FBS school against its 2025 conference's average",
+    subtitle = "Black tick: conference average; colored dot: the conference leader; hover a dot for both expectations"
   ) +
   theme_cfb2nfl()
 girafe(ggobj = p, width_svg = 13, height_svg = 8)
-```
-
-```{r}
-#| label: s34-explore
-#| fig-height: 9
-p <- ggplot(school, aes(draft_rate, adjusted)) +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "#6b7280") +
-  geom_point_interactive(
-    aes(
-      fill = team,
-      size = eligible,
-      tooltip = paste0(
-        team,
-        " (2025: ",
-        conf_now,
-        ")\n",
-        drafted,
-        " drafted of ",
-        eligible,
-        " eligible; ",
-        fmt(expected, 1),
-        " expected\nDraft rate ",
-        pct(draft_rate),
-        ", adjusted ",
-        pct(adjusted)
-      ),
-      data_id = team
-    ),
-    shape = 21,
-    color = "white",
-    alpha = 0.9
-  ) +
-  annotate(
-    "text",
-    x = 0.005,
-    y = 0.38,
-    label = "On the dashed line: unchanged by the adjustment",
-    hjust = 0,
-    size = 4.6,
-    color = "#374151"
-  ) +
-  scale_fill_manual(values = team_colors, na.value = "#6b7280", guide = "none") +
-  scale_size_area(max_size = 7, guide = "none") +
-  scale_x_continuous(labels = scales::percent) +
-  scale_y_continuous(labels = scales::percent) +
-  labs(
-    x = "Draft rate",
-    y = "Adjusted draft rate",
-    title = "How far the adjustment moved every FBS school",
-    subtitle = "Team colors; dot size is eligible players; hover a dot for counts"
-  ) +
-  theme_cfb2nfl()
-girafe(ggobj = p, width_svg = 13, height_svg = 9)
 ```
 
 ```{r}
@@ -1073,17 +1133,27 @@ stopifnot(
   school$team[1] == "Alabama",
   bama$drafted == 116L,
   bama$eligible == 285L,
+  round(100 * bama$draft_rate) == 41,
   fmt(bama$above) == "92",
+  fmt(bama$expected, 1) == "23.5",
+  pct(min(non_st$pos_rate)) == "7.7%",
+  pct(max(non_st$pos_rate)) == "10.1%",
+  pct(st_rate) == "2.2%",
   identical(
     sort(school$team[school$conf_now == "FBS independents"]),
     c("Notre Dame", "UConn")
   ),
-  all(g5_now$above < 0),
-  all(school$conf_now_tier[school$above > 0] == "Power"),
-  n_above == 46L,
+  identical(g5_fbs_beaters, "Cincinnati"),
+  school$conf_now[school$team == "Cincinnati"] == "Big 12",
+  n_g5_above_tier == 24L,
+  nrow(g5) == 72L,
+  fmt(g5_best$above_tier, 1) == "14.2",
   g5_best$team == "Boise State",
   g5_best$drafted == 21L,
-  fmt(g5_best$expected, 1) == "21.4",
+  fmt(g5_best$expected_tier, 1) == "6.8",
+  n_above == 46L,
+  # the Pac-12's last two schools are classed by their Power seasons
+  all(school$school_tier[school$team %in% c("Oregon State", "Washington State")] == "Power"),
   nrow(smallest) == 1L,
   smallest$team == "Idaho",
   smallest$eligible == 16L,
@@ -1092,7 +1162,9 @@ stopifnot(
   pct(smallest$adjusted) == "1.9%",
   max(school$adjusted) < 0.47,
   nrow(conf_leader) == 11L,
-  conf_leader$team[conf_leader$conf_now == "Pac-12"] == "Oregon State"
+  conf_leader$team[conf_leader$conf_now == "Pac-12"] == "Oregon State",
+  grepl("^#", boise_color),
+  grepl("^#", bama_color)
 )
 ```
 
@@ -1100,10 +1172,8 @@ stopifnot(
 #| label: s35-compute
 #| include: false
 school_pos <- school_pos |>
-  left_join(select(fbs_schools, team, conf_now), by = "team") |>
-  mutate(adjusted = shrink_rate(drafted, eligible, group = position_group)) |>
   group_by(position_group) |>
-  mutate(rank = rank(-above, ties.method = "min")) |>
+  mutate(rank = rank(-above, ties.method = "min"), n_schools = n()) |>
   ungroup()
 pos_top <- school_pos |>
   filter(rank == 1L) |>
@@ -1120,29 +1190,37 @@ nicknames <- tibble::tribble(
 ) |>
   mutate(position_group = factor(position_group, levels = pos_levels)) |>
   left_join(
-    select(school_pos, claimant = team, position_group, eligible, drafted, above, rank),
+    select(school_pos, claimant = team, position_group, eligible, drafted, above, rank, n_schools),
     by = c("claimant", "position_group")
   ) |>
   left_join(
     select(pos_top, position_group, leader = team, leader_drafted = drafted, leader_above = above),
     by = "position_group"
   ) |>
-  mutate(holds = claimant == leader)
+  mutate(holds = claimant == leader, top5 = rank <= 5L)
 n_hold <- sum(nicknames$holds)
+n_top5 <- sum(nicknames$top5)
 nk <- function(n, col) nicknames[[col]][nicknames$nickname == n]
+# defensive ends and edge rushers count in the defensive line
+psu_dl <- filter(school_pos, team == "Penn State", position_group == "Defensive line")
+byu_conf <- team_season |>
+  filter(team == "BYU", season >= first_season, season <= last_season) |>
+  distinct(season, conference)
 ```
 
-### 3.5 Alabama leads four positions, and of six fan nicknames only LSU's WRU matches the data's leader
+### 3.5 Alabama leads four positions, and three of six fan nicknames hold up as top-five schools, with only LSU's WRU first
 
-Ranking schools by draftees above expected at each position, the table
-answers the nickname questions: LSU leads receivers but ranks
-`r nk("DBU", "rank")`th at defensive back, where Alabama leads; Penn State ranks
-`r nk("Linebacker U", "rank")`nd at linebacker, USC
-`r nk("Tailback U", "rank")`nd at running back, BYU
-`r nk("QBU", "rank")`th at quarterback, and Iowa `r nk("Tight End U", "rank")`th
-at tight end behind Notre Dame. The bars show each position's top five,
-with the nickname school added where it falls outside them, and the
-heatmap shows every school at every position.
+Ranked by draftees above expected, LSU is first at receiver and
+`r nk("DBU", "rank")`th at defensive back, and Iowa is
+`r nk("Tight End U", "rank")`th at tight end behind Notre Dame, so DBU and
+Tight End U are close rather than misses. Penn State ranks
+`r nk("Linebacker U", "rank")`nd at linebacker (defensive ends and edge
+rushers count in the defensive line, where it ranks `r psu_dl$rank`th with
+`r psu_dl$drafted` drafted), while USC (`r nk("Tailback U", "rank")`nd at
+running back) and BYU (`r nk("QBU", "rank")`th at quarterback, an
+independent until 2023) rest on small samples of
+`r nk("Tailback U", "eligible")` and `r nk("QBU", "eligible")` eligible
+players.
 
 ```{r}
 #| label: s35-table
@@ -1153,13 +1231,14 @@ nicknames |>
     `School that claims it` = claimant,
     `Its draftees (eligible)` = paste0(drafted, " (", eligible, ")"),
     `Its above expected` = fmt(above, 1),
-    `Its rank of 137` = rank,
+    `Its rank` = paste0(rank, " of ", n_schools),
+    `In the top 5` = if_else(top5, "Yes", "No"),
     `Data leader` = leader,
     `Leader's draftees` = leader_drafted,
     `Leader's above expected` = fmt(leader_above, 1)
   ) |>
   kable(
-    caption = "Fan nicknames for position schools against the data, final seasons 2013 to 2025. Schools are ranked at each position by draftees above expected (drafted minus the FBS rate for the position times the school's eligible players there)."
+    caption = "Fan nicknames for position schools against the data, final seasons 2013 to 2025. Schools are ranked among the FBS schools with an eligible player at the position, by draftees above expected (drafted minus the FBS rate for the position times the school's eligible players there). The bars below show each position's top five, adding the nickname school where it falls outside them, and the heatmap shows every school at every position."
   )
 ```
 
@@ -1241,7 +1320,9 @@ p <- ggplot(grid_df, aes(position_group, team, fill = above)) +
         fmt(above, 1),
         " above expected (rank ",
         rank,
-        " of 137)"
+        " of ",
+        n_schools,
+        ")"
       ),
       data_id = paste(team, position_group)
     ),
@@ -1281,7 +1362,15 @@ stopifnot(
   nicknames$nickname[nicknames$holds] == "WRU",
   nk("DBU", "leader") == "Alabama",
   nk("Tight End U", "leader") == "Notre Dame",
-  identical(nicknames$rank, c(5L, 22L, 1L, 22L, 36L, 5L))
+  identical(nicknames$rank, c(5L, 22L, 1L, 22L, 36L, 5L)),
+  n_top5 == 3L,
+  identical(nicknames$nickname[nicknames$top5], c("DBU", "WRU", "Tight End U")),
+  psu_dl$rank == 7L,
+  psu_dl$drafted == 15L,
+  nk("Tailback U", "eligible") == 12L,
+  nk("QBU", "eligible") == 14L,
+  all(byu_conf$conference[byu_conf$season <= 2022L] == "FBS Independents"),
+  byu_conf$conference[byu_conf$season == 2023L] == "Big 12"
 )
 ```
 
@@ -1299,8 +1388,9 @@ tibble::tribble(
   "Power players are drafted at five times the Group of 5 rate", sprintf("%s of Power eligible players drafted against %s for the Group of 5 (%.1f times); %s for FCS and below.", pct(tr("Power", "draft_rate")), pct(tr("Group of 5", "draft_rate")), power_g5, pct(tr("FCS and below", "draft_rate"))) ,
   "Undrafted signings are spread more evenly"                  , sprintf("Undrafted rate %s Power against %s Group of 5 (%.1f times); every Group of 5 conference had more undrafted signings than draftees.", pct(tr("Power", "udfa_rate")), pct(tr("Group of 5", "udfa_rate")), power_g5_udfa) ,
   "The gap holds at every position"                            , sprintf("Power over Group of 5 draft rate from %.1f times (%s) to %.1f times (%s); the SEC tops %d of 9 positions.", min(pos_tier$ratio), tolower(pos_tier$position_group[which.min(pos_tier$ratio)]), max(pos_tier$ratio), tolower(pos_tier$position_group[which.max(pos_tier$ratio)]), n_sec_leads) ,
-  "A few Power schools far outproduce their position mix"      , sprintf("Alabama: %d drafted, %s expected; %d of %d FBS schools above expected, none now in the Group of 5.", bama$drafted, fmt(bama$expected, 1), n_above, nrow(school))                                   ,
-  "Alabama leads four positions; one nickname of six holds"    , sprintf("Alabama tops %d positions by draftees above expected; of %d nicknames only %s (%s) matches the leader.", n_bama_leads, nrow(nicknames), nicknames$nickname[nicknames$holds], nicknames$claimant[nicknames$holds])
+  "A few Power schools far exceed an average FBS school"       , sprintf("Alabama: %d drafted, %s expected at the FBS average; %d of %d FBS schools above it, only %s among Group of 5 schools.", bama$drafted, fmt(bama$expected, 1), n_above, nrow(school), g5_fbs_beaters) ,
+  "Boise State leads the Group of 5 against its own tier"      , sprintf("%s: %d drafted, %s expected at Group of 5 rates; %d of %d Group of 5 schools above their tier's expectation.", g5_best$team, g5_best$drafted, fmt(g5_best$expected_tier, 1), n_g5_above_tier, nrow(g5)) ,
+  "Alabama leads four positions; three nicknames make the top five", sprintf("Alabama tops %d positions by draftees above expected; of %d nickname schools %d rank in the top five and only %s (%s) first.", n_bama_leads, nrow(nicknames), n_top5, nicknames$nickname[nicknames$holds], nicknames$claimant[nicknames$holds])
 ) |>
   kable(caption = "The findings and the numbers behind them.")
 ```
@@ -1362,27 +1452,24 @@ Draft production is concentrated inside the Power conferences, not just
 between tiers.
 
 - Alabama, Ohio State, LSU and Georgia each produced at least 65 more
-  draftees than their position mix predicts, while no school now in the
-  Group of 5 beat its prediction.
-- The fan nicknames do not track these classes: at
-  `r sum(!nicknames$holds)` of the six positions another school leads,
-  Alabama at `r sum(nicknames$leader[!nicknames$holds] == "Alabama")` of
-  them.
+  draftees than an average FBS school with the same players by position.
+- At `r sum(!nicknames$holds)` of the six nickname positions another
+  school leads, Alabama at
+  `r sum(nicknames$leader[!nicknames$holds] == "Alabama")` of them.
 :::
 
 ::: {.callout-important}
-The Group of 5 draft rate fell as more of its players finished at Power
-schools.
+The Group of 5 draft rate fell while more draftees credited to Power
+schools had earlier played at Group of 5 schools.
 
-- Draftees credited to a Power school who had earlier played at a Group of
-  5 school numbered at most `r early_max` per class through 2022 and
-  `r up_2026` in the class of 2026. Because a draftee counts for his last
-  school, players who transfer up lower the Group of 5 rate and raise the
-  Power rate.
+- Those draftees numbered at most `r early_max` per class through 2022 and
+  `r up_2026` in the class of 2026. Each counts for the Power school they
+  finished at, not the Group of 5 school they left.
 :::
 
 ::: {.callout-important}
-Undrafted signings are the broader route to the NFL.
+For Group of 5 players, undrafted signings are the broader route to the
+NFL.
 
 - Every Group of 5 conference sent more players to NFL rosters undrafted
   than through the draft.
@@ -1401,17 +1488,14 @@ stopifnot(
 )
 ```
 
-Several caveats bound these numbers. A draftee is credited to his last
-college roster before the draft, so a transfer counts for his final stop.
-Eligibility is a roster-based stand-in for "had a real shot", and final
-seasons 2013 to 2025 only approximately match the draft classes of 2014 to
+Each draftee is credited to the last college roster before the draft,
+eligibility is a roster-based stand-in for a real shot at the NFL, and
+final seasons 2013 to 2025 only approximately match the classes of 2014 to
 2026. Undrafted offensive linemen are undercounted (an undrafted rate of
 `r pct(ol_udfa$udfa_rate)`, against `r pct(other_udfa$udfa_rate)` at the
-other non-kicking positions), because an undrafted player is matched to the
-NFL only through a college stat line. FCS-and-below rosters are incomplete,
-so that tier enters only as one total. Within-conference comparisons group
-schools by their 2025 conference, and Idaho, which left FBS after 2017, by
-its last FBS conference.
+other non-kicking positions) because the NFL match runs through college
+stat lines. FCS-and-below rosters are incomplete, so that tier enters only
+as one total.
 
 ```{r}
 #| label: teardown
