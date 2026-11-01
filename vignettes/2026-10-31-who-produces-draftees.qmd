@@ -1,0 +1,676 @@
+---
+title: "Power-conference players are drafted at five times the Group of 5 rate, and Alabama leads four positions"
+date: "2026-10-31"
+description: "Players who finished at Power-conference schools from 2013 to 2025 were drafted at five times the Group of 5 rate, while undrafted signings were spread far more evenly."
+followups:
+  - "Do teams that win more produce more draftees? (Post 3)"
+author:
+  - "AI directed by Nick Giangreco"
+freeze: auto
+vignette: >
+  %\VignetteIndexEntry{Power-conference players are drafted at five times the Group of 5 rate, and Alabama leads four positions}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r}
+#| label: setup
+#| include: false
+# Load the package from the checkout with pkgload; no package install is
+# required. Under altdoc the render runs in a temp dir, so resolve the root
+# first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
+root <- Sys.getenv("CFB2NFL_ROOT", "")
+if (!nzchar(root)) {
+  dir <- getwd()
+  while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
+    dir <- dirname(dir)
+  }
+  root <- if (file.exists(file.path(dir, "_targets"))) dir else getwd()
+}
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+library(DBI)
+library(dplyr)
+library(duckdb)
+library(ggiraph)
+library(ggplot2)
+library(knitr)
+
+# One interaction style for every girafe figure: a clear hover pop, dimming
+# of non-hovered marks, a dark tooltip, and toolbar zoom + PNG download.
+set_girafe_defaults(
+  opts_hover = opts_hover(
+    css = "stroke:#111827;stroke-width:2.5px;filter:brightness(1.12);"
+  ),
+  opts_hover_inv = opts_hover_inv(css = "opacity:0.45;"),
+  opts_tooltip = opts_tooltip(
+    css = "background:#111827;color:#fff;padding:6px 9px;border-radius:5px;font-weight:bold;font-size:15px;"
+  ),
+  opts_zoom = opts_zoom(min = 1, max = 5),
+  opts_toolbar = opts_toolbar(saveaspng = TRUE, position = "topright"),
+  opts_sizing = opts_sizing(rescale = TRUE)
+)
+
+# thousands-separated and percent formatters for inline numbers
+fmt <- function(x, digits = 0) {
+  formatC(as.numeric(x), big.mark = ",", format = "f", digits = digits)
+}
+pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
+```
+
+```{r}
+#| label: registry
+#| include: false
+# Key on athlete id, never name: picks has two Josh Allens (Wyoming 2018,
+# Kentucky 2019).
+subjects <- tibble::tribble(
+  ~who         , ~cfb_athlete_id ,
+  "Joe Burrow" , "3915511"       ,
+  "Cam Ward"   , "4688380"       ,
+  "Josh Allen" , "3918298"
+)
+```
+
+```{r}
+#| label: load
+#| include: false
+team_season <- dbReadTable(con, "team_season")
+team_draft <- dbReadTable(con, "team_draft")
+teams <- dbReadTable(con, "teams")
+roster <- dbReadTable(con, "roster")
+picks <- dbReadTable(con, "picks")
+stopifnot(nrow(team_season) > 0, nrow(team_draft) > 0, nrow(picks) > 0)
+
+tier_order <- c("Power", "Group of 5", "FCS and below")
+tier_colors <- c(
+  "Power" = "#1d4ed8",
+  "Group of 5" = "#f59e0b",
+  "FCS and below" = "#6b7280"
+)
+team_colors <- team_color_values(teams)
+# Notre Dame is Power (decision 0003) though it plays as an FBS independent;
+# fail the render if the pipeline override regresses.
+stopifnot(all(team_draft$tier_label[team_draft$team == "Notre Dame"] == "Power"))
+
+# Final college seasons 2013 to 2025, approximately the draft classes of
+# 2014 to 2026; the 2026 season is in progress.
+first_season <- 2013L
+last_season <- 2025L
+credited <- team_draft |>
+  filter(season >= first_season, season <= last_season) |>
+  mutate(tier_label = factor(tier_label, levels = tier_order))
+fbs_cr <- credited |>
+  filter(tier_label != "FCS and below") |>
+  mutate(
+    # Notre Dame as an independent is a one-school Power group (it played
+    # 2020 in the ACC); the other independents are Group of 5
+    league = case_when(
+      conference == "FBS Independents" & team == "Notre Dame" ~ "Notre Dame",
+      conference == "FBS Independents" ~ "Other FBS independents",
+      .default = conference
+    )
+  )
+stopifnot(!anyNA(credited$tier_label), !anyNA(fbs_cr$league))
+
+# Each school's 2025 conference for within-conference comparisons; Idaho
+# left FBS after 2017, so it keeps its last FBS conference.
+conf_now <- team_season |>
+  filter(classification == "fbs", season <= last_season) |>
+  group_by(team) |>
+  slice_max(season, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  transmute(
+    team,
+    conf_now = if_else(
+      team == "Notre Dame",
+      "Notre Dame",
+      if_else(conference == "FBS Independents", "Other FBS independents", conference)
+    ),
+    conf_now_season = season
+  )
+fbs_schools <- distinct(fbs_cr, team) |> left_join(conf_now, by = "team")
+left_fbs <- filter(fbs_schools, conf_now_season < last_season)
+stopifnot(
+  !anyNA(fbs_schools$conf_now),
+  nrow(fbs_schools) == 137L,
+  identical(left_fbs$team, "Idaho"),
+  left_fbs$conf_now == "Sun Belt",
+  left_fbs$conf_now_season == 2017L
+)
+
+# The recurring cast, by id, credited to the last roster school before
+# the draft.
+star <- function(who) {
+  id <- subjects$cfb_athlete_id[subjects$who == who]
+  pk <- filter(picks, playerId == id)
+  last_stop <- roster |>
+    filter(playerId == id, season < pk$year) |>
+    slice_max(season, n = 1)
+  first_stop <- roster |>
+    filter(playerId == id) |>
+    slice_min(season, n = 1, with_ties = FALSE)
+  mutate(pk, last_team = last_stop$team, first_team = first_stop$team)
+}
+burrow <- star("Joe Burrow")
+ward <- star("Cam Ward")
+allen <- star("Josh Allen")
+stopifnot(
+  nrow(burrow) == 1L,
+  burrow$name == "Joe Burrow",
+  burrow$year == 2020L,
+  burrow$overall == 1L,
+  burrow$last_team == "LSU",
+  burrow$first_team == "Ohio State",
+  nrow(ward) == 1L,
+  ward$name == "Cam Ward",
+  ward$year == 2025L,
+  ward$overall == 1L,
+  ward$last_team == "Miami",
+  nrow(allen) == 1L,
+  allen$name == "Josh Allen",
+  allen$year == 2018L,
+  allen$overall == 7L,
+  allen$last_team == "Wyoming"
+)
+```
+
+::: {.callout-note appearance="minimal"}
+*Data as of the latest published release, retrieved 2026-10-31. Players
+are counted in their final college season, 2013 through 2025, which covers
+approximately the draft classes of 2014 through 2026.*
+:::
+
+## 1. Introduction
+
+The [previous post](2026-10-31-conferences-landscape.html) found half of
+all draft picks coming from 27 schools; this one asks how often a player
+who finishes his career at a conference, school, or position gets drafted,
+crediting each draftee to his last school (Joe Burrow to LSU, not Ohio
+State; Cam Ward to Miami, not Washington State; Josh Allen to Wyoming).
+Along the way it checks the nicknames fans give schools: is LSU still DBU,
+Penn State still Linebacker U, USC still Tailback U, and BYU still QBU?
+
+## 2. Data
+
+### 2.1 An eligible player is one whose college career ended with a real shot at the draft
+
+```{r}
+#| label: terms-compute
+#| include: false
+n_eligible <- sum(credited$n_eligible)
+n_exits <- sum(credited$n_exits)
+n_drafted <- sum(credited$n_drafted)
+n_udfa <- sum(credited$n_udfa)
+stopifnot(
+  n_eligible == 44248L,
+  n_drafted == 3129L,
+  n_udfa == 3374L,
+  n_exits == 87911L
+)
+```
+
+Every rate in the post divides by eligible players, so the table defines
+them and every other term; of the `r fmt(n_exits)` players whose college
+careers ended from 2013 to 2025, `r fmt(n_eligible)` were eligible,
+`r fmt(n_drafted)` were drafted, and `r fmt(n_udfa)` signed undrafted.
+
+```{r}
+#| label: terms
+tibble::tribble(
+  ~Term                    , ~Meaning                                                                                                                                                                                                                                                                                                                                                  ,
+  "Final season"           , "A player's last season on a college roster before the draft. He is counted once, for the school and conference he played for that season, so a transfer counts for his last stop."                                                                                                                                                                       ,
+  "Eligible player"        , "A player whose college career has ended and who had a real shot at the NFL: he spent at least three seasons on college rosters, or he was drafted, or he signed with an NFL team undrafted. Players who left after one or two seasons without reaching the NFL are not counted, and neither are undrafted players still on a 2026 roster, whose outcome is not yet known." ,
+  "Draft rate"             , "Drafted players divided by eligible players. A draft rate of 10% means 10 of every 100 eligible players were drafted."                                                                                                                                                                                                                          ,
+  "Undrafted free agent"   , "An eligible player who was not drafted but later appears on an NFL roster. Offensive linemen are undercounted, because an undrafted player is only matched to the NFL when he has a college stat line, which linemen rarely do."                                                                                                                   ,
+  "Undrafted rate"         , "Undrafted free agents divided by eligible players."                                                                                                                                                                                                                                                                                            ,
+  "Tier"                   , "Power (the SEC, Big Ten, ACC, Big 12, the Pac-12 through 2023, and Notre Dame), Group of 5 (the other FBS conferences and independents), and FCS and below. FCS-and-below rosters are incomplete, so that tier appears only as one total."                                                                                                         ,
+  "2025 conference"        , "The conference a school played in during 2025, used to group schools for side-by-side comparison. Conference-level rates instead use the conference of each player's final season."                                                                                                                                                               ,
+  "Position group"         , "The player's final-season roster position, grouped: quarterback, running back, receiver, tight end, offensive line, defensive line, linebacker, defensive back, and special teams."                                                                                                                                                                 ,
+  "Expected draftees"      , "How many draftees a school would have produced if each of its eligible players were drafted at the FBS-wide rate for his position. A school heavy at positions the NFL drafts often is not credited for its position mix."                                                                                                                         ,
+  "Draftees above expected", "Drafted players minus expected draftees."                                                                                                                                                                                                                                                                                                      ,
+  "Adjusted rate"          , "A school's draft rate pulled toward its group's average, more strongly the fewer eligible players it has, so a small sample cannot top a ranking by luck (section 3.4)."
+) |>
+  kable(caption = "Terms used throughout.")
+```
+
+## 3. Results
+
+```{r}
+#| label: s31-compute
+#| include: false
+rates <- function(d) {
+  d |>
+    summarise(
+      schools = n_distinct(team),
+      eligible = sum(n_eligible),
+      drafted = sum(n_drafted),
+      udfa = sum(n_udfa),
+      .groups = "drop"
+    ) |>
+    mutate(draft_rate = drafted / eligible, udfa_rate = udfa / eligible)
+}
+tier_rates <- rates(group_by(credited, tier_label))
+tr <- function(t, col) tier_rates[[col]][tier_rates$tier_label == t]
+power_g5 <- tr("Power", "draft_rate") / tr("Group of 5", "draft_rate")
+# a conference's tier is the one most of its eligible players played in
+# (the Pac-12's two 2024 and 2025 schools are Group of 5)
+league_tier <- fbs_cr |>
+  count(league, tier_label, wt = n_eligible) |>
+  group_by(league) |>
+  slice_max(n, n = 1) |>
+  ungroup() |>
+  select(league, tier = tier_label)
+conf_rates <- rates(group_by(fbs_cr, league)) |>
+  left_join(league_tier, by = "league") |>
+  arrange(desc(draft_rate))
+cr_rate <- function(l, col = "draft_rate") {
+  conf_rates[[col]][conf_rates$league == l]
+}
+season_rates <- rates(group_by(fbs_cr, season, tier_label))
+g5_season <- filter(season_rates, tier_label == "Group of 5")
+power_season <- filter(season_rates, tier_label == "Power")
+g5_first <- g5_season$draft_rate[g5_season$season == first_season]
+g5_last <- g5_season$draft_rate[g5_season$season == last_season]
+```
+
+### 3.1 Power-conference players were drafted at five times the Group of 5 rate, 13.8% against 2.7%
+
+The table counts eligible players and draftees by tier and conference, the
+bars rank the conferences, and the season lines show the Group of 5 rate
+falling from `r pct(g5_first)` of 2013 final seasons to `r pct(g5_last)` of
+2025 final seasons while the Power rate stayed between
+`r pct(min(power_season$draft_rate))` and `r pct(max(power_season$draft_rate))`.
+
+```{r}
+#| label: s31-table
+bind_rows(
+  tier_rates |>
+    transmute(Group = paste("All", tier_label), Tier = as.character(tier_label), schools, eligible, drafted, draft_rate),
+  conf_rates |>
+    transmute(Group = league, Tier = as.character(tier), schools, eligible, drafted, draft_rate)
+) |>
+  transmute(
+    Group,
+    Tier,
+    Schools = fmt(schools),
+    `Eligible players` = fmt(eligible),
+    Drafted = fmt(drafted),
+    `Draft rate` = pct(draft_rate)
+  ) |>
+  kable(
+    caption = "Eligible players and draftees by tier, then by FBS conference, for final seasons 2013 to 2025. A school counts in every conference it played in. The Pac-12 combines its Power seasons through 2023 with the two schools that remained in 2024 and 2025."
+  )
+```
+
+```{r}
+#| label: s31-explain
+#| fig-height: 7
+power_line <- tr("Power", "draft_rate")
+g5_line <- tr("Group of 5", "draft_rate")
+p <- ggplot(
+  conf_rates,
+  aes(draft_rate, reorder(league, draft_rate), fill = tier)
+) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(
+        league,
+        " (",
+        tier,
+        "): ",
+        fmt(drafted),
+        " drafted of ",
+        fmt(eligible),
+        " eligible (",
+        pct(draft_rate),
+        ")"
+      ),
+      data_id = league
+    ),
+    width = 0.75
+  ) +
+  geom_text(
+    aes(label = pct(draft_rate)),
+    hjust = -0.15,
+    size = 5,
+    fontface = "bold"
+  ) +
+  geom_vline(
+    xintercept = c(power_line, g5_line),
+    color = tier_colors[c("Power", "Group of 5")],
+    linetype = "dashed",
+    linewidth = 0.9
+  ) +
+  annotate(
+    "text",
+    x = c(power_line, g5_line) + 0.002,
+    y = nrow(conf_rates) + 1,
+    label = c(
+      paste0("All Power: ", pct(power_line), ", five times the Group of 5"),
+      paste0("All Group of 5: ", pct(g5_line))
+    ),
+    hjust = 0,
+    size = 5,
+    fontface = "bold",
+    color = c(tier_colors[["Power"]], "#b45309")
+  ) +
+  scale_y_discrete(expand = expansion(add = c(0.6, 1.5))) +
+  scale_fill_manual(values = tier_colors, name = NULL) +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 0.25)) +
+  labs(
+    x = "Draft rate (drafted / eligible players)",
+    y = NULL,
+    title = "Every Power conference drafts above every Group of 5 conference",
+    subtitle = "Final seasons 2013 to 2025; dashed lines are the tier totals"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: s31-explore
+#| fig-height: 7
+league_season <- rates(group_by(fbs_cr, league, season)) |>
+  left_join(league_tier, by = "league")
+p <- ggplot(
+  league_season,
+  aes(season, draft_rate, color = tier, group = league)
+) +
+  geom_line_interactive(
+    aes(data_id = league, tooltip = league),
+    linewidth = 1.1,
+    alpha = 0.8
+  ) +
+  geom_point_interactive(
+    aes(
+      data_id = league,
+      tooltip = paste0(
+        league,
+        ", ",
+        season,
+        ": ",
+        drafted,
+        " drafted of ",
+        eligible,
+        " eligible (",
+        pct(draft_rate),
+        ")"
+      )
+    ),
+    size = 2.6
+  ) +
+  scale_color_manual(values = tier_colors, name = NULL) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_continuous(breaks = seq(first_season, last_season, 2)) +
+  labs(
+    x = "Final college season",
+    y = "Draft rate",
+    title = "Every conference's draft rate, season by season",
+    subtitle = "Hover a line to follow one conference; hover a point for its counts"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: s31-pin
+#| include: false
+power_confs <- conf_rates$draft_rate[conf_rates$tier == "Power"]
+g5_confs <- conf_rates$draft_rate[conf_rates$tier == "Group of 5"]
+stopifnot(
+  pct(tr("Power", "draft_rate")) == "13.8%",
+  pct(tr("Group of 5", "draft_rate")) == "2.7%",
+  tr("Power", "drafted") == 2561L,
+  tr("Power", "eligible") == 18611L,
+  tr("Group of 5", "drafted") == 483L,
+  tr("Group of 5", "eligible") == 17590L,
+  round(power_g5) == 5,
+  abs(power_g5 - 5) < 0.05,
+  min(power_confs) > max(g5_confs),
+  conf_rates$league[1] == "Notre Dame",
+  conf_rates$league[2] == "SEC",
+  pct(cr_rate("SEC")) == "18.7%",
+  pct(g5_first) == "4.1%",
+  pct(g5_last) == "0.9%",
+  pct(min(power_season$draft_rate)) == "11.9%",
+  pct(max(power_season$draft_rate)) == "19.1%",
+  nrow(conf_rates) == 12L
+)
+```
+
+```{r}
+#| label: s32-compute
+#| include: false
+power_g5_udfa <- tr("Power", "udfa_rate") / tr("Group of 5", "udfa_rate")
+fbs_tot <- rates(fbs_cr)
+power_tot <- rates(filter(fbs_cr, tier_label == "Power"))
+power_share_drafted <- power_tot$drafted / fbs_tot$drafted
+power_share_udfa <- power_tot$udfa / fbs_tot$udfa
+power_share_eligible <- power_tot$eligible / fbs_tot$eligible
+g5_more_udfa <- with(
+  filter(conf_rates, tier == "Group of 5"),
+  all(udfa > drafted)
+)
+# schools whose eligible players were mostly in Power seasons, with more
+# undrafted signings than draftees
+school_tier <- fbs_cr |>
+  count(team, tier_label, wt = n_eligible) |>
+  group_by(team) |>
+  slice_max(n, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  select(team, school_tier = tier_label)
+school_rates <- rates(group_by(fbs_cr, team)) |>
+  left_join(school_tier, by = "team") |>
+  left_join(fbs_schools, by = "team")
+udfa_heavy <- school_rates |>
+  filter(school_tier == "Power", udfa > drafted) |>
+  arrange(desc(udfa - drafted), team)
+n_power_schools <- sum(school_rates$school_tier == "Power")
+```
+
+### 3.2 Undrafted signings are spread far more evenly, with Power players signing at under twice the Group of 5 rate
+
+Power schools had `r pct(power_share_eligible, 0)` of FBS eligible players
+and `r pct(power_share_drafted, 0)` of FBS draftees but only
+`r pct(power_share_udfa, 0)` of FBS undrafted free agents; the table and
+the paired dots compare the two rates by conference, and the scatter places
+every FBS school, where `r nrow(udfa_heavy)` of the `r n_power_schools`
+mostly Power schools, led by `r udfa_heavy$team[1]`,
+`r udfa_heavy$team[2]` and `r udfa_heavy$team[3]`, sent more players to
+the NFL undrafted than drafted.
+
+```{r}
+#| label: s32-table
+bind_rows(
+  filter(tier_rates, tier_label != "FCS and below") |>
+    transmute(Group = paste("All", tier_label), eligible, drafted, udfa, draft_rate, udfa_rate),
+  transmute(conf_rates, Group = league, eligible, drafted, udfa, draft_rate, udfa_rate)
+) |>
+  transmute(
+    Group,
+    `Eligible players` = fmt(eligible),
+    Drafted = fmt(drafted),
+    `Draft rate` = pct(draft_rate),
+    `Undrafted free agents` = fmt(udfa),
+    `Undrafted rate` = pct(udfa_rate)
+  ) |>
+  kable(
+    caption = sprintf(
+      "Draft and undrafted rates by FBS tier and conference, final seasons 2013 to 2025. Power players were drafted at %.1f times the Group of 5 rate but signed undrafted at %.1f times it.",
+      power_g5,
+      power_g5_udfa
+    )
+  )
+```
+
+```{r}
+#| label: s32-explain
+#| fig-height: 7
+dumb <- conf_rates |>
+  mutate(league = reorder(league, draft_rate)) |>
+  tidyr::pivot_longer(
+    c(draft_rate, udfa_rate),
+    names_to = "outcome",
+    values_to = "rate"
+  ) |>
+  mutate(
+    outcome = if_else(outcome == "draft_rate", "Drafted", "Undrafted free agent"),
+    n = if_else(outcome == "Drafted", drafted, udfa)
+  )
+outcome_colors <- c("Drafted" = "#1d4ed8", "Undrafted free agent" = "#0f766e")
+n_g5_rows <- sum(conf_rates$tier == "Group of 5")
+p <- ggplot(dumb, aes(rate, league)) +
+  annotate(
+    "rect",
+    xmin = -Inf,
+    xmax = Inf,
+    ymin = 0.5,
+    ymax = n_g5_rows + 0.5,
+    fill = "#fef3c7",
+    alpha = 0.7
+  ) +
+  geom_line(aes(group = league), color = "#9ca3af", linewidth = 1.2) +
+  geom_point_interactive(
+    aes(
+      color = outcome,
+      tooltip = paste0(
+        league,
+        ": ",
+        fmt(n),
+        " ",
+        tolower(outcome),
+        if_else(outcome == "Drafted", "", "s"),
+        " of ",
+        fmt(eligible),
+        " eligible (",
+        pct(rate),
+        ")"
+      ),
+      data_id = paste(league, outcome)
+    ),
+    size = 5
+  ) +
+  annotate(
+    "text",
+    x = 0.19,
+    y = n_g5_rows / 2 + 0.5,
+    label = "Group of 5: more players\nsigned undrafted than were drafted",
+    hjust = 1,
+    size = 5,
+    fontface = "bold",
+    color = "#b45309"
+  ) +
+  scale_color_manual(values = outcome_colors, name = NULL) +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 0.22)) +
+  labs(
+    x = "Share of eligible players",
+    y = NULL,
+    title = "The undrafted rate varies far less than the draft rate",
+    subtitle = "Final seasons 2013 to 2025; hover a dot for counts"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: s32-explore
+#| fig-height: 9
+# hand-placed labels for the three schools furthest above the line
+heavy_lab <- slice_head(udfa_heavy, n = 3) |>
+  mutate(
+    lx = draft_rate + c(-0.035, -0.04, 0.01),
+    ly = udfa_rate + c(0.012, -0.012, 0.022)
+  )
+p <- ggplot(school_rates, aes(draft_rate, udfa_rate)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "#6b7280") +
+  annotate(
+    "text",
+    x = 0.005,
+    y = 0.168,
+    label = "Above the line: more undrafted than drafted",
+    hjust = 0,
+    size = 4.6,
+    color = "#374151"
+  ) +
+  geom_point_interactive(
+    aes(
+      fill = team,
+      size = eligible,
+      tooltip = paste0(
+        team,
+        " (2025: ",
+        conf_now,
+        ")\n",
+        drafted,
+        " drafted, ",
+        udfa,
+        " undrafted free agents, of ",
+        eligible,
+        " eligible"
+      ),
+      data_id = team
+    ),
+    shape = 21,
+    color = "white",
+    alpha = 0.9
+  ) +
+  geom_segment(
+    data = heavy_lab,
+    aes(xend = lx, yend = ly, color = team),
+    linewidth = 0.8
+  ) +
+  geom_label(
+    data = heavy_lab,
+    aes(lx, ly, label = team, color = team),
+    size = 4.8,
+    fontface = "bold"
+  ) +
+  scale_color_manual(values = team_colors, guide = "none") +
+  scale_fill_manual(values = team_colors, na.value = "#6b7280", guide = "none") +
+  scale_size_area(max_size = 7, guide = "none") +
+  scale_x_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = scales::percent) +
+  coord_cartesian(xlim = c(0, 0.42), ylim = c(0, 0.17)) +
+  labs(
+    x = "Draft rate",
+    y = "Undrafted rate",
+    title = "Every FBS school's draft and undrafted rates",
+    subtitle = "Team colors; dot size is eligible players; hover a dot for counts"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 9)
+```
+
+```{r}
+#| label: s32-pin
+#| include: false
+stopifnot(
+  pct(tr("Power", "udfa_rate")) == "10.6%",
+  pct(tr("Group of 5", "udfa_rate")) == "5.7%",
+  power_g5_udfa < 2,
+  sprintf("%.1f", power_g5) == "5.0",
+  sprintf("%.1f", power_g5_udfa) == "1.9",
+  pct(power_share_eligible, 0) == "51%",
+  pct(power_share_drafted, 0) == "84%",
+  pct(power_share_udfa, 0) == "66%",
+  g5_more_udfa,
+  nrow(udfa_heavy) == 26L,
+  n_power_schools == 65L,
+  identical(udfa_heavy$team[1:3], c("Rutgers", "Vanderbilt", "Colorado")),
+  # the shaded band holds exactly the Group of 5 conferences
+  all(tail(conf_rates$tier, n_g5_rows) == "Group of 5"),
+  max(school_rates$udfa_rate) < 0.17,
+  max(school_rates$draft_rate) < 0.42
+)
+```
+
+```{r}
+#| label: teardown
+#| include: false
+dbDisconnect(con, shutdown = TRUE)
+```
