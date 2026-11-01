@@ -877,7 +877,11 @@ fbs_without_pick <- setdiff(fbs_teams_window, school_picks$team)
 # Josh Allen's school, far down the list from the top producers
 wyo <- filter(school_picks, team == allen$collegeTeam)
 wyo_color <- team_color_values(teams)[[allen$collegeTeam]]
-allen_pick <- filter(window_picks, playerId == allen$playerId, year == allen$year)
+allen_pick <- filter(
+  window_picks,
+  playerId == allen$playerId,
+  year == allen$year
+)
 ```
 
 ### 3.4 Twenty-seven schools account for half of all draft picks
@@ -967,8 +971,17 @@ p <- ggplot(school_picks, aes(rank, cum_share)) +
     data = wyo,
     aes(
       tooltip = paste0(
-        "#", rank, " ", team, ": ", picks, " picks, including Josh Allen (",
-        allen$year, ", pick ", allen$overall, ")"
+        "#",
+        rank,
+        " ",
+        team,
+        ": ",
+        picks,
+        " picks, including Josh Allen (",
+        allen$year,
+        ", pick ",
+        allen$overall,
+        ")"
       ),
       data_id = team
     ),
@@ -990,8 +1003,14 @@ p <- ggplot(school_picks, aes(rank, cum_share)) +
     x = wyo$rank + 15,
     y = wyo$cum_share - 0.2,
     label = paste0(
-      "Wyoming (Josh Allen, pick ", allen$overall, " in ", allen$year, "):\n",
-      wyo$picks, " picks, rank ", wyo$rank
+      "Wyoming (Josh Allen, pick ",
+      allen$overall,
+      " in ",
+      allen$year,
+      "):\n",
+      wyo$picks,
+      " picks, rank ",
+      wyo$rank
     ),
     hjust = 0,
     size = 5,
@@ -1025,7 +1044,13 @@ top <- filter(school_picks, rank <= 60 | team == allen$collegeTeam) |>
     ),
     note = if_else(
       team == allen$collegeTeam,
-      paste0(", including Josh Allen (", allen$year, ", pick ", allen$overall, ")"),
+      paste0(
+        ", including Josh Allen (",
+        allen$year,
+        ", pick ",
+        allen$overall,
+        ")"
+      ),
       ""
     )
   )
@@ -1112,7 +1137,11 @@ ndsu_color <- team_color_values(teams)[["North Dakota State"]]
 hill_pick <- filter(small, playerId == hill$playerId, year == hill$year)
 # division in the school's latest recorded season before the draft
 hill_division <- team_season |>
-  filter(team == hill$collegeTeam, season < hill$year, !is.na(classification)) |>
+  filter(
+    team == hill$collegeTeam,
+    season < hill$year,
+    !is.na(classification)
+  ) |>
   slice_max(season, n = 1) |>
   pull(classification)
 hill_color <- team_color_values(teams)[[hill$collegeTeam]]
@@ -1283,8 +1312,12 @@ p <- ggplot(small, aes(year, overall, color = traced)) +
     x = hill_pick$year + 0.35,
     y = hill_pick$overall + 40,
     label = paste0(
-      "Tyreek Hill, Division II West Alabama\n", hill_pick$year,
-      ", round ", hill_pick$round, ", pick ", hill_pick$overall
+      "Tyreek Hill, Division II West Alabama\n",
+      hill_pick$year,
+      ", round ",
+      hill_pick$round,
+      ", pick ",
+      hill_pick$overall
     ),
     hjust = 0,
     size = 4.4,

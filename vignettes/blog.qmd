@@ -6,7 +6,7 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-Articles for data investigations and challenging  beliefs and expectations. AI may be indicated in generating blogs. However, all code and data used originate from the validated audited pipeline so no findings are fabricated.
+Vignettes for data investigations and challenging  beliefs and expectations. AI may be indicated in generating blogs. However, all code and data used originate from the validated audited pipeline so no findings are fabricated. The purpose of these vignettes is to explore, investigate, and question the data.
 
 ```{r}
 #| label: setup
@@ -22,7 +22,11 @@ if (requireNamespace("cfb2nfl", quietly = TRUE)) {
   while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
     dir <- dirname(dir)
   }
-  for (src in sort(list.files(file.path(dir, "R"), pattern = "[.]R$", full.names = TRUE))) {
+  for (src in sort(list.files(
+    file.path(dir, "R"),
+    pattern = "[.]R$",
+    full.names = TRUE
+  ))) {
     source(src, local = FALSE, encoding = "UTF-8")
   }
 }
@@ -34,9 +38,14 @@ library(reactable)
 # Blog posts are dated vignettes (decision 0015); the table is built from the
 # files themselves so a new post appears just by adding YYYY-MM-DD-slug.qmd.
 root <- cfb2nfl_root()
-post_files <- sort(list.files(file.path(root, "vignettes"),
-  pattern = "^\\d{4}-\\d{2}-\\d{2}-.+\\.qmd$", full.names = TRUE
-), decreasing = TRUE)
+post_files <- sort(
+  list.files(
+    file.path(root, "vignettes"),
+    pattern = "^\\d{4}-\\d{2}-\\d{2}-.+\\.qmd$",
+    full.names = TRUE
+  ),
+  decreasing = TRUE
+)
 
 posts <- map_dfr(post_files, function(f) {
   meta <- rmarkdown::yaml_front_matter(f)
