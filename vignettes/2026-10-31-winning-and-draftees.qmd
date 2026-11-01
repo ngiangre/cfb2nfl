@@ -1,0 +1,669 @@
+---
+title: "Schools that win more produce more draftees, strongly in the Power conferences and moderately in the Group of 5"
+date: "2026-10-31"
+description: "DRAFT"
+followups:
+  - "DRAFT"
+author:
+  - "AI directed by Nick Giangreco"
+freeze: auto
+vignette: >
+  %\VignetteIndexEntry{Schools that win more produce more draftees, strongly in the Power conferences and moderately in the Group of 5}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r}
+#| label: setup
+#| include: false
+# Load the package from the checkout with pkgload; no package install is
+# required. Under altdoc the render runs in a temp dir, so resolve the root
+# first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
+root <- Sys.getenv("CFB2NFL_ROOT", "")
+if (!nzchar(root)) {
+  dir <- getwd()
+  while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
+    dir <- dirname(dir)
+  }
+  root <- if (file.exists(file.path(dir, "_targets"))) dir else getwd()
+}
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+library(DBI)
+library(dplyr)
+library(duckdb)
+library(ggiraph)
+library(ggplot2)
+library(knitr)
+
+# One interaction style for every girafe figure: a clear hover pop, dimming
+# of non-hovered marks, a dark tooltip, and toolbar zoom + PNG download.
+set_girafe_defaults(
+  opts_hover = opts_hover(
+    css = "stroke:#111827;stroke-width:2.5px;filter:brightness(1.12);"
+  ),
+  opts_hover_inv = opts_hover_inv(css = "opacity:0.45;"),
+  opts_tooltip = opts_tooltip(
+    css = "background:#111827;color:#fff;padding:6px 9px;border-radius:5px;font-weight:bold;font-size:15px;"
+  ),
+  opts_zoom = opts_zoom(min = 1, max = 5),
+  opts_toolbar = opts_toolbar(saveaspng = TRUE, position = "topright"),
+  opts_sizing = opts_sizing(rescale = TRUE)
+)
+
+# thousands-separated, percent and correlation formatters for inline numbers
+fmt <- function(x, digits = 0) {
+  formatC(as.numeric(x), big.mark = ",", format = "f", digits = digits)
+}
+pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
+r2 <- function(x) sprintf("%.2f", x)
+signed <- function(x, digits = 0) paste0(if_else(x >= 0, "+", ""), fmt(x, digits))
+```
+
+```{r}
+#| label: registry
+#| include: false
+# Key on athlete id, never name: picks has two Josh Allens (Wyoming 2018,
+# Kentucky 2019).
+subjects <- tibble::tribble(
+  ~who            , ~cfb_athlete_id ,
+  "Joe Burrow"    , "3915511"       ,
+  "Cam Ward"      , "4688380"       ,
+  "Josh Allen"    , "3918298"       ,
+  "Jordan Travis" , "4360799"
+)
+```
+
+```{r}
+#| label: load
+#| include: false
+team_season <- dbReadTable(con, "team_season")
+team_draft <- dbReadTable(con, "team_draft")
+teams <- dbReadTable(con, "teams")
+roster <- dbReadTable(con, "roster")
+picks <- dbReadTable(con, "picks")
+udfa_ids <- dbGetQuery(
+  con,
+  "SELECT DISTINCT playerId FROM outcomes WHERE outcome_signed_udfa_d"
+)$playerId
+stopifnot(
+  nrow(team_season) > 0,
+  nrow(team_draft) > 0,
+  nrow(picks) > 0,
+  length(udfa_ids) > 0
+)
+
+tier_order <- c("Power", "Group of 5")
+tier_colors <- c("Power" = "#1d4ed8", "Group of 5" = "#f59e0b")
+team_colors <- team_color_values(teams)
+
+# Records cover every FBS season from 2010, when the rosters start, so a
+# player finishing in 2013 is judged on the seasons they played.
+first_record <- 2010L
+first_season <- 2013L
+last_season <- 2025L
+fbs_seasons <- team_season |>
+  filter(
+    classification == "fbs",
+    season >= first_record,
+    season <= last_season
+  )
+# no FBS ties since 2010, so win % is wins / completed games
+stopifnot(sum(fbs_seasons$ties) == 0L, !anyNA(fbs_seasons$tier_label))
+record <- fbs_seasons |>
+  group_by(team) |>
+  summarise(
+    fbs_seasons = n(),
+    games = sum(games_played),
+    wins = sum(wins),
+    losses = sum(losses),
+    sp = mean(sp_overall, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(win_pct = wins / games)
+# a school's tier is the one it held in most FBS seasons
+school_tier <- fbs_seasons |>
+  count(team, tier_label) |>
+  group_by(team) |>
+  slice_max(n, n = 1) |>
+  ungroup() |>
+  select(team, tier = tier_label)
+stopifnot(!anyDuplicated(school_tier$team))
+
+credited <- team_draft |>
+  filter(
+    season >= first_season,
+    season <= last_season,
+    tier_label != "FCS and below"
+  )
+school <- credited |>
+  group_by(team) |>
+  summarise(
+    eligible = sum(n_eligible),
+    drafted = sum(n_drafted),
+    .groups = "drop"
+  ) |>
+  mutate(draft_rate = drafted / eligible) |>
+  inner_join(record, by = "team") |>
+  inner_join(school_tier, by = "team") |>
+  mutate(
+    tier = factor(tier, levels = tier_order),
+    record_label = paste0(wins, "-", losses)
+  )
+stopifnot(
+  nrow(school) == 137L,
+  n_distinct(credited$team) == 137L,
+  sum(school$tier == "Power") == 65L,
+  sum(school$tier == "Group of 5") == 72L,
+  !anyNA(school$sp),
+  !anyNA(school$win_pct)
+)
+
+# Expected draftees: within each tier, a logistic regression turns a win
+# percentage into an expected draft rate (kept between 0 and 1), times the
+# school's eligible players.
+fit_tier <- function(d, x) {
+  f <- stats::as.formula(paste("cbind(drafted, eligible - drafted) ~", x))
+  lapply(split(d, d$tier), \(g) glm(f, family = binomial, data = g))
+}
+win_fits <- fit_tier(school, "win_pct")
+school <- school |>
+  group_by(tier) |>
+  mutate(
+    expected_rate = predict(
+      win_fits[[as.character(first(tier))]],
+      newdata = pick(everything()),
+      type = "response"
+    )
+  ) |>
+  ungroup() |>
+  mutate(
+    expected = expected_rate * eligible,
+    above = drafted - expected
+  )
+curve_at <- function(fits, x, value) {
+  vapply(
+    fits,
+    \(m) unname(predict(m, newdata = setNames(data.frame(value), x), type = "response")),
+    numeric(1)
+  )
+}
+
+# The recurring cast, by id: the school they were credited to and its
+# record that season.
+star <- function(who) {
+  id <- subjects$cfb_athlete_id[subjects$who == who]
+  pk <- filter(picks, playerId == id)
+  stints <- roster |> filter(playerId == id, season < pk$year)
+  last_stop <- slice_max(stints, season, n = 1, with_ties = FALSE)
+  first_stop <- slice_min(stints, season, n = 1, with_ties = FALSE)
+  rec <- filter(team_season, team == last_stop$team, season == last_stop$season)
+  mutate(
+    pk,
+    last_team = last_stop$team,
+    last_season = last_stop$season,
+    first_team = first_stop$team,
+    n_teams = n_distinct(stints$team),
+    season_wins = rec$wins,
+    season_losses = rec$losses
+  )
+}
+burrow <- star("Joe Burrow")
+ward <- star("Cam Ward")
+allen <- star("Josh Allen")
+travis <- star("Jordan Travis")
+stopifnot(
+  nrow(burrow) == 1L,
+  burrow$name == "Joe Burrow",
+  burrow$year == 2020L,
+  burrow$overall == 1L,
+  burrow$last_team == "LSU",
+  burrow$last_season == 2019L,
+  burrow$first_team == "Ohio State",
+  burrow$season_wins == 15L,
+  burrow$season_losses == 0L,
+  nrow(travis) == 1L,
+  travis$name == "Jordan Travis",
+  travis$year == 2024L,
+  travis$last_team == "Florida State",
+  travis$last_season == 2023L,
+  travis$first_team == "Louisville",
+  travis$season_wins == 13L,
+  travis$season_losses == 1L,
+  nrow(ward) == 1L,
+  ward$name == "Cam Ward",
+  ward$year == 2025L,
+  ward$overall == 1L,
+  ward$last_team == "Miami",
+  ward$last_season == 2024L,
+  ward$n_teams == 3L,
+  nrow(allen) == 1L,
+  allen$name == "Josh Allen",
+  allen$year == 2018L,
+  allen$last_team == "Wyoming",
+  allen$n_teams == 1L
+)
+```
+
+::: {.callout-note appearance="minimal"}
+*Data as of the latest published release, retrieved 2026-10-31. Records
+cover FBS seasons 2010 through 2025; players are counted in their final
+college season, 2013 through 2025, which covers approximately the draft
+classes of 2014 through 2026.*
+:::
+
+## 1. Introduction
+
+The [first post](2026-10-31-conferences-landscape.html) found draft picks
+concentrated in a short list of schools and the
+[second](2026-10-31-who-produces-draftees.html) found Power-conference
+players drafted at five times the Group of 5 rate; this one asks whether the
+schools that win, like Joe Burrow's `r burrow$season_wins`-`r burrow$season_losses`
+LSU of `r burrow$last_season` or Jordan Travis's
+`r travis$season_wins`-`r travis$season_losses` Florida State of
+`r travis$last_season`, are the schools whose players get drafted.
+
++ *Expectation: teams that win more produce more draftees.*
+
+## 2. Data
+
+```{r}
+#| label: s21-compute
+#| include: false
+n_games <- sum(school$games)
+n_eligible <- sum(school$eligible)
+n_drafted <- sum(school$drafted)
+stopifnot(
+  n_eligible == 36201L,
+  n_drafted == 3044L,
+  n_games == 25666L
+)
+```
+
+### 2.1 Each of 137 FBS schools has a winning percentage and a draft rate
+
+The table defines every term; the `r nrow(school)` FBS schools
+(`r sum(school$tier == "Power")` Power, `r sum(school$tier == "Group of 5")`
+Group of 5) played `r fmt(n_games)` FBS-season games from 2010 to 2025 and
+had `r fmt(n_eligible)` eligible players, `r fmt(n_drafted)` of them
+drafted, in final seasons 2013 to 2025.
+
+```{r}
+#| label: terms
+tibble::tribble(
+  ~Term                  , ~Meaning                                                                                                                                                                                                                                                                                                                                   ,
+  "School"               , "An FBS program with at least one player whose college career ended there in a Power or Group of 5 season from 2013 to 2025."                                                                                                                                                                                                            ,
+  "Tier"                 , "Power (the SEC, Big Ten, ACC, Big 12, the Pac-12 through 2023, and Notre Dame) or Group of 5 (the other FBS conferences and independents). A school's tier is the one it held in most of its FBS seasons from 2010 to 2025, so Cincinnati, which joined the Big 12 in 2023, is Group of 5."                                        ,
+  "Win %"                , "Wins divided by completed games over all of a school's FBS seasons from 2010 to 2025, bowls and playoffs included. A school that wins six of every ten games has a win % of 60%."                                                                                                                                                    ,
+  "SP+"                  , "A rating of how strong a team was in a season that adjusts each game for the opponent's strength, so a win over a strong team counts for more than a win over a weak one; higher is better. A school's SP+ is the average over its FBS seasons from 2010 to 2025."                                                                   ,
+  "Eligible player"      , "A player whose college career ended at the school and who had a real shot at the NFL: at least three seasons on college rosters, or drafted, or signed with an NFL team undrafted (the same definition as the previous post)."                                                                                                          ,
+  "Draft rate"           , "Drafted players divided by eligible players, counting each player once, for the last school they played for, in final seasons 2013 to 2025."                                                                                                                                                                                           ,
+  "Correlation (r)"      , "How closely two numbers rise and fall together across schools, on a scale where 0 means no relationship and 1 means the schools sit on a perfect rising line. The plausible range is the span the true correlation likely falls in, given how many schools there are (a 95% confidence interval)."                                ,
+  "Expected draftees"    , "For a school with this record in its tier, how many draftees we would expect: a curve fitted to the schools of each tier turns a win % into an expected draft rate, which is multiplied by the school's eligible players. The curve is a logistic regression, chosen because its expected rates stay between 0% and 100%."            ,
+  "Over- or under-producer", "A school with more (over) or fewer (under) draftees than expected for its record."                                                                                                                                                                                                                                    ,
+  "Transfer-in"          , "An eligible player who was on a different school's roster in an earlier season before finishing at the school that gets the credit."
+) |>
+  kable(caption = "Terms used throughout.")
+```
+
+## 3. Results
+
+```{r}
+#| label: s31-compute
+#| include: false
+cor_tier <- function(d, x, y = "draft_rate") {
+  d |>
+    group_by(tier) |>
+    group_modify(\(g, k) {
+      ct <- cor.test(g[[x]], g[[y]])
+      tibble::tibble(
+        schools = nrow(g),
+        r = unname(ct$estimate),
+        lo = ct$conf.int[1],
+        hi = ct$conf.int[2]
+      )
+    }) |>
+    ungroup()
+}
+win_cor <- cor_tier(school, "win_pct")
+wc <- function(t, col) win_cor[[col]][win_cor$tier == t]
+at60 <- curve_at(win_fits, "win_pct", 0.6)
+tier_tot <- school |>
+  group_by(tier) |>
+  summarise(
+    eligible = sum(eligible),
+    drafted = sum(drafted),
+    .groups = "drop"
+  ) |>
+  mutate(draft_rate = drafted / eligible)
+```
+
+### 3.1 Within each tier, schools that win more have higher draft rates, and a Power school winning 60% of its games is expected to see 14.2% of its players drafted against 3.9% in the Group of 5
+
+*Expectation: teams that win more produce more draftees.* ✅
+
+The table gives the correlation of win % with draft rate in each tier,
+`r r2(wc("Power", "r"))` for Power schools and `r r2(wc("Group of 5", "r"))`
+for the Group of 5, both clearly above zero, and the scatter shows that the
+two tiers sit on separate curves, so a Group of 5 school with a Power
+school's record is still expected to send far fewer players to the draft.
+
+```{r}
+#| label: s31-table
+win_cor |>
+  left_join(tier_tot, by = "tier") |>
+  mutate(at60 = at60[as.character(tier)]) |>
+  transmute(
+    Tier = tier,
+    Schools = schools,
+    `Eligible players` = fmt(eligible),
+    Drafted = fmt(drafted),
+    `Draft rate` = pct(draft_rate),
+    `Correlation of win % with draft rate (r)` = r2(r),
+    `Plausible range of r` = paste(r2(lo), "to", r2(hi)),
+    `Expected draft rate at a 60% win %` = pct(at60)
+  ) |>
+  kable(
+    caption = "School win % (FBS seasons 2010 to 2025) against draft rate (final seasons 2013 to 2025), by tier. The expected draft rate comes from each tier's fitted curve."
+  )
+```
+
+```{r}
+#| label: s31-explain
+#| fig-height: 8
+grid <- school |>
+  group_by(tier) |>
+  reframe(win_pct = seq(min(win_pct), max(win_pct), length.out = 100)) |>
+  group_by(tier) |>
+  mutate(
+    fit = predict(
+      win_fits[[as.character(first(tier))]],
+      newdata = pick(everything()),
+      type = "response"
+    )
+  ) |>
+  ungroup()
+p <- ggplot(school, aes(win_pct, draft_rate, color = tier)) +
+  geom_point_interactive(
+    aes(
+      tooltip = paste0(
+        team,
+        " (",
+        tier,
+        "): ",
+        pct(win_pct),
+        " wins, ",
+        pct(draft_rate),
+        " drafted"
+      ),
+      data_id = team
+    ),
+    size = 3.4,
+    alpha = 0.55
+  ) +
+  geom_line(data = grid, aes(y = fit), linewidth = 1.6) +
+  annotate(
+    "segment",
+    x = 0.6,
+    xend = 0.6,
+    y = at60[["Group of 5"]],
+    yend = at60[["Power"]],
+    color = "#111827",
+    linewidth = 1.1,
+    arrow = arrow(ends = "both", length = unit(0.25, "cm"))
+  ) +
+  # labels in the empty upper left, tied to the curve values at 60%
+  annotate(
+    "segment",
+    x = 0.45,
+    xend = 0.595,
+    y = c(0.31, 0.26),
+    yend = c(at60[["Power"]], at60[["Group of 5"]]),
+    color = c(tier_colors[["Power"]], "#b45309"),
+    linewidth = 0.7
+  ) +
+  annotate(
+    "label",
+    x = 0.45,
+    y = c(0.31, 0.26),
+    label = c(
+      paste0("Power school at 60% wins: ", pct(at60[["Power"]]), " expected"),
+      paste0("Group of 5 school at 60% wins: ", pct(at60[["Group of 5"]]), " expected")
+    ),
+    hjust = 1,
+    size = 5,
+    fontface = "bold",
+    color = c(tier_colors[["Power"]], "#b45309"),
+    linewidth = 0
+  ) +
+  scale_color_manual(values = tier_colors, name = NULL) +
+  scale_x_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    x = "Win % (FBS seasons 2010 to 2025)",
+    y = "Draft rate",
+    title = "Draft rate rises with win % in both tiers, on separate curves",
+    subtitle = sprintf(
+      "Each dot is a school; lines are each tier's fitted curve (r = %s Power, %s Group of 5)",
+      r2(wc("Power", "r")),
+      r2(wc("Group of 5", "r"))
+    )
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 8)
+```
+
+```{r}
+#| label: s31-explore
+#| fig-height: 8
+tip <- function(d) {
+  paste0(
+    d$team,
+    " (",
+    d$tier,
+    ")\nRecord 2010 to 2025: ",
+    d$record_label,
+    " (",
+    pct(d$win_pct),
+    "); average SP+ ",
+    fmt(d$sp, 1),
+    "\n",
+    d$drafted,
+    " drafted of ",
+    d$eligible,
+    " eligible (",
+    pct(d$draft_rate),
+    "); ",
+    fmt(d$expected, 1),
+    " expected"
+  )
+}
+school$tip <- tip(school)
+p <- ggplot(school, aes(win_pct, draft_rate)) +
+  geom_line(
+    data = grid,
+    aes(y = fit),
+    color = "#9ca3af",
+    linewidth = 1.2
+  ) +
+  geom_point_interactive(
+    aes(fill = team, tooltip = tip, data_id = team),
+    shape = 21,
+    size = 4.2,
+    color = "white",
+    stroke = 0.6
+  ) +
+  facet_wrap(~tier, scales = "free_y") +
+  scale_fill_team(teams, guide = "none") +
+  scale_x_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    x = "Win % (FBS seasons 2010 to 2025)",
+    y = "Draft rate",
+    title = "Every FBS school's record and draft rate",
+    subtitle = "Team colors; each panel has its own vertical scale; hover a dot for the record, SP+ and counts"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 8)
+```
+
+```{r}
+#| label: s31-pin
+#| include: false
+stopifnot(
+  r2(wc("Power", "r")) == "0.82",
+  r2(wc("Group of 5", "r")) == "0.40",
+  wc("Power", "lo") > 0,
+  wc("Group of 5", "lo") > 0,
+  r2(wc("Group of 5", "lo")) == "0.19",
+  r2(wc("Group of 5", "hi")) == "0.58",
+  pct(at60[["Power"]]) == "14.2%",
+  pct(at60[["Group of 5"]]) == "3.9%",
+  # both fitted curves rise
+  all(vapply(win_fits, \(m) coef(m)[["win_pct"]] > 0, logical(1)))
+)
+```
+
+```{r}
+#| label: s32-compute
+#| include: false
+ranked <- school |>
+  group_by(tier) |>
+  arrange(desc(above), .by_group = TRUE) |>
+  mutate(rank_over = row_number(), rank_under = rev(row_number())) |>
+  ungroup()
+over <- filter(ranked, rank_over <= 5L)
+under <- filter(ranked, rank_under <= 5L)
+od <- function(t, col = "team", which = over) which[[col]][which$tier == t]
+academies <- c("Army", "Navy", "Air Force")
+g5_bottom4 <- ranked |> filter(tier == "Group of 5", rank_under <= 4L)
+named <- c(
+  od("Power")[1:2],
+  rev(od("Power", which = under))[1:2],
+  od("Group of 5")[1],
+  academies
+)
+fl <- filter(school, team == "Florida")
+oks <- filter(school, team == "Oklahoma State")
+lsu <- filter(school, team == "LSU")
+```
+
+### 3.2 Florida and LSU produced 34 and 28 more draftees than their records predict, and Oklahoma State and Kansas State 23 and 22 fewer
+
+The table and bars rank each tier's five furthest over and under their
+expected draftees: LSU, where Burrow finished after starting at Ohio State,
+is second among Power schools, and in the Group of 5 Cincinnati leads while
+the three service academies sit among the four furthest under.
+
+```{r}
+#| label: s32-table
+bind_rows(over, under) |>
+  arrange(tier, desc(above)) |>
+  transmute(
+    Tier = tier,
+    School = team,
+    `Record 2010 to 2025` = record_label,
+    `Win %` = pct(win_pct),
+    `Eligible players` = eligible,
+    Drafted = drafted,
+    Expected = fmt(expected, 1),
+    `Drafted minus expected` = signed(above, 1)
+  ) |>
+  kable(
+    caption = "The five schools in each tier with the most draftees above and below the number expected for their record, final seasons 2013 to 2025."
+  )
+```
+
+```{r}
+#| label: s32-explain
+#| fig-height: 9
+bars <- bind_rows(over, under) |>
+  mutate(
+    key = paste(tier, team, sep = "___"),
+    shade = if_else(team %in% named, team, "Other")
+  )
+p <- ggplot(bars, aes(above, reorder(key, above), fill = shade)) +
+  geom_col_interactive(
+    aes(tooltip = tip, data_id = team),
+    width = 0.75
+  ) +
+  geom_vline(xintercept = 0, color = "#111827", linewidth = 0.8) +
+  geom_text(
+    aes(
+      label = signed(above),
+      hjust = if_else(above >= 0, -0.2, 1.2)
+    ),
+    size = 5,
+    fontface = "bold",
+    color = "#111827"
+  ) +
+  facet_wrap(~tier, scales = "free", ncol = 2) +
+  scale_y_discrete(labels = function(x) sub(".*___", "", x)) +
+  scale_x_continuous(expand = expansion(mult = 0.22)) +
+  scale_fill_manual(
+    values = c(team_colors[intersect(named, names(team_colors))], Other = "#9ca3af"),
+    guide = "none"
+  ) +
+  labs(
+    x = "Drafted minus expected for the record",
+    y = NULL,
+    title = "Florida and LSU lead the Power schools; Cincinnati leads the Group of 5",
+    subtitle = "Five furthest over and under in each tier; the schools named in the text in team colors"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 9)
+```
+
+```{r}
+#| label: s32-explore
+#| fig-height: 8
+p <- ggplot(school, aes(expected, drafted)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "#6b7280") +
+  geom_point_interactive(
+    aes(fill = team, tooltip = tip, data_id = team),
+    shape = 21,
+    size = 4.2,
+    color = "white",
+    stroke = 0.6
+  ) +
+  facet_wrap(~tier, scales = "free") +
+  scale_fill_team(teams, guide = "none") +
+  labs(
+    x = "Expected draftees for the record",
+    y = "Drafted",
+    title = "Every school's draftees against the number its record predicts",
+    subtitle = "Above the dashed line: more draftees than expected; hover a dot for counts"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 8)
+```
+
+```{r}
+#| label: s32-pin
+#| include: false
+stopifnot(
+  identical(od("Power")[1:2], c("Florida", "LSU")),
+  fmt(od("Power", "above")[1:2]) == c("34", "28"),
+  identical(
+    od("Power", which = arrange(under, rank_under))[1:2],
+    c("Oklahoma State", "Kansas State")
+  ),
+  fmt(-od("Power", "above", arrange(under, rank_under))[1:2]) == c("23", "22"),
+  od("Group of 5")[1] == "Cincinnati",
+  all(academies %in% g5_bottom4$team),
+  burrow$last_team == "LSU",
+  burrow$first_team == "Ohio State",
+  nrow(bars) == 20L
+)
+```
+
+```{r}
+#| label: teardown
+#| include: false
+dbDisconnect(con, shutdown = TRUE)
+```
