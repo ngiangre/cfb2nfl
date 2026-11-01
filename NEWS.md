@@ -1,5 +1,13 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- New blog post on which conferences, schools and positions produce
+  draftees and undrafted signings, including a check of fan nicknames
+  such as DBU and Linebacker U
+  ([vignettes/2026-10-31-who-produces-draftees.qmd](https://github.com/ngiangre/cfb2nfl/blob/main/vignettes/2026-10-31-who-produces-draftees.qmd)).
+- New `shrink_rate()`: pulls rates for small groups toward their group's
+  average (beta-binomial empirical Bayes), so a school with few players
+  can't top a ranking on one lucky pick.
+
 - New derived tables `team_season` and `team_draft` in the DuckDB bundle
   ([decision 0033](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0033-team-draft-attribution.md)).
   `team_season` has one row per team per season across every division:
