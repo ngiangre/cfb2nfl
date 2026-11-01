@@ -1,9 +1,12 @@
 ---
 title: "Schools that win more produce more draftees, strongly in the Power conferences and moderately in the Group of 5"
 date: "2026-10-31"
-description: "DRAFT"
+description: "From 2013 to 2025, win percentage tracked draft rate with a correlation of 0.82 among Power schools and 0.40 in the Group of 5, and a Power school winning 60% of its games was expected to see 14.2% of its eligible players drafted against 3.9% at a Group of 5 school."
 followups:
-  - "DRAFT"
+  - "Does recruited talent drive both winning and drafting? Add team recruiting ratings at entry as a common cause."
+  - "Do head coaches carry draft production with them when they change schools?"
+  - "Season by season, does a winning season come before or after a rise in a school's draft class?"
+  - "Do draftees from programs that produce above expectation also last longer in the NFL?"
 author:
   - "AI directed by Nick Giangreco"
 freeze: auto
@@ -369,7 +372,7 @@ win_cor |>
     `Expected draft rate at a 60% win %` = pct(at60)
   ) |>
   kable(
-    caption = "School win % (FBS seasons 2010 to 2025) against draft rate (final seasons 2013 to 2025), by tier. The expected draft rate comes from each tier's fitted curve."
+    caption = "School win % (FBS seasons 2010 to 2025) against draft rate (final seasons 2013 to 2025), by tier. Players are counted in their school's tier, the one it held in most seasons. The expected draft rate comes from each tier's fitted curve."
   )
 ```
 
@@ -1056,7 +1059,7 @@ cast_tin <- setNames(
 )
 ```
 
-### 3.5 Leaving out transfers barely changes the link, though transfers made up nearly half of the 2026 Power draft class
+### 3.5 Leaving out transfer-ins barely changes the link, though transfer-ins made up nearly half of the Power draftees in the class of 2026
 
 Recomputing each school's draft rate without its transfer-ins (Burrow, Cam
 Ward and Jordan Travis among them; Josh Allen, on Wyoming rosters only, is
@@ -1202,6 +1205,107 @@ stopifnot(
   # the figure title: totals rise every class from 2021, Power the larger part
   all(diff(class_tot$transfer_ins[class_tot$draft_class >= 2021L]) > 0),
   all(class_wide$Power > class_wide$g5)
+)
+```
+
+## 4. Summary
+
+Schools that win more produce more draftees within each tier, closely among
+Power schools and loosely in the Group of 5, and the link holds with SP+ in
+place of win %, across two separate five-year windows, and without
+transfer-ins.
+
+```{r}
+#| label: summary
+tibble::tribble(
+  ~`Expectation or check`, ~Verdict, ~Evidence,
+  "Teams that win more produce more draftees", "✅", sprintf("Correlation of win %% with draft rate %s for Power schools (plausible range %s to %s) and %s for the Group of 5 (%s to %s); at 60%% wins, %s of eligible players expected drafted at a Power school against %s in the Group of 5.", r2(wc("Power", "r")), r2(wc("Power", "lo")), r2(wc("Power", "hi")), r2(wc("Group of 5", "r")), r2(wc("Group of 5", "lo")), r2(wc("Group of 5", "hi")), pct(at60[["Power"]]), pct(at60[["Group of 5"]])),
+  "Check: SP+ in place of win %", "Holds, more closely", sprintf("Correlation %s for Power schools and %s for the Group of 5.", r2(sc("Power")), r2(sc("Group of 5"))),
+  "Check: earlier and later windows (Power schools)", "Holds", sprintf("Draft rate 2013 to 2017 with 2019 to 2023: %s; early win %% with later draft rate and early draft rate with later win %%: %s each.", r2(wr[1]), r2(wr[3])),
+  "Check: without transfer-ins", "Holds", sprintf("Correlation %s for Power schools and %s for the Group of 5.", r2(hc("Power")), r2(hc("Group of 5")))
+) |>
+  kable(caption = "The expectation, the checks on it, and the numbers behind them.")
+```
+
+## 5. Discussion
+
+```{r}
+#| label: discussion-compute
+#| include: false
+# schools scatter around the fitted curves more than binomial chance
+# allows (Pearson dispersion above 1), so expected counts are benchmarks
+dispersion <- vapply(
+  win_fits,
+  \(m) sum(residuals(m, type = "pearson")^2) / df.residual(m),
+  numeric(1)
+)
+stopifnot(
+  all(dispersion > 2),
+  pct(oks$win_pct, 0) == "65%",
+  oks$drafted == 25L,
+  oks$eligible == 282L,
+  pct(fl$win_pct, 0) == "58%",
+  fl$drafted == 72L,
+  fl$eligible == 287L,
+  oks$win_pct > fl$win_pct
+)
+```
+
+::: {.callout-important}
+Winning and drafting rise together, but this data cannot say which drives
+which.
+
+- Early winning tracks later drafting exactly as closely as early drafting
+  tracks later winning (`r r2(wr[3])` each, Power schools).
+- Recruited talent likely drives both, since the players a school signs
+  shape both its record and its draft class; testing that needs recruiting
+  ratings at entry.
+:::
+
+::: {.callout-important}
+A record leaves large differences between programs.
+
+- Oklahoma State won `r pct(oks$win_pct, 0)` of its games and had
+  `r oks$drafted` of `r oks$eligible` eligible players drafted; Florida won
+  `r pct(fl$win_pct, 0)` and had `r fl$drafted` of `r fl$eligible`.
+- The three service academies, whose graduates owe military service, are
+  among the four Group of 5 schools furthest below expectation.
+:::
+
+::: {.callout-important}
+In the Group of 5, a rating that adjusts for opponents tracks draft rate better than the record does.
+
+- SP+, which adjusts for opponents, raises the Group of 5 correlation from
+  `r r2(wc("Group of 5", "r"))` to `r r2(sc("Group of 5"))`, consistent
+  with Group of 5 records being earned against schedules of uneven
+  strength.
+:::
+
+Each school is summarized over many seasons, so changes within the period,
+such as a new coach, are averaged away, and a school's tier is the one it
+held most often, so Cincinnati, Houston, UCF and BYU count as Group of 5
+despite their Big 12 seasons. Schools scatter around the fitted curves
+more than chance alone would produce, so expected draftees are a benchmark
+rather than a forecast. Eligibility is a roster-based stand-in for a real
+shot at the NFL, and a transfer-in is detected only through rosters, which
+start in 2010 and cover more schools from 2022.
+
+```{r}
+#| label: discussion-pin
+#| include: false
+big12_g5 <- team_season |>
+  filter(
+    team %in% c("Cincinnati", "Houston", "UCF", "BYU"),
+    conference == "Big 12"
+  ) |>
+  distinct(team)
+cincy_big12 <- min(team_season$season[
+  team_season$team == "Cincinnati" & team_season$conference == "Big 12"
+])
+stopifnot(
+  cincy_big12 == 2023L,
+  nrow(big12_g5) == 4L,
+  all(school$tier[school$team %in% big12_g5$team] == "Group of 5")
 )
 ```
 
