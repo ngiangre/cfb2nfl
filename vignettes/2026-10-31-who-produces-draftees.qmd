@@ -126,11 +126,9 @@ conf_now <- team_season |>
   ungroup() |>
   transmute(
     team,
-    conf_now = if_else(
-      team == "Notre Dame",
-      "Notre Dame",
-      if_else(conference == "FBS Independents", "Other FBS independents", conference)
-    ),
+    # the 2025 independents (Notre Dame, UConn) form one group
+    conf_now = if_else(conference == "FBS Independents", "FBS independents", conference),
+    conf_now_tier = tier_label,
     conf_now_season = season
   )
 fbs_schools <- distinct(fbs_cr, team) |> left_join(conf_now, by = "team")
@@ -193,7 +191,8 @@ who finishes his career at a conference, school, or position gets drafted,
 crediting each draftee to his last school (Joe Burrow to LSU, not Ohio
 State; Cam Ward to Miami, not Washington State; Josh Allen to Wyoming).
 Along the way it checks the nicknames fans give schools: is LSU still DBU,
-Penn State still Linebacker U, USC still Tailback U, and BYU still QBU?
+Penn State still Linebacker U, USC still Tailback U, BYU still QBU, and
+Iowa still Tight End U?
 
 ## 2. Data
 
@@ -666,6 +665,619 @@ stopifnot(
   all(tail(conf_rates$tier, n_g5_rows) == "Group of 5"),
   max(school_rates$udfa_rate) < 0.17,
   max(school_rates$draft_rate) < 0.42
+)
+```
+
+```{r}
+#| label: s33-compute
+#| include: false
+pos_levels <- position_group_levels()
+fbs_pos <- fbs_cr |>
+  filter(position_group != "Position not recorded") |>
+  mutate(position_group = factor(position_group, levels = pos_levels))
+n_not_recorded <- sum(
+  fbs_cr$n_eligible[fbs_cr$position_group == "Position not recorded"]
+)
+pos_tier <- rates(group_by(fbs_pos, position_group, tier_label)) |>
+  select(position_group, tier_label, eligible, drafted, draft_rate) |>
+  tidyr::pivot_wider(
+    names_from = tier_label,
+    values_from = c(eligible, drafted, draft_rate)
+  ) |>
+  mutate(ratio = draft_rate_Power / `draft_rate_Group of 5`)
+# Notre Dame, a conference of one, is left to the school rankings
+conf_pos <- rates(
+  group_by(filter(fbs_pos, league != "Notre Dame"), league, position_group)
+) |>
+  group_by(position_group) |>
+  mutate(leader = draft_rate == max(draft_rate)) |>
+  ungroup()
+pos_leaders <- filter(conf_pos, leader)
+pos_tier <- left_join(
+  pos_tier,
+  select(pos_leaders, position_group, top = league, top_rate = draft_rate),
+  by = "position_group"
+)
+n_sec_leads <- sum(pos_leaders$league == "SEC")
+non_sec <- filter(pos_leaders, league != "SEC")
+```
+
+### 3.3 At every position Power players were drafted at four to six times the Group of 5 rate, and the SEC led eight of nine positions
+
+The table compares Power and Group of 5 draft rates position by position,
+the heatmap outlines each position's top conference, and the season panels
+follow both tiers at every position. Notre Dame, a conference of one, is
+left to the school rankings, and the `r fmt(n_not_recorded)` FBS eligible
+players with no recorded position are left out from here on.
+
+```{r}
+#| label: s33-table
+pos_tier |>
+  transmute(
+    `Position group` = position_group,
+    `Power eligible` = fmt(eligible_Power),
+    `Power draft rate` = pct(draft_rate_Power),
+    `Group of 5 eligible` = fmt(`eligible_Group of 5`),
+    `Group of 5 draft rate` = pct(`draft_rate_Group of 5`),
+    `Power rate ÷ Group of 5 rate` = sprintf("%.1f", ratio),
+    `Top conference` = paste0(top, " (", pct(top_rate), ")")
+  ) |>
+  kable(
+    caption = "Draft rates by position group and tier, final seasons 2013 to 2025, with the conference whose players at that position were drafted at the highest rate."
+  )
+```
+
+```{r}
+#| label: s33-explain
+#| fig-height: 8
+league_levels <- conf_rates |>
+  filter(league != "Notre Dame") |>
+  arrange(draft_rate) |>
+  pull(league)
+heat <- conf_pos |>
+  mutate(league = factor(league, levels = league_levels))
+p <- ggplot(heat, aes(position_group, league, fill = draft_rate)) +
+  geom_tile_interactive(
+    aes(
+      tooltip = paste0(
+        league,
+        ", ",
+        tolower(position_group),
+        ": ",
+        drafted,
+        " drafted of ",
+        fmt(eligible),
+        " eligible (",
+        pct(draft_rate),
+        ")"
+      ),
+      data_id = paste(league, position_group)
+    ),
+    color = "white",
+    linewidth = 1
+  ) +
+  geom_tile(
+    data = filter(heat, leader),
+    fill = NA,
+    color = "#111827",
+    linewidth = 1.6
+  ) +
+  geom_text(
+    aes(
+      label = pct(draft_rate, 0),
+      color = draft_rate > 0.12
+    ),
+    size = 4.6,
+    fontface = "bold"
+  ) +
+  scale_fill_gradient(
+    low = "#f8fafc",
+    high = tier_colors[["Power"]],
+    labels = scales::percent,
+    name = "Draft rate"
+  ) +
+  scale_color_manual(values = c(`TRUE` = "white", `FALSE` = "#111827"), guide = "none") +
+  scale_x_discrete(labels = function(x) sub(" ", "\n", x), position = "top") +
+  labs(
+    x = NULL,
+    y = NULL,
+    title = "The SEC tops eight of nine positions; the Big Ten tops tight end",
+    subtitle = "Outlined: the top conference at each position; conferences ordered by overall draft rate"
+  ) +
+  theme_cfb2nfl(base_size = 14) +
+  theme(legend.position = "right", panel.grid = element_blank())
+girafe(ggobj = p, width_svg = 13, height_svg = 8)
+```
+
+```{r}
+#| label: s33-explore
+#| fig-height: 10
+pos_season <- rates(group_by(fbs_pos, position_group, tier_label, season))
+p <- ggplot(
+  pos_season,
+  aes(season, draft_rate, color = tier_label, group = tier_label)
+) +
+  geom_line(linewidth = 1) +
+  geom_point_interactive(
+    aes(
+      tooltip = paste0(
+        position_group,
+        ", ",
+        tier_label,
+        ", ",
+        season,
+        ": ",
+        drafted,
+        " drafted of ",
+        eligible,
+        " eligible (",
+        pct(draft_rate),
+        ")"
+      ),
+      data_id = paste(position_group, tier_label, season)
+    ),
+    size = 2.2
+  ) +
+  facet_wrap(~position_group, ncol = 3) +
+  scale_color_manual(values = tier_colors, name = NULL) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_continuous(breaks = c(2013, 2019, 2025)) +
+  labs(
+    x = "Final college season",
+    y = "Draft rate",
+    title = "Draft rate by position, tier, and season",
+    subtitle = "Hover a point for counts"
+  ) +
+  theme_cfb2nfl(base_size = 14)
+girafe(ggobj = p, width_svg = 13, height_svg = 10)
+```
+
+```{r}
+#| label: s33-pin
+#| include: false
+stopifnot(
+  n_not_recorded == 466L,
+  nrow(pos_tier) == 9L,
+  floor(min(pos_tier$ratio)) == 4,
+  round(max(pos_tier$ratio)) == 6,
+  min(pos_tier$ratio) > 4,
+  max(pos_tier$ratio) < 6.5,
+  n_sec_leads == 8L,
+  nrow(pos_leaders) == 9L,
+  non_sec$league == "Big Ten",
+  non_sec$position_group == "Tight end"
+)
+```
+
+```{r}
+#| label: s34-compute
+#| include: false
+pos_rate <- rates(group_by(fbs_pos, position_group)) |>
+  select(position_group, pos_rate = draft_rate)
+school_pos <- rates(group_by(fbs_pos, team, position_group)) |>
+  left_join(pos_rate, by = "position_group") |>
+  mutate(expected = eligible * pos_rate, above = drafted - expected)
+school <- school_pos |>
+  group_by(team) |>
+  summarise(
+    eligible = sum(eligible),
+    drafted = sum(drafted),
+    expected = sum(expected),
+    .groups = "drop"
+  ) |>
+  mutate(above = drafted - expected, draft_rate = drafted / eligible) |>
+  left_join(fbs_schools, by = "team") |>
+  mutate(adjusted = shrink_rate(drafted, eligible, group = conf_now)) |>
+  arrange(desc(above))
+conf_avg <- school |>
+  group_by(conf_now) |>
+  summarise(
+    avg = sum(drafted) / sum(eligible),
+    schools = n(),
+    .groups = "drop"
+  ) |>
+  arrange(avg)
+# Oregon State and Washington State, the 2025 Pac-12, tie on the adjusted
+# rate (the pair is too small to estimate a spread); the raw rate breaks it
+conf_leader <- school |>
+  arrange(desc(adjusted), desc(draft_rate)) |>
+  group_by(conf_now) |>
+  slice_head(n = 1) |>
+  ungroup()
+sch <- function(t) filter(school, team == t)
+bama <- sch("Alabama")
+g5_now <- filter(school, conf_now_tier == "Group of 5")
+g5_best <- slice_max(g5_now, above, n = 1)
+smallest <- slice_min(school, eligible, n = 1)
+n_above <- sum(school$above > 0)
+```
+
+### 3.4 Alabama produced 92 more draftees than its position mix predicts, and no school now in the Group of 5 beat its prediction
+
+The table ranks the 15 schools furthest above their expected draftees, the
+dots set every school's adjusted rate against its 2025 conference's
+average, and the scatter shows how far the adjustment moved each school;
+`r n_above` of `r nrow(school)` FBS schools beat their prediction, all of
+them in a 2025 Power conference or Notre Dame, and the closest Group of 5
+school was `r g5_best$team` (`r g5_best$drafted` drafted,
+`r fmt(g5_best$expected, 1)` expected). A school with few eligible players
+can post a high or low rate by luck, so each school's rate is pulled toward
+its 2025 conference's average, more strongly the fewer players it has (a
+method called empirical Bayes shrinkage): `r smallest$team`, with
+`r smallest$eligible` eligible players and `r smallest$drafted` drafted,
+moves from `r pct(smallest$draft_rate)` to `r pct(smallest$adjusted)`.
+
+```{r}
+#| label: s34-table
+school |>
+  slice_head(n = 15) |>
+  transmute(
+    School = team,
+    `2025 conference` = conf_now,
+    `Eligible players` = eligible,
+    Drafted = drafted,
+    `Expected draftees` = fmt(expected, 1),
+    `Above expected` = fmt(above, 1),
+    `Draft rate` = pct(draft_rate),
+    `Adjusted rate` = pct(adjusted)
+  ) |>
+  kable(
+    caption = "The 15 FBS schools with the most draftees above expected, final seasons 2013 to 2025. Expected draftees apply the FBS draft rate for each position group to the school's eligible players at that position. The adjusted rate pulls each school toward its 2025 conference's average."
+  )
+```
+
+```{r}
+#| label: s34-explain
+#| fig-height: 8
+dots <- school |>
+  mutate(
+    conf_now = factor(conf_now, levels = conf_avg$conf_now),
+    is_leader = team %in% conf_leader$team
+  )
+lead_dots <- filter(dots, is_leader)
+p <- ggplot(dots, aes(adjusted, conf_now)) +
+  geom_point(
+    data = mutate(conf_avg, conf_now = factor(conf_now, levels = conf_avg$conf_now)),
+    aes(avg, conf_now),
+    shape = 124,
+    size = 12,
+    color = "#111827"
+  ) +
+  geom_point_interactive(
+    data = filter(dots, !is_leader),
+    aes(
+      tooltip = paste0(
+        team,
+        " (",
+        conf_now,
+        "): adjusted rate ",
+        pct(adjusted),
+        "; ",
+        drafted,
+        " drafted of ",
+        eligible,
+        " eligible"
+      ),
+      data_id = team
+    ),
+    size = 3.6,
+    color = "#9ca3af",
+    alpha = 0.8
+  ) +
+  geom_point_interactive(
+    data = lead_dots,
+    aes(
+      fill = team,
+      tooltip = paste0(
+        team,
+        " leads the ",
+        conf_now,
+        ": adjusted rate ",
+        pct(adjusted),
+        "; ",
+        drafted,
+        " drafted of ",
+        eligible,
+        " eligible"
+      ),
+      data_id = team
+    ),
+    shape = 21,
+    size = 6,
+    color = "#111827",
+    stroke = 1
+  ) +
+  geom_text(
+    data = lead_dots,
+    aes(label = team, color = team),
+    hjust = 0,
+    nudge_x = 0.008,
+    size = 4.8,
+    fontface = "bold"
+  ) +
+  scale_fill_manual(values = team_colors, guide = "none") +
+  scale_color_manual(values = team_colors, guide = "none") +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 0.47)) +
+  labs(
+    x = "Adjusted draft rate",
+    y = "2025 conference",
+    title = "Each conference's leader, against the conference average",
+    subtitle = "Black tick: conference average; colored dot: the school with the highest adjusted rate; grey: every other school"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 8)
+```
+
+```{r}
+#| label: s34-explore
+#| fig-height: 9
+p <- ggplot(school, aes(draft_rate, adjusted)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "#6b7280") +
+  geom_point_interactive(
+    aes(
+      fill = team,
+      size = eligible,
+      tooltip = paste0(
+        team,
+        " (2025: ",
+        conf_now,
+        ")\n",
+        drafted,
+        " drafted of ",
+        eligible,
+        " eligible; ",
+        fmt(expected, 1),
+        " expected\nDraft rate ",
+        pct(draft_rate),
+        ", adjusted ",
+        pct(adjusted)
+      ),
+      data_id = team
+    ),
+    shape = 21,
+    color = "white",
+    alpha = 0.9
+  ) +
+  annotate(
+    "text",
+    x = 0.005,
+    y = 0.38,
+    label = "On the dashed line: unchanged by the adjustment",
+    hjust = 0,
+    size = 4.6,
+    color = "#374151"
+  ) +
+  scale_fill_manual(values = team_colors, na.value = "#6b7280", guide = "none") +
+  scale_size_area(max_size = 7, guide = "none") +
+  scale_x_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    x = "Draft rate",
+    y = "Adjusted draft rate",
+    title = "How far the adjustment moved every FBS school",
+    subtitle = "Team colors; dot size is eligible players; hover a dot for counts"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 9)
+```
+
+```{r}
+#| label: s34-pin
+#| include: false
+stopifnot(
+  nrow(school) == 137L,
+  school$team[1] == "Alabama",
+  bama$drafted == 116L,
+  bama$eligible == 285L,
+  fmt(bama$above) == "92",
+  identical(
+    sort(school$team[school$conf_now == "FBS independents"]),
+    c("Notre Dame", "UConn")
+  ),
+  all(g5_now$above < 0),
+  all(school$conf_now_tier[school$above > 0] == "Power"),
+  n_above == 46L,
+  g5_best$team == "Boise State",
+  g5_best$drafted == 21L,
+  fmt(g5_best$expected, 1) == "21.4",
+  nrow(smallest) == 1L,
+  smallest$team == "Idaho",
+  smallest$eligible == 16L,
+  smallest$drafted == 0L,
+  pct(smallest$draft_rate) == "0.0%",
+  pct(smallest$adjusted) == "1.9%",
+  max(school$adjusted) < 0.47,
+  nrow(conf_leader) == 11L,
+  conf_leader$team[conf_leader$conf_now == "Pac-12"] == "Oregon State"
+)
+```
+
+```{r}
+#| label: s35-compute
+#| include: false
+school_pos <- school_pos |>
+  left_join(select(fbs_schools, team, conf_now), by = "team") |>
+  mutate(adjusted = shrink_rate(drafted, eligible, group = position_group)) |>
+  group_by(position_group) |>
+  mutate(rank = rank(-above, ties.method = "min")) |>
+  ungroup()
+pos_top <- school_pos |>
+  filter(rank == 1L) |>
+  arrange(position_group)
+n_bama_leads <- sum(pos_top$team == "Alabama")
+nicknames <- tibble::tribble(
+  ~nickname      , ~position_group   , ~claimant    ,
+  "DBU"          , "Defensive back"  , "LSU"        ,
+  "Linebacker U" , "Linebacker"      , "Penn State" ,
+  "WRU"          , "Receiver"        , "LSU"        ,
+  "Tailback U"   , "Running back"    , "USC"        ,
+  "QBU"          , "Quarterback"     , "BYU"        ,
+  "Tight End U"  , "Tight end"       , "Iowa"
+) |>
+  mutate(position_group = factor(position_group, levels = pos_levels)) |>
+  left_join(
+    select(school_pos, claimant = team, position_group, eligible, drafted, above, rank),
+    by = c("claimant", "position_group")
+  ) |>
+  left_join(
+    select(pos_top, position_group, leader = team, leader_drafted = drafted, leader_above = above),
+    by = "position_group"
+  ) |>
+  mutate(holds = claimant == leader)
+n_hold <- sum(nicknames$holds)
+nk <- function(n, col) nicknames[[col]][nicknames$nickname == n]
+```
+
+### 3.5 Alabama leads four positions, and of six fan nicknames only LSU's WRU matches the data's leader
+
+Ranking schools by draftees above expected at each position, the table
+answers the nickname questions: LSU leads receivers but ranks
+`r nk("DBU", "rank")`th at defensive back, where Alabama leads; Penn State ranks
+`r nk("Linebacker U", "rank")`nd at linebacker, USC
+`r nk("Tailback U", "rank")`nd at running back, BYU
+`r nk("QBU", "rank")`th at quarterback, and Iowa `r nk("Tight End U", "rank")`th
+at tight end behind Notre Dame. The bars show each position's top five,
+with the nickname school added where it falls outside them, and the
+heatmap shows every school at every position.
+
+```{r}
+#| label: s35-table
+nicknames |>
+  transmute(
+    Nickname = nickname,
+    Position = position_group,
+    `School that claims it` = claimant,
+    `Its draftees (eligible)` = paste0(drafted, " (", eligible, ")"),
+    `Its above expected` = fmt(above, 1),
+    `Its rank of 137` = rank,
+    `Data leader` = leader,
+    `Leader's draftees` = leader_drafted,
+    `Leader's above expected` = fmt(leader_above, 1)
+  ) |>
+  kable(
+    caption = "Fan nicknames for position schools against the data, final seasons 2013 to 2025. Schools are ranked at each position by draftees above expected (drafted minus the FBS rate for the position times the school's eligible players there)."
+  )
+```
+
+```{r}
+#| label: s35-explain
+#| fig-height: 11
+bars <- school_pos |>
+  left_join(
+    select(nicknames, position_group, claimant, nickname),
+    by = "position_group"
+  ) |>
+  filter(rank <= 5L | (!is.na(claimant) & team == claimant)) |>
+  mutate(
+    is_claim = !is.na(claimant) & team == claimant,
+    label = if_else(rank > 5L, paste0(team, " (#", rank, ")"), team),
+    key = paste(position_group, label, sep = "___")
+  )
+p <- ggplot(
+  bars,
+  aes(above, reorder(key, above), fill = if_else(is_claim, team, "Other"))
+) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(
+        team,
+        ", ",
+        tolower(position_group),
+        ": ",
+        drafted,
+        " drafted of ",
+        eligible,
+        " eligible, ",
+        fmt(above, 1),
+        " above expected (rank ",
+        rank,
+        ")",
+        if_else(is_claim, paste0("\nClaims the nickname ", nickname), "")
+      ),
+      data_id = paste(team, position_group)
+    ),
+    width = 0.75
+  ) +
+  facet_wrap(~position_group, scales = "free_y", ncol = 3) +
+  scale_y_discrete(labels = function(x) sub(".*___", "", x)) +
+  scale_fill_manual(
+    values = c(team_colors, Other = "#9ca3af"),
+    guide = "none"
+  ) +
+  labs(
+    x = "Draftees above expected",
+    y = NULL,
+    title = "The top five schools at each position, by draftees above expected",
+    subtitle = "Ties included; in team colors, the school that claims the position's nickname (its rank in brackets when outside the top five)"
+  ) +
+  theme_cfb2nfl(base_size = 13)
+girafe(ggobj = p, width_svg = 13, height_svg = 11)
+```
+
+```{r}
+#| label: s35-explore
+#| fig-height: 26
+grid_df <- school_pos |>
+  mutate(team = factor(team, levels = rev(school$team)))
+lim <- max(abs(grid_df$above))
+p <- ggplot(grid_df, aes(position_group, team, fill = above)) +
+  geom_tile_interactive(
+    aes(
+      tooltip = paste0(
+        team,
+        ", ",
+        tolower(position_group),
+        "\n",
+        drafted,
+        " drafted of ",
+        eligible,
+        " eligible; ",
+        fmt(expected, 1),
+        " expected\n",
+        fmt(above, 1),
+        " above expected (rank ",
+        rank,
+        " of 137)"
+      ),
+      data_id = paste(team, position_group)
+    ),
+    color = "white"
+  ) +
+  scale_fill_gradient2(
+    low = "#b45309",
+    mid = "#f8fafc",
+    high = tier_colors[["Power"]],
+    midpoint = 0,
+    limits = c(-lim, lim),
+    name = "Above\nexpected"
+  ) +
+  scale_x_discrete(labels = function(x) sub(" ", "\n", x), position = "top") +
+  labs(
+    x = NULL,
+    y = NULL,
+    title = "Every FBS school at every position",
+    subtitle = "Draftees above (blue) or below (orange) expected; schools ordered by total above expected; hover a tile for counts"
+  ) +
+  theme_cfb2nfl(base_size = 10) +
+  theme(panel.grid = element_blank(), legend.position = "right")
+girafe(ggobj = p, width_svg = 13, height_svg = 26)
+```
+
+```{r}
+#| label: s35-pin
+#| include: false
+stopifnot(
+  nrow(pos_top) == 9L,
+  n_bama_leads == 4L,
+  identical(
+    sort(as.character(pos_top$position_group[pos_top$team == "Alabama"])),
+    c("Defensive back", "Linebacker", "Quarterback", "Running back")
+  ),
+  n_hold == 1L,
+  nicknames$nickname[nicknames$holds] == "WRU",
+  nk("DBU", "leader") == "Alabama",
+  nk("Tight End U", "leader") == "Notre Dame",
+  identical(nicknames$rank, c(5L, 22L, 1L, 22L, 36L, 5L))
 )
 ```
 
