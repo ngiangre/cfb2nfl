@@ -116,6 +116,9 @@ n_college_rec <- sum(pp$college_groups > 0)
 n_drafted <- sum(pp$drafted)
 n_nfl_linked <- sum(pp$nfl_linked)
 n_nfl_rec <- sum(!is.na(pp$nfl_group))
+# The roster lists one position per athlete; the caveat relies on it.
+n_multi_season <- sum(pp$college_seasons > 1L)
+stopifnot(sum(pp$college_changed) == 0L)
 stopifnot(
   n_universe == 134867L,
   n_hs_linked == 36577L,
@@ -142,8 +145,6 @@ one.
   their position group in college.*
 + *Expectation two: nearly every drafted player kept his college position group
   in the NFL.*
-+ *Expectation three: some players change position group between college
-  seasons.*
 
 ## 2. Data
 
@@ -511,70 +512,10 @@ quarterback at Ohio State, and was drafted as a receiver. Joe Burrow and Cam
 Ward played quarterback in college and were drafted as quarterbacks, Burrow
 first overall in 2020 and Ward first overall in 2025.
 
-### 3.3 No player changed position group between college seasons
-
-*Expectation: some players changed group between college seasons.* ❌
-
-The third comparison counts players by the number of distinct college groups on
-their roster records. The table and the figure both show the same result: every
-athlete with a recorded college position has exactly one group. The roster
-source records a single position per athlete, so this measures the source, not
-the players.
-
-```{r}
-#| label: s33-prep
-college <- pp |> filter(college_groups > 0)
-changes <- tibble::tibble(
-  `Distinct college groups` = c("One group", "Two or more groups"),
-  Players = c(sum(college$college_groups == 1L), sum(college$college_groups >= 2L))
-)
-stopifnot(
-  sum(changes$Players) == nrow(college),
-  changes$Players[2] == 0L,
-  sum(pp$college_changed) == 0L
-)
-```
-
-```{r}
-#| label: s33-table
-changes |>
-  mutate(Players_label = fmt(Players), Share = pct(Players / sum(Players))) |>
-  select(`Distinct college groups`, Players = Players_label, Share) |>
-  kable(
-    align = "lrr",
-    caption = paste0(
-      "College athletes with a recorded position, by the number of distinct ",
-      "position groups across their seasons."
-    )
-  )
-```
-
-```{r}
-#| label: s33-explain
-#| fig-height: 5
-p <- ggplot(changes, aes(x = Players, y = `Distinct college groups`)) +
-  geom_col_interactive(
-    aes(
-      tooltip = sprintf("%s: %s players", `Distinct college groups`, fmt(Players)),
-      data_id = `Distinct college groups`,
-      fill = `Distinct college groups`
-    ),
-    width = 0.6
-  ) +
-  scale_fill_manual(
-    values = c("One group" = "#1d4ed8", "Two or more groups" = "#9ca3af"),
-    guide = "none"
-  ) +
-  scale_x_continuous(labels = scales::comma) +
-  labs(x = "College athletes", y = NULL) +
-  theme_cfb2nfl()
-girafe(ggobj = p, width_svg = 13, height_svg = 5)
-```
-
 ## 4. Summary
 
 Most recruits keep their group, and nearly all draftees keep their college group
-into the NFL, while the roster data cannot show a change within college.
+into the NFL.
 
 ```{r}
 #| label: summary
@@ -582,7 +523,6 @@ tibble::tribble(
   ~Expectation                                                       , ~Verdict , ~Evidence                                                                 ,
   "Most linked recruits kept their group through college"            , "✅"      , paste0(pct(hs_overall), " of ", fmt(nrow(hs)), " recruits")         ,
   "Nearly every drafted player kept his college group in the NFL"    , "✅"      , paste0(pct(nfl_overall), " of ", fmt(nrow(dr)), " draftees")         ,
-  "Some players change group between college seasons"                , "❌"      , "0 of the college athletes with a recorded position"
 ) |>
   kable(
     align = "lcl",
@@ -609,8 +549,9 @@ of his class. Checked against the matching names, that school and class year
 rule joins two different people in an estimated 0.6% of links. The NFL comparison covers only
 draftees linked by draft slot, and the undrafted players in the NFL data have no
 bridge to a college id, so they are not in it. The college roster records one
-position per athlete, so changes between seasons cannot be observed in this
-source. Recent classes are right-censored, and the recruit positions are the
+position per athlete (none of the `r fmt(n_multi_season)` players with more
+than one recorded season changes group), so position changes within college
+cannot be observed in this source. Recent classes are right-censored, and the recruit positions are the
 recruiting service's listings, not the player's own account.
 
 ```{r}
