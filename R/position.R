@@ -102,15 +102,24 @@ position_code_map <- function() {
     "Kick Returner"
   )
   c(
-    setNames(rep("Quarterback", length(quarterback)), quarterback),
-    setNames(rep("Running back", length(running_back)), running_back),
-    setNames(rep("Receiver", length(receiver)), receiver),
-    setNames(rep("Tight end", length(tight_end)), tight_end),
-    setNames(rep("Offensive line", length(offensive_line)), offensive_line),
-    setNames(rep("Defensive line", length(defensive_line)), defensive_line),
-    setNames(rep("Linebacker", length(linebacker)), linebacker),
-    setNames(rep("Defensive back", length(defensive_back)), defensive_back),
-    setNames(rep("Special teams", length(special_teams)), special_teams),
+    stats::setNames(rep("Quarterback", length(quarterback)), quarterback),
+    stats::setNames(rep("Running back", length(running_back)), running_back),
+    stats::setNames(rep("Receiver", length(receiver)), receiver),
+    stats::setNames(rep("Tight end", length(tight_end)), tight_end),
+    stats::setNames(
+      rep("Offensive line", length(offensive_line)),
+      offensive_line
+    ),
+    stats::setNames(
+      rep("Defensive line", length(defensive_line)),
+      defensive_line
+    ),
+    stats::setNames(rep("Linebacker", length(linebacker)), linebacker),
+    stats::setNames(
+      rep("Defensive back", length(defensive_back)),
+      defensive_back
+    ),
+    stats::setNames(rep("Special teams", length(special_teams)), special_teams),
     ATH = "Athlete",
     `?` = "Position not recorded"
   )

@@ -66,5 +66,12 @@ utils::globalVariables(c(
   "n_eligible",
   "n_exits",
   "n_round1",
-  "win_pct"
+  "win_pct",
+  # pointblank expr targets in contract_position_path
+  "hs_linked",
+  "hs_group",
+  "nfl_linked",
+  "nfl_group",
+  "college_groups",
+  "college_changed"
 ))
