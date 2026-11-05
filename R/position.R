@@ -165,11 +165,12 @@ unmapped_positions <- function(position, source) {
 #'
 #' One row per college athlete id (decision 0021 recipe), chaining the three
 #' harmonized positions:
-#' - **HS** is taken only through [link_recruiting()] (name-guarded, decision
-#'   0013); a recruit whose name does not agree with the college name gets no
-#'   HS group. The college name is the stat-line name where one exists, else
-#'   the draft-listed name; players with neither cannot be guarded and stay
-#'   unlinked.
+#' - **HS** is taken from the id-joined recruit only when a guard passes
+#'   ([recruit_link_method()], decisions 0013 and 0036): exact name agreement,
+#'   or a name variant plus a school + class year match, or (when no college
+#'   name is on file) the school + class year match alone. The college name is
+#'   the stat-line name where one exists, else the draft-listed name.
+#'   `hs_link_method` records which guard passed.
 #' - **College** groups come from the roster position in each season, ignoring
 #'   blanks. The first, last, and modal (most seasons, then most recent) groups
 #'   are kept, plus a flag for any in-college change of group.
@@ -179,7 +180,7 @@ unmapped_positions <- function(position, source) {
 #'
 #' Reused athlete ids are excluded from the universe (decision 0022).
 #'
-#' @param roster Cleaned roster (`playerId`, `season`, `position`).
+#' @param roster Cleaned roster (`playerId`, `season`, `team`, `position`).
 #' @param recruiting Cleaned recruiting table (one row per `playerId`).
 #' @param player_season Player-season backbone; supplies the college name.
 #' @param picks_nfl Output of [link_nfl_draft()] (`playerId`, `gsis_id`,
@@ -210,27 +211,47 @@ build_position_path <- function(
     dplyr::filter(!is.na(.data$player)) |>
     dplyr::distinct(.data$playerId, .keep_all = TRUE)
 
-  # HS: the guarded link decides which recruit row is trusted; the position
-  # is read from that same recruit only when the guard passes.
-  hs_pos <- recruiting |>
-    dplyr::transmute(
-      playerId = .data$playerId,
-      recruit_position = .data$recruit_position
+  # HS: the guard decides which id-joined recruit row is trusted (decision
+  # 0036 extends 0013's name guard with school + class year); the position is
+  # read from that same recruit only when a guard passes.
+  early <- roster |>
+    dplyr::semi_join(universe, by = "playerId") |>
+    dplyr::group_by(.data$playerId) |>
+    dplyr::summarise(
+      first_season = min(.data$season),
+      early_teams = list(unique(.data$team[
+        .data$season <= min(.data$season) + 1L
+      ])),
+      .groups = "drop"
     )
   hs <- universe |>
+    dplyr::inner_join(recruiting, by = "playerId") |>
     dplyr::left_join(names_tbl, by = "playerId") |>
-    link_recruiting(recruiting) |>
-    dplyr::mutate(hs_linked = dplyr::coalesce(.data$recruit_matched, FALSE)) |>
-    dplyr::select("playerId", "hs_linked", "hs_class") |>
-    dplyr::left_join(hs_pos, by = "playerId") |>
+    dplyr::left_join(early, by = "playerId") |>
     dplyr::mutate(
+      hs_link_method = recruit_link_method(
+        .data$player,
+        .data$recruit_name,
+        .data$committed_to,
+        .data$hs_class,
+        .data$first_season,
+        .data$early_teams
+      ),
+      hs_linked = !is.na(.data$hs_link_method),
+      hs_class = dplyr::if_else(.data$hs_linked, .data$hs_class, NA_integer_),
       hs_group = dplyr::if_else(
         .data$hs_linked,
         harmonize_position(.data$recruit_position, "recruiting"),
         NA_character_
       )
     ) |>
-    dplyr::select("playerId", "hs_linked", "hs_class", "hs_group")
+    dplyr::select(
+      "playerId",
+      "hs_linked",
+      "hs_link_method",
+      "hs_class",
+      "hs_group"
+    )
 
   # College: recorded roster positions only, one row per player-season-group.
   college_obs <- roster |>
@@ -324,6 +345,7 @@ build_position_path <- function(
     dplyr::select(
       "playerId",
       "hs_linked",
+      "hs_link_method",
       "hs_class",
       "hs_group",
       "college_seasons",
@@ -382,6 +404,10 @@ contract_position_mapping <- function(feeds, stop_on_fail = TRUE) {
 #' @param min_nfl_coverage Floor on the slot-linked share of those picks
 #'   (decision 0014 measured 99.7% in its spike; the 2010+ linked share is
 #'   about 98.9%).
+#' @param n_recruits_universe Recruit records whose id is in the universe;
+#'   `NULL` skips the HS coverage check.
+#' @param min_hs_coverage Floor on the linked share of those recruits
+#'   (decision 0036 measured about 98%).
 #' @param stop_on_fail Abort on failure.
 #' @return The pointblank agent, invisibly.
 #' @export
@@ -390,16 +416,25 @@ contract_position_path <- function(
   n_universe,
   n_picks_universe,
   min_nfl_coverage = 0.97,
+  n_recruits_universe = NULL,
+  min_hs_coverage = 0.95,
   stop_on_fail = TRUE
 ) {
   rlang::check_installed("pointblank")
   levels <- harmonized_position_levels()
   n_nfl <- sum(position_path$nfl_linked, na.rm = TRUE)
   nfl_coverage <- if (n_picks_universe > 0) n_nfl / n_picks_universe else 1
+  n_hs <- sum(position_path$hs_linked, na.rm = TRUE)
+  hs_coverage <- if (is.null(n_recruits_universe) || n_recruits_universe == 0) {
+    1
+  } else {
+    n_hs / n_recruits_universe
+  }
   agent <- pointblank::create_agent(position_path, label = "position_path") |>
     pointblank::col_exists(c(
       "playerId",
       "hs_linked",
+      "hs_link_method",
       "hs_class",
       "hs_group",
       "college_seasons",
@@ -446,6 +481,14 @@ contract_position_path <- function(
     pointblank::col_vals_expr(rlang::expr(!hs_linked | !is.na(hs_group))) |>
     pointblank::col_vals_expr(rlang::expr(hs_linked | is.na(hs_group))) |>
     pointblank::col_vals_expr(
+      rlang::expr(hs_linked == !is.na(hs_link_method))
+    ) |>
+    pointblank::col_vals_in_set(
+      "hs_link_method",
+      c("name", "name_variant", "school_year"),
+      preconditions = function(x) dplyr::filter(x, !is.na(.data$hs_link_method))
+    ) |>
+    pointblank::col_vals_expr(
       rlang::expr(!nfl_linked | (drafted & !is.na(nfl_group)))
     ) |>
     pointblank::col_vals_expr(
@@ -456,6 +499,13 @@ contract_position_path <- function(
       min_nfl_coverage,
       preconditions = function(x) {
         tibble::tibble(nfl_coverage = .env$nfl_coverage)
+      }
+    ) |>
+    pointblank::col_vals_gte(
+      "hs_coverage",
+      min_hs_coverage,
+      preconditions = function(x) {
+        tibble::tibble(hs_coverage = .env$hs_coverage)
       }
     ) |>
     pointblank::interrogate()
@@ -471,9 +521,17 @@ contract_position_path <- function(
 #' @param roster Cleaned roster.
 #' @param picks_nfl Output of [link_nfl_draft()].
 #' @param reused Reused athlete ids (see [reused_ids()]).
-#' @return A list with `n_universe` and `n_picks_universe`.
+#' @param recruiting Cleaned recruiting table; `NULL` leaves
+#'   `n_recruits_universe` as `NULL`.
+#' @return A list with `n_universe`, `n_picks_universe`, and
+#'   `n_recruits_universe` (recruit ids in the universe).
 #' @export
-position_universe_counts <- function(roster, picks_nfl, reused = character()) {
+position_universe_counts <- function(
+  roster,
+  picks_nfl,
+  reused = character(),
+  recruiting = NULL
+) {
   ids <- unique(roster$playerId[
     !is.na(roster$playerId) & !roster$playerId %in% reused
   ])
@@ -486,6 +544,9 @@ position_universe_counts <- function(roster, picks_nfl, reused = character()) {
     picks_nfl$year >= 2010L
   list(
     n_universe = length(ids),
-    n_picks_universe = sum(in_universe)
+    n_picks_universe = sum(in_universe),
+    n_recruits_universe = if (!is.null(recruiting)) {
+      sum(unique(recruiting$playerId) %in% ids)
+    }
   )
 }

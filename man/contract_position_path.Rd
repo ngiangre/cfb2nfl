@@ -9,6 +9,8 @@ contract_position_path(
   n_universe,
   n_picks_universe,
   min_nfl_coverage = 0.97,
+  n_recruits_universe = NULL,
+  min_hs_coverage = 0.95,
   stop_on_fail = TRUE
 )
 }
@@ -23,6 +25,12 @@ universe and unique among picks.}
 \item{min_nfl_coverage}{Floor on the slot-linked share of those picks
 (decision 0014 measured 99.7\% in its spike; the 2010+ linked share is
 about 98.9\%).}
+
+\item{n_recruits_universe}{Recruit records whose id is in the universe;
+\code{NULL} skips the HS coverage check.}
+
+\item{min_hs_coverage}{Floor on the linked share of those recruits
+(decision 0036 measured about 98\%).}
 
 \item{stop_on_fail}{Abort on failure.}
 }

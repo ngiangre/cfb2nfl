@@ -9,9 +9,10 @@ description: >
   groups (Quarterback, Running back, Receiver, Tight end, Offensive line,
   Defensive line, Linebacker, Defensive back, Special teams, Athlete, Position
   not recorded), so EDGE/DE/DT all read "Defensive line" and IOL/OG/OT all read
-  "Offensive line". HS is taken only through `link_recruiting()`, the
-  name-guarded recruit link (decision 0013); recruits who fail the guard, or
-  who cannot be guarded because no college name is on file, get no HS group.
+  "Offensive line". HS is taken from the id-joined recruit only when a guard
+  passes (`recruit_link_method()`, decisions 0013 and 0036): exact name
+  agreement, a name variant plus a school + class year match, or, when no
+  college name is on file, the school + class year match alone.
   The NFL group is the nflverse draft position of the slot-linked pick
   (decision 0014). Ids with more than one CFBD pick, and reused ids (decision
   0022), are not linked. A DERIVED table: materialized into the DuckDB bundle
@@ -29,14 +30,25 @@ columns:
   - name: hs_linked
     type: logical
     description: >
-      TRUE when the recruiting record passes the name guard against the
-      college name (`link_recruiting()`, decision 0013). FALSE covers both
-      unrecruited players and recruits rejected as different people.
-    provenance: derived (link_recruiting recruit_matched)
+      TRUE when the id-joined recruiting record passes a link guard
+      (`hs_link_method` not NA). FALSE covers both unrecruited players and
+      recruits rejected as different people.
+    provenance: derived (recruit_link_method)
+  - name: hs_link_method
+    type: string
+    description: >
+      Which guard linked the recruit (decision 0036): "name" (names agree after
+      normalization), "name_variant" (nickname / legal-name / typo variant at
+      the committed school within 0-2 years of the class), or "school_year"
+      (no college name on file; committed school is a first-two-seasons roster
+      team and the first season is 0-2 years after the class). NA when not
+      linked. The school + year guards carry an estimated 0.6% wrong-person
+      rate, scored against the name guard.
+    provenance: derived (recruit_link_method)
   - name: hs_class
     type: int32
     description: High-school recruiting class year, set only when `hs_linked`.
-    provenance: derived (recruiting.hs_class via link_recruiting)
+    provenance: derived (recruiting.hs_class)
   - name: hs_group
     type: string
     description: >

@@ -167,6 +167,107 @@ normalize_name <- function(x) {
   trimws(x)
 }
 
+#' Are two names plausible variants of one person's name?
+#'
+#' A looser check than exact [normalize_name()] agreement, for nickname,
+#' legal-name, typo, and hyphenated-surname differences ("Chris Bispham" /
+#' "Christopher Bispham", "Bryce Cabledue" / "Bryce Cabeldue", "Justin
+#' Evans-Jenkins" / "Justin Evans"). Both the surname and the first name must be
+#' compatible: equal, one a prefix of the other, a small edit distance, or a
+#' shared token; first names may also just share an initial. Too loose to trust
+#' alone, so [recruit_link_method()] only accepts it with a school + class year
+#' match (decision 0036).
+#'
+#' @param a,b Character vectors of names (recycled).
+#' @return A logical vector; `NA` where either name is missing.
+#' @keywords internal
+name_variant <- function(a, b) {
+  compatible <- function(x, y, max_dist) {
+    x == y ||
+      startsWith(x, y) ||
+      startsWith(y, x) ||
+      utils::adist(x, y)[1, 1] <= max_dist
+  }
+  mapply(
+    function(a, b) {
+      if (is.na(a) || is.na(b)) {
+        return(NA)
+      }
+      ta <- strsplit(normalize_name(a), " ")[[1]]
+      tb <- strsplit(normalize_name(b), " ")[[1]]
+      if (length(ta) == 0 || length(tb) == 0) {
+        return(FALSE)
+      }
+      la <- ta[length(ta)]
+      lb <- tb[length(tb)]
+      last_ok <- compatible(la, lb, 1L) || la %in% tb || lb %in% ta
+      first_ok <- compatible(ta[1], tb[1], 2L) ||
+        substr(ta[1], 1, 1) == substr(tb[1], 1, 1) ||
+        any(utils::head(ta, -1) %in% tb) ||
+        any(utils::head(tb, -1) %in% ta)
+      last_ok && first_ok
+    },
+    a,
+    b,
+    USE.NAMES = FALSE
+  )
+}
+
+#' How a recruit record is linked to a college athlete id
+#'
+#' The recruiting `athleteId` collides across people (decision 0013), so an
+#' id-joined recruit is trusted only when a guard passes. Exact name agreement
+#' is the primary guard. Many athletes have no college name on file (no stat
+#' line, never drafted), and many true matches differ only by a nickname or legal
+#' name, so decision 0036 adds a **school + class year** guard: the recruit
+#' committed to a team the athlete is rostered at in his first two roster
+#' seasons, and that first season falls 0 to 2 years after the recruiting class.
+#' Scored against the name guard, school + year keeps 99.8% of exact-name links
+#' and passes an estimated 0.6% wrong-person pairs. Methods, in order:
+#'
+#' - `"name"`: names agree after [normalize_name()].
+#' - `"name_variant"`: names are [name_variant()]s **and** school + year pass.
+#' - `"school_year"`: no college name to check **and** school + year pass.
+#' - `NA`: not linked (a name that disagrees is never rescued by school alone).
+#'
+#' @param player College name of the athlete (`NA` when none is on file).
+#' @param recruit_name Recruit's name.
+#' @param committed_to Recruit's committed school (CFBD team name).
+#' @param hs_class Recruiting class year.
+#' @param first_season The athlete's first roster season.
+#' @param early_teams List of character vectors: teams the athlete is rostered
+#'   at in his first two roster seasons.
+#' @return A character vector of link methods, `NA` where not linked.
+#' @keywords internal
+recruit_link_method <- function(
+  player,
+  recruit_name,
+  committed_to,
+  hs_class,
+  first_season,
+  early_teams
+) {
+  school_year <- mapply(
+    function(c, t) !is.na(c) && c %in% t,
+    committed_to,
+    early_teams,
+    USE.NAMES = FALSE
+  ) &
+    dplyr::coalesce((first_season - hs_class) %in% 0:2, FALSE)
+  has_name <- !is.na(player)
+  exact <- has_name &
+    !is.na(recruit_name) &
+    normalize_name(player) == normalize_name(recruit_name)
+  variant <- has_name &
+    dplyr::coalesce(name_variant(player, recruit_name), FALSE)
+  dplyr::case_when(
+    exact ~ "name",
+    variant & school_year ~ "name_variant",
+    !has_name & !is.na(recruit_name) & school_year ~ "school_year",
+    .default = NA_character_
+  )
+}
+
 #' Attach name-guarded high-school recruiting ratings
 #'
 #' Left-joins the per-athlete recruiting ratings ([clean_recruiting()]) onto the

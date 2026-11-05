@@ -18,6 +18,7 @@ test_that("position_path dict matches build_position_path() output schema", {
     roster = tibble::tibble(
       playerId = c("1", "1", "2"),
       season = c(2015L, 2016L, 2015L),
+      team = c("X", "X", "Y"),
       position = c("QB", "QB", NA)
     ),
     recruiting = tibble::tibble(

@@ -4,7 +4,12 @@
 \alias{position_universe_counts}
 \title{Expected sizes for the position-path contract}
 \usage{
-position_universe_counts(roster, picks_nfl, reused = character())
+position_universe_counts(
+  roster,
+  picks_nfl,
+  reused = character(),
+  recruiting = NULL
+)
 }
 \arguments{
 \item{roster}{Cleaned roster.}
@@ -12,9 +17,13 @@ position_universe_counts(roster, picks_nfl, reused = character())
 \item{picks_nfl}{Output of \code{\link[=link_nfl_draft]{link_nfl_draft()}}.}
 
 \item{reused}{Reused athlete ids (see \code{\link[=reused_ids]{reused_ids()}}).}
+
+\item{recruiting}{Cleaned recruiting table; \code{NULL} leaves
+\code{n_recruits_universe} as \code{NULL}.}
 }
 \value{
-A list with \code{n_universe} and \code{n_picks_universe}.
+A list with \code{n_universe}, \code{n_picks_universe}, and
+\code{n_recruits_universe} (recruit ids in the universe).
 }
 \description{
 The universe is the non-reused roster athlete ids. The coverage denominator

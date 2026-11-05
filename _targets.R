@@ -364,6 +364,7 @@ list(
         position_path,
         n_universe = position_counts$n_universe,
         n_picks_universe = position_counts$n_picks_universe,
+        n_recruits_universe = position_counts$n_recruits_universe,
         stop_on_fail = FALSE
       )
     )
@@ -535,7 +536,7 @@ list(
   ),
   tar_target(
     position_counts,
-    position_universe_counts(roster, picks_nfl, reused)
+    position_universe_counts(roster, picks_nfl, reused, recruiting)
   ),
 
   # ---- features -------------------------------------------------------------

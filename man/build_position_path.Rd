@@ -14,7 +14,7 @@ build_position_path(
 )
 }
 \arguments{
-\item{roster}{Cleaned roster (\code{playerId}, \code{season}, \code{position}).}
+\item{roster}{Cleaned roster (\code{playerId}, \code{season}, \code{team}, \code{position}).}
 
 \item{recruiting}{Cleaned recruiting table (one row per \code{playerId}).}
 
@@ -34,11 +34,12 @@ A tibble, one row per athlete id.
 One row per college athlete id (decision 0021 recipe), chaining the three
 harmonized positions:
 \itemize{
-\item \strong{HS} is taken only through \code{\link[=link_recruiting]{link_recruiting()}} (name-guarded, decision
-0013); a recruit whose name does not agree with the college name gets no
-HS group. The college name is the stat-line name where one exists, else
-the draft-listed name; players with neither cannot be guarded and stay
-unlinked.
+\item \strong{HS} is taken from the id-joined recruit only when a guard passes
+(\code{\link[=recruit_link_method]{recruit_link_method()}}, decisions 0013 and 0036): exact name agreement,
+or a name variant plus a school + class year match, or (when no college
+name is on file) the school + class year match alone. The college name is
+the stat-line name where one exists, else the draft-listed name.
+\code{hs_link_method} records which guard passed.
 \item \strong{College} groups come from the roster position in each season, ignoring
 blanks. The first, last, and modal (most seasons, then most recent) groups
 are kept, plus a flag for any in-college change of group.

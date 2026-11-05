@@ -26,9 +26,19 @@ the three stages per college athlete id.
   any feed aborts the build.
 - **A derived table** `position_path` (one row per non-reused college athlete
   id; decision 0021 recipe, bundled in DuckDB only) with:
-  - **HS group** only through `link_recruiting()`, so the name guard decides
-    which recruit row is trusted (decision 0013). A recruit whose name does not
-    agree gets no HS group.
+  - **HS group** from the id-joined recruit only when a guard passes
+    (`recruit_link_method()`, extending decision 0013), recorded in
+    `hs_link_method`:
+    1. `name`: names agree after `normalize_name()` (0013's guard).
+    2. `name_variant`: a nickname / legal-name / typo variant (`name_variant()`)
+       **and** a school + class year match.
+    3. `school_year`: no college name on file **and** a school + class year
+       match. School + class year means the recruit's `committed_to` is a
+       roster team in the athlete's first two roster seasons, and the first
+       roster season is 0 to 2 years after `hs_class`.
+    A name that disagrees outright is never rescued by school alone: same
+    surname, same school, same class is where CFBD's id collisions concentrate
+    (brothers, common surnames).
   - **College groups** from roster positions, ignoring blanks: first, last,
     modal (most seasons, then most recent), and a flag for any in-college change.
   - **NFL group** from the nflverse draft position of the slot-linked pick
@@ -55,10 +65,32 @@ the three stages per college athlete id.
   data. The issue's premise that a player's position changes within college is
   not supported by this source, and the table cannot detect such a change. A
   per-season position source is an open question.
-- **HS coverage is limited by names.** 22,768 of 37,099 recruits in the
-  roster universe link through the name guard (61%). Only about half of roster
-  ids have a name in the stat lines, and recruits without a name cannot be
-  guarded, so they stay unlinked rather than guessed.
+- **HS coverage was limited by names, not by mismatches.** The name guard alone
+  links 22,768 of 37,099 recruits in the roster universe (61%). Roster rows
+  carry no name, so 13,063 id-joined recruits had nothing to check against
+  (the athlete never logged a stat line or was drafted).
+- **Evaluation of the school + class year guard** (2026-11-05), scored against
+  the name guard on the 24,036 pairs where both can be checked:
+  - Recall: 22,732 of 22,768 exact-name links also pass school + year (99.8%).
+  - Of the 1,147 pairs the name guard rejects but school + year passes, 768 are
+    name variants (Chris / Christopher, typos, hyphenated or legal names), 16
+    differ in surname (mostly name changes), and 363 share only a surname. A
+    sample of the 363 is roughly 40% different people (common surnames,
+    brothers on one roster) and 60% nicknames.
+  - Estimated wrong-person rate among pairs passing school + year: about 150
+    of 23,879, i.e. 0.6% (plausible range 0.4–1.5%).
+  - The 121 pairs that fail both guards are clear collisions (different
+    school, years apart).
+  - Corroboration: the HS-to-college same-group rate is 84.7% for
+    `school_year` links and 79.8% for `name` links; wrong-person links would
+    pull the former down toward chance.
+- **Result:** 36,577 of 37,099 recruits linked (98.6%): 22,768 `name`, 768
+  `name_variant`, 13,041 `school_year`; about 80 expected wrong-person links.
+  `contract_position_path()` enforces an HS coverage floor of 0.95 and that
+  `hs_linked` agrees with `hs_link_method`.
+- `link_recruiting()` (the model-feature path on the player-season backbone)
+  is unchanged: every backbone row has a stat-line name, so only the
+  `name_variant` tier would apply there. Adopting it is a separate change.
 - **NFL slot-link coverage** is 3,732 linked draftees, and 3,733 of the 3,775
   2010+ universe picks match (98.9%). The contract floor is 0.97.
 - **Undrafted players have no NFL position.** nflverse has no bridge to a CFBD
@@ -66,7 +98,10 @@ the three stages per college athlete id.
   undrafted players. They are outside the NFL comparison.
 
 **Follow-on:** a per-season position source; a name-guarded link for UDFA
-positions; recruit-to-college linkage that does not rely on names alone.
+positions; keep the recruit's hometown (`hometownInfo`, dropped by
+`clean_recruiting()`) and check it against roster `home_city`/`home_state` to
+cut the school + year error rate (needs a republish); the `name_variant` tier
+in `link_recruiting()`.
 
 ## Outcome / what we learned
 

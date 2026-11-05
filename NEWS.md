@@ -11,8 +11,11 @@
   ([decision 0036](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0036-position-harmonization-and-path.md)).
 - New derived table `position_path` (DuckDB bundle only): one row per college
   athlete id with its harmonized high school, college and NFL position groups.
-  High school groups come only through the name-guarded recruiting link, and
-  NFL groups only through the draft-slot link. Reused athlete ids are excluded
+  High school groups come through a guarded recruiting link (exact name, or a
+  name variant or missing college name backed by a school + class year match,
+  `hs_link_method`), which links 98.6% of recruits instead of 61% at an
+  estimated 0.6% wrong-person rate on the new links. NFL groups come only
+  through the draft-slot link. Reused athlete ids are excluded
   ([decision 0036](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0036-position-harmonization-and-path.md)).
 
 - New blog post testing whether schools that win more produce more

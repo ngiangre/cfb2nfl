@@ -69,6 +69,7 @@ utils::globalVariables(c(
   "win_pct",
   # pointblank expr targets in contract_position_path
   "hs_linked",
+  "hs_link_method",
   "hs_group",
   "nfl_linked",
   "nfl_group",

@@ -4,7 +4,7 @@ date: "2026-11-05"
 description: "Of linked high school recruits who played college football, most kept their position group in college, and nearly every linked draftee kept his college group in the NFL."
 followups:
   - "Recover undrafted players' NFL positions by name and school, so the college-to-NFL comparison covers players who never heard their name called."
-  - "Link more high school recruits to their college id by school and class year, since the name guard leaves more than a third of the recruit pool unlinked."
+  - "Add the recruit's hometown to the school and class year check, to cut the estimated 0.6% of those links that join two different people."
   - "Test whether a recruit whose position changes between high school and college is more likely to be drafted, once the college group is held fixed."
   - "Find a roster source that records position by season, so in-college position changes can be measured rather than assumed absent."
 author:
@@ -110,12 +110,18 @@ stopifnot(nrow(named) == nrow(subjects))
 # The population the post reasons about, counted once and reused below.
 n_universe <- nrow(pp)
 n_hs_linked <- sum(pp$hs_linked)
+n_hs_by <- table(factor(pp$hs_link_method, c("name", "name_variant", "school_year")))
 n_hs_rec <- sum(pp$hs_linked & !is.na(pp$hs_group) & pp$hs_group != "Position not recorded")
 n_college_rec <- sum(pp$college_groups > 0)
 n_drafted <- sum(pp$drafted)
 n_nfl_linked <- sum(pp$nfl_linked)
 n_nfl_rec <- sum(!is.na(pp$nfl_group))
-stopifnot(n_universe == 134867L, n_hs_linked == 22768L, n_nfl_linked == 3732L)
+stopifnot(
+  n_universe == 134867L,
+  n_hs_linked == 36577L,
+  sum(n_hs_by) == n_hs_linked,
+  n_nfl_linked == 3732L
+)
 ```
 
 ::: {.callout-note appearance="minimal"}
@@ -154,7 +160,7 @@ tibble::tribble(
   ~Term                   , ~Meaning                                                                                       ,
   "Athlete id"            , "The college player's id in the roster and draft records. One id is one player in this table.",
   "Position group"        , "One of eleven shared groups, such as Quarterback or Defensive line; blanks are 'Position not recorded'.",
-  "High school group"     , "The group of the recruit record the name guard links to this athlete; recruits without a link have none.",
+  "High school group"     , "The group of the recruit record linked to this athlete by name, or by school and class year (see the next table); recruits without a link have none.",
   "College group"         , "The group recorded on the athlete's roster, across seasons (modal group is the one the most seasons list).",
   "NFL group"             , "The group of the nflverse draft record for the player's draft slot, when that slot is linked to the athlete."
 ) |>
@@ -166,7 +172,10 @@ tibble::tribble(
 tibble::tribble(
   ~Stage                                                  , ~Players                 , ~Share                         ,
   "College athlete ids on a roster"                       , fmt(n_universe)          , "100.0%"                       ,
-  "Linked to a high school recruit record (name guard)"   , fmt(n_hs_linked)         , pct(n_hs_linked / n_universe)  ,
+  "Linked to a high school recruit record"                , fmt(n_hs_linked)         , pct(n_hs_linked / n_universe)  ,
+  "Of these, by the same name"                                    , fmt(n_hs_by[["name"]])         , pct(n_hs_by[["name"]] / n_universe)         ,
+  "Of these, by a nickname or spelling variant, same school and class year", fmt(n_hs_by[["name_variant"]]), pct(n_hs_by[["name_variant"]] / n_universe),
+  "Of these, by school and class year (no college name on file)"  , fmt(n_hs_by[["school_year"]])  , pct(n_hs_by[["school_year"]] / n_universe)  ,
   "High school position recorded"                         , fmt(n_hs_rec)            , pct(n_hs_rec / n_universe)     ,
   "College position recorded in at least one season"      , fmt(n_college_rec)       , pct(n_college_rec / n_universe),
   "Drafted (any CFBD draft pick)"                         , fmt(n_drafted)           , pct(n_drafted / n_universe)    ,
@@ -592,10 +601,12 @@ his skills fit a neighbouring role, so a recruit's listed group is a usable
 starting point for a forecast.
 :::
 
-Caveats. The high school comparison covers only recruits the name guard can
-link to a college id, which is about `r pct(n_hs_linked / n_universe)` of the
-roster athlete ids; the rest, including every recruit whose name cannot be
-checked, are left out rather than guessed. The NFL comparison covers only
+Caveats. The high school comparison covers recruits linked to a college id,
+about `r pct(n_hs_linked / n_universe)` of the roster athlete ids. A recruit is
+linked when the names agree, or, for a nickname or a player with no college
+name on file, when he enrolled at the school he committed to within two years
+of his class. Checked against the matching names, that school and class year
+rule joins two different people in an estimated 0.6% of links. The NFL comparison covers only
 draftees linked by draft slot, and the undrafted players in the NFL data have no
 bridge to a college id, so they are not in it. The college roster records one
 position per athlete, so changes between seasons cannot be observed in this
