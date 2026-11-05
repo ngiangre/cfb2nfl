@@ -1,5 +1,13 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Season-scoped refresh, first step: a decision record for refreshing only the
+  season that changed, plus the calendar and selector helpers it needs.
+  `current_season()` and `draft_season()` give the season each source refreshes
+  on a given date, and `refresh_seasons()` parses the `CFB2NFL_REFRESH_SEASONS`
+  selector (`current`, a year, a range, or a comma list). Nothing is wired into
+  the ingest targets yet, so the pipeline behaves as before
+  ([decision 0034](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0034-season-scoped-refresh.md)).
+
 - New blog post testing whether schools that win more produce more
   draftees. The link is strong among Power schools and moderate in the
   Group of 5. The post also names the programs that draft more or fewer
