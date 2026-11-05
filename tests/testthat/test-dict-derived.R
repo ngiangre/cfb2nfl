@@ -141,6 +141,44 @@ test_that("player_season_stats dict matches build_player_season_stats() output s
   expect_equal(typeof(wide$passing_completions), "double")
 })
 
+test_that("player_game dict matches build_player_game() output schema", {
+  skip_if_not_installed("yaml")
+  game_player_stats <- tibble::tibble(
+    gameId = 1L,
+    season = 2024L,
+    week = 1L,
+    seasonType = "regular",
+    team = c("Alpha", "Alpha", "Beta"),
+    conference = "SEC",
+    homeAway = c("home", "home", "away"),
+    points = 30L,
+    category = c("passing", "rushing", "defensive"),
+    statType = c("C/ATT", "CAR", "TOT"),
+    playerId = c("1", "1", "2"),
+    player = "Test Player",
+    stat = c("20/30", "4", "6")
+  )
+  games <- tibble::tibble(
+    id = 1L,
+    season = 2024L,
+    week = 1L,
+    seasonType = "regular",
+    homeTeam = "Alpha",
+    awayTeam = "Beta",
+    homeClassification = "fbs",
+    awayClassification = "fbs",
+    homeConference = "SEC",
+    awayConference = "SEC",
+    homePoints = 30L,
+    awayPoints = 20L,
+    homePregameElo = 1500,
+    awayPregameElo = 1400,
+    neutralSite = FALSE,
+    completed = TRUE
+  )
+  check_dict("player_game", build_player_game(game_player_stats, games))
+})
+
 team_fixture_dict <- function() {
   list(
     games = tibble::tibble(

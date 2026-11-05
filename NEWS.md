@@ -7,6 +7,30 @@
   selector (`current`, a year, a range, or a comma list). Nothing is wired into
   the ingest targets yet, so the pipeline behaves as before
   ([decision 0034](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0034-season-scoped-refresh.md)).
+- New blog post on position stability from high school to college to the
+  NFL: most linked recruits keep their position group in college, nearly every
+  linked draftee keeps it in the NFL, and the roster source records no
+  in-college change
+  ([vignettes/2026-11-05-position-stability.qmd](https://github.com/ngiangre/cfb2nfl/blob/main/vignettes/2026-11-05-position-stability.qmd)).
+- New `harmonize_position()` maps the recruiting, roster, draft, and NFL
+  position codes to eleven shared groups. A contract fails the build if any
+  raw code is unmapped
+  ([decision 0036](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0036-position-harmonization-and-path.md)).
+- New derived table `position_path` (DuckDB bundle only): one row per college
+  athlete id with its harmonized high school, college and NFL position groups.
+  High school groups come through a guarded recruiting link (exact name, or a
+  name variant or missing college name backed by a school + class year match,
+  `hs_link_method`), which links 98.6% of recruits instead of 61% at an
+  estimated 0.6% wrong-person rate on the new links. NFL groups come only
+  through the draft-slot link. Reused athlete ids are excluded
+  ([decision 0036](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0036-position-harmonization-and-path.md)).
+- New derived table `player_game` in the DuckDB bundle: one row per player per
+  game with a stat line. It carries the side, opponent, conferences, points,
+  pregame Elo (NA where CFBD has none), the wide per-game usage counts (passing,
+  rushing, receiving, defensive), and `team_games`, the team's games played in
+  the season, for games-appeared rates. Checked by a new data contract that
+  requires one row per distinct player-game in the box score
+  ([decision 0035](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0035-player-game-table.md)).
 
 - New blog post testing whether schools that win more produce more
   draftees. The link is strong among Power schools and moderate in the

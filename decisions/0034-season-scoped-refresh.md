@@ -74,7 +74,7 @@ narrows a refresh.
 | Source | Season | Rule |
 |---|---|---|
 | CFB season data (`games`, `game_team_stats`, `game_player_stats`, `player_stats`, `roster`, `coaches`, `plays`, `play_stats`) | `current_season(date)` | Aug-to-Jul year (see §4) |
-| `recruiting` | `current_season(date) + 1` | the incoming class; recruiting for class Y is published during Y-1's season |
+| `recruiting` | `current_season(date) + 1` | the incoming class; recruiting for class Y is published during Y-1's season (verified 2026-11-05: `/recruiting/players?year=2027` returned 2,942 recruits, 93% committed, but 28% still without a star rating vs 7–11% in finished classes, so the class is provisional until February signing day and re-pulling it weekly is the point) |
 | `picks`, `nfl_draft_picks`, combine | `draft_season(date)` | the most recently completed draft; the new draft year takes over on **May 1** (the draft is late April) |
 | `nfl_rosters`, `nfl_player_stats` | NFL season | the NFL season runs Sep–Feb; use the same Aug cutoff, which lands on the prior season in Jan–Jul |
 | `teams` (non-season) | none | rides the current slice, no season key |
