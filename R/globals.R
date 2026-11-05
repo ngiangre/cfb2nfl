@@ -38,6 +38,12 @@ utils::globalVariables(c(
   # pointblank::vars() targets in later contracts/audit helpers
   ".env",
   "followed_coach",
+  # pointblank::vars() / expr targets in contract_player_game()
+  "seasonType",
+  "opponent",
+  "home_away",
+  "neutral_site",
+  "team_games",
   "hc_changed",
   "n_na",
   "recruit_matched",
