@@ -1,5 +1,22 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- New blog post on position stability from high school to college to the
+  NFL: most linked recruits keep their position group in college, nearly every
+  linked draftee keeps it in the NFL, and the roster source records no
+  in-college change
+  ([vignettes/2026-11-05-position-stability.qmd](https://github.com/ngiangre/cfb2nfl/blob/main/vignettes/2026-11-05-position-stability.qmd)).
+- New `harmonize_position()` maps the recruiting, roster, draft, and NFL
+  position codes to eleven shared groups. A contract fails the build if any
+  raw code is unmapped
+  ([decision 0036](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0036-position-harmonization-and-path.md)).
+- New derived table `position_path` (DuckDB bundle only): one row per college
+  athlete id with its harmonized high school, college and NFL position groups.
+  High school groups come through a guarded recruiting link (exact name, or a
+  name variant or missing college name backed by a school + class year match,
+  `hs_link_method`), which links 98.6% of recruits instead of 61% at an
+  estimated 0.6% wrong-person rate on the new links. NFL groups come only
+  through the draft-slot link. Reused athlete ids are excluded
+  ([decision 0036](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0036-position-harmonization-and-path.md)).
 - New derived table `player_game` in the DuckDB bundle: one row per player per
   game with a stat line. It carries the side, opponent, conferences, points,
   pregame Elo (NA where CFBD has none), the wide per-game usage counts (passing,
