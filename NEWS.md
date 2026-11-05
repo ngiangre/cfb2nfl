@@ -1,5 +1,13 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- New derived table `player_game` in the DuckDB bundle: one row per player per
+  game with a stat line. It carries the side, opponent, conferences, points,
+  pregame Elo (NA where CFBD has none), the wide per-game usage counts (passing,
+  rushing, receiving, defensive), and `team_games`, the team's games played in
+  the season, for games-appeared rates. Checked by a new data contract that
+  requires one row per distinct player-game in the box score
+  ([decision 0035](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0035-player-game-table.md)).
+
 - New blog post testing whether schools that win more produce more
   draftees. The link is strong among Power schools and moderate in the
   Group of 5. The post also names the programs that draft more or fewer

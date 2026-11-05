@@ -1172,6 +1172,125 @@ contract_game_player_stats <- function(
   enforce_contract(agent, "game_player_stats", stop_on_fail)
 }
 
+#' Data contract for the player x game table
+#'
+#' Guards [build_player_game()] (decision 0035). Enforces the key
+#' `(playerId, gameId)`, that every `gameId` is a real game, and no silent row
+#' loss: the output has exactly one row per distinct `(playerId, gameId)` in
+#' `game_player_stats`. Elo is allowed to be `NA` (FCS and lower-division
+#' opponents have none), so its share is reported by the audit row rather than
+#' failed here. Usage counts are non-negative where present.
+#'
+#' @param player_game Output of [build_player_game()].
+#' @param game_player_stats Cleaned long player-game stats (the input).
+#' @param games Cleaned games (the game-id reference set).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_player_game <- function(
+  player_game,
+  game_player_stats,
+  games,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  n_expected <- dplyr::n_distinct(game_player_stats[c("playerId", "gameId")])
+  # Yardage is signed (sacks and rushing losses are negative), so it gets a
+  # range check instead of the non-negative count check.
+  yard_stat_cols <- c("pass_yds", "rush_yds", "rec_yds")
+  count_stat_cols <- c(
+    "pass_cmp",
+    "pass_att",
+    "pass_td",
+    "pass_int",
+    "rush_car",
+    "rush_td",
+    "rec",
+    "rec_td",
+    "tackles",
+    "solo_tackles",
+    "tfl",
+    "sacks"
+  )
+  stat_cols <- c(count_stat_cols, yard_stat_cols)
+  agent <- pointblank::create_agent(player_game, label = "player_game") |>
+    pointblank::col_exists(c(
+      "playerId",
+      "gameId",
+      "season",
+      "week",
+      "seasonType",
+      "team",
+      "team_conference",
+      "opponent",
+      "opponent_conference",
+      "home_away",
+      "neutral_site",
+      "team_points",
+      "opponent_points",
+      "team_pregame_elo",
+      "opponent_pregame_elo",
+      "team_games",
+      dplyr::all_of(stat_cols)
+    )) |>
+    pointblank::col_vals_not_null(pointblank::vars(
+      playerId,
+      gameId,
+      season,
+      week,
+      seasonType,
+      team,
+      opponent,
+      home_away,
+      neutral_site,
+      team_games
+    )) |>
+    pointblank::rows_distinct(pointblank::vars(playerId, gameId)) |>
+    # No silent row loss: one row per distinct (playerId, gameId) in the input.
+    pointblank::col_vals_equal(
+      "n",
+      n_expected,
+      preconditions = function(x) tibble::tibble(n = nrow(x))
+    ) |>
+    pointblank::col_vals_in_set("gameId", set = unique(games$id)) |>
+    pointblank::col_vals_between("season", 2010L, 2026L) |>
+    pointblank::col_vals_gte("week", 1L) |>
+    pointblank::col_vals_in_set("home_away", set = c("home", "away")) |>
+    pointblank::col_vals_expr(rlang::expr(opponent != team)) |>
+    pointblank::col_vals_between("team_games", 1L, 20L) |>
+    pointblank::col_vals_gte("team_points", 0L, na_pass = TRUE) |>
+    pointblank::col_vals_gte("opponent_points", 0L, na_pass = TRUE) |>
+    pointblank::col_vals_between(
+      "team_pregame_elo",
+      500,
+      3000,
+      na_pass = TRUE
+    ) |>
+    pointblank::col_vals_between(
+      "opponent_pregame_elo",
+      500,
+      3000,
+      na_pass = TRUE
+    )
+  # Usage counts are non-negative where present; NA means no line in that
+  # category for the player-game (see build_player_game()). Yards are bounded
+  # loosely (a single game's passing or rushing yards stay well inside this).
+  agent <- agent |>
+    pointblank::col_vals_gte(
+      columns = dplyr::all_of(count_stat_cols),
+      value = 0,
+      na_pass = TRUE
+    ) |>
+    pointblank::col_vals_between(
+      columns = dplyr::all_of(yard_stat_cols),
+      left = -200,
+      right = 1000,
+      na_pass = TRUE
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "player_game", stop_on_fail)
+}
+
 # ---- person-period outcome table (decision 0032) ---------------------------
 
 #' Contract for the person-period outcome table

@@ -1,0 +1,149 @@
+dataset: player_game
+source: derived in-pipeline (build_player_game(game_player_stats, games))
+grain: one player in one game (a stat line in that game)
+key: playerId + gameId
+description: >
+  One row per player per game in which the player has at least one stat line
+  in game_player_stats, whatever the category (a kicker-only line still counts).
+  The shared base for per-game usage (#50) and opponent-adjusted game
+  performance (#47). Team, opponent, side, neutral-site flag, points and
+  pregame Elo come from games (joined by gameId == id); the stat columns are
+  the box-score counts for the player's line in that game, wide. A stat column
+  is NA when the player had no line in that category in that game (CFBD lists a
+  category only when the player recorded something in it), and 0 when a zero
+  was recorded. Elo is NA for games without a CFBD pregame Elo (mostly FCS and
+  lower-division opponents). team_games is the team's games played in the season
+  (games with a final score, all divisions, postseason included), the
+  denominator for games appeared. A DERIVED table: materialized into the DuckDB
+  bundle, not published as parquet (decision 0021). Contract:
+  contract_player_game() (key uniqueness, every gameId in games, no row loss
+  against game_player_stats). Decision 0035. Carries no NFL outcome fields
+  (leakage, decision 0014).
+columns:
+  - name: playerId
+    type: string
+    description: CFBD athlete id, the shared college athlete namespace (decision 0003).
+    provenance: derived (game_player_stats.playerId)
+  - name: gameId
+    type: int32
+    description: CFBD game id; joins to games.id.
+    provenance: derived (game_player_stats.gameId)
+  - name: season
+    type: int32
+    description: Season year.
+    provenance: derived (game_player_stats.season)
+  - name: week
+    type: int32
+    description: Week number (per seasonType; postseason weeks renumber from 1).
+    provenance: derived (game_player_stats.week)
+  - name: seasonType
+    type: string
+    description: regular or postseason.
+    provenance: derived (game_player_stats.seasonType)
+  - name: team
+    type: string
+    description: The player's school (teams.team namespace, display only).
+    provenance: derived (game_player_stats.team)
+  - name: team_conference
+    type: string
+    description: Conference of the player's team in that game (from games).
+    provenance: derived (games.homeConference / awayConference)
+  - name: opponent
+    type: string
+    description: Opposing school (games.homeTeam / awayTeam, display only).
+    provenance: derived (games)
+  - name: opponent_conference
+    type: string
+    description: Conference of the opponent in that game (NA where games lists none; 725 player-games, all also without an opponent Elo).
+    provenance: derived (games)
+  - name: home_away
+    type: string
+    description: home or away, from the box score (game_player_stats.homeAway).
+    provenance: derived (game_player_stats.homeAway)
+  - name: neutral_site
+    type: logical
+    description: Game played at a neutral site.
+    provenance: derived (games.neutralSite)
+  - name: team_points
+    type: int32
+    description: Points scored by the player's team in the game (NA before completion).
+    provenance: derived (games)
+  - name: opponent_points
+    type: int32
+    description: Points scored by the opponent in the game (NA before completion).
+    provenance: derived (games)
+  - name: team_pregame_elo
+    type: double
+    description: CFBD pregame Elo of the player's team. NA where CFBD has no Elo (about 26% of player-games, mostly FCS / lower-division teams).
+    provenance: derived (games.*PregameElo)
+  - name: opponent_pregame_elo
+    type: double
+    description: CFBD pregame Elo of the opponent. NA where CFBD has no Elo (about 27% of player-games).
+    provenance: derived (games.*PregameElo)
+  - name: team_games
+    type: int32
+    description: >
+      The player's team's games played in the season (games with a final score,
+      all divisions, postseason included). Denominator for games appeared per
+      team-season (#50). Contract: 1-20.
+    provenance: derived (team_record(games)$games_played)
+  - name: pass_cmp
+    type: double
+    description: Passing completions (CFBD passing C/ATT, numerator). NA if no passing line.
+    provenance: derived (game_player_stats passing C/ATT)
+  - name: pass_att
+    type: double
+    description: Passing attempts (CFBD passing C/ATT, denominator). NA if no passing line.
+    provenance: derived (game_player_stats passing C/ATT)
+  - name: pass_yds
+    type: double
+    description: Passing yards. NA if no passing line.
+    provenance: derived (game_player_stats passing YDS)
+  - name: pass_td
+    type: double
+    description: Passing touchdowns. NA if no passing line.
+    provenance: derived (game_player_stats passing TD)
+  - name: pass_int
+    type: double
+    description: Interceptions thrown. NA if no passing line.
+    provenance: derived (game_player_stats passing INT)
+  - name: rush_car
+    type: double
+    description: Rushing attempts (carries). NA if no rushing line.
+    provenance: derived (game_player_stats rushing CAR)
+  - name: rush_yds
+    type: double
+    description: Rushing yards. NA if no rushing line.
+    provenance: derived (game_player_stats rushing YDS)
+  - name: rush_td
+    type: double
+    description: Rushing touchdowns. NA if no rushing line.
+    provenance: derived (game_player_stats rushing TD)
+  - name: rec
+    type: double
+    description: Receptions. NA if no receiving line.
+    provenance: derived (game_player_stats receiving REC)
+  - name: rec_yds
+    type: double
+    description: Receiving yards. NA if no receiving line.
+    provenance: derived (game_player_stats receiving YDS)
+  - name: rec_td
+    type: double
+    description: Receiving touchdowns. NA if no receiving line.
+    provenance: derived (game_player_stats receiving TD)
+  - name: tackles
+    type: double
+    description: Total tackles (defensive TOT). NA if no defensive line.
+    provenance: derived (game_player_stats defensive TOT)
+  - name: solo_tackles
+    type: double
+    description: Solo tackles. NA if no defensive line.
+    provenance: derived (game_player_stats defensive SOLO)
+  - name: tfl
+    type: double
+    description: Tackles for loss. NA if no defensive line.
+    provenance: derived (game_player_stats defensive TFL)
+  - name: sacks
+    type: double
+    description: Sacks (may be fractional, shared sacks). NA if no defensive line.
+    provenance: derived (game_player_stats defensive SACKS)
