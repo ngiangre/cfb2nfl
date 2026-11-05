@@ -1,6 +1,6 @@
 # 0036 — One position map and a per-player position path (issue #49)
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-05
 
 ## Context
