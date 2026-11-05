@@ -195,7 +195,10 @@ build_outcomes <- function(
         norm = normalize_name(.data$player_name)
       ) |>
         dplyr::select("norm", "gsis_id"),
-      by = "norm"
+      by = "norm",
+      # Name candidates fan out both ways (shared names); the summarise below
+      # keeps only players with exactly one candidate.
+      relationship = "many-to-many"
     ) |>
     dplyr::left_join(gsis_first, by = "gsis_id") |>
     # Bound candidates to a plausible entry window by their actual first NFL

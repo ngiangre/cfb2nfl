@@ -58,3 +58,16 @@ test_that("cfbd_request errors without an API key", {
   withr::defer(Sys.setenv(CFBD_API_KEY = "test-key"))
   expect_error(cfbd_request("/roster"), "CFBD_API_KEY")
 })
+
+test_that("cfbd_log_call appends one line per call only when configured", {
+  log <- withr::local_tempfile()
+  withr::local_envvar(CFB2NFL_CALL_LOG = log)
+  cfbd_log_call("/roster", list(year = 2026L))
+  cfbd_log_call("/teams")
+  lines <- readLines(log)
+  expect_length(lines, 2L)
+  expect_match(lines[[1]], "\t/roster\tyear=2026$")
+  withr::local_envvar(CFB2NFL_CALL_LOG = "")
+  expect_null(cfbd_log_call("/teams"))
+  expect_length(readLines(log), 2L)
+})

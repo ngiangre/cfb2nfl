@@ -1,11 +1,12 @@
 name: data-refresh
 
-# Refresh CFBD data on a schedule and publish it as a GitHub release asset,
-# keeping large data out of git history. Kept separate from the site build.
-# Requires the CFBD_API_KEY repository secret.
+# FULL refresh: re-pull every season (~780 CFBD calls) and publish it as the
+# data-latest release asset, keeping large data out of git history. On demand
+# only (decision 0034): the scheduled path is data-current.yaml, which re-pulls
+# just the current season. Use this when a schema change needs every season
+# re-cleaned; CFBD often throttles shared runner IPs on a pull this size, so
+# data-raw/refresh.R run locally is the fallback. Requires CFBD_API_KEY.
 on:
-  schedule:
-    - cron: "0 13 * * 0" # weekly, Sunday 13:00 UTC (~09:00 ET; cron is fixed UTC so it drifts an hour across DST)
   workflow_dispatch:
 
 permissions:
@@ -19,6 +20,8 @@ jobs:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       # Refresh mode: the pipeline ingests fresh and writes every asset (dec 0017).
       CFB2NFL_REFRESH: "true"
+      # Full window: every season is rebuilt, not spliced (decision 0034).
+      CFB2NFL_REFRESH_SEASONS: ""
     steps:
       - uses: actions/checkout@v4
 
@@ -63,9 +66,9 @@ jobs:
             tags <- tryCatch(piggyback::pb_releases(repo)$tag_name, error = function(e) character())
             if (!"data-latest" %in% tags) piggyback::pb_release_create(repo, tag = "data-latest")
             # Publish the parquet tables and the bundled DuckDB file (decision 0016).
-            piggyback::pb_upload(list.files("data", pattern = "\\.(parquet|duckdb)$", full.names = TRUE), repo = repo, tag = "data-latest")
+            piggyback::pb_upload(list.files("data", pattern = "\\.(parquet|duckdb)$", full.names = TRUE), repo = repo, tag = "data-latest", overwrite = TRUE)
             # Append-only history of per-step schema hashes for drift detection.
             if (file.exists("data/audit_history.csv")) {
-              piggyback::pb_upload("data/audit_history.csv", repo = repo, tag = "data-latest")
+              piggyback::pb_upload("data/audit_history.csv", repo = repo, tag = "data-latest", overwrite = TRUE)
             }
           '

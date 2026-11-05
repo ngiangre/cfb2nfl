@@ -18,19 +18,25 @@ tar_option_set(
 targets::tar_source()
 
 list(
-  # ---- ingest (decisions 0017-0018) -----------------------------------------
+  # ---- ingest (decisions 0017-0018, 0034) -----------------------------------
   # Refresh mode (CFB2NFL_REFRESH=true) pulls each source from CFBD/nflverse in
   # memory; track mode (default, no key) leaves them NULL because the cleaned
-  # parquet below is read directly. Targets are NOT cued "always": a re-refresh
-  # is explicit, via data-raw/refresh.R, which invalidates the ingest targets
-  # before running.
+  # parquet below is read directly. Season-keyed CFBD sources pull only the
+  # seasons CFB2NFL_REFRESH_SEASONS selects (unset = the full window; decision
+  # 0034) and the *_file targets splice them into the published table.
+  # Whole-table sources (/draft/picks, /coaches, /teams: one call each) and the
+  # nflverse tables (no CFBD calls) are always pulled in full. Targets are NOT
+  # cued "always": a re-refresh is explicit, via data-raw/refresh*.R or the
+  # data workflows, which invalidate the ingest targets before running.
   tar_target(
     raw_picks,
     if (refresh_enabled()) ingest_picks()
   ),
   tar_target(
     raw_player_stats,
-    if (refresh_enabled()) ingest_player_stats()
+    if (refresh_enabled()) {
+      ingest_player_stats(refresh_seasons(source = "player_stats"))
+    }
   ),
   tar_target(
     raw_coaches,
@@ -42,11 +48,13 @@ list(
   ),
   tar_target(
     raw_roster,
-    if (refresh_enabled()) ingest_roster()
+    if (refresh_enabled()) ingest_roster(refresh_seasons(source = "roster"))
   ),
   tar_target(
     raw_recruiting,
-    if (refresh_enabled()) ingest_recruiting()
+    if (refresh_enabled()) {
+      ingest_recruiting(refresh_seasons(source = "recruiting"))
+    }
   ),
   # Game statistics (CFBD /games family). /games/players carries the shared
   # athlete id, so game_player_stats joins the playerId namespace directly.
@@ -57,7 +65,7 @@ list(
   tar_target(
     games_grid,
     tidyr::expand_grid(
-      season = 2010:2026,
+      season = refresh_seasons(source = "games"),
       seasonType = c("regular", "postseason")
     )
   ),
@@ -78,9 +86,15 @@ list(
   # The week grid comes from the cleaned games (fresh ingest in refresh mode,
   # the published parquet in track mode), so the stats ingests never re-pull
   # /games to discover weeks and track mode never touches a NULL raw target.
+  # Only the selected seasons' weeks with a completed game are pulled, so an
+  # in-season run skips the scheduled-but-unplayed weeks.
   tar_target(
     week_grid,
     games |>
+      dplyr::filter(
+        season %in% refresh_seasons(source = "games"),
+        completed
+      ) |>
       dplyr::distinct(season, seasonType, week) |>
       dplyr::arrange(season, seasonType, week)
   ),
@@ -142,10 +156,15 @@ list(
   tar_target(picks, arrow::read_parquet(picks_file)),
   tar_target(
     player_stats_file,
-    parquet_asset(
-      "data/player_stats.parquet",
-      function() clean_player_stats(raw_player_stats)
-    ),
+    parquet_asset("data/player_stats.parquet", function() {
+      splice_seasons(
+        clean_player_stats(raw_player_stats),
+        "data/player_stats.parquet",
+        "season",
+        refresh_seasons(source = "player_stats"),
+        full = refresh_is_full(source = "player_stats")
+      )
+    }),
     format = "file"
   ),
   tar_target(player_stats, arrow::read_parquet(player_stats_file)),
@@ -165,40 +184,72 @@ list(
   tar_target(teams, arrow::read_parquet(teams_file)),
   tar_target(
     roster_file,
-    parquet_asset("data/roster.parquet", function() clean_roster(raw_roster)),
+    parquet_asset("data/roster.parquet", function() {
+      splice_seasons(
+        clean_roster(raw_roster),
+        "data/roster.parquet",
+        "season",
+        refresh_seasons(source = "roster"),
+        full = refresh_is_full(source = "roster")
+      )
+    }),
     format = "file"
   ),
   tar_target(roster, arrow::read_parquet(roster_file)),
   tar_target(
     recruiting_file,
-    parquet_asset(
-      "data/recruiting.parquet",
-      function() clean_recruiting(raw_recruiting)
-    ),
+    parquet_asset("data/recruiting.parquet", function() {
+      splice_seasons(
+        clean_recruiting(raw_recruiting),
+        "data/recruiting.parquet",
+        "hs_class",
+        refresh_seasons(source = "recruiting"),
+        full = refresh_is_full(source = "recruiting"),
+        dedupe = dedupe_recruiting
+      )
+    }),
     format = "file"
   ),
   tar_target(recruiting, arrow::read_parquet(recruiting_file)),
   tar_target(
     games_file,
-    parquet_asset("data/games.parquet", function() clean_games(raw_games)),
+    parquet_asset("data/games.parquet", function() {
+      splice_seasons(
+        clean_games(raw_games),
+        "data/games.parquet",
+        "season",
+        refresh_seasons(source = "games"),
+        full = refresh_is_full(source = "games")
+      )
+    }),
     format = "file"
   ),
   tar_target(games, arrow::read_parquet(games_file)),
   tar_target(
     game_team_stats_file,
-    parquet_asset(
-      "data/game_team_stats.parquet",
-      function() clean_game_team_stats(raw_game_team_stats)
-    ),
+    parquet_asset("data/game_team_stats.parquet", function() {
+      splice_seasons(
+        clean_game_team_stats(raw_game_team_stats),
+        "data/game_team_stats.parquet",
+        "season",
+        refresh_seasons(source = "game_team_stats"),
+        full = refresh_is_full(source = "game_team_stats")
+      )
+    }),
     format = "file"
   ),
   tar_target(game_team_stats, arrow::read_parquet(game_team_stats_file)),
   tar_target(
     game_player_stats_file,
-    parquet_asset(
-      "data/game_player_stats.parquet",
-      function() clean_game_player_stats(raw_game_player_stats)
-    ),
+    parquet_asset("data/game_player_stats.parquet", function() {
+      splice_seasons(
+        clean_game_player_stats(raw_game_player_stats),
+        "data/game_player_stats.parquet",
+        "season",
+        refresh_seasons(source = "game_player_stats"),
+        full = refresh_is_full(source = "game_player_stats")
+      )
+    }),
     format = "file"
   ),
   tar_target(game_player_stats, arrow::read_parquet(game_player_stats_file)),
@@ -281,6 +332,32 @@ list(
     ok_recruiting,
     pointblank::all_passed(
       contract_recruiting(recruiting, stop_on_fail = FALSE)
+    )
+  ),
+  # Season-scoped refreshes rewrite only some seasons (decision 0034); no
+  # season may go missing from a season-keyed table.
+  tar_target(
+    ok_season_coverage,
+    pointblank::all_passed(
+      contract_season_coverage(
+        list(
+          player_stats = player_stats$season,
+          roster = roster$season,
+          recruiting = recruiting$hs_class,
+          games = games$season,
+          game_team_stats = game_team_stats$season,
+          game_player_stats = game_player_stats$season
+        ),
+        required = required_seasons(c(
+          "player_stats",
+          "roster",
+          "recruiting",
+          "games",
+          "game_team_stats",
+          "game_player_stats"
+        )),
+        stop_on_fail = FALSE
+      )
     )
   ),
   tar_target(
@@ -448,6 +525,7 @@ list(
       roster = ok_roster,
       recruiting = ok_recruiting,
       teams = ok_teams,
+      season_coverage = ok_season_coverage,
       games = ok_games,
       game_team_stats = ok_game_team_stats,
       game_player_stats = ok_game_player_stats,

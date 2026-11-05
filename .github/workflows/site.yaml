@@ -6,9 +6,10 @@ on:
   workflow_dispatch:
 
 # Requires GitHub Pages to be enabled for the repo (Settings > Pages > "GitHub
-# Actions"). Data is not in git; it is pulled from a release asset published by
-# the data-refresh workflow, then the pipeline runs so the audit/DAG pages have
-# targets to read.
+# Actions"). Data is not in git; it is pulled from the data-latest release
+# (published by data-current.yaml, which also dispatches this workflow), then
+# the pipeline runs in track mode, with no CFBD key and no API calls, so the
+# audit/DAG pages have targets to read.
 permissions:
   contents: read
   pages: write

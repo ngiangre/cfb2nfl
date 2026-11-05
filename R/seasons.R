@@ -1,8 +1,9 @@
-# Season calendar and the season-scoped refresh selector (decision 0034).
+# Season calendar, the season-scoped refresh selector, and the season splice
+# (decision 0034).
 #
-# Pure functions of a date and an environment variable: no API calls. The
-# ingest targets will call refresh_seasons() to decide which seasons to pull;
-# until they do, nothing here changes what the pipeline ingests.
+# Pure functions of a date, an environment variable, and local files: no API
+# calls. The ingest targets call refresh_seasons() to decide which seasons to
+# pull, and splice_seasons() to merge them into the published table.
 
 #' Source groups for season-keyed refresh
 #'
@@ -75,7 +76,10 @@ refresh_season_for <- function(source, date = Sys.Date()) {
   season <- switch(
     group,
     cfb = current_season(date),
-    recruiting = current_season(date) + 1L,
+    # The class enrolled this season: CFBD assigns athlete ids to a class
+    # once it enrolls, and the cleaned table keeps only recruits with an id,
+    # so the incoming class (all ids missing) would add no rows.
+    recruiting = current_season(date),
     draft = draft_season(date),
     nfl = current_season(date)
   )
@@ -209,4 +213,135 @@ parse_season_token <- function(token, max_season) {
     "Unrecognized token {.val {token}} in the refresh seasons selector.",
     "i" = "Use {.val current}, a year such as {.val 2024}, or a range such as {.val 2010:2025}."
   ))
+}
+
+#' Does the selector cover a source's full window?
+#'
+#' A full-window refresh rebuilds the table from scratch (today's behavior);
+#' anything narrower splices into the published table ([splice_seasons()]).
+#'
+#' @inheritParams refresh_seasons
+#' @return `TRUE` when the selector selects every season in the window.
+#' @keywords internal
+refresh_is_full <- function(
+  spec = Sys.getenv("CFB2NFL_REFRESH_SEASONS", ""),
+  source,
+  min_season = 2010L,
+  date = Sys.Date()
+) {
+  setequal(
+    refresh_seasons(spec, source, min_season, date),
+    refresh_seasons("", source, min_season, date)
+  )
+}
+
+#' Splice freshly cleaned seasons into the published table
+#'
+#' A season-scoped refresh (decision 0034) re-ingests only some seasons. The
+#' published asset stays one parquet per table (one `data-latest` release, no
+#' partition directories), so the fresh rows replace exactly those seasons'
+#' rows in the existing file and every other season is kept as published.
+#'
+#' Guards, all failing before anything is written:
+#' - the existing file must be present (download `data-latest` first);
+#' - the fresh rows must have the published columns (a schema change needs a
+#'   full refresh, which rebuilds every season);
+#' - no refreshed season may shrink below `min_ratio` of its published rows,
+#'   so a truncated or failed pull cannot silently replace good data. A season
+#'   with no published rows (a new season) is not checked.
+#'
+#' @param fresh The freshly cleaned rows for `seasons`.
+#' @param path The published parquet to splice into.
+#' @param season_col The table's season column (e.g. `"season"`, `"hs_class"`).
+#' @param seasons The seasons `fresh` replaces.
+#' @param full When `TRUE`, `fresh` is the whole table and is returned as is.
+#' @param dedupe Optional function applied after binding (e.g. to restore a
+#'   one-row-per-athlete key, see [dedupe_recruiting()]).
+#' @param min_ratio Smallest allowed fresh-to-published row ratio per season.
+#' @return The spliced table.
+#' @keywords internal
+splice_seasons <- function(
+  fresh,
+  path,
+  season_col,
+  seasons,
+  full = FALSE,
+  dedupe = NULL,
+  min_ratio = 0.5
+) {
+  if (isTRUE(full)) {
+    return(fresh)
+  }
+  if (!file.exists(path)) {
+    cli::cli_abort(c(
+      "Season-scoped refresh needs the published {.path {path}} to splice into.",
+      "i" = "Download the {.val data-latest} release first ({.file data-raw/pull-data.R}), or run a full refresh."
+    ))
+  }
+  old <- arrow::read_parquet(path)
+  if (!setequal(names(fresh), names(old))) {
+    cli::cli_abort(c(
+      "Fresh rows for {.path {path}} do not match the published columns.",
+      "x" = "Added: {.val {setdiff(names(fresh), names(old))}}; missing: {.val {setdiff(names(old), names(fresh))}}.",
+      "i" = "A schema change needs a full refresh (unset {.envvar CFB2NFL_REFRESH_SEASONS})."
+    ))
+  }
+  old_n <- table(factor(old[[season_col]], levels = seasons))
+  new_n <- table(factor(fresh[[season_col]], levels = seasons))
+  shrunk <- seasons[old_n > 0 & new_n < min_ratio * old_n]
+  if (length(shrunk) > 0) {
+    cli::cli_abort(c(
+      "Refreshed seasons shrank below {min_ratio * 100}% of their published rows in {.path {path}}: {shrunk}.",
+      "i" = "Published: {as.integer(old_n[as.character(shrunk)])}; fresh: {as.integer(new_n[as.character(shrunk)])}. The pull is likely truncated; nothing was written."
+    ))
+  }
+  out <- dplyr::bind_rows(
+    old[!old[[season_col]] %in% seasons, , drop = FALSE],
+    fresh[, names(old)]
+  )
+  if (!is.null(dedupe)) {
+    out <- dedupe(out)
+  }
+  out
+}
+
+#' Estimate the CFBD calls a refresh will make
+#'
+#' Mirrors the ingest call patterns: one call per season for player stats,
+#' roster, and recruiting; two `/games` calls per season (regular and
+#' postseason); one `/games/teams` and one `/games/players` call per played
+#' week; plus one call each for the whole-table `/draft/picks`, `/coaches`,
+#' and `/teams`. Week counts come from the published games; a season not yet
+#' published is assumed to have `default_weeks` played weeks. nflverse sources
+#' cost no CFBD calls.
+#'
+#' @param seasons Named list of season vectors for `games`, `player_stats`,
+#'   `roster`, and `recruiting` (as from [refresh_seasons()]).
+#' @param games The published games table (`season`, `seasonType`, `week`,
+#'   `completed`), or `NULL`.
+#' @param default_weeks Played weeks assumed for an unpublished season.
+#' @return A named integer vector of calls by endpoint, with a `total`.
+#' @keywords internal
+estimate_refresh_calls <- function(seasons, games = NULL, default_weeks = 16L) {
+  game_seasons <- seasons$games
+  weeks <- if (is.null(games)) {
+    0L
+  } else {
+    games |>
+      dplyr::filter(.data$season %in% game_seasons, .data$completed) |>
+      dplyr::distinct(.data$season, .data$seasonType, .data$week) |>
+      nrow()
+  }
+  known <- if (is.null(games)) integer() else unique(games$season)
+  weeks <- weeks + default_weeks * sum(!game_seasons %in% known)
+  calls <- c(
+    games = 2L * length(game_seasons),
+    game_team_stats = as.integer(weeks),
+    game_player_stats = as.integer(weeks),
+    player_stats = length(seasons$player_stats),
+    roster = length(seasons$roster),
+    recruiting = length(seasons$recruiting),
+    picks_coaches_teams = 3L
+  )
+  c(calls, total = sum(calls))
 }

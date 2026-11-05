@@ -107,6 +107,36 @@ cfbd_request <- function(
   req
 }
 
+#' Log a CFBD call when a call log is configured
+#'
+#' Appends one line (time, endpoint, query) to the file named by
+#' `CFB2NFL_CALL_LOG`, if set, so a refresh can report how many calls it made
+#' against the monthly quota (decision 0034). Retries inside one call are not
+#' counted separately.
+#'
+#' @param endpoint API path.
+#' @param query Named list of query parameters.
+#' @return `NULL`, invisibly.
+#' @keywords internal
+cfbd_log_call <- function(endpoint, query = list()) {
+  log <- Sys.getenv("CFB2NFL_CALL_LOG")
+  if (nzchar(log)) {
+    q <- paste(names(query), unlist(query), sep = "=", collapse = "&")
+    cat(
+      format(Sys.time(), "%Y-%m-%dT%H:%M:%S"),
+      "\t",
+      endpoint,
+      "\t",
+      q,
+      "\n",
+      file = log,
+      append = TRUE,
+      sep = ""
+    )
+  }
+  invisible(NULL)
+}
+
 #' Perform an authenticated CFBD API request
 #'
 #' Performs the request from [cfbd_request()] and returns the parsed body as a
@@ -129,6 +159,7 @@ cfbd_get <- function(
   retry_max_seconds = 120
 ) {
   rlang::check_installed(c("httr2", "tibble"), reason = "to call the CFBD API.")
+  cfbd_log_call(endpoint, query)
   cfbd_request(
     endpoint,
     query,

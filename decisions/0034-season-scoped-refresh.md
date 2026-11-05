@@ -1,6 +1,6 @@
-# 0034 — Season-scoped refresh: current-season runs, partitioned assets
+# 0034 — Season-scoped refresh: current-season runs spliced into one release
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-05
 
 ## Context
@@ -16,32 +16,38 @@ refreshed on a sensible cadence at all under the current design.
 This entry revises decisions 0017 and 0018 (the single full-table asset per
 table, invalidated wholesale) and extends decision 0029 (branching by season
 for the games family) to every season-keyed source. It implements the design in
-issue #46. This branch records the decisions and ships the calendar and selector
-helpers only; wiring the ingest targets, partitioned assets, and workflows is
-follow-up work (checklist below).
+issue #46.
 
 ## Decision
 
-### 1. Partitioning
+### 1. Season splice into one file per table (revised from partitions)
 
-Season-keyed cleaned tables are stored as one parquet file per season:
-`data/<table>/season=YYYY.parquet`, read with `arrow::open_dataset()`.
-Recommended over a `<table>_historical` + `<table>_current` pair because:
+The draft of this decision proposed per-season partition files
+(`data/<table>/season=YYYY.parquet`). Built instead: each published cleaned
+table **stays one parquet**, and a season-scoped run **splices** the re-pulled
+seasons into it (`splice_seasons()`, `R/seasons.R`): the fresh cleaned rows
+replace exactly those seasons' rows, every other season is kept as published.
+Reasons for the revision:
 
-- The partition key is the same concept every source already has (`season`), so
-  one scheme covers `games`, `player_stats`, `roster`, `recruiting`, `plays`, and
-  so on. A pair would need a split rule per table and a re-merge on every
-  rollover.
-- A run replaces exactly the partitions it re-pulled. Rollover needs no data
-  movement: the just-finished season simply stops being in the selector.
-- Partial failures are visible per season (a missing `season=` file is a
-  contract failure, not a silently short table).
+- GitHub release assets are a flat namespace with no directories, so partitions
+  would be ~200 assets named like `roster-2024.parquet`, and every consumer
+  (`build_duckdb()`, the readers, the site download, the dictionaries, the data
+  model) would change. The splice changes none of them.
+- The call savings are identical: only the selected seasons are ingested.
+- Partial failures stay loud. Guards abort before anything is written: the
+  published file must exist, the fresh rows must have the published columns (a
+  schema change needs a full refresh), and no refreshed season may shrink below
+  50% of its published rows (a truncated pull cannot replace good data). The
+  `season_coverage` contract then requires every season from 2010 through the
+  last completed one in each season-keyed table.
 
-Non-season tables (`teams`, `play_types`, `play_stat_types`, the dimension
-lookups) stay as single files and ride the current slice. Derived tables
-(`conference_tiers`, `outcomes`, `team_season`, `team_draft`, the DuckDB bundle)
-are recomputed from all partitions on every run. That is local compute with no
-API calls.
+Season-keyed and spliced: `player_stats`, `roster`, `recruiting` (`hs_class`,
+re-deduped to one row per athlete with `dedupe_recruiting()`), `games`,
+`game_team_stats`, `game_player_stats`. Pulled in full every run because they
+are one call each or free: `picks`, `coaches`, `teams` (CFBD, 3 calls) and the
+nflverse tables (no CFBD calls). Derived tables (`conference_tiers`,
+`outcomes`, team tables, the DuckDB bundle) are recomputed from the spliced
+tables every run, locally.
 
 ### 2. Selector: `CFB2NFL_REFRESH_SEASONS`
 
@@ -74,7 +80,7 @@ narrows a refresh.
 | Source | Season | Rule |
 |---|---|---|
 | CFB season data (`games`, `game_team_stats`, `game_player_stats`, `player_stats`, `roster`, `coaches`, `plays`, `play_stats`) | `current_season(date)` | Aug-to-Jul year (see §4) |
-| `recruiting` | `current_season(date) + 1` | the incoming class; recruiting for class Y is published during Y-1's season (verified 2026-11-05: `/recruiting/players?year=2027` returned 2,942 recruits, 93% committed, but 28% still without a star rating vs 7–11% in finished classes, so the class is provisional until February signing day and re-pulling it weekly is the point) |
+| `recruiting` | `current_season(date)` | the class enrolled this season (revised from the incoming class, see below) |
 | `picks`, `nfl_draft_picks`, combine | `draft_season(date)` | the most recently completed draft; the new draft year takes over on **May 1** (the draft is late April) |
 | `nfl_rosters`, `nfl_player_stats` | NFL season | the NFL season runs Sep–Feb; use the same Aug cutoff, which lands on the prior season in Jan–Jul |
 | `teams` (non-season) | none | rides the current slice, no season key |
@@ -88,6 +94,14 @@ differs from `current_season(date)` only in May–July, when the draft is done b
 the college season has not started. The spec's "draft year = current_season() + 1"
 is not used because it would refresh a draft that has not happened yet.
 
+**Recruiting is the enrolled class, not the incoming one.** The draft used
+`current_season() + 1`. The incoming class is published in-season (2026-11-05:
+`/recruiting/players?year=2027` returned 2,942 recruits), but **0 of 2,942
+carry a CFBD athlete id**: ids are assigned on enrollment, and
+`clean_recruiting()` keeps only recruits with an id (the shared namespace,
+decision 0003). So that call added no rows. The class that changes during a
+season is the enrolled one, as its athletes get ids.
+
 ### 4. Calendar edge cases
 
 - `current_season(date)`: `year(date)` if `month(date) >= 8`, else `year(date) - 1`.
@@ -97,83 +111,76 @@ is not used because it would refresh a draft that has not happened yet.
 - Seasons are keyed by the CFBD `year`, so spring games and recruiting-cycle
   dates do not move the season.
 
-### 5. Schedule
+### 5. Schedule and entry points
 
-- `data-current.yaml` (replacing the weekly full `data-refresh.yaml`): weekly
-  from late August to mid January, plus runs after National Signing Day (early
-  February), the combine (early March), and the draft (late April). Off-season
-  runs are `workflow_dispatch` only.
-- `data-raw/refresh-historical.R` (on demand, run locally where CFBD does not
-  throttle): backfills a season range, prints the estimated call count, and
-  requires confirmation before starting.
-- `site.yaml` downloads the published assets and renders. No ingest.
+- `.github/workflows/data-current.yaml` (scheduled): downloads every published
+  asset, runs `tar_make()` with `CFB2NFL_REFRESH_SEASONS=current`, publishes
+  with `overwrite = TRUE`, and dispatches `site.yaml`. Sundays August through
+  January, plus Feb 8 (after National Signing Day), Mar 10 (after the combine),
+  and May 2 (after the draft). `workflow_dispatch` takes any selector.
+- `.github/workflows/data-refresh.yaml`: demoted to `workflow_dispatch` only,
+  the full rebuild (~780 calls) for schema changes.
+- `data-raw/refresh-historical.R <selector> [--yes] [--publish]` (local, on
+  demand): prints `estimate_refresh_calls()` and refuses to start without
+  confirmation; reports the calls actually made. `data-raw/refresh.R` stays the
+  full rebuild and also reports its call count.
+- Calls are counted through `CFB2NFL_CALL_LOG` (`cfbd_log_call()`, one line
+  per request; retries inside a request are not counted).
+- `site.yaml` downloads the release and runs `tar_make()` in **track mode**
+  (no key, no API calls) so the audit/DAG pages have targets to read. Shipping
+  the targets store to skip that compute was not done; the build already needs
+  no `CFBD_API_KEY`.
+- The stats ingests pull only weeks with at least one completed game, so an
+  in-season run skips scheduled-but-unplayed weeks.
 
 ### 6. Release layout
 
-A single `data-latest` tag holds all partitions. Reasons: `pb_download()` needs
-one tag for a fresh checkout; a two-tag split (`data-historical`,
-`data-current`) forces every consumer to know which tag owns which season and
-complicates rollover. Partition file names are unique per table and season, so
-they do not collide in the flat release-asset namespace (the collision problem
-decision 0018 raised for raw vs cleaned files does not recur). The audit history
-CSV keeps being carried across runs as today.
+A single `data-latest` tag holds every asset, one parquet per table as before.
+A two-tag split (`data-historical`, `data-current`) would force every consumer
+to know which tag owns which season and complicate rollover. Season rollover
+needs no action: on August 1 `current` moves to the new season and the
+finished one is simply no longer re-pulled. The audit history CSV keeps being
+carried across runs.
 
-### 7. Expected call cost of a current-season run
+### 7. Call cost of a current-season run
 
-Estimated from the existing ingest call patterns (decisions 0028, 0029, 0031),
-for one season:
-
-| Source | Calls |
-|---|---|
-| `/games` (regular + postseason) | 2 |
-| `/games/teams` (one per played week, both season types, ~15 weeks) | ~16 |
-| `/games/players` (one per played week) | ~16 |
-| `/stats/player/season` | 1 |
-| `/roster` | 1 |
-| `/recruiting/players` (next class) | 1 |
-| `/coaches`, `/teams`, `/draft/picks` (non-season or cheap, refreshed) | ~3 |
-| `/plays` (one per week) | ~16 |
-| **Subtotal without `/plays` or `/plays/stats`** | **~40** |
-| **Total with `/plays`** | **~56** |
-| `/plays/stats` (per game, ~2,100 games) | excluded from the default run |
-
-Both totals are under the ~100-call target. `/plays/stats` stays opt-in by season (decision
-0031) and is not part of the default current run. nflverse sources cost no
-CFBD calls.
+Measured 2026-11-05 with `data-raw/refresh-historical.R current --yes`:
+**28 CFBD calls** (estimate 24, from the published games' 8 completed weeks; 10
+were complete by then), against ~780 for a full refresh. Breakdown: `/games` 2,
+`/games/teams` 10, `/games/players` 10, `/stats/player/season` 1, `/roster` 1,
+`/recruiting/players` 1, `/draft/picks` + `/coaches` + `/teams` 3. Week-level
+stats grow by one call each per played week, so a late-season run is ~35 and
+a bowl-season run ~40. `/plays` (#44) would add about one call per week.
 
 ## Hypotheses / expectations
 
 - A current-season run costs under 100 CFBD calls, against ~780 for the full
   refresh today.
-- Re-pulling one historical season reproduces its published partition (row
-  counts and schema hash match), so partitions are interchangeable across runs.
-- Derived tables rebuilt from all partitions give the same output as today's
+- Re-pulling one historical season reproduces its published rows (row counts
+  and schema hash match), so a splice is interchangeable with a full refresh.
+- Derived tables rebuilt from the spliced tables give the same output as today's
   full refresh when the selector covers the whole window.
 
 ## Consequences
 
-- Revises decision 0017: the publish step writes partitions, not whole-table
-  files. Revises decision 0018 only in the layout of the cleaned asset; the
-  parquet-equals-DuckDB-equals-dictionary rule still holds per season.
-- Extends decision 0029: the games-family branching becomes the pattern for
-  every season-keyed source.
-- Contracts must check that every season in the window is present exactly once
-  per table, and that a partial run does not silently drop seasons.
-- The `season=` partition layout changes what `inst/data-model.md` and the
-  dictionaries describe. Those documents need updating in the follow-up.
-
-## Follow-up checklist
-
-- [ ] Season-branch `picks`, `player_stats`, `coaches`, `roster`, `recruiting`, and the nflverse tables, using `refresh_seasons()` for the season vector.
-- [ ] Read-published-partition vs ingest switch per branch, honoring `CFB2NFL_REFRESH_SEASONS`.
-- [ ] Partitioned `parquet_asset()` writer and an `open_dataset()` reader; `build_duckdb()` reads the full partition set.
-- [ ] Contracts: every season in the window present once per table; no silent partial-run gaps; current-slice row counts within bounds of the prior run.
-- [ ] `.github/workflows/data-current.yaml` with the seasonal schedule; retire or demote `data-refresh.yaml`.
-- [ ] `data-raw/refresh-historical.R` with call-count estimate and confirmation; update `data-raw/refresh.R`, `publish-data.R`, `pull-data.R`.
-- [ ] Slim `site.yaml` to download and render.
-- [ ] Update `AGENTS.md` (Data, quota, pipeline sections), `inst/data-model.md`, and `NEWS.md`.
-- [ ] Verify the call-count estimate against a real current-season run before relying on it.
+- Revises decision 0017: a refresh may now rewrite only some seasons of a
+  published table. Decision 0018 is unchanged: parquet == DuckDB == dictionary
+  schema, one cleaned asset per table.
+- Extends decision 0029: every season-keyed CFBD source ingests only the
+  selected seasons; the games family keeps its per-week branching.
+- A splice can differ from a full re-clean in one place: recruiting dedupe sees
+  only each athlete's previously kept record, so a refreshed record that drops
+  below one the published table had already discarded wins anyway. A full
+  refresh resolves it.
+- New sources (#44 plays, #45 combine) should declare a season column and use
+  `splice_seasons()` in their `*_file` target.
 
 ## Outcome / what we learned
 
-_Filled in later._
+- The first real current-season run (2026-11-05, local, not published) cost 28
+  calls and replaced 2026 rows only: `game_player_stats` 92,559 → 103,277 2026
+  rows, `player_stats` 144,711 → 149,725, other seasons untouched; every
+  contract, including `season_coverage`, passed.
+- The incoming recruiting class has no athlete ids until enrollment (above).
+- The `build_outcomes()` UDFA name join is many-to-many by design; it only
+  warned in refresh mode, now silenced with an explicit `relationship`.

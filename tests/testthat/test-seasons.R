@@ -35,8 +35,8 @@ test_that("refresh_season_for maps each source group on its calendar", {
   # CFB season data is the season that ended in December.
   expect_identical(refresh_season_for("games", jan), 2025L)
   expect_identical(refresh_season_for("roster", jan), 2025L)
-  # Recruiting is the incoming class, one ahead of the CFB season.
-  expect_identical(refresh_season_for("recruiting", jan), 2026L)
+  # Recruiting is the class enrolled in the current CFB season.
+  expect_identical(refresh_season_for("recruiting", jan), 2025L)
   # Draft-keyed sources: the draft has not happened yet in January.
   expect_identical(refresh_season_for("picks", jan), 2025L)
   expect_identical(refresh_season_for("nfl_draft_picks", jan), 2025L)
@@ -54,7 +54,7 @@ test_that("refresh_season_for maps each source group on its calendar", {
 
   dec31 <- as.Date("2026-12-31")
   expect_identical(refresh_season_for("games", dec31), 2026L)
-  expect_identical(refresh_season_for("recruiting", dec31), 2027L)
+  expect_identical(refresh_season_for("recruiting", dec31), 2026L)
 })
 
 test_that("refresh_season_for rejects unknown or non-season sources", {
@@ -68,10 +68,10 @@ test_that("an unset or empty selector is the full window to the current season",
   expect_identical(refresh_seasons("", source = "games", date = d), 2010:2026)
   expect_identical(refresh_seasons(NA, source = "games", date = d), 2010:2026)
   expect_identical(refresh_seasons(NULL, source = "games", date = d), 2010:2026)
-  # Recruiting's window runs to the incoming class.
+  # Recruiting's window runs to the enrolled class, not the incoming one.
   expect_identical(
     refresh_seasons("", source = "recruiting", date = d),
-    2010:2027
+    2010:2026
   )
   # The env var is read when the spec is not given.
   withr::with_envvar(
@@ -88,7 +88,7 @@ test_that("the selector accepts current, a single year, a range and a list", {
   )
   expect_identical(
     refresh_seasons("current", source = "recruiting", date = d),
-    2027L
+    2026L
   )
   expect_identical(refresh_seasons("2024", source = "games", date = d), 2024L)
   expect_identical(
@@ -215,4 +215,174 @@ test_that("bad arguments to the selector are rejected", {
     refresh_seasons("", source = "games", min_season = 2030L, date = d),
     "empty"
   )
+})
+
+# ---- season splice (decision 0034) -------------------------------------------
+
+splice_fixture <- function(dir) {
+  path <- file.path(dir, "t.parquet")
+  arrow::write_parquet(
+    tibble::tibble(season = c(2024L, 2024L, 2025L, 2025L), x = c(1, 2, 3, 4)),
+    path
+  )
+  path
+}
+
+test_that("splice_seasons replaces only the refreshed seasons", {
+  path <- splice_fixture(withr::local_tempdir())
+  fresh <- tibble::tibble(season = c(2025L, 2025L, 2025L), x = c(30, 40, 50))
+  out <- splice_seasons(fresh, path, "season", 2025L)
+  expect_equal(sort(out$x), c(1, 2, 30, 40, 50))
+  expect_equal(sum(out$season == 2024L), 2L)
+})
+
+test_that("splice_seasons adds a new season and keeps column order", {
+  path <- splice_fixture(withr::local_tempdir())
+  fresh <- tibble::tibble(x = 9, season = 2026L)
+  out <- splice_seasons(fresh, path, "season", 2026L)
+  expect_equal(names(out), c("season", "x"))
+  expect_equal(nrow(out), 5L)
+})
+
+test_that("splice_seasons returns the fresh table on a full refresh", {
+  fresh <- tibble::tibble(season = 2010L, x = 1)
+  expect_identical(
+    splice_seasons(
+      fresh,
+      "does-not-exist.parquet",
+      "season",
+      2010L,
+      full = TRUE
+    ),
+    fresh
+  )
+})
+
+test_that("splice_seasons refuses to run without the published file", {
+  expect_error(
+    splice_seasons(
+      tibble::tibble(season = 2025L),
+      "nope.parquet",
+      "season",
+      2025L
+    ),
+    "data-latest"
+  )
+})
+
+test_that("splice_seasons refuses a schema change", {
+  path <- splice_fixture(withr::local_tempdir())
+  fresh <- tibble::tibble(season = 2025L, x = 1, y = 2)
+  expect_error(splice_seasons(fresh, path, "season", 2025L), "full refresh")
+})
+
+test_that("splice_seasons refuses a truncated pull", {
+  path <- splice_fixture(withr::local_tempdir())
+  fresh <- tibble::tibble(season = 2025L, x = 1)
+  # 1 of 2 published rows is exactly the 50% floor: allowed.
+  expect_equal(nrow(splice_seasons(fresh, path, "season", 2025L)), 3L)
+  expect_error(
+    splice_seasons(fresh, path, "season", 2025L, min_ratio = 0.75),
+    "shrank"
+  )
+  # Refreshing a season that returns no rows at all is a truncation.
+  expect_error(
+    splice_seasons(
+      tibble::tibble(season = integer(), x = double()),
+      path,
+      "season",
+      2024L
+    ),
+    "shrank"
+  )
+})
+
+test_that("splice_seasons re-dedupes recruiting to one row per athlete", {
+  dir <- withr::local_tempdir()
+  path <- file.path(dir, "r.parquet")
+  old <- tibble::tibble(
+    playerId = c("a", "b"),
+    hs_class = c(2025L, 2026L),
+    stars = c(3L, 3L),
+    rating = c(0.85, 0.80)
+  )
+  arrow::write_parquet(old, path)
+  # "a" reappears in the refreshed 2026 class with a higher rating.
+  fresh <- tibble::tibble(
+    playerId = c("a", "b"),
+    hs_class = c(2026L, 2026L),
+    stars = c(4L, 3L),
+    rating = c(0.90, 0.81)
+  )
+  out <- splice_seasons(
+    fresh,
+    path,
+    "hs_class",
+    2026L,
+    dedupe = dedupe_recruiting
+  )
+  expect_equal(nrow(out), 2L)
+  expect_equal(out$rating[out$playerId == "a"], 0.90)
+  expect_equal(out$rating[out$playerId == "b"], 0.81)
+})
+
+test_that("refresh_is_full distinguishes the full window from a slice", {
+  d <- as.Date("2026-11-05")
+  expect_true(refresh_is_full("", "roster", date = d))
+  expect_true(refresh_is_full("2010:2026", "roster", date = d))
+  expect_false(refresh_is_full("current", "roster", date = d))
+  expect_true(refresh_is_full("2010:2026", "recruiting", date = d))
+  expect_false(refresh_is_full("2011:2026", "recruiting", date = d))
+})
+
+test_that("estimate_refresh_calls counts calls per endpoint", {
+  games <- tibble::tibble(
+    season = c(2025L, 2025L, 2025L, 2026L, 2026L),
+    seasonType = c("regular", "regular", "postseason", "regular", "regular"),
+    week = c(1L, 2L, 1L, 1L, 2L),
+    completed = c(TRUE, TRUE, TRUE, TRUE, FALSE)
+  )
+  seasons <- list(
+    games = 2026L,
+    player_stats = 2026L,
+    roster = 2026L,
+    recruiting = 2027L
+  )
+  est <- estimate_refresh_calls(seasons, games)
+  expect_equal(est[["games"]], 2L)
+  expect_equal(est[["game_team_stats"]], 1L)
+  expect_equal(est[["total"]], 2L + 1L + 1L + 1L + 1L + 1L + 3L)
+  # An unpublished season assumes the default week count.
+  est_new <- estimate_refresh_calls(
+    list(
+      games = 2027L,
+      player_stats = 2027L,
+      roster = 2027L,
+      recruiting = 2028L
+    ),
+    games,
+    default_weeks = 15L
+  )
+  expect_equal(est_new[["game_player_stats"]], 15L)
+})
+
+test_that("contract_season_coverage flags a missing season", {
+  ok <- contract_season_coverage(
+    list(roster = c(2024L, 2025L, 2026L)),
+    required = list(roster = 2024:2025),
+    stop_on_fail = FALSE
+  )
+  expect_true(pointblank::all_passed(ok))
+  gap <- contract_season_coverage(
+    list(roster = c(2024L, 2026L)),
+    required = list(roster = 2024:2025),
+    stop_on_fail = FALSE
+  )
+  expect_false(pointblank::all_passed(gap))
+})
+
+test_that("required_seasons stops before each source's current season", {
+  r <- required_seasons(c("roster", "recruiting"), date = as.Date("2026-11-05"))
+  expect_equal(range(r$roster), c(2010L, 2025L))
+  expect_equal(range(r$recruiting), c(2010L, 2025L))
 })
