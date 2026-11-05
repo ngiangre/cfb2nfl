@@ -306,6 +306,17 @@ list(
     )
   ),
   tar_target(
+    ok_player_game,
+    pointblank::all_passed(
+      contract_player_game(
+        player_game,
+        game_player_stats,
+        games,
+        stop_on_fail = FALSE
+      )
+    )
+  ),
+  tar_target(
     ok_tiers,
     pointblank::all_passed(
       contract_conference_tiers(
@@ -456,6 +467,7 @@ list(
       redshirt = ok_roster_flags,
       position_mapping = ok_position_mapping,
       position_path = ok_position_path,
+      player_game = ok_player_game,
       stat_taxonomy = ok_stat_taxonomy,
       player_season_stats = ok_player_season_stats,
       outcomes = ok_outcomes,
@@ -549,6 +561,10 @@ list(
   # release asset for them (decision 0021).
   tar_target(career, career_summary(roster)),
   tar_target(roster_flags, flag_redshirt(roster, player_stats)),
+  # Player x game grain (decision 0035): one row per (playerId, gameId) with a
+  # stat line; the shared base for per-game usage and opponent-adjusted
+  # performance. Derived like career/roster_flags, not published parquet.
+  tar_target(player_game, build_player_game(game_player_stats, games)),
   # Wide player-season stats for the DuckDB bundle (decision 0026): a derived
   # convenience table, like career/roster_flags above.
   tar_target(player_season_stats, build_player_season_stats(player_stats)),
@@ -623,6 +639,7 @@ list(
         roster_flags = roster_flags,
         career_summary = career,
         position_path = position_path,
+        player_game = player_game,
         player_season_stats = player_season_stats,
         team_season = team_season,
         team_draft = team_draft,
@@ -782,6 +799,14 @@ list(
         roster,
         keys = "playerId",
         contract_passed = ok_position_path
+      ),
+      audit_step(
+        player_game,
+        "build_player_game",
+        "features",
+        game_player_stats,
+        keys = c("playerId", "gameId"),
+        contract_passed = ok_player_game
       ),
       audit_step(
         model_table,

@@ -28,6 +28,7 @@ dictionaries next to this file, one YAML per table:
 | `roster_flags` | roster player-season + eligibility flags | [`dict/roster_flags.yml`](dict/roster_flags.yml) |
 | `career_summary` | one player's college career | [`dict/career_summary.yml`](dict/career_summary.yml) |
 | `position_path` | one college athlete id: harmonized HS, college and NFL position groups | [`dict/position_path.yml`](dict/position_path.yml) |
+| `player_game` | one player in one game (stat line + team, opponent, Elo, team games) | [`dict/player_game.yml`](dict/player_game.yml) |
 | `team_season` | one team in one season (every division) | [`dict/team_season.yml`](dict/team_season.yml) |
 | `team_draft` | team × final college season × position group | [`dict/team_draft.yml`](dict/team_draft.yml) |
 | `player_season_stats` | **wide**: player-season-team stat columns | [`dict/player_season_stats.yml`](dict/player_season_stats.yml) |
@@ -113,6 +114,9 @@ erDiagram
     games ||--o{ game_team_stats : "gameId == id"
     games ||--o{ game_player_stats : "gameId == id"
     game_player_stats }o--|| player_stats : "playerId (shared athlete id)"
+    game_player_stats ||--|| player_game : "playerId, gameId (one row per stat line)"
+    games ||--o{ player_game : "gameId == id"
+    team_season ||--o{ player_game : "team, season (team_games)"
     picks ||--o| nfl_pick_link : "same slot join, name-guarded"
     nfl_pick_link ||--o| nfl_draft_picks : "draft slot"
     nfl_draft_picks ||--o{ nfl_rosters : "gsis_id, season"
@@ -164,7 +168,10 @@ wrong rows, so they are called out explicitly.
    `game_player_stats.playerId` is the **shared** college athlete id
    (namespace 1), so game-level features join the career backbone directly;
    `game_team_stats.teamId` is CFBD's team-id namespace (distinct from athlete
-   ids — join teams by name).
+   ids — join teams by name). `player_game` (decision 0035) is the derived
+   player × game grain on the same keys: `(playerId, gameId)` is unique, its
+   `gameId` joins `games.id`, and `team_games` is the team's games played in
+   the season (the denominator for games appeared).
 
 ### Two namespaces that look joinable but are not
 

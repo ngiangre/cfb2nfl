@@ -17,6 +17,13 @@
   estimated 0.6% wrong-person rate on the new links. NFL groups come only
   through the draft-slot link. Reused athlete ids are excluded
   ([decision 0036](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0036-position-harmonization-and-path.md)).
+- New derived table `player_game` in the DuckDB bundle: one row per player per
+  game with a stat line. It carries the side, opponent, conferences, points,
+  pregame Elo (NA where CFBD has none), the wide per-game usage counts (passing,
+  rushing, receiving, defensive), and `team_games`, the team's games played in
+  the season, for games-appeared rates. Checked by a new data contract that
+  requires one row per distinct player-game in the box score
+  ([decision 0035](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0035-player-game-table.md)).
 
 - New blog post testing whether schools that win more produce more
   draftees. The link is strong among Power schools and moderate in the
