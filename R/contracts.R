@@ -1478,3 +1478,59 @@ contract_coaches_picks <- function(
   }
   invisible(agent)
 }
+
+#' Season coverage of the season-keyed published tables (decision 0034)
+#'
+#' A season-scoped refresh rewrites only the selected seasons, so this checks
+#' that no season silently went missing: every season from `min_season`
+#' through the last completed one must have rows in each table. The current
+#' season (or incoming recruiting class) may still be empty early in its cycle,
+#' so it is not required.
+#'
+#' @param seasons_by_table Named list; each element is the season column of
+#'   one table (e.g. `list(roster = roster$season)`).
+#' @param required Named list of required season vectors, same names.
+#' @param stop_on_fail Abort on failure.
+#' @return The pointblank agent, invisibly.
+#' @export
+contract_season_coverage <- function(
+  seasons_by_table,
+  required,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  tbl <- tibble::tibble(
+    table = names(seasons_by_table),
+    n_missing = vapply(
+      names(seasons_by_table),
+      function(t) {
+        length(setdiff(required[[t]], unique(seasons_by_table[[t]])))
+      },
+      integer(1)
+    )
+  )
+  agent <- pointblank::create_agent(tbl, label = "season_coverage") |>
+    pointblank::col_vals_equal("n_missing", 0L) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "season_coverage", stop_on_fail)
+}
+
+#' Seasons each season-keyed table must contain
+#'
+#' `min_season` through the season before each source's current one
+#' ([refresh_season_for()]): the last completed season for college data, the
+#' current season's signed class for recruiting.
+#'
+#' @param sources Season-keyed source names.
+#' @param min_season The earliest season in the window.
+#' @param date The date the window is evaluated at.
+#' @return A named list of integer season vectors.
+#' @keywords internal
+required_seasons <- function(sources, min_season = 2010L, date = Sys.Date()) {
+  stats::setNames(
+    lapply(sources, function(s) {
+      seq.int(min_season, refresh_season_for(s, date) - 1L)
+    }),
+    sources
+  )
+}

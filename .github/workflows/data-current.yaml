@@ -1,0 +1,93 @@
+name: data-current
+
+# Season-scoped refresh (decision 0034): re-pull only the current season (and
+# the incoming recruiting class), splice it into the published tables, and
+# republish everything to the single data-latest release. ~40 CFBD calls per
+# run, against ~780 for a full refresh (data-refresh.yaml, on demand only).
+# Requires the CFBD_API_KEY repository secret.
+#
+# Scheduled only when new data is expected (cron is fixed UTC):
+on:
+  schedule:
+    # Weekly through the season and bowls: Sundays, August through January.
+    - cron: "0 13 * 1,8-12 0"
+    # After National Signing Day (first Wednesday of February).
+    - cron: "0 13 8 2 *"
+    # After the NFL Scouting Combine (late February / early March).
+    - cron: "0 13 10 3 *"
+    # After the NFL Draft (late April); draft_season() turns over on May 1.
+    - cron: "0 13 2 5 *"
+  workflow_dispatch:
+    inputs:
+      seasons:
+        description: "CFB2NFL_REFRESH_SEASONS selector (current, a year, a:b, comma list)"
+        default: "current"
+        required: true
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    env:
+      CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      CFB2NFL_REFRESH: "true"
+      CFB2NFL_REFRESH_SEASONS: ${{ github.event.inputs.seasons || 'current' }}
+      CFB2NFL_CALL_LOG: ${{ github.workspace }}/cfbd-calls.tsv
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: |
+            local::.
+            any::piggyback
+            any::duckdb
+
+      # The splice needs every published table, and the schema history must
+      # carry across runs; CI checkouts start empty, so pull both first.
+      - name: Download published data
+        run: |
+          Rscript -e '
+            dir.create("data", showWarnings = FALSE)
+            piggyback::pb_download(
+              repo = Sys.getenv("GITHUB_REPOSITORY"),
+              tag = "data-latest",
+              dest = "data"
+            )
+          '
+
+      # One pass: ingest the selected seasons -> splice -> process -> write
+      # every parquet and the DuckDB bundle (decisions 0017, 0034). Contracts
+      # (incl. season coverage) abort before anything is published.
+      - name: Ingest current season, process, and bundle
+        run: Rscript -e 'targets::tar_make()'
+
+      - name: Report CFBD calls
+        if: always()
+        run: |
+          n=$( [ -f cfbd-calls.tsv ] && wc -l < cfbd-calls.tsv || echo 0 )
+          echo "CFBD calls made: $n" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish data as release asset
+        run: |
+          Rscript -e '
+            repo <- Sys.getenv("GITHUB_REPOSITORY")
+            assets <- list.files("data", pattern = "\\.(parquet|duckdb)$", full.names = TRUE)
+            piggyback::pb_upload(assets, repo = repo, tag = "data-latest", overwrite = TRUE)
+            if (file.exists("data/audit_history.csv")) {
+              piggyback::pb_upload("data/audit_history.csv", repo = repo, tag = "data-latest", overwrite = TRUE)
+            }
+          '
+
+      # The site renders from the release, so rebuild it on the new data.
+      - name: Rebuild the site
+        run: gh workflow run site.yaml --repo "$GITHUB_REPOSITORY" --ref main

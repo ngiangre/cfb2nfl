@@ -1,5 +1,19 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Season-scoped refresh: the scheduled data refresh now re-pulls only the
+  current season and splices it into the published tables, costing about 28–40
+  CFBD calls instead of ~780 (measured: 28 on 2026-11-05). The
+  `CFB2NFL_REFRESH_SEASONS` selector (`current`, a year, a range, or a comma
+  list) limits the season-keyed ingests; `splice_seasons()` replaces those
+  seasons' rows and refuses to write on a missing file, a schema change, or a
+  truncated pull; a new `season_coverage` contract checks no season goes
+  missing. New `data-current.yaml` workflow (Sundays August–January plus after
+  signing day, the combine, and the draft; rebuilds the site), new
+  `data-raw/refresh-historical.R` for on-demand season backfills with a call
+  estimate and confirmation, and `data-refresh.yaml` is now the on-demand full
+  rebuild. Every CFBD call can be logged via `CFB2NFL_CALL_LOG`. Still one
+  `data-latest` release, one parquet per table
+  ([decision 0034](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0034-season-scoped-refresh.md)).
 - New blog post on position stability from high school to college to the
   NFL: most linked recruits keep their position group in college, nearly every
   linked draftee keeps it in the NFL, and the roster source records no

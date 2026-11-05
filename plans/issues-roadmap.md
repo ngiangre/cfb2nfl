@@ -31,14 +31,14 @@ without checking what it re-pulls.
 
 ## Track A: data infrastructure (one branch at a time)
 
-- [ ] **A1 #46** season-scoped refresh (decision 0034, `R/seasons.R` done; ingest
-  rewiring, partitions and workflows remain): decision record (revises 0017/0018,
-  extends 0029), `current_season()` + per-source mapping, partitioned assets,
-  `data-current.yaml`, `refresh-historical.R`, slim `site.yaml`.
+- [x] **A1 #46** season-scoped refresh (decision 0034; built as a season splice
+  into one file per table, 28 calls per current run): decision record (revises 0017/0018,
+  extends 0029), `current_season()` + per-source mapping, season splice,
+  `data-current.yaml`, `refresh-historical.R`.
 - [ ] **A2 #48 + #45** in one branch so one publish covers both. #48 adds no
   calls (`location` is already in the `/teams` response); #45 is nflverse (no
   key). Code can be written alongside A1; only publish/merge waits.
-- [ ] **A3 #44 Phase 1** (plays + dimensions, ~360 calls) into partitions.
+- [ ] **A3 #44 Phase 1** (plays + dimensions, ~360 calls), spliced by season.
   Deferred past this week.
 - [ ] **A4 #44 Phase 2** play-stats backfill, one season/month, newest first,
   via `refresh-historical.R`.
@@ -66,7 +66,7 @@ without checking what it re-pulls.
 
 ## Next moves
 
-1. #46: season-branch the ingests and partitioned assets (0034 checklist).
+1. Next weekly run is `data-current.yaml` (~30 calls), not the full refresh.
 2. #47 and #50 in parallel on `player_game`; #51 part 1.
-3. Open question: is the 2027 recruiting class available on CFBD yet (a
-   one-call check errored on 2026-11-05)?
+3. Resolved 2026-11-05: the 2027 class is on CFBD but has no athlete ids
+   until enrollment, so "current" recruiting is the enrolled class (0034).

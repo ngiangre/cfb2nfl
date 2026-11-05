@@ -193,6 +193,23 @@ clean_recruiting <- function(recruiting) {
       recruit_position = .data$position,
       committed_to = .data$committedTo
     ) |>
+    dedupe_recruiting()
+}
+
+#' Keep one recruiting record per athlete
+#'
+#' The highest `rating`, then `stars`, then most recent class wins. Shared by
+#' [clean_recruiting()] and the season-scoped refresh, which re-dedupes after
+#' splicing a refreshed class into the published table ([splice_seasons()]).
+#' A splice only sees each athlete's previously kept record, so it can differ
+#' from a full re-clean when a refreshed record drops below one the published
+#' table had already discarded; a full refresh resolves it.
+#'
+#' @param recruiting Cleaned recruiting rows (possibly several per athlete).
+#' @return One row per `playerId`.
+#' @keywords internal
+dedupe_recruiting <- function(recruiting) {
+  recruiting |>
     dplyr::arrange(
       .data$playerId,
       dplyr::desc(.data$rating),

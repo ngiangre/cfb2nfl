@@ -22,18 +22,34 @@ because the local IP isn't throttled) and publishing with the same
 `piggyback::pb_upload(..., tag="data-latest", overwrite = TRUE)` the CI job
 runs, then re-dispatching `site.yaml`. **Quota:** the key is tier-limited
 (5000 calls/month as of 2026-10-17; the free 1000/month tier was exhausted by
-the game-stats sweep — see `plans/game-stats.md`). A full refresh costs ~780 calls
-calls: the `/games` family ingests (`games`, `game_team_stats`,
-`game_player_stats`) pace themselves at 1 call/2 s with a 10-try/600 s retry
-budget (`cfbd_game_get()`); don't re-run a failed refresh without first
-working out what it would re-pull.
+the game-stats sweep — see `plans/game-stats.md`). A full refresh costs ~780
+calls; the routine **season-scoped** refresh (decision 0034) costs ~28–40: the
+`/games` family ingests (`games`, `game_team_stats`, `game_player_stats`) pace
+themselves at 1 call/2 s with a 10-try/600 s retry budget (`cfbd_game_get()`);
+don't re-run a failed refresh without first working out what it would re-pull.
+Set `CFB2NFL_CALL_LOG=<file>` to log every CFBD call (the refresh scripts and
+`data-current.yaml` report the count).
 The **pipeline owns ingest → process → assets** (decision 0017): a single
 `tar_make()` in **refresh mode** (`CFB2NFL_REFRESH=true`) ingests every source
 (incl. `conference_tiers`, derived in-pipeline from `player_stats` by
 `build_conference_tiers()`), processes it, and writes all assets (raw parquet +
 `cfb2nfl.duckdb`). Default/**track mode** reads committed/downloaded parquet
-with no API key (how the site build runs). `data-raw/refresh.R` is a thin
-wrapper (`CFB2NFL_REFRESH=true` + `tar_make()`). Years 2010–2026.
+with no API key (how the site build runs). **Season-scoped refresh**
+(decision 0034): `CFB2NFL_REFRESH_SEASONS` (`current`, a year, `a:b`, comma
+list; unset = full window) limits the season-keyed CFBD ingests (`player_stats`,
+`roster`, `recruiting`, the `/games` family) to those seasons, and
+`splice_seasons()` replaces just those seasons' rows in the published parquet
+(still **one file per table on one `data-latest` tag**). It aborts before
+writing if the published file is missing, the schema changed (needs a full
+refresh), or a season shrank below 50% (truncated pull); the `season_coverage`
+contract then requires every season through the last completed one. Entry
+points: `data-current.yaml` (scheduled: Sundays Aug–Jan + after signing day,
+combine, draft; `current`), `data-raw/refresh-historical.R <selector> --yes
+[--publish]` (local, on demand, prints a call estimate and needs
+confirmation), `data-raw/refresh.R` / `data-refresh.yaml` (full rebuild, ~780
+calls, on demand only). "Current" recruiting is the **enrolled** class: the
+incoming class has no CFBD athlete ids until enrollment, so the cleaner drops
+all of it. Years 2010–2026.
 
 | File | Grain | Key / notes |
 |------|-------|-------------|
@@ -54,8 +70,8 @@ wrapper (`CFB2NFL_REFRESH=true` + `tar_make()`). Years 2010–2026.
 - **`data/` is gitignored — NO parquet is tracked in git.** Do **not** `git add`
   or commit `data/*.parquet` (a `git status` won't even show it). The **cleaned**
   tables (parquet == DuckDB == dict schema, decision 0018) ship as assets on the
-  **`data-latest` GitHub release**: the `data-refresh.yaml`
-  job runs `tar_make()` in refresh mode (writes `data/*.{parquet,duckdb}`) then
+  **`data-latest` GitHub release**: the `data-current.yaml`
+  (or full `data-refresh.yaml`) job runs `tar_make()` in refresh mode (writes `data/*.{parquet,duckdb}`) then
   `piggyback::pb_upload(..., tag="data-latest")`; `site.yaml` does
   `piggyback::pb_download(tag="data-latest")` on a fresh checkout and runs
   `tar_make()` in track mode. Adding a new table means: add its `ingest_*()`, a
@@ -261,9 +277,12 @@ wrapper (`CFB2NFL_REFRESH=true` + `tar_make()`). Years 2010–2026.
   check; key on athlete id; start from `vignettes/_post-template.qmd`.
 - **CI** (`.github/workflows/`): `check.yaml` (R CMD check + testthat + contract
   fixtures), `site.yaml` (pull data release asset → `tar_make()` → render →
-  Pages), `data-refresh.yaml` (scheduled refresh-mode `tar_make()` → publish
-  `*.{parquet,duckdb}` via `piggyback`). Refresh needs `CFBD_API_KEY`; the site
-  build runs in track mode (no key) and needs Pages enabled.
+  Pages), `data-current.yaml` (scheduled season-scoped refresh: download the
+  release → `tar_make()` with `CFB2NFL_REFRESH_SEASONS=current` → publish
+  `*.{parquet,duckdb}` via `piggyback` → dispatch `site.yaml`; decision 0034),
+  `data-refresh.yaml` (full refresh, `workflow_dispatch` only). Refresh needs
+  `CFBD_API_KEY`; the site build runs in track mode (no key) and needs Pages
+  enabled.
 - **DuckDB query asset** (decision 0016): `build_duckdb()` (`R/duckdb.R`) bundles
   the **cleaned** tables into `data/cfb2nfl.duckdb`, built by the `duckdb_file`
   target (`format = "file"`, downstream of clean) so its schema matches the
