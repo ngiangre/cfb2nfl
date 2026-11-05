@@ -358,6 +358,32 @@ list(
     )
   ),
   tar_target(
+    ok_position_path,
+    pointblank::all_passed(
+      contract_position_path(
+        position_path,
+        n_universe = position_counts$n_universe,
+        n_picks_universe = position_counts$n_picks_universe,
+        stop_on_fail = FALSE
+      )
+    )
+  ),
+  tar_target(
+    ok_position_mapping,
+    pointblank::all_passed(
+      contract_position_mapping(
+        list(
+          recruiting = recruiting$recruit_position,
+          roster = roster$position,
+          picks = picks$position,
+          nfl_draft = nfl_draft_picks$position,
+          nfl_roster = nfl_rosters$position
+        ),
+        stop_on_fail = FALSE
+      )
+    )
+  ),
+  tar_target(
     ok_stat_taxonomy,
     pointblank::all_passed(
       contract_stat_taxonomy(
@@ -427,6 +453,8 @@ list(
       nfl_link = ok_nfl_link,
       career_summary = ok_career,
       redshirt = ok_roster_flags,
+      position_mapping = ok_position_mapping,
+      position_path = ok_position_path,
       stat_taxonomy = ok_stat_taxonomy,
       player_season_stats = ok_player_season_stats,
       outcomes = ok_outcomes,
@@ -491,6 +519,24 @@ list(
   # NFL outcomes bridged to CFBD picks by draft slot (decision 0014); an
   # outcome/label source, kept off the model input path.
   tar_target(picks_nfl, link_nfl_draft(picks, nfl_draft_picks)),
+  # Per-player position path, HS -> college -> NFL (issue #49, decision 0021):
+  # a derived table, bundled in DuckDB and documented in inst/dict, not
+  # published as parquet. Built from the guarded recruiting/NFL links above.
+  tar_target(
+    position_path,
+    build_position_path(
+      roster,
+      recruiting,
+      player_season,
+      picks_nfl,
+      nfl_draft_picks,
+      reused = reused
+    )
+  ),
+  tar_target(
+    position_counts,
+    position_universe_counts(roster, picks_nfl, reused)
+  ),
 
   # ---- features -------------------------------------------------------------
   tar_target(ps_change, add_change_features(ps_pop)),
@@ -575,6 +621,7 @@ list(
         ps_change = ps_change,
         roster_flags = roster_flags,
         career_summary = career,
+        position_path = position_path,
         player_season_stats = player_season_stats,
         team_season = team_season,
         team_draft = team_draft,
@@ -726,6 +773,14 @@ list(
         roster,
         keys = "playerId",
         contract_passed = ok_career
+      ),
+      audit_step(
+        position_path,
+        "position_path",
+        "features",
+        roster,
+        keys = "playerId",
+        contract_passed = ok_position_path
       ),
       audit_step(
         model_table,

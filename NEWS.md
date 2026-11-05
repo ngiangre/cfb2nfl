@@ -1,5 +1,20 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- New blog post on position stability from high school to college to the
+  NFL: most linked recruits keep their position group in college, nearly every
+  linked draftee keeps it in the NFL, and the roster source records no
+  in-college change
+  ([vignettes/2026-11-05-position-stability.qmd](https://github.com/ngiangre/cfb2nfl/blob/main/vignettes/2026-11-05-position-stability.qmd)).
+- New `harmonize_position()` maps the recruiting, roster, draft, and NFL
+  position codes to eleven shared groups. A contract fails the build if any
+  raw code is unmapped
+  ([decision 0036](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0036-position-harmonization-and-path.md)).
+- New derived table `position_path` (DuckDB bundle only): one row per college
+  athlete id with its harmonized high school, college and NFL position groups.
+  High school groups come only through the name-guarded recruiting link, and
+  NFL groups only through the draft-slot link. Reused athlete ids are excluded
+  ([decision 0036](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0036-position-harmonization-and-path.md)).
+
 - New blog post testing whether schools that win more produce more
   draftees. The link is strong among Power schools and moderate in the
   Group of 5. The post also names the programs that draft more or fewer

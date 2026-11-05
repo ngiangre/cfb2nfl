@@ -1,0 +1,609 @@
+---
+title: "Most high school recruits keep their position group through college, and drafted players keep it into the NFL"
+date: "2026-11-05"
+description: "Of linked high school recruits who played college football, most kept their position group in college, and nearly every linked draftee kept his college group in the NFL."
+followups:
+  - "Recover undrafted players' NFL positions by name and school, so the college-to-NFL comparison covers players who never heard their name called."
+  - "Link more high school recruits to their college id by school and class year, since the name guard leaves more than a third of the recruit pool unlinked."
+  - "Test whether a recruit whose position changes between high school and college is more likely to be drafted, once the college group is held fixed."
+  - "Find a roster source that records position by season, so in-college position changes can be measured rather than assumed absent."
+author:
+  - "AI directed by Nick Giangreco"
+freeze: auto
+vignette: >
+  %\VignetteIndexEntry{Most high school recruits keep their position group through college, and drafted players keep it into the NFL}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r}
+#| label: setup
+#| include: false
+# Load the package from the checkout with pkgload; no package install is
+# required. Under altdoc the render runs in a temp dir, so resolve the root
+# first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
+root <- Sys.getenv("CFB2NFL_ROOT", "")
+if (!nzchar(root)) {
+  dir <- getwd()
+  while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
+    dir <- dirname(dir)
+  }
+  root <- if (file.exists(file.path(dir, "_targets"))) dir else getwd()
+}
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+library(DBI)
+library(dplyr)
+library(duckdb)
+library(ggiraph)
+library(ggplot2)
+library(knitr)
+
+# One interaction style for every girafe figure: a clear hover pop, dimming
+# of non-hovered marks, a dark tooltip, and toolbar zoom + PNG download.
+set_girafe_defaults(
+  opts_hover = opts_hover(
+    css = "stroke:#111827;stroke-width:2.5px;filter:brightness(1.12);"
+  ),
+  opts_hover_inv = opts_hover_inv(css = "opacity:0.45;"),
+  opts_tooltip = opts_tooltip(
+    css = "background:#111827;color:#fff;padding:6px 9px;border-radius:5px;font-weight:bold;font-size:15px;"
+  ),
+  opts_zoom = opts_zoom(min = 1, max = 5),
+  opts_toolbar = opts_toolbar(saveaspng = TRUE, position = "topright"),
+  opts_sizing = opts_sizing(rescale = TRUE)
+)
+
+# thousands-separated and percent formatters for inline numbers
+fmt <- function(x, digits = 0) {
+  formatC(as.numeric(x), big.mark = ",", format = "f", digits = digits)
+}
+pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
+```
+
+```{r}
+#| label: registry
+#| include: false
+# Key on athlete id, never name: recruiting ids collide (decision 0013), and
+# picks has two Josh Allens (Wyoming 2018, Kentucky 2019).
+subjects <- tibble::tribble(
+  ~who            , ~cfb_athlete_id ,
+  "Joe Burrow"    , "3915511"       ,
+  "Cam Ward"      , "4688380"       ,
+  "Josh Allen"    , "3918298"       ,
+  "Jordan Travis" , "4360799"       ,
+  "Braxton Miller" , "512838"
+)
+```
+
+```{r}
+#| label: load
+#| include: false
+pp <- dbReadTable(con, "position_path")
+picks <- dbReadTable(con, "picks")
+stopifnot(nrow(pp) > 0, nrow(picks) > 0, !anyDuplicated(pp$playerId))
+
+# One display name per athlete id, from the draft record (decision 0022 ids
+# are unique within this table, so the name is the draftee's).
+player_names <- picks |>
+  filter(!is.na(playerId)) |>
+  distinct(playerId, .keep_all = TRUE) |>
+  transmute(playerId, player = name)
+pp <- left_join(pp, player_names, by = "playerId")
+
+pos_levels <- harmonized_position_levels()
+rec_levels <- setdiff(pos_levels, "Position not recorded")
+
+# Every named subject is a row of the table, with the group the post relies on.
+named <- pp |> filter(playerId %in% subjects$cfb_athlete_id)
+stopifnot(nrow(named) == nrow(subjects))
+```
+
+```{r}
+#| label: universe-facts
+#| include: false
+# The population the post reasons about, counted once and reused below.
+n_universe <- nrow(pp)
+n_hs_linked <- sum(pp$hs_linked)
+n_hs_rec <- sum(pp$hs_linked & !is.na(pp$hs_group) & pp$hs_group != "Position not recorded")
+n_college_rec <- sum(pp$college_groups > 0)
+n_drafted <- sum(pp$drafted)
+n_nfl_linked <- sum(pp$nfl_linked)
+n_nfl_rec <- sum(!is.na(pp$nfl_group))
+stopifnot(n_universe == 134867L, n_hs_linked == 22768L, n_nfl_linked == 3732L)
+```
+
+::: {.callout-note appearance="minimal"}
+*Data as of the `data-latest` release, retrieved 2026-11-05. Careers of recent
+classes are right-censored; later seasons may not yet be present.*
+:::
+
+## 1. Introduction
+
+A recruit is listed as a quarterback, a defensive end, or an athlete before he
+has played a snap, and the NFL lists him again by a position of its own. This
+post asks how often those labels agree, from high school to college and from
+college to the draft. The recurring cast gives a concrete test. Joe Burrow, Cam
+Ward, and Jordan Travis were all college quarterbacks, and each was drafted as
+one.
+
++ *Expectation one: most high school recruits who played college football kept
+  their position group in college.*
++ *Expectation two: nearly every drafted player kept his college position group
+  in the NFL.*
++ *Expectation three: some players change position group between college
+  seasons.*
+
+## 2. Data
+
+### 2.1 Position groups agree with one another for most players, but the sources cover different players
+
+Each source uses its own vocabulary, so every raw position is first mapped to
+one of eleven shared groups. The table counts how many players each stage can
+place, since a player with no record at a stage drops out of that stage's
+comparison.
+
+```{r}
+#| label: terms
+tibble::tribble(
+  ~Term                   , ~Meaning                                                                                       ,
+  "Athlete id"            , "The college player's id in the roster and draft records. One id is one player in this table.",
+  "Position group"        , "One of eleven shared groups, such as Quarterback or Defensive line; blanks are 'Position not recorded'.",
+  "High school group"     , "The group of the recruit record the name guard links to this athlete; recruits without a link have none.",
+  "College group"         , "The group recorded on the athlete's roster, across seasons (modal group is the one the most seasons list).",
+  "NFL group"             , "The group of the nflverse draft record for the player's draft slot, when that slot is linked to the athlete."
+) |>
+  kable(caption = "The terms used throughout.")
+```
+
+```{r}
+#| label: stage-table
+tibble::tribble(
+  ~Stage                                                  , ~Players                 , ~Share                         ,
+  "College athlete ids on a roster"                       , fmt(n_universe)          , "100.0%"                       ,
+  "Linked to a high school recruit record (name guard)"   , fmt(n_hs_linked)         , pct(n_hs_linked / n_universe)  ,
+  "High school position recorded"                         , fmt(n_hs_rec)            , pct(n_hs_rec / n_universe)     ,
+  "College position recorded in at least one season"      , fmt(n_college_rec)       , pct(n_college_rec / n_universe),
+  "Drafted (any CFBD draft pick)"                         , fmt(n_drafted)           , pct(n_drafted / n_universe)    ,
+  "Linked to an NFL draft record (draft slot)"            , fmt(n_nfl_linked)        , pct(n_nfl_linked / n_universe) ,
+  "NFL position recorded"                                 , fmt(n_nfl_rec)           , pct(n_nfl_rec / n_universe)
+) |>
+  kable(
+    align = "lrr",
+    caption = "How many college athletes each stage can place in a position group."
+  )
+```
+
+## 3. Results
+
+### 3.1 Most high school recruits keep their position group through college
+
+*Expectation: most linked recruits who played college football kept their group.* ✅
+
+The first comparison takes each linked recruit with a recorded high school
+position and a recorded college position, and asks whether the two groups match.
+The exhibits show the share that stayed, by high school group, and where the
+others went.
+
+```{r}
+#| label: s31-prep
+hs <- pp |>
+  filter(
+    hs_linked,
+    !is.na(hs_group), hs_group != "Position not recorded",
+    college_groups > 0, !is.na(college_modal_group)
+  )
+hs_overall <- mean(hs$hs_group == hs$college_modal_group)
+hs_stay <- hs |>
+  group_by(hs_group) |>
+  summarise(
+    recruits = n(),
+    stayed = sum(hs_group == college_modal_group),
+    share = stayed / recruits,
+    .groups = "drop"
+  ) |>
+  arrange(share)
+stopifnot(
+  sum(hs_stay$recruits) == nrow(hs),
+  hs_overall > 0.5
+)
+```
+
+```{r}
+#| label: s31-table
+hs_stay |>
+  transmute(
+    `High school group` = hs_group,
+    `Recruits linked and recorded` = fmt(recruits),
+    `Same group in college` = fmt(stayed),
+    `Share who stayed` = pct(share)
+  ) |>
+  kable(
+    align = "lrrr",
+    caption = paste0(
+      "Linked recruits who played college football, by high school position ",
+      "group. Overall, ", pct(hs_overall), " kept the same group."
+    )
+  )
+```
+
+```{r}
+#| label: s31-explain
+#| fig-height: 6
+bars <- hs_stay |>
+  mutate(
+    hs_group = factor(hs_group, levels = hs_group),
+    side = if_else(share >= hs_overall, "at or above", "below")
+  )
+p <- ggplot(bars, aes(x = share, y = hs_group, fill = side)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf(
+        "%s: %s of %s kept their group (%s)",
+        hs_group, fmt(stayed), fmt(recruits), pct(share)
+      ),
+      data_id = as.character(hs_group)
+    ),
+    width = 0.7
+  ) +
+  geom_vline(xintercept = hs_overall, linetype = "dashed", colour = "#111827") +
+  annotate(
+    "text",
+    x = hs_overall,
+    y = nrow(bars) + 0.7,
+    label = paste("All linked recruits:", pct(hs_overall)),
+    hjust = 0.5,
+    size = 5
+  ) +
+  scale_fill_manual(
+    values = c("at or above" = "#1d4ed8", "below" = "#9ca3af"),
+    guide = "none"
+  ) +
+  scale_x_continuous(
+    labels = scales::percent_format(accuracy = 1),
+    limits = c(0, 1)
+  ) +
+  labs(
+    x = "Share of recruits in the group who played the same group in college",
+    y = NULL
+  ) +
+  coord_cartesian(clip = "off") +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s31-explore
+#| fig-height: 7
+hs_grid <- hs |>
+  count(hs_group, college_modal_group, name = "n") |>
+  tidyr::complete(
+    hs_group = rec_levels,
+    college_modal_group = rec_levels,
+    fill = list(n = 0L)
+  ) |>
+  group_by(hs_group) |>
+  mutate(row_share = n / pmax(sum(n), 1L)) |>
+  ungroup() |>
+  mutate(
+    hs_group = factor(hs_group, levels = rev(rec_levels)),
+    college_modal_group = factor(college_modal_group, levels = rec_levels)
+  )
+p <- ggplot(hs_grid, aes(college_modal_group, hs_group, fill = row_share)) +
+  geom_tile_interactive(
+    aes(
+      tooltip = sprintf(
+        "High school %s, college %s: %s recruits (%s of the %s group)",
+        as.character(hs_group), as.character(college_modal_group),
+        fmt(n), pct(row_share), as.character(hs_group)
+      ),
+      data_id = paste(hs_group, college_modal_group)
+    ),
+    colour = "white"
+  ) +
+  scale_fill_gradient(
+    low = "#f9fafb",
+    high = "#1d4ed8",
+    labels = scales::percent_format(accuracy = 1),
+    name = "Share of high school group"
+  ) +
+  labs(x = "College position group", y = "High school position group") +
+  theme_cfb2nfl() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+girafe(ggobj = p, width_svg = 13, height_svg = 8)
+```
+
+```{r}
+#| label: s31-pin
+#| include: false
+jt <- pp |> filter(playerId == "4360799")
+stopifnot(
+  jt$hs_group == "Quarterback",
+  jt$college_modal_group == "Quarterback",
+  jt$nfl_group == "Quarterback"
+)
+```
+
+Quarterbacks are the clearest case. Jordan Travis was recruited as a
+quarterback, played quarterback at Florida State, and was drafted as one in 2024.
+
+### 3.2 Nearly every drafted player keeps his college position group in the NFL
+
+*Expectation: nearly every drafted player kept his college group.* ✅
+
+The second comparison takes each draftee who has a linked NFL draft record and a
+recorded college group, and checks the NFL group against the college one. The
+table and the bars give the share that matched, and the interactive grid shows
+the few moves between groups.
+
+```{r}
+#| label: s32-prep
+dr <- pp |>
+  filter(
+    nfl_linked,
+    !is.na(nfl_group), nfl_group != "Position not recorded",
+    college_groups > 0, !is.na(college_modal_group)
+  )
+nfl_overall <- mean(dr$nfl_group == dr$college_modal_group)
+nfl_stay <- dr |>
+  group_by(college_modal_group) |>
+  summarise(
+    draftees = n(),
+    stayed = sum(nfl_group == college_modal_group),
+    share = stayed / draftees,
+    .groups = "drop"
+  ) |>
+  arrange(share)
+conv <- dr |>
+  filter(college_modal_group == "Quarterback", nfl_group != "Quarterback")
+stopifnot(
+  sum(nfl_stay$draftees) == nrow(dr),
+  nfl_overall > 0.9,
+  "512838" %in% conv$playerId
+)
+```
+
+```{r}
+#| label: s32-table
+nfl_stay |>
+  transmute(
+    `College group` = college_modal_group,
+    `Draftees linked and recorded` = fmt(draftees),
+    `Same group in the NFL` = fmt(stayed),
+    `Share who stayed` = pct(share)
+  ) |>
+  kable(
+    align = "lrrr",
+    caption = paste0(
+      "Linked draftees by college position group. Overall, ",
+      pct(nfl_overall), " kept the same group in the NFL."
+    )
+  )
+```
+
+```{r}
+#| label: s32-explain
+#| fig-height: 6
+bars <- nfl_stay |>
+  mutate(
+    college_modal_group = factor(college_modal_group, levels = college_modal_group),
+    side = if_else(share >= nfl_overall, "at or above", "below")
+  )
+p <- ggplot(bars, aes(x = share, y = college_modal_group, fill = side)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf(
+        "%s: %s of %s kept their group in the NFL (%s)",
+        as.character(college_modal_group), fmt(stayed), fmt(draftees), pct(share)
+      ),
+      data_id = as.character(college_modal_group)
+    ),
+    width = 0.7
+  ) +
+  geom_vline(xintercept = nfl_overall, linetype = "dashed", colour = "#111827") +
+  annotate(
+    "text",
+    x = nfl_overall,
+    y = nrow(bars) + 0.7,
+    label = paste("All linked draftees:", pct(nfl_overall)),
+    hjust = 0.5,
+    size = 5
+  ) +
+  scale_fill_manual(
+    values = c("at or above" = "#1d4ed8", "below" = "#9ca3af"),
+    guide = "none"
+  ) +
+  scale_x_continuous(
+    labels = scales::percent_format(accuracy = 1),
+    limits = c(0, 1)
+  ) +
+  labs(
+    x = "Share of draftees in the college group who played the same group in the NFL",
+    y = NULL
+  ) +
+  coord_cartesian(clip = "off") +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s32-explore
+#| fig-height: 7
+nfl_grid <- dr |>
+  count(college_modal_group, nfl_group, name = "n") |>
+  tidyr::complete(
+    college_modal_group = rec_levels,
+    nfl_group = rec_levels,
+    fill = list(n = 0L)
+  ) |>
+  group_by(college_modal_group) |>
+  mutate(row_share = n / pmax(sum(n), 1L)) |>
+  ungroup() |>
+  mutate(
+    college_modal_group = factor(college_modal_group, levels = rev(rec_levels)),
+    nfl_group = factor(nfl_group, levels = rec_levels)
+  )
+p <- ggplot(nfl_grid, aes(nfl_group, college_modal_group, fill = row_share)) +
+  geom_tile_interactive(
+    aes(
+      tooltip = sprintf(
+        "College %s, NFL %s: %s draftees (%s of the %s group)",
+        as.character(college_modal_group), as.character(nfl_group),
+        fmt(n), pct(row_share), as.character(college_modal_group)
+      ),
+      data_id = paste(college_modal_group, nfl_group)
+    ),
+    colour = "white"
+  ) +
+  scale_fill_gradient(
+    low = "#f9fafb",
+    high = "#1d4ed8",
+    labels = scales::percent_format(accuracy = 1),
+    name = "Share of college group"
+  ) +
+  labs(x = "NFL position group", y = "College position group") +
+  theme_cfb2nfl() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+girafe(ggobj = p, width_svg = 13, height_svg = 8)
+```
+
+```{r}
+#| label: s32-pin
+#| include: false
+pins <- pp |> filter(playerId %in% c("3915511", "4688380", "4360799"))
+stopifnot(
+  all(pins$college_modal_group == "Quarterback"),
+  all(pins$nfl_group == "Quarterback")
+)
+miller <- pp |> filter(playerId == "512838")
+stopifnot(
+  miller$hs_group == "Quarterback",
+  miller$college_modal_group == "Quarterback",
+  miller$nfl_group == "Receiver"
+)
+# School and draft year come from the draft record, not the position table.
+rec_picks <- picks |> filter(playerId %in% c("512838", "4360799", "3915511", "4688380"))
+stopifnot(
+  rec_picks$collegeTeam[rec_picks$playerId == "512838"] == "Ohio State",
+  rec_picks$year[rec_picks$playerId == "4360799"] == 2024L,
+  rec_picks$overall[rec_picks$playerId == "3915511"] == 1L,
+  rec_picks$overall[rec_picks$playerId == "4688380"] == 1L
+)
+```
+
+The converted quarterbacks are rare. Braxton Miller was recruited as a
+dual-threat player (recorded as a quarterback in the recruit record), played
+quarterback at Ohio State, and was drafted as a receiver. Joe Burrow and Cam
+Ward played quarterback in college and were drafted as quarterbacks, Burrow
+first overall in 2020 and Ward first overall in 2025.
+
+### 3.3 No player changed position group between college seasons
+
+*Expectation: some players changed group between college seasons.* ❌
+
+The third comparison counts players by the number of distinct college groups on
+their roster records. The table and the figure both show the same result: every
+athlete with a recorded college position has exactly one group. The roster
+source records a single position per athlete, so this measures the source, not
+the players.
+
+```{r}
+#| label: s33-prep
+college <- pp |> filter(college_groups > 0)
+changes <- tibble::tibble(
+  `Distinct college groups` = c("One group", "Two or more groups"),
+  Players = c(sum(college$college_groups == 1L), sum(college$college_groups >= 2L))
+)
+stopifnot(
+  sum(changes$Players) == nrow(college),
+  changes$Players[2] == 0L,
+  sum(pp$college_changed) == 0L
+)
+```
+
+```{r}
+#| label: s33-table
+changes |>
+  mutate(Players_label = fmt(Players), Share = pct(Players / sum(Players))) |>
+  select(`Distinct college groups`, Players = Players_label, Share) |>
+  kable(
+    align = "lrr",
+    caption = paste0(
+      "College athletes with a recorded position, by the number of distinct ",
+      "position groups across their seasons."
+    )
+  )
+```
+
+```{r}
+#| label: s33-explain
+#| fig-height: 5
+p <- ggplot(changes, aes(x = Players, y = `Distinct college groups`)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf("%s: %s players", `Distinct college groups`, fmt(Players)),
+      data_id = `Distinct college groups`,
+      fill = `Distinct college groups`
+    ),
+    width = 0.6
+  ) +
+  scale_fill_manual(
+    values = c("One group" = "#1d4ed8", "Two or more groups" = "#9ca3af"),
+    guide = "none"
+  ) +
+  scale_x_continuous(labels = scales::comma) +
+  labs(x = "College athletes", y = NULL) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 5)
+```
+
+## 4. Summary
+
+Most recruits keep their group, and nearly all draftees keep their college group
+into the NFL, while the roster data cannot show a change within college.
+
+```{r}
+#| label: summary
+tibble::tribble(
+  ~Expectation                                                       , ~Verdict , ~Evidence                                                                 ,
+  "Most linked recruits kept their group through college"            , "✅"      , paste0(pct(hs_overall), " of ", fmt(nrow(hs)), " recruits")         ,
+  "Nearly every drafted player kept his college group in the NFL"    , "✅"      , paste0(pct(nfl_overall), " of ", fmt(nrow(dr)), " draftees")         ,
+  "Some players change group between college seasons"                , "❌"      , "0 of the college athletes with a recorded position"
+) |>
+  kable(
+    align = "lcl",
+    caption = "Each expectation and what the data showed."
+  )
+```
+
+## 5. Discussion
+
+::: {.callout-important}
+Position is the most stable label in a player's path. The mismatches cluster
+where a group is close to another: a recruit listed as an athlete is recorded
+as a receiver or a defensive back in college, and a college defensive lineman
+is sometimes an NFL linebacker. These are the positions a player is moved into when
+his skills fit a neighbouring role, so a recruit's listed group is a usable
+starting point for a forecast.
+:::
+
+Caveats. The high school comparison covers only recruits the name guard can
+link to a college id, which is about `r pct(n_hs_linked / n_universe)` of the
+roster athlete ids; the rest, including every recruit whose name cannot be
+checked, are left out rather than guessed. The NFL comparison covers only
+draftees linked by draft slot, and the undrafted players in the NFL data have no
+bridge to a college id, so they are not in it. The college roster records one
+position per athlete, so changes between seasons cannot be observed in this
+source. Recent classes are right-censored, and the recruit positions are the
+recruiting service's listings, not the player's own account.
+
+```{r}
+#| label: teardown
+#| include: false
+dbDisconnect(con, shutdown = TRUE)
+```

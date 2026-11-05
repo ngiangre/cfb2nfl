@@ -21,6 +21,7 @@ erd_groups <- c(
   conference_tiers = "Context",
   picks = "Draft & NFL",
   nfl_pick_link = "Draft & NFL",
+  position_path = "Draft & NFL",
   nfl_draft_picks = "Draft & NFL",
   nfl_rosters = "Draft & NFL",
   nfl_player_stats = "Draft & NFL",
