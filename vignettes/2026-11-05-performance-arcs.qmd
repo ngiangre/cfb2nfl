@@ -228,7 +228,7 @@ p <- cast_qb |>
     aes(tooltip = paste0(.data$who, ", ", .data$season, ": ", fmt(.data$value), " yards"))
   ) +
   labs(x = "Season index", y = "Passing yards", colour = NULL) +
-  theme_minimal(base_size = 14)
+  theme_cfb2nfl()
 girafe(ggobj = p, width_svg = 13, height_svg = 6)
 ```
 
@@ -243,7 +243,7 @@ p <- cast_qb |>
     size = 4
   ) +
   labs(x = "Season", y = "Passing yards", colour = NULL) +
-  theme_minimal(base_size = 14)
+  theme_cfb2nfl()
 girafe(ggobj = p, width_svg = 13, height_svg = 6)
 ```
 
@@ -277,7 +277,7 @@ p <- band_yds |>
   geom_col_interactive(aes(tooltip = .data$tooltip), show.legend = FALSE) +
   scale_fill_manual(values = c(`FALSE` = "#4C78A8", `TRUE` = "#9CA3AF")) +
   labs(x = "Opponent band", y = "Mean passing yards per game") +
-  theme_minimal(base_size = 14)
+  theme_cfb2nfl()
 girafe(ggobj = p, width_svg = 13, height_svg = 6)
 ```
 
@@ -293,7 +293,7 @@ p <- pass_games |>
     size = 3
   ) +
   labs(x = "Season", y = "Mean passing yards per game", colour = "Opponent band") +
-  theme_minimal(base_size = 14)
+  theme_cfb2nfl()
 girafe(ggobj = p, width_svg = 13, height_svg = 6)
 ```
 
@@ -327,7 +327,7 @@ p <- cast_res |>
   geom_col_interactive(aes(tooltip = .data$tooltip), position = "dodge") +
   geom_hline(yintercept = 0) +
   labs(x = "Season", y = "Mean residual (yards per game)", fill = NULL) +
-  theme_minimal(base_size = 14)
+  theme_cfb2nfl()
 girafe(ggobj = p, width_svg = 13, height_svg = 6)
 ```
 
@@ -344,7 +344,7 @@ p <- gp |>
   ) +
   geom_hline(yintercept = 0) +
   labs(x = "Season", y = "Residual (yards in the game)", colour = NULL) +
-  theme_minimal(base_size = 14)
+  theme_cfb2nfl()
 girafe(ggobj = p, width_svg = 13, height_svg = 6)
 ```
 
