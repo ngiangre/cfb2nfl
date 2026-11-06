@@ -38,6 +38,16 @@ utils::globalVariables(c(
   # pointblank::vars() targets in later contracts/audit helpers
   ".env",
   "followed_coach",
+  # data-masked columns in season_arc() and build_game_production()
+  "season_index",
+  "value",
+  "stat",
+  "opponent_pregame_elo",
+  "opponent_elo_band",
+  "baseline",
+  "band_n",
+  "residual",
+  "player",
   # pointblank::vars() / expr targets in contract_player_game()
   "seasonType",
   "opponent",

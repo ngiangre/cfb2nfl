@@ -13,6 +13,8 @@ erd_groups <- c(
   roster_flags = "College stats",
   game_player_stats = "College stats",
   player_game = "College stats",
+  season_arc = "College stats",
+  game_production = "College stats",
   games = "Games",
   game_team_stats = "Games",
   roster = "Context",

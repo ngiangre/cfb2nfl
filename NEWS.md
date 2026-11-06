@@ -1,5 +1,11 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- New derived tables `season_arc` (one player-season for a headline stat, with
+  the player's career season index) and `game_production` (one player-game
+  yardage stat against the opponent-Elo-band baseline, with unrated opponents
+  kept as their own band). Both are bundled in DuckDB, carry contracts and
+  audit rows, and feed the new performance-arcs post (issue #47; decision
+  [0037](https://github.com/ngiangre/cfb2nfl/blob/feat/performance-arcs/decisions/0037-season-arcs-opponent-adjusted-production.md)).
 - Season-scoped refresh: the scheduled data refresh now re-pulls only the
   current season and splices it into the published tables, costing about 28–40
   CFBD calls instead of ~780 (measured: 28 on 2026-11-05). The
