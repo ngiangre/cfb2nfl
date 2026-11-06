@@ -415,7 +415,7 @@ stopifnot(
 )
 ```
 
-### 3.3 Drafted player-seasons log a stat line in 81% of seasons, against 50% for the rest
+### 3.3 Drafted player-seasons log a stat line in 33% of their team's games, twice the 15% for the rest
 
 *Expectation: drafted player-seasons log a stat line in a larger share of their team's games than other player-seasons.* ✅
 
