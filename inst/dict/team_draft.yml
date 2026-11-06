@@ -4,15 +4,14 @@ grain: one team x final college season x position group
 key: team, season, position_group
 description: >
   Players whose college career ended at a team, counted in the season they
-  left (decision 0033). A drafted player is credited to their final roster
-  season before the draft (most recent in-window pick, decision 0011); an
-  undrafted player to their final roster season. Undrafted players still on
-  the latest roster are excluded (outcome unknown); reused ids excluded
-  (decision 0022). Position group from the final-season roster position
-  (`position_group()`). Eligible is a roster proxy: 3+ roster seasons, or
+  left. A drafted player is credited to their final roster season before the
+  draft (most recent in-window pick); an undrafted player to their final roster
+  season. Undrafted players still on the latest roster are excluded (outcome
+  unknown); reused ids excluded. Position group from the final-season roster
+  position (position_group()). Eligible is a roster proxy: 3+ roster seasons, or
   drafted, or UDFA. UDFAs are only linked for players with a stat line, so
-  offensive-line UDFAs are undercounted. A DERIVED table: DuckDB bundle only.
-  Contract: `contract_team_draft()`.
+  offensive-line UDFAs are undercounted. A derived table: DuckDB bundle only.
+  Contract: contract_team_draft().
 columns:
   - {name: team, type: string, description: Team the player left., provenance: roster}
   - {name: season, type: int32, description: The player's final college season at the team., provenance: roster}

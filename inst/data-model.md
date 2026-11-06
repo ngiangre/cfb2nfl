@@ -30,9 +30,9 @@ dictionaries next to this file, one YAML per table:
 | `career_end` | one player's college career, classified by how it ended (`early_stop_proxy` is a proxy, not an injury label) | [`dict/career_end.yml`](dict/career_end.yml) |
 | `position_path` | one college athlete id: harmonized HS, college and NFL position groups | [`dict/position_path.yml`](dict/position_path.yml) |
 | `player_game` | one player in one game (stat line + team, opponent, Elo, team games) | [`dict/player_game.yml`](dict/player_game.yml) |
-| `season_arc` | one player-season for one headline stat, with career season index (issue #47) | [`dict/season_arc.yml`](dict/season_arc.yml) |
-| `game_production` | one player-game-yardage stat vs its opponent-Elo-band baseline (decision 0037) | [`dict/game_production.yml`](dict/game_production.yml) |
-| `player_usage` | one player-season-team: games appeared out of team games, per-game usage (issue #50) | [`dict/player_usage.yml`](dict/player_usage.yml) |
+| `season_arc` | one player-season for one headline stat, with career season index | [`dict/season_arc.yml`](dict/season_arc.yml) |
+| `game_production` | one player-game-yardage stat vs its opponent-Elo-band baseline | [`dict/game_production.yml`](dict/game_production.yml) |
+| `player_usage` | one player-season-team: games appeared out of team games, per-game usage | [`dict/player_usage.yml`](dict/player_usage.yml) |
 | `team_season` | one team in one season (every division) | [`dict/team_season.yml`](dict/team_season.yml) |
 | `team_draft` | team × final college season × position group | [`dict/team_draft.yml`](dict/team_draft.yml) |
 | `player_season_stats` | **wide**: player-season-team stat columns | [`dict/player_season_stats.yml`](dict/player_season_stats.yml) |
@@ -40,24 +40,23 @@ dictionaries next to this file, one YAML per table:
 | `outcomes` | one player-season in the model population (person-period labels) | [`dict/outcomes.yml`](dict/outcomes.yml) |
 | `audit_log` | one audited pipeline step | [`dict/audit_log.yml`](dict/audit_log.yml) |
 
-**Bundle-only tables.** Several tables in the bundle are **derived in-pipeline**
-and not published as parquet, like `stat_taxonomy`: they are built from other
-cleaned tables (`ps_change` from the link chain, `roster_flags` from roster +
+**Bundle-only tables.** Several tables are **derived in-pipeline** and not
+published as parquet, like `stat_taxonomy`: they are built from other cleaned
+tables (`ps_change` from the link chain, `roster_flags` from roster +
 player_stats, `career_summary` from roster, `player_season_stats` from
-player_stats — decisions 0021/0026), so they are materialized into the DuckDB
-bundle and documented with dictionaries but need no release asset before a
-track-mode build. `ps_change` carries the `drafted` label (it sits downstream
-of `link_drafted`); `roster_flags` / `career_summary` are leakage-free
-roster-derived features; all carry contracts and audit rows like the cleaned
-tables. `career_end` (decision 0039) classifies each career from `career_summary`,
+player_stats), so they are materialized into the DuckDB bundle and documented
+with dictionaries but need no release asset before a track-mode build.
+`ps_change` carries the `drafted` label; `roster_flags` / `career_summary` are
+leakage-free roster-derived features; all carry contracts and audit rows like
+the cleaned tables. `career_end` classifies each career from `career_summary`,
 `outcomes` and the picks bridge; its `early_stop_proxy` marks careers that
-stopped with eligibility left, with no NFL entry and no transfer. That is a
-proxy for an injury-shaped exit, not an injury.
+stopped with eligibility left, with no NFL entry and no transfer, a proxy for an
+injury-shaped exit, not an injury.
 
 Two more derived tables are bundled only: `nfl_pick_link` (the name-guarded
-draft-slot bridge to nflverse — use it instead of re-running the raw slot join
-in SQL, decision 0014) and the slimmed `audit_log` (the lineage log, decision
-0005). Every bundle ALSO carries two generated metadata tables (decision 0027):
+draft-slot bridge to nflverse, used instead of re-running the raw slot join in
+SQL) and the slimmed `audit_log` (the lineage log). Every bundle also carries
+two generated metadata tables:
 
 - **`_schema_manifest`** — one row per bundled table with its grain/key (read
   from `inst/dict/*.yml` at build time) and the dictionary path. A bundled
@@ -83,22 +82,22 @@ stats interpretable — a bare `TD` becomes "Passing touchdowns" vs "Defensive
 touchdowns". Keyed at `(category, statType)` grain because a category alone can
 be phase-ambiguous (`fumbles/FUM` is offense, `fumbles/REC` is defense).
 `contract_stat_taxonomy()` enforces coverage of every pair present in
-`player_stats` (decision 0019).
+`player_stats`.
 
 The dictionaries document the **cleaned** schemas (e.g. `clean_picks` adds
 `playerId`/`drafted`). Both published assets carry exactly these cleaned tables:
 the `data/*.parquet` files and the DuckDB bundle share one identical schema per
-table (decision 0018).
+table.
 
 ## The DuckDB asset
 
 `data/cfb2nfl.duckdb` bundles every cleaned table into one SQL-queryable file.
-It is built by the **`duckdb_file`** target in `_targets.R` (`build_duckdb()`,
-decision 0016) from the cleaned, contract-checked tables — the same tables
-written to the `data/*.parquet` assets (decision 0018), so parquet and DuckDB
-carry one identical schema per table, matching the dictionaries above — and
-published alongside the parquet on the `data-latest` GitHub release. Table names
-match the rows above (`conference_tiers`, not `tiers`).
+It is built by the **`duckdb_file`** target in `_targets.R` (`build_duckdb()`)
+from the cleaned, contract-checked tables, the same tables written to the
+`data/*.parquet` assets, so parquet and DuckDB carry one identical schema per
+table, matching the dictionaries above, and published alongside the parquet on
+the `data-latest` GitHub release. Table names match the rows above
+(`conference_tiers`, not `tiers`).
 
 ```r
 library(DBI)
@@ -157,7 +156,7 @@ wrong rows, so they are called out explicitly.
 
 2. **Team / school name (string).** `player_stats.team` = `roster.team` =
    `coaches.school` = `teams.team`. `teams` is DISPLAY metadata only
-   (logos/colors, decision 0008) — keep it off the model path.
+   (logos/colors); keep it off the model path.
 
 3. **`(team, season)`** links a player-season to its head coach in `coaches`
    (a school can have >1 head coach in a season, so this is many-to-one and can
@@ -180,12 +179,12 @@ wrong rows, so they are called out explicitly.
    `game_player_stats.playerId` is the **shared** college athlete id
    (namespace 1), so game-level features join the career backbone directly;
    `game_team_stats.teamId` is CFBD's team-id namespace (distinct from athlete
-   ids — join teams by name). `player_game` (decision 0035) is the derived
-   player × game grain on the same keys: `(playerId, gameId)` is unique, its
-   `gameId` joins `games.id`, and `team_games` is the team's games played in
-   the season (the denominator for games appeared).
-   `player_usage` (decision 0038) is the derived player-season-team grain on
-   the same keys: `games_appeared` over `team_games` is the playing-time rate.
+   ids — join teams by name). `player_game` is the derived player × game grain
+   on the same keys: `(playerId, gameId)` is unique, its `gameId` joins
+   `games.id`, and `team_games` is the team's games played in the season (the
+   denominator for games appeared).
+   `player_usage` is the derived player-season-team grain on the same keys:
+   `games_appeared` over `team_games` is the playing-time rate.
    The per-game appearance flags behind it come from the
    `player_appearance_sequence()` helper (not a table).
 
@@ -195,16 +194,16 @@ wrong rows, so they are called out explicitly.
   CFBD `/recruiting/players` `athleteId` collides across different people. Never
   join `recruiting` on id alone — go through `link_recruiting()`, which
   name-guards the join. Genuinely unrated recruits are absent; model "unrated"
-  as a real category rather than imputing (decision 0013).
+  as a real category rather than imputing.
 - **`picks.nflAthleteId` is NOT the nflverse id.** It shares nothing with
-  nflverse `gsis_id`/`espn_id`; use the draft-slot bridge above (decision 0014).
+  nflverse `gsis_id`/`espn_id`; use the draft-slot bridge above.
 
 ## Reasoning over the tables for the project's questions
 
 **Population / outcome (v1).** The unit is a player-season with a qualifying
 stat line in a draft-eligible season; the positive label is `drafted`. The
-`outcomes` table (decision 0032) materializes this at the **person-period**
-grain: one row per player-season in the model population, with the
+`outcomes` table materializes this at the **person-period** grain: one row per
+player-season in the model population, with the
 eligibility clock (`hs_grad_year`, `draft_eligible`, `eligible_season_index`),
 the drafted / NFL-entry / NFL-success labels (`outcome_*` columns), and the
 survival bookkeeping (`years_to_nfl_entry` + `nfl_entry_event`,

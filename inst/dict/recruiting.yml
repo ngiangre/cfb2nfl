@@ -4,15 +4,12 @@ grain: one recruited athlete (deduped from the per-class feed)
 key: playerId (string, from athleteId)
 description: >
   High-school recruiting ratings (industry `stars` 2–5, composite `rating`
-  ~0.74–1.0, national `ranking`) keyed by athlete id. New ingestion for the
-  recruiting spike (decision 0013). clean_recruiting DROPS recruits with no
-  athleteId (~40% of the feed: never enrolled, JUCO/international, or unlinked)
-  and DEDUPES to one row per athlete (highest rating, then stars, then most
-  recent class). CAVEAT: the recruiting athleteId is NOT a reliable member of
-  the shared athlete-id namespace — it collides across different people (e.g.
-  Cam Ward's id maps to a different recruit, Xavier Ward), so any join must be
-  name-guarded at link time via link_recruiting() (decision 0013). This table
-  is the join-ready ratings source, not a validated per-player attribute.
+  ~0.74–1.0, national `ranking`) keyed by athlete id. clean_recruiting drops
+  recruits with no athleteId (~40% of the feed) and dedupes to one row per
+  athlete (highest rating, then stars, then most recent class). The recruiting
+  athleteId is NOT a reliable member of the shared athlete-id namespace: it
+  collides across different people (e.g. Cam Ward's id maps to Xavier Ward), so
+  any join must be name-guarded via link_recruiting().
 columns:
   - name: playerId
     type: string
@@ -20,10 +17,7 @@ columns:
     provenance: derived (clean_recruiting)
   - name: recruit_name
     type: string
-    description: >
-      Recruit name as reported by the recruiting feed. Retained for the
-      link-time name guard (link_recruiting) and QA — may disagree with the
-      athlete-id namespace name on a collision.
+    description: Recruit name as reported by the feed; used for the link-time name guard. May disagree with the athlete-id namespace name on a collision.
     provenance: raw (name)
   - name: hs_class
     type: int32
@@ -35,9 +29,7 @@ columns:
     provenance: raw
   - name: rating
     type: double
-    description: >
-      Composite rating, a 0–1 index (most rated players ~0.7–1.0, with a tail of
-      2-stars dipping lower); NA where unrated. Contract bounds it to [0, 1].
+    description: Composite 0–1 rating (most rated players ~0.7–1.0); NA where unrated. Contract bounds it to [0, 1].
     provenance: raw
   - name: national_rank
     type: int32
@@ -49,7 +41,5 @@ columns:
     provenance: raw (position)
   - name: committed_to
     type: string
-    description: >
-      School the recruit committed to per the feed. Treat cautiously — can
-      reflect a later/updated commitment, not the first college (decision 0013).
+    description: School the recruit committed to per the feed. May reflect a later commitment, not the first college.
     provenance: raw (committedTo)

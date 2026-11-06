@@ -3,34 +3,30 @@ source: derived in-pipeline (build_player_usage(player_game, roster, games))
 grain: one player-season-team (a player on a team in a season, roster or stat line)
 key: playerId + season + team
 description: >
-  Playing time per player-season-team (issue #50, decision 0038). games_appeared
-  counts the team's games in which the player has at least one stat line in
-  game_player_stats (player_game rows); team_games is the team's games played
-  that season (completed games with scores, all divisions, postseason included;
-  the team_record() games_played definition, decision 0035). appearance_rate is
-  games_appeared / team_games. The reg_ columns repeat the counts for regular-
-  season games only. Caveat: no stat line does not mean the player did not
-  play. Offensive linemen and many special-teamers log no stat line even when
-  they play, so their appearance rate is a floor, not a participation rate.
-  Per-game columns (pass_att_pg, rush_car_pg, rec_pg, tackles_pg) are the
-  player's total over games appeared divided by games_appeared; NA when the
-  player appeared in no game. The universe is the roster's player-seasons
-  unioned with stat-line player-seasons (about 1.7k stat-line player-seasons are
-  off the roster), so no player with a stat line is dropped. Position and class
-  year come from the roster for that team-season; on_roster is FALSE for a
-  stat-line-only player-season, and its position and class year are NA. Class
-  year is recorded only from about 2019 on (earlier seasons are mostly NA in
-  CFBD). A DERIVED table: materialized into the DuckDB bundle, not published as
-  parquet (decision 0021). Contract: contract_player_usage() (key uniqueness,
-  games_appeared <= team_games, no row loss against player_game, team_games
-  tied out to team_record()). Carries no NFL outcome fields (leakage, decision
-  0014); draft status is a display label, joined in the post, not here.
-  Helper player_appearance_sequence() exposes the per-game appeared flags
-  behind games_appeared, for issue #51.
+  Playing time per player-season-team. games_appeared counts the team's games in
+  which the player has at least one stat line in game_player_stats; team_games is
+  the team's games played that season (completed games with scores, all
+  divisions, postseason included); appearance_rate is games_appeared /
+  team_games. The reg_ columns repeat the counts for regular-season games only.
+  Caveat: no stat line does not mean the player did not play. Offensive linemen
+  and many special-teamers log no stat line even when they play, so their
+  appearance rate is a floor. Per-game columns (pass_att_pg, rush_car_pg, rec_pg,
+  tackles_pg) are the player's total over games appeared divided by
+  games_appeared; NA when the player appeared in no game. The universe is the
+  roster's player-seasons unioned with stat-line player-seasons (about 1.7k
+  stat-line player-seasons are off the roster), so no player with a stat line is
+  dropped. Position and class year come from the roster for that team-season;
+  on_roster is FALSE for a stat-line-only player-season, with position and class
+  year NA. Class year is recorded only from about 2019 on. A derived table:
+  materialized into the DuckDB bundle, not published as parquet. Contract:
+  contract_player_usage() (key uniqueness, games_appeared <= team_games, no row
+  loss against player_game, team_games tied out to team_record()).
+  player_appearance_sequence() exposes the per-game appeared flags behind
+  games_appeared.
 columns:
   - name: playerId
     type: string
-    description: CFBD athlete id, the shared college athlete namespace (decision 0003).
+    description: CFBD athlete id, the shared college athlete namespace.
     provenance: derived (roster.playerId, game_player_stats.playerId)
   - name: season
     type: int32
@@ -42,7 +38,7 @@ columns:
     provenance: derived (roster.team, player_game.team)
   - name: position_group
     type: string
-    description: Harmonized position group from the roster position for that team-season (harmonize_position(), roster source). NA when on_roster is FALSE.
+    description: Harmonized position group from the roster position for that team-season. NA when on_roster is FALSE.
     provenance: derived (roster.position via harmonize_position())
   - name: class_year
     type: int32
@@ -54,11 +50,11 @@ columns:
     provenance: derived (roster, game_player_stats)
   - name: team_games
     type: int32
-    description: The team's games played in the season (completed, scored, all divisions, postseason included). Denominator for appearance_rate. 0 when the team has no completed game in the season.
+    description: The team's games played in the season (completed, scored, all divisions, postseason included). Denominator for appearance_rate. 0 when the team has no completed game.
     provenance: derived (team_game_schedule(games))
   - name: games_appeared
     type: int32
-    description: Team games in which the player has at least one stat line. Not the same as games played (no stat line does not mean he did not play; see the description).
+    description: Team games in which the player has at least one stat line. Not the same as games played (see the description).
     provenance: derived (player_game rows per player-season-team)
   - name: appearance_rate
     type: double

@@ -3,10 +3,9 @@ source: CFBD /games/teams (per year × week × seasonType, 2010–2026)
 grain: LONG — one row per team-game-category-stat
 key: gameId + team + category
 description: >
-  Team-level box-score statistics per game, in long format. Pairs with
-  games (gameId == id) for period/context and game_player_stats for the
-  player-level view. Pivot category/stat into features; same long-grain
-  convention as player_stats.
+  Team-level box-score statistics per game, in long format. Pairs with games
+  (gameId == id) for context and with game_player_stats for the player view.
+  Pivot category/stat into features.
 columns:
   - name: gameId
     type: int32
@@ -14,7 +13,7 @@ columns:
     provenance: raw
   - name: season
     type: int32
-    description: Season year (attached at ingest from the pull loop).
+    description: Season year (attached at ingest).
     provenance: raw
   - name: week
     type: int32
@@ -50,5 +49,5 @@ columns:
     provenance: raw
   - name: stat
     type: string
-    description: Stat value (stored as string in the raw feed).
+    description: Stat value (string in the raw feed).
     provenance: raw

@@ -1,16 +1,15 @@
 dataset: picks
 source: CFBD /draft/picks
 grain: one NFL draft pick (draft slot)
-key: "(year, round, pick) — the pick slot. collegeAthleteId (int → string playerId, decision 0003) is the player join key but is NOT unique: CFBD recycles ids across people (decision 0022), even within one draft year, and ids are absent for most pre-2004 picks."
+key: "(year, round, pick). collegeAthleteId (int, coerced to string playerId) is the player join key but is NOT unique: CFBD recycles ids across people, even within one draft year, and ids are absent for most pre-2004 picks."
 description: >
-  Historical NFL draft picks. The modeling outcome (drafted). Joins to player
+  Historical NFL draft picks, the modeling outcome (drafted). Joins to player
   stats and roster on the shared athlete-id namespace once coerced to string.
-  clean_picks passes every raw column through (adding playerId and drafted), so
-  this documents the full cleaned schema.
+  clean_picks passes every raw column through and adds playerId and drafted.
 columns:
   - name: collegeAthleteId
     type: int32
-    description: CFBD college athlete id; the canonical player key (decision 0003). Not unique — id reuse (decision 0022) — and missing for most pre-2004 picks.
+    description: CFBD college athlete id, the canonical player key. Not unique (id reuse) and missing for most pre-2004 picks.
     provenance: raw
   - name: nflAthleteId
     type: int32
@@ -54,7 +53,7 @@ columns:
     provenance: raw
   - name: name
     type: string
-    description: Player display name (QA / display only — do not join on name).
+    description: Player display name (display only, do not join on name).
     provenance: raw
   - name: position
     type: string
@@ -82,27 +81,27 @@ columns:
     provenance: raw
   - name: hometownInfo_city
     type: string
-    description: Hometown city (unnested from hometownInfo).
+    description: Hometown city.
     provenance: raw
   - name: hometownInfo_state
     type: string
-    description: Hometown state (unnested from hometownInfo).
+    description: Hometown state.
     provenance: raw
   - name: hometownInfo_country
     type: string
-    description: Hometown country (unnested from hometownInfo).
+    description: Hometown country.
     provenance: raw
   - name: hometownInfo_latitude
     type: string
-    description: Hometown latitude, stored as string in the raw feed.
+    description: Hometown latitude (string in the raw feed).
     provenance: raw
   - name: hometownInfo_longitude
     type: string
-    description: Hometown longitude, stored as string in the raw feed.
+    description: Hometown longitude (string in the raw feed).
     provenance: raw
   - name: hometownInfo_countyFips
     type: string
-    description: Hometown county FIPS code, stored as string in the raw feed.
+    description: Hometown county FIPS code (string in the raw feed).
     provenance: raw
   - name: playerId
     type: string
@@ -110,5 +109,5 @@ columns:
     provenance: derived (clean_picks)
   - name: drafted
     type: logical
-    description: Always TRUE in this table; the positive outcome label.
+    description: Always TRUE here; the positive outcome label.
     provenance: derived (clean_picks)

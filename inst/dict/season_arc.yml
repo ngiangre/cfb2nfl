@@ -7,20 +7,19 @@ description: >
   (passing yards, rushing yards, receiving yards, tackles). The value is the
   season total from player_stats, summed across the team rows when the player
   split the season between two teams (27 player-seasons in the data, all
-  transfers). season_index is the player's career season: 1 for the first
-  season with any stat line in player_stats, counted over all stats so an index
-  means the same season in every arc. The data starts in 2010, so a player who
-  began earlier has index 1 at his first season in the data. Left-censored at
-  2010 and right-censored for recent classes. A DERIVED table: materialized into
-  the DuckDB bundle, not published as parquet (decision 0021). Contract:
-  contract_season_arc() (key uniqueness, one row per numeric player-season-stat
-  in player_stats, index at least 1). Issue #47; plans/explore-questions.md
-  question 6. Carries no NFL outcome fields (leakage, decision 0014). Athlete
-  ids recycled across people (decision 0022) are not excluded here.
+  transfers). season_index is the player's career season: 1 for the first season
+  with any stat line in player_stats, counted over all stats so an index means
+  the same season in every arc. The data starts in 2010, so a player who began
+  earlier has index 1 at his first season in the data. Left-censored at 2010 and
+  right-censored for recent classes. A derived table: materialized into the
+  DuckDB bundle, not published as parquet. Contract: contract_season_arc() (key
+  uniqueness, one row per numeric player-season-stat in player_stats, index at
+  least 1). Carries no NFL outcome fields. Athlete ids recycled across people
+  are not excluded here.
 columns:
   - name: playerId
     type: string
-    description: CFBD athlete id, the shared college athlete namespace (decision 0003).
+    description: CFBD athlete id, the shared college athlete namespace.
     provenance: derived (player_stats.playerId)
   - name: player
     type: string

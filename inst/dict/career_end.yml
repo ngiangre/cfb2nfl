@@ -3,27 +3,25 @@ source: derived in-pipeline (career_end_status(career, outcomes, picks_nfl))
 grain: one player's college career (one row per career_summary() row)
 key: playerId (string)
 description: >
-  How each college career ended (issue #51, part 1; decision 0039). One row per
-  career from `career_summary`, with exactly one category in `career_end`. The
-  early-stop category is a PROXY: a career that stops while NCAA eligibility
-  remains, on a single school, with no NFL entry, is labelled `early_stop`. It
-  is injury-shaped, not an injury. CFBD has no injury feed, so absence alone
-  cannot separate an injury from a walk-on quitting, an academic exit, or a
-  transfer to a school outside the roster data. Use `early_stop_proxy`, never
-  the word "injury", in summaries. Categories apply in order (first match
-  wins): right_censored, drafted, signed_udfa, not_in_model_population,
-  eligibility_exhausted, eligibility_unknown, transferred_then_stopped,
-  early_stop. A DERIVED table: bundled into the DuckDB asset and documented
-  here, not published as parquet (it rebuilds from the roster, picks and the
-  outcomes table in any mode, decision 0021). Careers whose last roster season
-  is the most recent season in the data, or whose next NFL draft is past the
-  last complete draft, are `right_censored`, never early stops. Eligibility
-  clock: seasons from first to last roster season, minus 2020 (the COVID-19
-  waiver), against 5. Contract: `contract_career_end()`.
+  How each college career ended. One row per career from `career_summary`, with
+  exactly one category in `career_end`. The early-stop category is a PROXY: a
+  career that stops while NCAA eligibility remains, on a single school, with no
+  NFL entry, is labelled `early_stop`. It is injury-shaped, not an injury: CFBD
+  has no injury feed, so absence alone cannot separate an injury from a walk-on
+  quitting, an academic exit, or a transfer outside the roster data. Use
+  `early_stop_proxy`, never the word "injury", in summaries. Categories apply in
+  order (first match wins): right_censored, drafted, signed_udfa,
+  not_in_model_population, eligibility_exhausted, eligibility_unknown,
+  transferred_then_stopped, early_stop. A derived table: bundled into the DuckDB
+  asset, not published as parquet. Careers whose last roster season is the most
+  recent in the data, or whose next NFL draft is past the last complete draft,
+  are `right_censored`, never early stops. Eligibility clock: seasons from first
+  to last roster season, minus 2020 (the COVID-19 waiver), against 5. Contract:
+  contract_career_end().
 columns:
   - name: playerId
     type: string
-    description: Athlete id (the shared college-athlete namespace). Ids with a roster span over 7 seasons are excluded as CFBD id reuse (decision 0022).
+    description: Athlete id (the shared college-athlete namespace). Ids with a roster span over 7 seasons are excluded as CFBD id reuse.
     provenance: derived (career_summary.playerId)
   - name: first_season
     type: int32
@@ -47,17 +45,11 @@ columns:
     provenance: derived (career_summary.gap_seasons)
   - name: clock_seasons_used
     type: int32
-    description: >
-      Eligibility seasons used: calendar seasons from first to last roster
-      season, minus the 2020 season (not counted against eligibility under the
-      NCAA COVID-19 waiver). Can be 0 for a one-season 2020 career.
+    description: "Eligibility seasons used: calendar seasons from first to last roster season, minus the 2020 season (not counted under the NCAA COVID-19 waiver). Can be 0 for a one-season 2020 career."
     provenance: derived (first_season, last_season)
   - name: eligibility_remaining
     type: int32
-    description: >
-      eligibility_seasons (5) minus clock_seasons_used. Above 0 means eligibility
-      remained at the last roster season. Not observable exactly: medical
-      hardship and redshirt rules are not in the data.
+    description: eligibility_seasons (5) minus clock_seasons_used. Above 0 means eligibility remained at the last roster season. Not observable exactly (medical hardship and redshirt rules are not in the data).
     provenance: derived
   - name: clock_start_observed
     type: logical
@@ -69,25 +61,24 @@ columns:
     provenance: derived (outcomes.playerId)
   - name: drafted
     type: logical
-    description: TRUE when a CFBD pick is bridged to the player in a draft after first_season (one pick per player, decision 0011). Covers every career, stat line or not.
+    description: TRUE when a CFBD pick is bridged to the player in a draft after first_season. Covers every career, stat line or not.
     provenance: derived (picks via link_nfl_draft)
   - name: signed_udfa
     type: logical
-    description: TRUE when the player was not drafted but matched to an NFL roster by the name guard (decision 0014). Only in-population players can be TRUE.
+    description: TRUE when the player was not drafted but matched to an NFL roster by the name guard. Only in-population players can be TRUE.
     provenance: derived (outcomes.outcome_signed_udfa_d)
   - name: right_censored
     type: logical
-    description: TRUE when the career is not yet observed to end (last roster season is the most recent season in the data, or the following NFL draft is past the last complete draft). Never an early stop.
+    description: TRUE when the career is not yet observed to end (last roster season is the most recent in the data, or the following NFL draft is past the last complete draft). Never an early stop.
     provenance: derived
   - name: career_end
     type: string
     description: >
       Mutually exclusive, exhaustive category. right_censored / drafted /
-      signed_udfa / not_in_model_population (no stat line and not drafted, so
-      undrafted NFL status is unresolved) / eligibility_exhausted /
-      eligibility_unknown (eligibility remains, clock start left-censored) /
-      transferred_then_stopped (eligibility remains, more than one school) /
-      early_stop (the proxy).
+      signed_udfa / not_in_model_population (no stat line and not drafted) /
+      eligibility_exhausted / eligibility_unknown (eligibility remains, clock
+      start left-censored) / transferred_then_stopped (eligibility remains, more
+      than one school) / early_stop (the proxy).
     provenance: derived
   - name: early_stop_proxy
     type: logical

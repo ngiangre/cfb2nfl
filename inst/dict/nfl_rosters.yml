@@ -4,11 +4,10 @@ grain: one player-season on an NFL roster
 key: (gsis_id, season)
 description: >
   nflverse season rosters, one row per player-season. The source for the
-  primary longevity measure — distinct NFL seasons on a roster — which, unlike
-  a stats-based definition, counts linemen / special-teamers / backups who
-  accrue no box-score stats (decision 0014). clean_nfl_rosters drops rows with
-  no gsis_id (unlinkable) and dedupes to one row per player-season. Roster
-  presence for recent seasons is right-censored (players still active).
+  primary longevity measure, distinct NFL seasons on a roster, which counts
+  linemen / special-teamers / backups who accrue no box-score stats.
+  clean_nfl_rosters drops rows with no gsis_id and dedupes to one row per
+  player-season. Roster presence for recent seasons is right-censored.
 columns:
   - name: gsis_id
     type: string
@@ -20,10 +19,7 @@ columns:
     provenance: raw
   - name: player_name
     type: string
-    description: >
-      Player full name (nflverse full_name). Kept to name-guard an undrafted
-      college->NFL match, which has no draft slot to key on (see
-      resolve_nfl_outcome()); display/QA only, never a join key.
+    description: Player full name; used to name-guard an undrafted college-to-NFL match. Display/QA only, never a join key.
     provenance: raw (full_name)
   - name: nfl_team
     type: string

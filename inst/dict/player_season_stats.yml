@@ -6,13 +6,10 @@ description: >
   Wide reshaping of the long `player_stats`: one numeric column per
   (category, statType) pair, named `<category>_<statType>` (lowercased,
   non-alphanumerics to underscore). Values are summed over duplicate pairs and
-  coerced to double; pairs a player-season never logged are NA. This is a
-  SQL-querying convenience bundled into the DuckDB asset (decision 0026) —
-  it is NOT published as standalone parquet, like `ps_change`/
-  `roster_flags`/`career_summary` (decision 0021). Identity columns mirror the
-  `player_season` backbone grain (which DROPS the stats — this table is the
-  stats counterpart). A player who appeared for two teams in one season has
-  one row per team.
+  coerced to double; pairs a player-season never logged are NA. A SQL-querying
+  convenience bundled into the DuckDB asset, not published as standalone parquet.
+  Identity columns mirror the `player_season` backbone grain (which drops the
+  stats). A player who appeared for two teams in one season has one row per team.
 columns:
   - name: playerId
     type: string
@@ -20,7 +17,7 @@ columns:
     provenance: raw (player_stats)
   - name: player
     type: string
-    description: Player display name (QA / display only — do not join on name).
+    description: Player display name (display only, do not join on name).
     provenance: raw (player_stats)
   - name: season
     type: int32
@@ -42,7 +39,7 @@ columns:
     type: double
     description: >
       One column per (category, statType) pair in stat_taxonomy, e.g.
-      passing_completions, rushing_yds, def_ints. Sum of the long `stat`
-      values (cast to double); NA when the player-season logged none. Use
-      stat_taxonomy (bundled) for phase/label interpretation of each column.
+      passing_completions, rushing_yds, def_ints. Sum of the long `stat` values
+      (cast to double); NA when the player-season logged none. Use stat_taxonomy
+      (bundled) for phase/label interpretation of each column.
     provenance: derived (build_player_season_stats)

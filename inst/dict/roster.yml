@@ -3,13 +3,12 @@ source: CFBD /roster (per year, 2010–2026)
 grain: one player-season on a team roster
 key: playerId (string, from id) + season
 description: >
-  Per-season physicals (height, weight), position, jersey, and hometown keyed by
+  Per-season physicals (height, weight), position, jersey and hometown keyed by
   athlete id, and a full player-season backbone (includes players with no
-  qualifying stat line, e.g. many linemen). New ingestion for decision 0003.
-  NOTE: `season` is stamped from the queried year — the endpoint's own `year`
-  field is the player's eligibility class (1-5), renamed `class_year`. Weight is
-  STATIC per player (repeated across seasons), so a between-season weight_delta
-  is not derivable here (decision 0003 Outcome).
+  qualifying stat line, e.g. many linemen). `season` is stamped from the queried
+  year; the endpoint's own `year` field is the player's eligibility class (1-5),
+  renamed `class_year`. Weight is STATIC per player across seasons, so no
+  between-season weight_delta is derivable here.
 columns:
   - name: playerId
     type: string
@@ -22,11 +21,10 @@ columns:
   - name: class_year
     type: int32
     description: >
-      Player eligibility class (1-5) — the endpoint's own `year` field, renamed.
-      NOT the season. Older CFBD seasons return the queried YEAR here instead of
-      a class (~124k rows before cleaning); values outside 1-5 are coerced to NA
-      by `clean_roster()` (weight-coercion precedent, decision 0009) and enforced
-      by `contract_roster()`.
+      Player eligibility class (1-5), the endpoint's own `year` field renamed,
+      NOT the season. Older CFBD seasons return the queried year here instead of
+      a class; values outside 1-5 are coerced to NA by clean_roster() and
+      enforced by contract_roster().
     provenance: raw (year), cleaned (out-of-range -> NA)
   - name: team
     type: string
@@ -38,14 +36,14 @@ columns:
     provenance: raw
   - name: height
     type: int32
-    description: Height in INCHES (e.g. 74 = 6'2"); values outside the plausible 60-85 range are coerced to NA by clean_roster (decision 0009 precedent, decision 0027).
+    description: Height in inches (e.g. 74 = 6'2"); values outside the plausible 60-85 range are coerced to NA by clean_roster.
     provenance: raw
   - name: weight
     type: int32
     description: >
-      Weight (lbs). Static per player across seasons (see note above). A raw
-      value of 0 is a missing-data placeholder, coerced to NA in clean_roster
-      (decision 0009). Contract range 100-500, NA-pass.
+      Weight (lbs), static per player across seasons. A raw 0 is a
+      missing-data placeholder, coerced to NA by clean_roster. Contract range
+      100-500, NA allowed.
     provenance: raw (0 -> NA in clean_roster)
   - name: jersey
     type: int32

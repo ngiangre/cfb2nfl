@@ -3,9 +3,8 @@ source: CFBD /stats/player/season (per year, 2010–2026)
 grain: LONG — one row per player-season-category-statType-stat
 key: playerId (string) + season
 description: >
-  Player season statistics in long format. Must be pivoted into
-  position-relevant features (features stage); discovering which stats carry
-  information is part of the analysis.
+  Player season statistics in long format. Pivot into position-relevant
+  features at the features stage.
 columns:
   - name: season
     type: int32
@@ -17,7 +16,7 @@ columns:
     provenance: raw
   - name: player
     type: string
-    description: Player display name (QA / display only — do not join on name).
+    description: Player display name (display only, do not join on name).
     provenance: raw
   - name: position
     type: string
@@ -41,5 +40,5 @@ columns:
     provenance: raw
   - name: stat
     type: string
-    description: Stat value (stored as string in the raw feed).
+    description: Stat value (string in the raw feed).
     provenance: raw

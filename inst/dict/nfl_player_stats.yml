@@ -4,12 +4,10 @@ grain: one player-season (regular season only)
 key: (gsis_id, season)
 description: >
   NFL production at the player-season grain, regular season only, aggregated
-  from the long weekly nflverse stats (decision 0014). Season totals for the
-  common passing / rushing / receiving / defensive box-score categories. Stat
-  column names match nfl_draft_picks' career totals. `games` counts weeks with
-  a recorded stat line (an approximation of games played, not roster games).
-  Season totals for recent seasons are censored (season may be incomplete or
-  not started).
+  from the long weekly nflverse stats. Season totals for the common passing /
+  rushing / receiving / defensive categories; column names match
+  nfl_draft_picks' career totals. `games` counts weeks with a recorded stat
+  line. Totals for recent seasons are censored.
 columns:
   - name: gsis_id
     type: string
@@ -17,7 +15,7 @@ columns:
     provenance: derived (clean_nfl_player_stats)
   - name: player_name
     type: string
-    description: Player display name (QA / display only — do not join on name).
+    description: Player display name (display only, do not join on name).
     provenance: raw (player_display_name)
   - name: season
     type: int32

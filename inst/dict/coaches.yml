@@ -1,10 +1,10 @@
 dataset: coaches
 source: CFBD /coaches (seasons block unnested)
-grain: one head-coach-season (head coaches only — no coordinators / S&C)
+grain: one head-coach-season (head coaches only, no coordinators / S&C)
 key: coach_id + season; joins to player-seasons on (school == team, season)
 description: >
   Head coaches with per-season program performance (SRS, SP+ overall/offense/
-  defense, wins). Coach *changes* between seasons are the v1 coaching features.
+  defense, wins). Coach changes between seasons are the v1 coaching features.
 columns:
   - name: coach_id
     type: int32
@@ -28,19 +28,19 @@ columns:
     provenance: raw (seasons_year)
   - name: srs
     type: double
-    description: Team-season Simple Rating System (points above/below average, where 0 is average; typically roughly -25 to +30).
+    description: Simple Rating System (points above/below average, 0 is average; roughly -25 to +30).
     provenance: raw (seasons_srs)
   - name: sp_overall
     type: double
-    description: Team-season SP+ overall rating (points per game vs average, typically roughly -25 to +30).
+    description: SP+ overall rating (points per game vs average, roughly -25 to +30).
     provenance: raw (seasons_spOverall)
   - name: sp_offense
     type: double
-    description: Team-season SP+ offense rating (same scale as sp_overall).
+    description: SP+ offense rating (same scale as sp_overall).
     provenance: raw (seasons_spOffense)
   - name: sp_defense
     type: double
-    description: Team-season SP+ defense rating (same scale as sp_overall; sign convention follows the feed).
+    description: SP+ defense rating (same scale as sp_overall; sign follows the feed).
     provenance: raw (seasons_spDefense)
   - name: games
     type: int32

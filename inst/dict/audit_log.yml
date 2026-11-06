@@ -3,16 +3,15 @@ source: derived in-pipeline (audit_step rows bound into the audit_log target)
 grain: one row per audited pipeline step
 key: step (unique per run)
 description: >
-  The lineage/audit layer (decision 0005), slimmed for the DuckDB bundle
-  (decision 0027 — the nested `na_by_col` list column is dropped; the full log
-  lives in the pipeline). Lets SQL users verify row counts, join coverage and
-  schema hashes for every table in this bundle — the built-in defense against
-  silent row loss on joins. Known signals: `build_player_season` collapses the
-  long stats (~1.5M -> ~160k rows); `link_coaches` inflates rows where a school
-  had >1 head coach in a season (intentional many-to-many); `link_nfl_draft`
-  nulls the nflverse ids that fail the name guard. One row per (step, run);
-  historical schema hashes across runs are in the `audit_history.csv` release
-  asset, not here.
+  The lineage/audit layer, slimmed for the DuckDB bundle (the nested
+  `na_by_col` list column is dropped; the full log lives in the pipeline). Lets
+  SQL users verify row counts, join coverage and schema hashes for every table
+  in this bundle, the built-in defense against silent row loss on joins. Known
+  signals: `build_player_season` collapses the long stats (~1.5M -> ~160k rows);
+  `link_coaches` inflates rows where a school had >1 head coach in a season
+  (intentional many-to-many); `link_nfl_draft` nulls the nflverse ids that fail
+  the name guard. One row per (step, run); historical schema hashes across runs
+  are in the `audit_history.csv` release asset, not here.
 columns:
   - name: step
     type: string
@@ -32,7 +31,7 @@ columns:
     provenance: derived (audit_step)
   - name: rows_delta
     type: int32
-    description: n_rows_out - n_rows_in (conflates joins and filters — check pct_keys_matched to tell them apart).
+    description: n_rows_out - n_rows_in (conflates joins and filters; check pct_keys_matched to tell them apart).
     provenance: derived (audit_step)
   - name: keys_dropped
     type: int32

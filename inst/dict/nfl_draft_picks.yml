@@ -1,16 +1,14 @@
 dataset: nfl_draft_picks
 source: nflverse nflreadr::load_draft_picks (draft seasons 2010–2026)
 grain: one NFL draft pick (unique on season/round/pick)
-key: (season, round, pick) — the slot key joined to CFBD picks (decision 0014)
+key: (season, round, pick) — the slot key joined to CFBD picks
 description: >
-  nflverse draft picks: the BRIDGE from CFBD picks to nflverse player ids
-  (gsis_id, pfr_player_id) plus a Pro-Football-Reference CAREER SUMMARY (games,
+  nflverse draft picks: the bridge from CFBD picks to nflverse player ids
+  (gsis_id, pfr_player_id) plus a Pro-Football-Reference career summary (games,
   seasons_started, last active season `to`, weighted/draft AV, Pro Bowl /
   All-Pro / HOF, and career box-score totals). Linked to CFBD picks by draft
-  slot (year/round/overall), NEVER by CFBD nflAthleteId — a different id
-  namespace (decision 0014). clean_nfl_draft_picks drops the source `car_av`
-  (all-NA for this window). Career totals are right-censored for recent classes
-  still active.
+  slot (year/round/overall), never by CFBD nflAthleteId. Career totals are
+  right-censored for recent classes still active.
 columns:
   - name: season
     type: int32
@@ -38,15 +36,11 @@ columns:
     provenance: raw
   - name: cfb_player_id
     type: string
-    description: >
-      nflverse's college-football player id; corroborates the slot bridge but
-      not the authoritative key.
+    description: nflverse's college-football player id; corroborates the slot bridge but is not the authoritative key.
     provenance: raw
   - name: pfr_player_name
     type: string
-    description: >
-      Player name per PFR; used for the link-time name guard (link_nfl_draft)
-      and QA — do not join on name.
+    description: Player name per PFR; used for the link-time name guard. Do not join on name.
     provenance: raw
   - name: position
     type: string

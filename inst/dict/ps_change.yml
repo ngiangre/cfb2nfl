@@ -4,14 +4,13 @@ grain: one player-season with a qualifying stat line (+ change features)
 key: playerId (string) + season
 description: >
   The player-season feature backbone (build_player_season -> link_coaches ->
-  link_tiers -> link_drafted) with longitudinal between-season change features
-  attached (decision 0021): team/tier/coach lags and the transfer and coaching
-  flags derived from them. Lags only use prior-season data (no leakage from the
-  predicted draft class). NOTE: rows can INFLATE at the coach link where a
-  school had >1 head coach in a season (intentional many-to-many), and this
-  table carries the `drafted` label — filter it out before using as a model
-  input. A DERIVED table: materialized into the DuckDB bundle and documented
-  here, but not published as a standalone parquet (stat_taxonomy precedent).
+  link_tiers -> link_drafted) with between-season change features attached:
+  team/tier/coach lags and the transfer and coaching flags derived from them.
+  Lags use only prior-season data (no leakage). Rows can inflate at the coach
+  link where a school had >1 head coach in a season (intentional many-to-many).
+  Carries the `drafted` label, so filter it out before use as a model input. A
+  derived table: materialized into the DuckDB bundle, not published as a
+  standalone parquet.
 columns:
   - name: playerId
     type: string

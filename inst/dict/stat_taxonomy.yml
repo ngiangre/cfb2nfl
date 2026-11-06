@@ -4,13 +4,13 @@ grain: one (category, statType) pair
 key: (category, statType)
 description: >
   Canonical mapping that makes the long player_stats interpretable: each
-  (category, statType) pair is assigned a game phase (offense / defense /
+  (category, statType) pair gets a game phase (offense / defense /
   special_teams), a plain-language label, and a kind (scoring / volume / rate).
-  Keyed at (category, statType) grain because a category alone can be phase-
-  ambiguous (fumbles/FUM and fumbles/LOST are offense; fumbles/REC is defense).
-  Read via stat_taxonomy(); coverage of every pair in player_stats is enforced
-  by contract_stat_taxonomy(). Materialized into the DuckDB bundle so SQL users
-  get phase/labels too; NOT published as a parquet asset.
+  Keyed at (category, statType) because a category alone can be phase-ambiguous
+  (fumbles/FUM and fumbles/LOST are offense; fumbles/REC is defense). Read via
+  stat_taxonomy(); coverage of every pair in player_stats is enforced by
+  contract_stat_taxonomy(). Materialized into the DuckDB bundle, not published
+  as a parquet asset.
 columns:
   - name: category
     type: string

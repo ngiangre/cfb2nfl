@@ -3,23 +3,18 @@ source: derived in-pipeline (career_summary(roster))
 grain: one player's college career
 key: playerId (string)
 description: >
-  Per-player career summary collapsed from the roster backbone (decision 0021):
-  seasons on a roster, first/last season observed, gap seasons (years absent
-  between first and last — injury-, redshirt- or sitting-out-shaped), and
-  transfer count (distinct teams minus one). Built on `roster`, so it includes
-  players with no qualifying stat line. A DERIVED table: materialized into the
-  DuckDB bundle and documented here, but not published as a standalone parquet —
-  it rebuilds from the cleaned roster in any pipeline mode (stat_taxonomy
-  precedent). Players whose roster span exceeds 7 seasons are excluded: a span
-  that long is CFBD id reuse across distinct individuals, not one career
-  (decision 0022). Contract: `contract_career_summary()` (1-7 seasons,
+  Per-player career summary collapsed from the roster backbone: seasons on a
+  roster, first/last season observed, gap seasons (years absent between first
+  and last), and transfer count (distinct teams minus one). Built on `roster`,
+  so it includes players with no qualifying stat line. Players whose roster span
+  exceeds 7 seasons are excluded as CFBD id reuse across distinct individuals. A
+  derived table: materialized into the DuckDB bundle, not published as a
+  standalone parquet. Contract: contract_career_summary() (1-7 seasons,
   non-negative gaps/transfers).
 columns:
   - name: playerId
     type: string
-    description: >
-      Athlete id (the shared college-athlete namespace); ids with a roster
-      span > 7 seasons are excluded as CFBD id reuse (decision 0022).
+    description: Athlete id (the shared college-athlete namespace); ids with a roster span > 7 seasons are excluded as CFBD id reuse.
     provenance: derived (roster.id)
   - name: seasons
     type: int32
@@ -39,13 +34,9 @@ columns:
     provenance: derived
   - name: gap_seasons
     type: int32
-    description: >
-      Seasons absent between first and last (span minus observed seasons).
-      Contract: non-negative.
+    description: "Seasons absent between first and last (span minus observed seasons). Contract: non-negative."
     provenance: derived
   - name: transfers
     type: int32
-    description: >
-      Team changes (teams - 1). A gap between two schools still counts once.
-      Contract: 0-6.
+    description: "Team changes (teams - 1). A gap between two schools still counts once. Contract: 0-6."
     provenance: derived

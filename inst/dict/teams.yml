@@ -3,15 +3,12 @@ source: CFBD /teams (all divisions)
 grain: one row per team (program)
 key: team (string, from school)
 description: >
-  Team dimension for display: logos, colors, mascot, abbreviation, and
+  Team dimension for display: logos, colors, mascot, abbreviation and
   conference. Joined by school NAME (`team`), the same namespace as
-  `player_stats.team` and the coach join (decision 0008). This is DISPLAY
-  metadata (used for logos/colors in the site/report), not a model feature, so
-  logo URLs are kept off the model path (see link_team_meta()). Cleaning dedupes
-  duplicate school names in /teams (a real program plus a phantom NA row) to one
-  row per school, and extracts light/dark logo URLs from the multi-resolution
-  `logos` array. A handful of small programs carry no logo (NA), handled with a
-  placeholder at display time.
+  `player_stats.team` and the coach join. Display metadata only, kept off the
+  model path. Cleaning dedupes duplicate school names to one row per school and
+  extracts light/dark logo URLs from the `logos` array; a few small programs
+  carry no logo (NA).
 columns:
   - name: team
     type: string
@@ -19,7 +16,7 @@ columns:
     provenance: raw (school)
   - name: team_id
     type: int32
-    description: CFBD numeric team id (retained for QA / future id joins).
+    description: CFBD numeric team id.
     provenance: raw (id)
   - name: mascot
     type: string
@@ -35,7 +32,7 @@ columns:
     provenance: raw
   - name: classification
     type: string
-    description: Division classification (fbs, fcs, ii, iii, ...); used to pick the real row when a school name is duplicated.
+    description: Division (fbs, fcs, ii, iii, ...); used to pick the real row when a school name is duplicated.
     provenance: raw
   - name: color
     type: string
@@ -47,9 +44,9 @@ columns:
     provenance: raw (alternateColor)
   - name: logo_light
     type: string
-    description: URL of the light-background logo (first /logos/ variant); NA for a few small programs.
+    description: Light-background logo URL; NA for a few small programs.
     provenance: derived (clean_teams)
   - name: logo_dark
     type: string
-    description: URL of the dark-background logo (first /logos-dark/ variant); NA when unavailable.
+    description: Dark-background logo URL; NA when unavailable.
     provenance: derived (clean_teams)

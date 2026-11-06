@@ -1,12 +1,12 @@
 dataset: conference_tiers
-source: derived in-pipeline from player_stats by build_conference_tiers() (decision 0017)
+source: derived in-pipeline from player_stats by build_conference_tiers()
 grain: one (season, conference) pair
 key: (season, conference)
 description: >
-  Season-aware mapping of conference → competitive tier (Power / Group of 5 /
-  FCS-and-below) used to measure transfer *direction* (decision 0003). Season-
-  keyed because memberships shift over 2010–2026 (Pac-12 collapse, Big East →
-  AAC, realignment). Coverage is enforced by contract_conference_tiers().
+  Season-aware mapping of conference to competitive tier (Power / Group of 5 /
+  FCS-and-below), used to measure transfer direction. Season-keyed because
+  memberships shift over 2010–2026 (Pac-12 collapse, Big East to AAC,
+  realignment). Coverage is enforced by contract_conference_tiers().
 columns:
   - name: season
     type: int32
@@ -18,7 +18,7 @@ columns:
     provenance: raw
   - name: tier
     type: int32
-    description: Ordinal tier level (1 FCS-and-below, 2 Group of 5, 3 Power).
+    description: Ordinal tier (1 FCS-and-below, 2 Group of 5, 3 Power).
     provenance: raw
   - name: tier_label
     type: string

@@ -3,26 +3,23 @@ source: derived in-pipeline (build_player_game(game_player_stats, games))
 grain: one player in one game (a stat line in that game)
 key: playerId + gameId
 description: >
-  One row per player per game in which the player has at least one stat line
-  in game_player_stats, whatever the category (a kicker-only line still counts).
-  The shared base for per-game usage (#50) and opponent-adjusted game
-  performance (#47). Team, opponent, side, neutral-site flag, points and
-  pregame Elo come from games (joined by gameId == id); the stat columns are
-  the box-score counts for the player's line in that game, wide. A stat column
-  is NA when the player had no line in that category in that game (CFBD lists a
-  category only when the player recorded something in it), and 0 when a zero
-  was recorded. Elo is NA for games without a CFBD pregame Elo (mostly FCS and
-  lower-division opponents). team_games is the team's games played in the season
-  (games with a final score, all divisions, postseason included), the
-  denominator for games appeared. A DERIVED table: materialized into the DuckDB
-  bundle, not published as parquet (decision 0021). Contract:
-  contract_player_game() (key uniqueness, every gameId in games, no row loss
-  against game_player_stats). Decision 0035. Carries no NFL outcome fields
-  (leakage, decision 0014).
+  One row per player per game in which the player has at least one stat line in
+  game_player_stats, whatever the category (a kicker-only line still counts).
+  The shared base for per-game usage and opponent-adjusted game performance.
+  Team, opponent, side, neutral-site flag, points and pregame Elo come from
+  games (joined by gameId == id); the stat columns are the player's box-score
+  counts for that game, wide. A stat column is NA when the player had no line in
+  that category in that game, and 0 when a zero was recorded. Elo is NA for games
+  without a CFBD pregame Elo (mostly FCS and lower-division opponents).
+  team_games is the team's games played in the season (games with a final score,
+  all divisions, postseason included), the denominator for games appeared. A
+  derived table: materialized into the DuckDB bundle, not published as parquet.
+  Contract: contract_player_game() (key uniqueness, every gameId in games, no
+  row loss against game_player_stats).
 columns:
   - name: playerId
     type: string
-    description: CFBD athlete id, the shared college athlete namespace (decision 0003).
+    description: CFBD athlete id, the shared college athlete namespace.
     provenance: derived (game_player_stats.playerId)
   - name: gameId
     type: int32
@@ -54,11 +51,11 @@ columns:
     provenance: derived (games)
   - name: opponent_conference
     type: string
-    description: Conference of the opponent in that game (NA where games lists none; 725 player-games, all also without an opponent Elo).
+    description: Conference of the opponent (NA where games lists none; 725 player-games, all also without an opponent Elo).
     provenance: derived (games)
   - name: home_away
     type: string
-    description: home or away, from the box score (game_player_stats.homeAway).
+    description: home or away, from the box score.
     provenance: derived (game_player_stats.homeAway)
   - name: neutral_site
     type: logical
@@ -66,15 +63,15 @@ columns:
     provenance: derived (games.neutralSite)
   - name: team_points
     type: int32
-    description: Points scored by the player's team in the game (NA before completion).
+    description: Points scored by the player's team (NA before completion).
     provenance: derived (games)
   - name: opponent_points
     type: int32
-    description: Points scored by the opponent in the game (NA before completion).
+    description: Points scored by the opponent (NA before completion).
     provenance: derived (games)
   - name: team_pregame_elo
     type: double
-    description: CFBD pregame Elo of the player's team. NA where CFBD has no Elo (about 26% of player-games, mostly FCS / lower-division teams).
+    description: CFBD pregame Elo of the player's team. NA where CFBD has no Elo (about 26% of player-games, mostly FCS / lower-division).
     provenance: derived (games.*PregameElo)
   - name: opponent_pregame_elo
     type: double
@@ -82,10 +79,7 @@ columns:
     provenance: derived (games.*PregameElo)
   - name: team_games
     type: int32
-    description: >
-      The player's team's games played in the season (games with a final score,
-      all divisions, postseason included). Denominator for games appeared per
-      team-season (#50). Contract: 1-20.
+    description: "The player's team's games played in the season (final score, all divisions, postseason included). Denominator for games appeared per team-season. Contract: 1-20."
     provenance: derived (team_record(games)$games_played)
   - name: pass_cmp
     type: double

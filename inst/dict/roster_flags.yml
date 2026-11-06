@@ -3,16 +3,13 @@ source: derived in-pipeline (flag_redshirt(roster, player_stats))
 grain: one player-season on a team roster (roster grain + eligibility flags)
 key: playerId (string) + season
 description: >
-  The full roster backbone with per-season and per-career eligibility flags
-  attached (decision 0021). `has_stats` marks whether the player recorded any
-  season statistic; `redshirt_season` flags the APPROXIMATE redshirt shape
-  (a no-stat season the player returned from — final-year absences are never
-  flagged, being as likely an injury or early departure); the career flags
-  collapse the per-season signal. All flags are redshirt-SHAPED, not certified:
-  a no-stat season may be an early exit, and a fifth-year class may be a grad
-  transfer. A DERIVED table: materialized into the DuckDB bundle and documented
-  here, but not published as a standalone parquet (stat_taxonomy precedent).
-  Contract: `contract_redshirt()`.
+  The full roster backbone with per-season and per-career eligibility flags.
+  `has_stats` marks whether the player recorded any season statistic;
+  `redshirt_season` flags the approximate redshirt shape (a no-stat season the
+  player returned from; final-year absences are never flagged); the career flags
+  collapse the per-season signal. All flags are redshirt-shaped, not certified.
+  A derived table: materialized into the DuckDB bundle, not published as a
+  standalone parquet. Contract: contract_redshirt().
 columns:
   - name: playerId
     type: string
@@ -40,7 +37,7 @@ columns:
     provenance: derived (clean_roster)
   - name: weight
     type: int32
-    description: Weight (lbs); static per player, 0-placeholder coerced to NA (decision 0009).
+    description: Weight (lbs); static per player, 0-placeholder coerced to NA.
     provenance: derived (clean_roster)
   - name: jersey
     type: int32
@@ -57,15 +54,13 @@ columns:
   - name: has_stats
     type: logical
     description: >
-      TRUE if the player recorded any season statistic in player_stats for this
+      TRUE if the player recorded any season statistic in player_stats this
       season. Coverage is partial and improving (~26% of roster seasons in 2010
       to ~60% by 2021), so FALSE conflates redshirt with missing data.
     provenance: derived (flag_redshirt)
   - name: redshirt_season
     type: logical
-    description: >
-      TRUE for a no-stat season followed by another observed season (stat-gap
-      rule). A final-year absence is never flagged.
+    description: TRUE for a no-stat season followed by another observed season. A final-year absence is never flagged.
     provenance: derived (flag_redshirt)
   - name: redshirt_career
     type: logical
@@ -73,7 +68,5 @@ columns:
     provenance: derived (flag_redshirt)
   - name: fifth_year_career
     type: logical
-    description: >
-      TRUE if the player was ever observed at class_year 5 (fifth eligibility
-      class; may be a grad transfer rather than a redshirt).
+    description: TRUE if the player was ever observed at class_year 5 (may be a grad transfer rather than a redshirt).
     provenance: derived (flag_redshirt)
