@@ -179,6 +179,26 @@ test_that("player_game dict matches build_player_game() output schema", {
   check_dict("player_game", build_player_game(game_player_stats, games))
 })
 
+test_that("career_end dict matches career_end_status() output schema", {
+  skip_if_not_installed("yaml")
+  career <- career_summary(tibble::tibble(
+    playerId = c("1", "1", "2"),
+    season = c(2015L, 2016L, 2015L),
+    team = c("Alpha", "Beta", "Alpha")
+  ))
+  outcomes <- tibble::tibble(
+    playerId = "1",
+    season = 2016L,
+    outcome_drafted_d = FALSE,
+    outcome_signed_udfa_d = FALSE
+  )
+  picks_nfl <- tibble::tibble(playerId = "2", year = 2017L)
+  check_dict(
+    "career_end",
+    career_end_status(career, outcomes, picks_nfl, last_complete_draft = 2025L)
+  )
+})
+
 test_that("season_arc dict matches build_season_arcs() output schema", {
   skip_if_not_installed("yaml")
   player_stats <- tibble::tibble(

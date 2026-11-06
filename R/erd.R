@@ -10,6 +10,7 @@ erd_groups <- c(
   stat_taxonomy = "College stats",
   ps_change = "College stats",
   career_summary = "College stats",
+  career_end = "College stats",
   roster_flags = "College stats",
   game_player_stats = "College stats",
   player_game = "College stats",

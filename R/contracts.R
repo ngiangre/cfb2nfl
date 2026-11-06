@@ -619,6 +619,76 @@ contract_career_summary <- function(career, stop_on_fail = TRUE) {
   enforce_contract(agent, "career_summary", stop_on_fail)
 }
 
+#' Data contract for career endings
+#'
+#' Validates [career_end_status()] (issue #51, part 1; decision 0039). One row
+#' per career, so the row count equals the career universe (no silent row loss).
+#' Every career gets exactly one category from `career_end_levels`, so the
+#' categories are exhaustive and mutually exclusive. Censored careers are never
+#' early stops, and the early-stop proxy flag is exactly the `early_stop`
+#' category with its defining conditions (single school, eligibility left, no
+#' NFL entry, not censored).
+#'
+#' @param career_end Output of [career_end_status()].
+#' @param career Per-player career summary the table was built from; its row
+#'   count is the expected row count.
+#' @param stop_on_fail Abort on failure? `FALSE` records the result for the
+#'   audit log instead (the `ok_*` target pattern).
+#'
+#' @return The interrogated pointblank agent (invisible).
+#' @export
+contract_career_end <- function(career_end, career, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  expected <- nrow(career)
+  agent <- pointblank::create_agent(career_end, label = "career_end") |>
+    pointblank::col_exists(c(
+      "playerId",
+      "career_end",
+      "early_stop_proxy",
+      "right_censored",
+      "eligibility_remaining",
+      "clock_seasons_used",
+      "transfers",
+      "drafted",
+      "signed_udfa",
+      "in_model_population"
+    )) |>
+    pointblank::col_vals_not_null(pointblank::vars(playerId, career_end)) |>
+    pointblank::col_vals_equal(
+      pointblank::vars(n),
+      expected,
+      preconditions = function(x) {
+        dplyr::mutate(x, n = nrow(x))
+      }
+    ) |>
+    pointblank::rows_distinct(pointblank::vars(playerId)) |>
+    pointblank::col_vals_in_set(
+      pointblank::vars(career_end),
+      set = names(career_end_levels)
+    ) |>
+    pointblank::col_vals_expr(rlang::expr(
+      right_censored == (career_end == "right_censored")
+    )) |>
+    pointblank::col_vals_expr(rlang::expr(
+      early_stop_proxy == (career_end == "early_stop")
+    )) |>
+    # The proxy's defining conditions, restated so a rule change cannot drift.
+    pointblank::col_vals_expr(rlang::expr(
+      !early_stop_proxy |
+        (!right_censored &
+          !drafted &
+          !signed_udfa &
+          in_model_population &
+          transfers == 0L &
+          eligibility_remaining > 0L)
+    )) |>
+    pointblank::col_vals_expr(rlang::expr(
+      !(drafted & signed_udfa)
+    )) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "career_end", stop_on_fail)
+}
+
 #' Data contract for the team-season table
 #'
 #' Guards [build_team_season()]: one row per `(team, season)`, a record that

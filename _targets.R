@@ -467,6 +467,12 @@ list(
     )
   ),
   tar_target(
+    ok_career_end,
+    pointblank::all_passed(
+      contract_career_end(career_end, career, stop_on_fail = FALSE)
+    )
+  ),
+  tar_target(
     ok_roster_flags,
     pointblank::all_passed(
       contract_redshirt(roster_flags, stop_on_fail = FALSE)
@@ -569,6 +575,7 @@ list(
       nfl_player_stats = ok_nfl_player_stats,
       nfl_link = ok_nfl_link,
       career_summary = ok_career,
+      career_end = ok_career_end,
       redshirt = ok_roster_flags,
       position_mapping = ok_position_mapping,
       position_path = ok_position_path,
@@ -668,6 +675,10 @@ list(
   # they rebuild from other cleaned tables in any mode, so track mode needs no
   # release asset for them (decision 0021).
   tar_target(career, career_summary(roster)),
+  # How each career ended (issue #51, part 1; decision 0039): a derived table
+  # on career + outcomes + the picks bridge. Its early_stop_proxy is a proxy,
+  # not an injury label. Not published as parquet (decision 0021).
+  tar_target(career_end, career_end_status(career, outcomes, picks_nfl)),
   tar_target(roster_flags, flag_redshirt(roster, player_stats)),
   # Player x game grain (decision 0035): one row per (playerId, gameId) with a
   # stat line; the shared base for per-game usage and opponent-adjusted
@@ -753,6 +764,7 @@ list(
         ps_change = ps_change,
         roster_flags = roster_flags,
         career_summary = career,
+        career_end = career_end,
         position_path = position_path,
         player_game = player_game,
         season_arc = season_arcs,
@@ -909,6 +921,14 @@ list(
         roster,
         keys = "playerId",
         contract_passed = ok_career
+      ),
+      audit_step(
+        career_end,
+        "career_end_status",
+        "features",
+        career,
+        keys = "playerId",
+        contract_passed = ok_career_end
       ),
       audit_step(
         position_path,
