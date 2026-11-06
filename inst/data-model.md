@@ -30,6 +30,7 @@ dictionaries next to this file, one YAML per table:
 | `career_end` | one player's college career, classified by how it ended (`early_stop_proxy` is a proxy, not an injury label) | [`dict/career_end.yml`](dict/career_end.yml) |
 | `position_path` | one college athlete id: harmonized HS, college and NFL position groups | [`dict/position_path.yml`](dict/position_path.yml) |
 | `player_game` | one player in one game (stat line + team, opponent, Elo, team games) | [`dict/player_game.yml`](dict/player_game.yml) |
+| `player_usage` | one player-season-team: games appeared out of team games, per-game usage (issue #50) | [`dict/player_usage.yml`](dict/player_usage.yml) |
 | `team_season` | one team in one season (every division) | [`dict/team_season.yml`](dict/team_season.yml) |
 | `team_draft` | team × final college season × position group | [`dict/team_draft.yml`](dict/team_draft.yml) |
 | `player_season_stats` | **wide**: player-season-team stat columns | [`dict/player_season_stats.yml`](dict/player_season_stats.yml) |
@@ -121,6 +122,8 @@ erDiagram
     game_player_stats ||--|| player_game : "playerId, gameId (one row per stat line)"
     games ||--o{ player_game : "gameId == id"
     team_season ||--o{ player_game : "team, season (team_games)"
+    player_game }o--|| player_usage : "playerId, season, team (games appeared)"
+    roster |o--o{ player_usage : "playerId, season, team (position, class year)"
     picks ||--o| nfl_pick_link : "same slot join, name-guarded"
     nfl_pick_link ||--o| nfl_draft_picks : "draft slot"
     nfl_draft_picks ||--o{ nfl_rosters : "gsis_id, season"
@@ -177,6 +180,10 @@ wrong rows, so they are called out explicitly.
    player × game grain on the same keys: `(playerId, gameId)` is unique, its
    `gameId` joins `games.id`, and `team_games` is the team's games played in
    the season (the denominator for games appeared).
+   `player_usage` (decision 0038) is the derived player-season-team grain on
+   the same keys: `games_appeared` over `team_games` is the playing-time rate.
+   The per-game appearance flags behind it come from the
+   `player_appearance_sequence()` helper (not a table).
 
 ### Two namespaces that look joinable but are not
 
