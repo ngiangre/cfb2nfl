@@ -27,6 +27,7 @@ dictionaries next to this file, one YAML per table:
 | `ps_change` | one player-season (stat-line grain) + change features | [`dict/ps_change.yml`](dict/ps_change.yml) |
 | `roster_flags` | roster player-season + eligibility flags | [`dict/roster_flags.yml`](dict/roster_flags.yml) |
 | `career_summary` | one player's college career | [`dict/career_summary.yml`](dict/career_summary.yml) |
+| `career_end` | one player's college career, classified by how it ended (`early_stop_proxy` is a proxy, not an injury label) | [`dict/career_end.yml`](dict/career_end.yml) |
 | `position_path` | one college athlete id: harmonized HS, college and NFL position groups | [`dict/position_path.yml`](dict/position_path.yml) |
 | `player_game` | one player in one game (stat line + team, opponent, Elo, team games) | [`dict/player_game.yml`](dict/player_game.yml) |
 | `team_season` | one team in one season (every division) | [`dict/team_season.yml`](dict/team_season.yml) |
@@ -45,7 +46,10 @@ bundle and documented with dictionaries but need no release asset before a
 track-mode build. `ps_change` carries the `drafted` label (it sits downstream
 of `link_drafted`); `roster_flags` / `career_summary` are leakage-free
 roster-derived features; all carry contracts and audit rows like the cleaned
-tables.
+tables. `career_end` (decision 0039) classifies each career from `career_summary`,
+`outcomes` and the picks bridge; its `early_stop_proxy` marks careers that
+stopped with eligibility left, with no NFL entry and no transfer. That is a
+proxy for an injury-shaped exit, not an injury.
 
 Two more derived tables are bundled only: `nfl_pick_link` (the name-guarded
 draft-slot bridge to nflverse — use it instead of re-running the raw slot join
@@ -123,6 +127,7 @@ erDiagram
     nfl_draft_picks ||--o{ nfl_player_stats : "gsis_id, season"
     ps_change }o--|| roster_flags : "playerId, season (flags/weights attach here)"
     roster |o--o{ career_summary : "playerId (collapsed)"
+    career_summary ||--|| career_end : "playerId (one row per career)"
     roster |o--o| position_path : "playerId (position path)"
     roster |o--o{ team_season : "team, season (aggregated)"
     games |o--o{ team_season : "team, season (aggregated)"

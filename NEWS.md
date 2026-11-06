@@ -1,5 +1,12 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- New career-ending table: each college career is classified by how it ended
+  (drafted, signed as an undrafted free agent, eligibility used up, transferred,
+  still active or right-censored, and an early stop with eligibility left).
+  The early-stop category is a proxy for an injury-shaped exit, not an injury
+  label: CFBD has no injury feed. Derived and bundled in the DuckDB asset, with a
+  contract, a dictionary, and an audit row
+  ([decision 0039](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0039-career-end-proxy.md)).
 - Season-scoped refresh: the scheduled data refresh now re-pulls only the
   current season and splices it into the published tables, costing about 28–40
   CFBD calls instead of ~780 (measured: 28 on 2026-11-05). The
