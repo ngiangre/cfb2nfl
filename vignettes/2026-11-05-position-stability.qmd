@@ -120,8 +120,8 @@ n_nfl_rec <- sum(!is.na(pp$nfl_group))
 n_multi_season <- sum(pp$college_seasons > 1L)
 stopifnot(sum(pp$college_changed) == 0L)
 stopifnot(
-  n_universe == 134867L,
-  n_hs_linked == 36577L,
+  n_universe == 134903L,
+  n_hs_linked == 36578L,
   sum(n_hs_by) == n_hs_linked,
   n_nfl_linked == 3732L
 )
