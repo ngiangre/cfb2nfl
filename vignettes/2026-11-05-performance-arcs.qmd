@@ -1,16 +1,16 @@
 ---
-title: "Cam Ward's passing yards rose in every season in the data and beat the opponent-adjusted baseline each time"
+title: "Quarterback yardage keeps climbing across a college career while running back and receiver production plateaus after the third season"
 date: "2026-11-05"
-description: "Cam Ward's passing yardage climbed each season from 2021 to 2024, and it stayed above the league baseline for opponents of the same strength in all four."
+description: "Across quarterbacks, running backs and receivers, median passing yardage rises through every career season in the data while rushing and receiving yardage levels off after the third, and all three fall against higher-rated opponents."
 followups:
-  - "Position-specific baselines: compare each passer only with other quarterbacks, not every player with a passing line."
-  - "Carry the opponent band into the season arcs, so a rise in yardage can be read against the schedule it was earned on."
-  - "Extend the arcs to the 2010 to 2013 seasons once game-level stats cover them, so early careers are not cut off at the start of the data."
+  - "Position-specific baselines: adjust each group against its own position rather than every player with a line in the category."
+  - "Split the career arcs by whether a player was eventually drafted, to see when the drafted and undrafted paths separate."
+  - "Carry a second stat per group (quarterback rushing, running back receiving) so a group is not reduced to one dimension."
 author:
   - "AI directed by Nick Giangreco"
 freeze: auto
 vignette: >
-  %\VignetteIndexEntry{Cam Ward's passing yards rose in every season in the data and beat the opponent-adjusted baseline each time}
+  %\VignetteIndexEntry{Quarterback yardage keeps climbing across a college career while running back and receiver production plateaus after the third season}
   %\VignetteEngine{quarto::html}
   %\VignetteEncoding{UTF-8}
 ---
@@ -68,27 +68,15 @@ pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
 ```
 
 ```{r}
-#| label: registry
-#| output: false
-# Key on athlete id, never name (recruiting ids collide, decision 0013).
-subjects <- tibble::tribble(
-  ~who            , ~cfb_athlete_id ,
-  "Joe Burrow"    , "3915511"       ,
-  "Cam Ward"      , "4688380"       ,
-  "Jordan Travis" , "4360799"       ,
-  "Shane Buechele" , "4039034"      ,
-  "Kyle Allen"    , "559681"
-)
-```
-
-```{r}
 #| label: load
 #| output: false
 # Season arcs and game production are derived pipeline tables (decision 0037),
-# bundled in the DuckDB, so the post reads exactly what the tests cover.
+# bundled in the DuckDB, so the post reads exactly what the tests cover. Roster
+# carries the position label used to form the three groups.
 sa <- dbReadTable(con, "season_arc")
 gp <- dbReadTable(con, "game_production")
 pg <- dbReadTable(con, "player_game")
+rost <- dbReadTable(con, "roster")
 
 band_levels <- c(
   "Under 1400",
@@ -97,51 +85,189 @@ band_levels <- c(
   "1800 and up",
   "Unrated"
 )
-pass_games <- gp |>
-  filter(.data$stat == "pass_yds") |>
-  mutate(opponent_elo_band = factor(.data$opponent_elo_band, band_levels))
-cast_qb <- sa |>
-  filter(.data$category == "passing") |>
-  inner_join(subjects, by = c(playerId = "cfb_athlete_id"))
+group_levels <- c("Quarterbacks", "Running backs", "Receivers")
+
+# Each position group is tracked by one signature yardage stat: a quarterback
+# by passing, a running back by rushing, a receiver by receiving. The group
+# palette is reused in every figure so group always means the same colour.
+sig <- tibble::tribble(
+  ~pos , ~group          , ~game_stat , ~category   , ~label            ,
+  "QB" , "Quarterbacks"  , "pass_yds" , "passing"   , "Passing yards"   ,
+  "RB" , "Running backs" , "rush_yds" , "rushing"   , "Rushing yards"   ,
+  "WR" , "Receivers"     , "rec_yds"  , "receiving" , "Receiving yards"
+)
+group_pal <- c(
+  Quarterbacks = "#4C78A8",
+  `Running backs` = "#E45756",
+  Receivers = "#54A24B"
+)
+
+# One group per player: the position he appears at most often on a roster,
+# restricted to the three offensive skill positions (key on athlete id).
+pos <- rost |>
+  filter(.data$position %in% c("QB", "RB", "WR")) |>
+  count(.data$playerId, .data$position) |>
+  group_by(.data$playerId) |>
+  slice_max(.data$n, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  transmute(.data$playerId, pos = .data$position)
+
+# Signature season arcs: season totals in each group's signature category.
+cast_sa <- sa |>
+  filter(.data$statType == "YDS") |>
+  inner_join(pos, by = "playerId") |>
+  inner_join(
+    sig |> select("pos", "category", "group", "label"),
+    by = c("pos", "category")
+  ) |>
+  mutate(group = factor(.data$group, group_levels))
+
+# Signature game production, carrying the opponent-adjusted residual.
+cast_gp <- gp |>
+  inner_join(pos, by = "playerId") |>
+  inner_join(
+    sig |> select("pos", game_stat = "game_stat", "group"),
+    by = c("pos", stat = "game_stat")
+  ) |>
+  mutate(
+    group = factor(.data$group, group_levels),
+    band = factor(.data$opponent_elo_band, band_levels)
+  )
 ```
 
 ```{r}
 #| label: facts
 #| output: false
-# Every figure in the post is computed here and pinned.
-ward <- cast_qb |> filter(.data$who == "Cam Ward") |> arrange(.data$season)
-ward_yds <- ward$value
+# Every figure and inline number is computed here from the database.
 
-# Which cast members' passing arcs rise every season they are in the data.
-rises_every_season <- cast_qb |>
-  arrange(.data$who, .data$season) |>
-  group_by(.data$who) |>
-  summarise(rises = all(diff(.data$value) > 0), .groups = "drop")
-
-# Raw yardage by opponent band: a mild decline with opponent strength.
-band_yds <- pass_games |>
-  group_by(.data$opponent_elo_band) |>
+# Opponent Elo distribution and the band each cutoff carves out. The cutoffs
+# are even 200-point Elo steps (1400 / 1600 / 1800); this shows how many games
+# and what Elo range land in each so the choice can be read off the data.
+elo_median <- median(pg$opponent_pregame_elo, na.rm = TRUE)
+elo_bands <- pg |>
+  mutate(
+    band = factor(opponent_elo_band(.data$opponent_pregame_elo), band_levels)
+  ) |>
+  group_by(.data$band) |>
   summarise(
     games = dplyr::n(),
-    mean_yds = mean(.data$value),
+    min_elo = min(.data$opponent_pregame_elo),
+    max_elo = max(.data$opponent_pregame_elo),
     .groups = "drop"
   ) |>
-  arrange(.data$opponent_elo_band)
-unrated_share <- mean(pass_games$opponent_elo_band == "Unrated")
+  arrange(.data$band)
 
-# Opponent-adjusted residual by season for the cast, from the baseline.
-cast_res <- gp |>
-  filter(.data$stat == "pass_yds") |>
-  inner_join(subjects, by = c(playerId = "cfb_athlete_id")) |>
-  group_by(.data$who, .data$season) |>
+# Population of each group: distinct players, season lines, and game lines.
+grp_pop <- sig |>
+  mutate(group = factor(.data$group, group_levels)) |>
+  select("group", "label") |>
+  left_join(
+    cast_sa |>
+      group_by(.data$group) |>
+      summarise(
+        players = dplyr::n_distinct(.data$playerId),
+        season_lines = dplyr::n(),
+        .groups = "drop"
+      ),
+    by = "group"
+  ) |>
+  left_join(
+    cast_gp |> count(.data$group, name = "game_lines"),
+    by = "group"
+  ) |>
+  arrange(.data$group)
+
+# Viz 1: career arcs. Median signature yards by career season, keeping only the
+# season indices where every group still has at least 50 players.
+arc_n <- cast_sa |> count(.data$group, .data$season_index)
+keep_idx <- arc_n |>
+  group_by(.data$season_index) |>
+  summarise(m = min(.data$n), .groups = "drop") |>
+  filter(.data$m >= 50) |>
+  pull(.data$season_index)
+arc_med <- cast_sa |>
+  filter(.data$season_index %in% keep_idx) |>
+  group_by(.data$group, .data$season_index) |>
   summarise(
-    games = dplyr::n(),
-    mean_resid = mean(.data$residual),
+    med = median(.data$value),
+    q1 = quantile(.data$value, 0.25),
+    q3 = quantile(.data$value, 0.75),
+    players = dplyr::n(),
     .groups = "drop"
   )
+max_idx <- max(keep_idx)
+qb_arc <- arc_med |> filter(.data$group == "Quarterbacks")
+qb_med_1 <- qb_arc$med[qb_arc$season_index == 1]
+qb_med_max <- qb_arc$med[qb_arc$season_index == max_idx]
+rb_arc <- arc_med |> filter(.data$group == "Running backs")
+rb_med_peak <- max(rb_arc$med)
 
-# Share of all player-games with no opponent Elo (the unrated band).
-opp_na <- mean(is.na(pg$opponent_pregame_elo))
+# Viz 2: opponent-band gradient. Mean signature yards per game by group x band,
+# with a +/- 1 SD range marking how much games vary within each band.
+band_grad <- cast_gp |>
+  group_by(.data$group, .data$band) |>
+  summarise(
+    mean_yds = mean(.data$value),
+    sd_yds = sd(.data$value),
+    games = dplyr::n(),
+    .groups = "drop"
+  ) |>
+  mutate(
+    lo = pmax(.data$mean_yds - .data$sd_yds, 0),
+    hi = .data$mean_yds + .data$sd_yds
+  )
+rated <- band_grad |> filter(.data$band != "Unrated")
+drop_tbl <- rated |>
+  group_by(.data$group) |>
+  summarise(
+    drop = mean_yds[.data$band == "Under 1400"] -
+      mean_yds[.data$band == "1800 and up"],
+    .groups = "drop"
+  )
+qb_drop <- drop_tbl$drop[drop_tbl$group == "Quarterbacks"]
+rb_drop <- drop_tbl$drop[drop_tbl$group == "Running backs"]
+wr_drop <- drop_tbl$drop[drop_tbl$group == "Receivers"]
+
+# Viz 3: residual spread. The residual is opponent- and season-adjusted, so it
+# centres near zero by construction; the spread is what differs by group.
+resid_spread <- cast_gp |>
+  group_by(.data$group) |>
+  summarise(
+    games = dplyr::n(),
+    sd = sd(.data$residual),
+    iqr = IQR(.data$residual),
+    p90 = quantile(.data$residual, 0.9),
+    .groups = "drop"
+  )
+qb_sd <- resid_spread$sd[resid_spread$group == "Quarterbacks"]
+wr_sd <- resid_spread$sd[resid_spread$group == "Receivers"]
+
+# Per-group x band residual summary, for the exploratory boxplot tooltips.
+resid_box <- cast_gp |>
+  group_by(.data$group, .data$band) |>
+  summarise(
+    med = median(.data$residual),
+    q1 = quantile(.data$residual, 0.25),
+    q3 = quantile(.data$residual, 0.75),
+    games = dplyr::n(),
+    .groups = "drop"
+  ) |>
+  mutate(
+    tip = paste0(
+      .data$group,
+      ", ",
+      .data$band,
+      ": median ",
+      fmt(.data$med),
+      ", IQR ",
+      fmt(.data$q1),
+      " to ",
+      fmt(.data$q3),
+      " over ",
+      fmt(.data$games),
+      " games"
+    )
+  )
 ```
 
 ::: {.callout-note appearance="minimal"}
@@ -151,66 +277,157 @@ classes are right-censored; later seasons may not yet be present.*
 
 ## 1. Introduction
 
-A quarterback's yardage moves from season to season and game to game, and
-opponent strength is one reason. This post follows the passing yards of five
-recent college quarterbacks and asks whether each season beat the league
-baseline for opponents of the same strength.
-
-+ *Expectation one: Cam Ward's passing yards rose in every season in the data.*
-+ *Expectation two: passing yardage falls modestly as opponent Elo rises.*
-+ *Expectation three: Cam Ward's yardage beat the opponent-adjusted baseline each season, while Jordan Travis's fell below it in two.*
+A player's yardage moves from season to season and game to game, and both the
+stage of his career and the strength of his opponent are reasons. This post
+follows three offensive groups, quarterbacks, running backs and receivers, and
+asks three descriptive questions of the data: how does each group's production
+grow across a college career, how does it change as opponents get stronger, and
+how much does it swing from game to game once opponent strength is held
+constant.
 
 ## 2. Data
 
 ### 2.1 Each game is set against the league baseline for its opponent strength
 
-Each player-game is compared with the average for the same season and opponent band.
+Each player-game is compared with the average for the same season, stat and
+opponent band.
 
 ```{r}
 #| label: terms
 tibble::tribble(
-  ~Term                     , ~Meaning                                          ,
-  "Season arc"              , "Season total of passing yards, one per season.",
-  "Season index"            , "The player's n-th season with a stat line in the data.",
-  "Opponent band"           , "The opponent's pregame Elo: under 1400, 1400 to 1599, 1600 to 1799, 1800 and up, or unrated (no Elo).",
-  "Baseline"                , "Mean yards for that season, band, and stat across all passers.",
-  "Residual"                , "A game's yards minus its baseline."
+  ~Term            , ~Meaning                                                                                                ,
+  "Position group" , "Quarterbacks, running backs, or receivers, from the player's most frequent roster position."           ,
+  "Signature stat" , "The yardage that defines a group: passing (QB), rushing (RB), receiving (WR)."                         ,
+  "Season arc"     , "Season total of the signature stat, one per season."                                                   ,
+  "Season index"   , "The player's n-th season with a stat line in the data (career season)."                                ,
+  "Opponent band"  , "The opponent's pregame Elo: under 1400, 1400 to 1599, 1600 to 1799, 1800 and up, or unrated (no Elo)." ,
+  "Baseline"       , "Mean yards for that season, band, and stat across all players with a line in the category."            ,
+  "Residual"       , "A game's yards minus its baseline."
 ) |>
   kable(caption = "The terms used in the post.")
 ```
 
+### 2.2 Opponent Elo is split into even 200-point bands
+
+Elo is CFBD's pregame team-strength rating: a higher number is a stronger
+opponent, and the rating is recentred each week so the median rated team sits
+near `r fmt(elo_median)`. The bands are even 200-point steps at 1400, 1600 and
+1800, chosen so each covers the same width of the scale rather than the same
+number of games. The table and histogram below show the resulting split:
+opponents CFBD does not rate (mostly FCS and lower-division teams) have no Elo
+and form their own unrated band rather than being dropped.
+
+```{r}
+#| label: s22-table
+elo_bands |>
+  transmute(
+    `Opponent band` = .data$band,
+    `Player-games` = fmt(.data$games),
+    `Lowest Elo` = ifelse(is.finite(.data$min_elo), fmt(.data$min_elo), "--"),
+    `Highest Elo` = ifelse(is.finite(.data$max_elo), fmt(.data$max_elo), "--")
+  ) |>
+  kable(caption = "Games and Elo range in each opponent band.")
+```
+
+```{r}
+#| label: s22-hist
+#| fig-height: 5
+pg |>
+  filter(!is.na(.data$opponent_pregame_elo)) |>
+  ggplot(aes(.data$opponent_pregame_elo)) +
+  geom_histogram(binwidth = 25, fill = "#4C78A8") +
+  geom_vline(
+    xintercept = c(1400, 1600, 1800),
+    linetype = "dashed",
+    linewidth = 0.8
+  ) +
+  annotate(
+    "text",
+    x = c(1300, 1500, 1700, 2000),
+    y = Inf,
+    vjust = 1.6,
+    label = c("Under 1400", "1400 to 1599", "1600 to 1799", "1800 and up"),
+    size = 4
+  ) +
+  labs(x = "Opponent pregame Elo", y = "Player-games") +
+  theme_cfb2nfl()
+```
+
+### 2.3 Each group is tracked by one signature stat
+
+A quarterback is read by his passing yards, a running back by his rushing yards,
+and a receiver by his receiving yards. All three groups are large enough to
+summarise.
+
+```{r}
+#| label: s23-table
+grp_pop |>
+  transmute(
+    `Position group` = .data$group,
+    `Signature stat` = .data$label,
+    Players = fmt(.data$players),
+    `Season lines` = fmt(.data$season_lines),
+    `Game lines` = fmt(.data$game_lines)
+  ) |>
+  kable(caption = "The three groups and the size of each population.")
+```
+
 ## 3. Results
 
-### 3.1 Cam Ward's passing yards rose in every season in the data
+### 3.1 Quarterback yardage keeps climbing across a career while running backs and receivers plateau
 
-*Expectation: his yardage rose in each season, and no other cast member's did.* ✅
-
-Only Ward's arc climbs at every step among the five cast members.
+Median passing yards rise at every career season shown, from
+`r fmt(qb_med_1)` in a quarterback's first season to `r fmt(qb_med_max)` by his
+`r max_idx`th, while rushing and receiving medians flatten after about the third
+season near `r fmt(rb_med_peak)` yards.
 
 ```{r}
 #| label: s31-table
-cast_qb |>
-  arrange(.data$who, .data$season) |>
+arc_med |>
   transmute(
-    Player = .data$who,
-    Season = .data$season,
+    `Position group` = .data$group,
     `Season index` = .data$season_index,
-    Team = .data$team,
-    `Passing yards` = fmt(.data$value)
+    `Median yards` = fmt(.data$med),
+    `Middle 50%` = paste0(fmt(.data$q1), " to ", fmt(.data$q3)),
+    Players = fmt(.data$players)
   ) |>
-  kable(caption = "Season passing yards for the five cast quarterbacks.")
+  arrange(`Position group`, `Season index`) |>
+  kable(
+    caption = "Median signature yards by career season, with the middle 50% range."
+  )
 ```
 
 ```{r}
 #| label: s31-explain
 #| fig-height: 6
-p <- cast_qb |>
-  ggplot(aes(.data$season_index, .data$value, colour = .data$who)) +
-  geom_line(linewidth = 1.2) +
-  geom_point_interactive(
-    aes(tooltip = paste0(.data$who, ", ", .data$season, ": ", fmt(.data$value), " yards"))
+p <- arc_med |>
+  mutate(
+    tooltip = paste0(
+      .data$group,
+      ", season ",
+      .data$season_index,
+      ": median ",
+      fmt(.data$med),
+      " yards (",
+      fmt(.data$players),
+      " players)"
+    )
+  ) |>
+  ggplot(aes(.data$season_index, .data$med, colour = .data$group)) +
+  geom_ribbon(
+    aes(ymin = .data$q1, ymax = .data$q3, fill = .data$group),
+    alpha = 0.12,
+    colour = NA
   ) +
-  labs(x = "Season index", y = "Passing yards", colour = NULL) +
+  geom_line(aes(group = .data$group), linewidth = 1.2) +
+  geom_point_interactive(aes(tooltip = .data$tooltip), size = 3) +
+  scale_colour_manual(values = group_pal, guide = "none") +
+  scale_fill_manual(values = group_pal, guide = "none") +
+  facet_wrap(~group, scales = "free_y") +
+  labs(
+    x = "Career season (season index)",
+    y = "Median signature yards"
+  ) +
   theme_cfb2nfl()
 girafe(ggobj = p, width_svg = 13, height_svg = 6)
 ```
@@ -218,142 +435,239 @@ girafe(ggobj = p, width_svg = 13, height_svg = 6)
 ```{r}
 #| label: s31-explore
 #| fig-height: 6
-p <- cast_qb |>
-  mutate(label = paste0(.data$who, " (", .data$season, ")")) |>
-  ggplot(aes(.data$season, .data$value, colour = .data$who)) +
-  geom_point_interactive(
-    aes(tooltip = paste0(.data$who, ", ", .data$season, ": ", fmt(.data$value), " yards")),
-    size = 4
+# The highest-career players in each group as named example arcs.
+top_players <- cast_sa |>
+  group_by(.data$group, .data$playerId, .data$player) |>
+  summarise(career = sum(.data$value), .groups = "drop") |>
+  group_by(.data$group) |>
+  slice_max(.data$career, n = 8, with_ties = FALSE) |>
+  ungroup()
+p <- cast_sa |>
+  inner_join(top_players |> select("playerId"), by = "playerId") |>
+  mutate(
+    tooltip = paste0(
+      .data$player,
+      ", ",
+      .data$season,
+      " (",
+      .data$team,
+      "): ",
+      fmt(.data$value),
+      " yards"
+    )
+  ) |>
+  ggplot(aes(
+    .data$season_index,
+    .data$value,
+    colour = .data$group,
+    group = .data$playerId
+  )) +
+  geom_line_interactive(
+    aes(tooltip = .data$player, data_id = .data$playerId),
+    linewidth = 0.9
   ) +
-  labs(x = "Season", y = "Passing yards", colour = NULL) +
+  geom_point_interactive(aes(tooltip = .data$tooltip), size = 2) +
+  scale_colour_manual(values = group_pal, guide = "none") +
+  facet_wrap(~group, scales = "free_y") +
+  labs(x = "Career season (season index)", y = "Signature yards") +
   theme_cfb2nfl()
 girafe(ggobj = p, width_svg = 13, height_svg = 6)
 ```
 
-### 3.2 Passing yardage falls modestly as opponent Elo rises
+### 3.2 Production falls against stronger opponents, steepest for running backs
 
-*Expectation: raw yardage decreases from the weakest to the strongest rated band.* ✅
-
-Raw yards drop by about 16 a game from the weakest rated band to the strongest,
-and unrated opponents sit near the bottom.
+From the weakest rated band to the strongest, mean yards per game fall about
+`r fmt(qb_drop)` for quarterbacks, `r fmt(rb_drop)` for running backs and
+`r fmt(wr_drop)` for receivers; the running back decline is the steepest in both
+yards and share. The point and range on each bar mark the mean and plus or minus
+one standard deviation of game-to-game yards, so the spread can be read beside
+the average.
 
 ```{r}
 #| label: s32-table
-band_yds |>
+band_grad |>
   transmute(
-    `Opponent band` = .data$opponent_elo_band,
-    `Passer games` = fmt(.data$games),
-    `Mean passing yards` = fmt(.data$mean_yds, 1)
+    `Position group` = .data$group,
+    `Opponent band` = .data$band,
+    `Mean yards per game` = fmt(.data$mean_yds, 1),
+    Games = fmt(.data$games)
   ) |>
-  kable(caption = "Mean passing yards per game by opponent band, all passers.")
+  arrange(`Position group`, `Opponent band`) |>
+  kable(caption = "Mean signature yards per game by group and opponent band.")
 ```
 
 ```{r}
 #| label: s32-explain
 #| fig-height: 6
-p <- band_yds |>
+p <- band_grad |>
   mutate(
-    opponent_elo_band = factor(.data$opponent_elo_band, band_levels),
-    tooltip = paste0(.data$opponent_elo_band, ": ", fmt(.data$mean_yds, 1), " yards")
+    tooltip = paste0(
+      .data$group,
+      ", ",
+      .data$band,
+      ": ",
+      fmt(.data$mean_yds, 1),
+      " yards (SD ",
+      fmt(.data$sd_yds, 1),
+      ") over ",
+      fmt(.data$games),
+      " games"
+    )
   ) |>
-  ggplot(aes(.data$opponent_elo_band, .data$mean_yds, fill = .data$opponent_elo_band == "Unrated")) +
-  geom_col_interactive(aes(tooltip = .data$tooltip), show.legend = FALSE) +
-  scale_fill_manual(values = c(`FALSE` = "#4C78A8", `TRUE` = "#9CA3AF")) +
-  labs(x = "Opponent band", y = "Mean passing yards per game") +
-  theme_cfb2nfl()
+  ggplot(aes(.data$band, .data$mean_yds, fill = .data$group)) +
+  geom_col_interactive(aes(tooltip = .data$tooltip), width = 0.8) +
+  geom_pointrange(
+    aes(ymin = .data$lo, ymax = .data$hi),
+    linewidth = 0.7,
+    size = 0.4
+  ) +
+  scale_fill_manual(values = group_pal, guide = "none") +
+  facet_wrap(~group, scales = "free_y") +
+  labs(x = "Opponent band", y = "Mean yards per game") +
+  theme_cfb2nfl() +
+  theme(axis.text.x = element_text(angle = 35, hjust = 1))
 girafe(ggobj = p, width_svg = 13, height_svg = 6)
 ```
 
 ```{r}
 #| label: s32-explore
 #| fig-height: 6
-p <- pass_games |>
-  group_by(.data$season, .data$opponent_elo_band) |>
-  summarise(mean_yds = mean(.data$value), games = dplyr::n(), .groups = "drop") |>
-  ggplot(aes(.data$season, .data$mean_yds, colour = .data$opponent_elo_band)) +
-  geom_point_interactive(
-    aes(tooltip = paste0(.data$season, ", ", .data$opponent_elo_band, ": ", fmt(.data$mean_yds, 1), " yards over ", fmt(.data$games), " games")),
-    size = 3
-  ) +
-  labs(x = "Season", y = "Mean passing yards per game", colour = "Opponent band") +
+p <- cast_gp |>
+  group_by(.data$group, .data$season, .data$band) |>
+  summarise(
+    mean_yds = mean(.data$value),
+    games = dplyr::n(),
+    .groups = "drop"
+  ) |>
+  mutate(
+    tooltip = paste0(
+      .data$group,
+      ", ",
+      .data$season,
+      ", ",
+      .data$band,
+      ": ",
+      fmt(.data$mean_yds, 1),
+      " yards over ",
+      fmt(.data$games),
+      " games"
+    )
+  ) |>
+  ggplot(aes(.data$season, .data$mean_yds, colour = .data$band)) +
+  geom_line(aes(group = .data$band), linewidth = 0.8) +
+  geom_point_interactive(aes(tooltip = .data$tooltip), size = 2) +
+  facet_wrap(~group, scales = "free_y") +
+  labs(x = "Season", y = "Mean yards per game", colour = "Opponent band") +
   theme_cfb2nfl()
 girafe(ggobj = p, width_svg = 13, height_svg = 6)
 ```
 
-### 3.3 Cam Ward beat the opponent-adjusted baseline each season, and Jordan Travis fell below it twice
+### 3.3 Game-to-game production swings most widely for quarterbacks
 
-*Expectation: Ward's residuals are positive in every season, and Travis's are negative in two.* ✅
+Each game's residual is its yards minus the baseline, the mean yards of every
+player with a line in that category in the same season and opponent band.
 
-The residual averages a player's gains over the baseline season by season.
+$$\text{residual} = \text{game yards} - \text{baseline (season, band)}$$
+
+Because the baseline already removes season and opponent strength, residuals
+centre near zero for every group; what differs is their spread, widest for
+quarterbacks (standard deviation `r fmt(qb_sd)` yards) and narrowest for
+receivers (`r fmt(wr_sd)` yards).
 
 ```{r}
 #| label: s33-table
-cast_res |>
-  arrange(.data$who, .data$season) |>
+resid_spread |>
   transmute(
-    Player = .data$who,
-    Season = .data$season,
-    Games = .data$games,
-    `Mean residual (yards)` = fmt(.data$mean_resid, 1)
+    `Position group` = .data$group,
+    Games = fmt(.data$games),
+    `Residual SD` = fmt(.data$sd, 1),
+    `Residual IQR` = fmt(.data$iqr, 1),
+    `90th percentile` = fmt(.data$p90, 1)
   ) |>
-  kable(caption = "Mean passing-yard residual per game, by cast player and season.")
+  kable(caption = "Spread of per-game residuals by group (yards).")
 ```
 
 ```{r}
 #| label: s33-explain
 #| fig-height: 6
-p <- cast_res |>
-  mutate(
-    tooltip = paste0(.data$who, ", ", .data$season, ": ", fmt(.data$mean_resid, 1), " yards over baseline")
-  ) |>
-  ggplot(aes(.data$season, .data$mean_resid, fill = .data$who)) +
-  geom_col_interactive(aes(tooltip = .data$tooltip), position = "dodge") +
-  geom_hline(yintercept = 0) +
-  labs(x = "Season", y = "Mean residual (yards per game)", fill = NULL) +
-  theme_cfb2nfl()
-girafe(ggobj = p, width_svg = 13, height_svg = 6)
+cast_gp |>
+  ggplot(aes(.data$band, .data$residual)) +
+  geom_hline(yintercept = 0, linewidth = 0.4) +
+  geom_jitter(
+    aes(colour = .data$group),
+    position = position_jitter(width = 0.28, height = 0, seed = 6821),
+    alpha = 0.05,
+    size = 0.4
+  ) +
+  geom_boxplot(
+    aes(fill = .data$group),
+    outlier.shape = NA,
+    width = 0.6,
+    alpha = 0.55
+  ) +
+  scale_colour_manual(values = group_pal, guide = "none") +
+  scale_fill_manual(values = group_pal, guide = "none") +
+  facet_wrap(~group, scales = "free_y") +
+  labs(x = "Opponent band", y = "Residual (yards per game)") +
+  theme_cfb2nfl() +
+  theme(axis.text.x = element_text(angle = 35, hjust = 1))
 ```
 
 ```{r}
 #| label: s33-explore
 #| fig-height: 6
-p <- gp |>
-  filter(.data$stat == "pass_yds") |>
-  inner_join(subjects, by = c(playerId = "cfb_athlete_id")) |>
-  ggplot(aes(.data$season, .data$residual, colour = .data$who)) +
-  geom_point_interactive(
-    aes(tooltip = paste0(.data$who, ", ", .data$season, ", week ", .data$week, " vs ", .data$opponent, ": ", fmt(.data$residual), " yards")),
-    size = 2.5
+p <- cast_gp |>
+  left_join(
+    resid_box |> select("group", "band", "tip"),
+    by = c("group", "band")
+  ) |>
+  ggplot(aes(.data$band, .data$residual, fill = .data$group)) +
+  geom_hline(yintercept = 0, linewidth = 0.4) +
+  geom_boxplot_interactive(
+    aes(tooltip = .data$tip, data_id = interaction(.data$group, .data$band)),
+    outlier.shape = NA,
+    width = 0.65
   ) +
-  geom_hline(yintercept = 0) +
-  labs(x = "Season", y = "Residual (yards in the game)", colour = NULL) +
-  theme_cfb2nfl()
+  scale_fill_manual(values = group_pal, guide = "none") +
+  facet_wrap(~group, scales = "free_y") +
+  labs(x = "Opponent band", y = "Residual (yards per game)") +
+  theme_cfb2nfl() +
+  theme(axis.text.x = element_text(angle = 35, hjust = 1))
 girafe(ggobj = p, width_svg = 13, height_svg = 6)
 ```
 
 ## 4. Summary
 
-Cam Ward's arc is the only one among the five that rose at every step, and his
-yardage stayed above baseline in each season.
+The three groups behave differently along all three axes the post looked at.
 
 ```{r}
 #| label: summary
 tibble::tribble(
-  ~Expectation                                           , ~Verdict , ~Evidence                              ,
-  "Ward's passing yards rose in every season"            , "✅"     , "376, 3,218, 3,732, 4,313 yards (2021 to 2024)" ,
-  "Passing yardage falls modestly as opponent Elo rises" , "✅"     , "About 16 yards per game, weakest to strongest rated band" ,
-  "Ward above baseline each season; Travis below in two" , "✅"     , "Ward positive in all four seasons; Travis negative in 2020 and 2021"
+  ~Question                                        , ~`What the data showed`                                                                                                                                                  ,
+  "How does production grow across a career?"      , paste0("Quarterback median passing yards rose every career season (", fmt(qb_med_1), " to ", fmt(qb_med_max), "); rushing and receiving plateaued after the third.")     ,
+  "How does it change against stronger opponents?" , paste0("Mean yards per game fell from the weakest to strongest rated band for all three, steepest for running backs (", fmt(rb_drop), " yards).")                        ,
+  "How much does it swing game to game?"           , paste0("Opponent-adjusted residuals centre near zero but spread widest for quarterbacks (SD ", fmt(qb_sd, 1), ") and narrowest for receivers (SD ", fmt(wr_sd, 1), ").")
 ) |>
-  kable(caption = "Each expectation and what the data showed.")
+  kable(caption = "Each question and what the data showed.")
 ```
 
 ## 5. Discussion
 
 ::: {.callout-important}
-Ward's residuals stayed positive, so his yardage beat the baseline for opponents of the same strength in every season. The baseline compares every passer, so it cannot separate a quarterback's own play from the offense around him.
+Production grows across a career for quarterbacks in a way it does not for
+running backs or receivers, whose medians level off after the third season. All
+three groups produce less against stronger opponents, and once that is removed
+quarterback output remains the most volatile from game to game.
 :::
 
-Caveats: unrated opponents (no Elo, mostly lower-division teams) are kept as their own band rather than dropped; about 27% of player-games fall there. The data begin in 2010, so a career's first season in the data is not necessarily its first season in college. Five players is a snapshot, not a sample.
+Caveats: the baseline pools every player with a line in the category rather than
+comparing within position, so a running back's receiving-band baseline mixes in
+receivers; a position-specific baseline is a natural refinement. Groups are
+assigned from a player's most frequent roster position and a group is reduced to
+one signature stat, so a quarterback's rushing or a running back's receiving is
+set aside. Game-level stats begin around 2013, so the game exhibits cover fewer
+seasons than the career arcs. Unrated opponents (no Elo, mostly lower-division
+teams) are kept as their own band rather than dropped.
 
 ```{r}
 #| label: teardown
