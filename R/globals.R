@@ -28,6 +28,11 @@ utils::globalVariables(c(
   "pick",
   "nfl_matched",
   "who",
+  # pointblank::vars() targets in contract_player_usage()
+  "on_roster",
+  "games_appeared",
+  "reg_team_games",
+  "reg_games_appeared",
   "stage",
   # pointblank::vars() targets for the stat-phase taxonomy contract
   "category",

@@ -1291,6 +1291,114 @@ contract_player_game <- function(
   enforce_contract(agent, "player_game", stop_on_fail)
 }
 
+#' Data contract for the player usage table
+#'
+#' Guards [build_player_usage()] (issue #50, decision 0038). Enforces the key
+#' `(playerId, season, team)`; `games_appeared <= team_games` (the requirement
+#' issue #51 depends on); the same bounds for the regular-season columns; and
+#' no silent row loss on either join: the games-appeared counts sum to the
+#' player-game rows, and each team-season's `team_games` equals
+#' [team_record()]'s `games_played`. Appearance rates are not failed on a
+#' low value: no stat line does not mean the player did not play (offensive
+#' linemen and special teams rarely log one), so that caveat lives in the
+#' post, not in the contract.
+#'
+#' @param player_usage Output of [build_player_usage()].
+#' @param player_game Output of [build_player_game()] (the input).
+#' @param games Cleaned games (the team-game reference set).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_player_usage <- function(
+  player_usage,
+  player_game,
+  games,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  n_expected <- nrow(player_game)
+  # Tie-out: each team-season's team_games (the schedule count) must equal the
+  # games_played that team_record() reports for the same season and team.
+  rec <- team_record(games) |>
+    dplyr::select("season", "team", rec_games = "games_played")
+  team_seasons <- player_usage |>
+    dplyr::distinct(.data$season, .data$team, .data$team_games) |>
+    dplyr::inner_join(rec, by = c("season", "team"))
+  n_team_mismatch <- sum(team_seasons$team_games != team_seasons$rec_games)
+
+  agent <- pointblank::create_agent(player_usage, label = "player_usage") |>
+    pointblank::col_exists(c(
+      "playerId",
+      "season",
+      "team",
+      "position_group",
+      "class_year",
+      "on_roster",
+      "team_games",
+      "games_appeared",
+      "appearance_rate",
+      "reg_team_games",
+      "reg_games_appeared",
+      "reg_appearance_rate",
+      "pass_att_pg",
+      "rush_car_pg",
+      "rec_pg",
+      "tackles_pg"
+    )) |>
+    pointblank::rows_distinct(pointblank::vars(playerId, season, team)) |>
+    pointblank::col_vals_not_null(pointblank::vars(
+      playerId,
+      season,
+      team,
+      on_roster,
+      team_games,
+      games_appeared,
+      reg_team_games,
+      reg_games_appeared
+    )) |>
+    pointblank::col_vals_between("season", 2010L, 2026L) |>
+    pointblank::col_vals_gte("team_games", 0L) |>
+    pointblank::col_vals_gte("games_appeared", 0L) |>
+    pointblank::col_vals_expr(rlang::expr(games_appeared <= team_games)) |>
+    pointblank::col_vals_expr(rlang::expr(
+      reg_games_appeared <= reg_team_games
+    )) |>
+    pointblank::col_vals_expr(rlang::expr(reg_team_games <= team_games)) |>
+    pointblank::col_vals_between(
+      "appearance_rate",
+      0,
+      1,
+      na_pass = TRUE
+    ) |>
+    # NA is allowed: a stat-line-only player-season has no roster position.
+    pointblank::col_vals_in_set(
+      "position_group",
+      set = c(harmonized_position_levels(), NA_character_)
+    ) |>
+    pointblank::col_vals_between(
+      "class_year",
+      1L,
+      5L,
+      na_pass = TRUE
+    ) |>
+    # No silent row loss: every player-game row is counted once.
+    pointblank::col_vals_equal(
+      "n",
+      n_expected,
+      preconditions = function(x) {
+        tibble::tibble(n = sum(x$games_appeared))
+      }
+    ) |>
+    # Team-game tie-out with team_record(): zero mismatched team-seasons.
+    pointblank::col_vals_equal(
+      "n",
+      0L,
+      preconditions = function(x) tibble::tibble(n = n_team_mismatch)
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "player_usage", stop_on_fail)
+}
+
 # ---- person-period outcome table (decision 0032) ---------------------------
 
 #' Contract for the person-period outcome table
