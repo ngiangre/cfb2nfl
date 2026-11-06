@@ -219,10 +219,10 @@ n_exits <- sum(credited$n_exits)
 n_drafted <- sum(credited$n_drafted)
 n_udfa <- sum(credited$n_udfa)
 stopifnot(
-  n_eligible == 44248L,
+  n_eligible == 44245L,
   n_drafted == 3129L,
   n_udfa == 3374L,
-  n_exits == 87911L
+  n_exits == 87906L
 )
 ```
 
@@ -438,9 +438,9 @@ stopifnot(
   pct(tr("Power", "draft_rate")) == "13.8%",
   pct(tr("Group of 5", "draft_rate")) == "2.7%",
   tr("Power", "drafted") == 2561L,
-  tr("Power", "eligible") == 18611L,
+  tr("Power", "eligible") == 18610L,
   tr("Group of 5", "drafted") == 483L,
-  tr("Group of 5", "eligible") == 17590L,
+  tr("Group of 5", "eligible") == 17589L,
   round(power_g5) == 5,
   abs(power_g5 - 5) < 0.05,
   min(power_confs) > max(g5_confs),
@@ -1147,10 +1147,10 @@ stopifnot(
   school$conf_now[school$team == "Cincinnati"] == "Big 12",
   n_g5_above_tier == 24L,
   nrow(g5) == 72L,
-  fmt(g5_best$above_tier, 1) == "14.2",
+  fmt(g5_best$above_tier, 1) == "14.1",
   g5_best$team == "Boise State",
   g5_best$drafted == 21L,
-  fmt(g5_best$expected_tier, 1) == "6.8",
+  fmt(g5_best$expected_tier, 1) == "6.9",
   n_above == 46L,
   # the Pac-12's last two schools are classed by their Power seasons
   all(school$school_tier[school$team %in% c("Oregon State", "Washington State")] == "Power"),

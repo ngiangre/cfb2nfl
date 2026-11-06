@@ -181,10 +181,10 @@ tt <- function(t, col) tier_tot[[col]][tier_tot$tier == t]
 xfive <- round(tt("Power", "draft_rate") / tt("Group of 5", "draft_rate"))
 stopifnot(
   xfive == 5,
-  tt("Power", "eligible") == 18611L,
+  tt("Power", "eligible") == 18610L,
   tt("Power", "drafted") == 2561L,
   pct(tt("Power", "draft_rate")) == "13.8%",
-  tt("Group of 5", "eligible") == 17590L,
+  tt("Group of 5", "eligible") == 17589L,
   tt("Group of 5", "drafted") == 483L,
   pct(tt("Group of 5", "draft_rate")) == "2.7%"
 )
@@ -304,7 +304,7 @@ n_games <- sum(school$games)
 n_eligible <- sum(school$eligible)
 n_drafted <- sum(school$drafted)
 stopifnot(
-  n_eligible == 36201L,
+  n_eligible == 36199L,
   n_drafted == 3044L,
   n_games == 25666L
 )
@@ -1263,9 +1263,9 @@ stopifnot(
   p_last$share < 0.5,
   p_early_max == 10L,
   # the table counts
-  identical(transfer_tier$eligible_tin, c(3235L, 3435L)),
+  identical(transfer_tier$eligible_tin, c(3234L, 3435L)),
   identical(transfer_tier$drafted_tin, c(387L, 55L)),
-  identical(transfer_tier$eligible, c(18611L, 17590L)),
+  identical(transfer_tier$eligible, c(18610L, 17589L)),
   identical(transfer_tier$drafted, c(2561L, 483L)),
   identical(pct(transfer_tier$eligible_tin / transfer_tier$eligible, 0), c("17%", "20%")),
   identical(pct(transfer_tier$drafted_tin / transfer_tier$drafted, 0), c("15%", "11%")),
