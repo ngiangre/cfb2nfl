@@ -179,6 +179,37 @@ test_that("player_game dict matches build_player_game() output schema", {
   check_dict("player_game", build_player_game(game_player_stats, games))
 })
 
+test_that("season_arc dict matches build_season_arcs() output schema", {
+  skip_if_not_installed("yaml")
+  player_stats <- tibble::tibble(
+    season = c(2021L, 2022L),
+    playerId = "1",
+    player = "Test Player",
+    team = "Alpha",
+    category = "passing",
+    statType = "YDS",
+    stat = c("100", "300")
+  )
+  check_dict("season_arc", build_season_arcs(player_stats))
+})
+
+test_that("game_production dict matches build_game_production() output schema", {
+  skip_if_not_installed("yaml")
+  player_game <- tibble::tibble(
+    playerId = c("1", "2"),
+    gameId = c(1L, 2L),
+    season = 2024L,
+    week = c(1L, 2L),
+    team = "Alpha",
+    opponent = c("Beta", "Gamma"),
+    opponent_pregame_elo = c(1500, NA),
+    pass_yds = c(200, NA),
+    rush_yds = c(NA, 25),
+    rec_yds = c(NA, 60)
+  )
+  check_dict("game_production", build_game_production(player_game))
+})
+
 test_that("player_usage dict matches build_player_usage() output schema", {
   skip_if_not_installed("yaml")
   game_player_stats <- tibble::tibble(
