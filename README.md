@@ -10,13 +10,13 @@ coming.
 
 <img src="man/figures/hero/hero.gif" alt="Rotating career timelines of the first five picks of the 2024 and 2025 NFL drafts: each player's team by season, college through the NFL" class="hero-gif">
 
-[About](vignettes/about.qmd) · [Explore](vignettes/explore.qmd) · [Blog](vignettes/blog.qmd)
+[About](vignettes/about.qmd) · [Explore](vignettes/explore.qmd) · [Investigations](vignettes/investigations.qmd)
 
 </div>
 
 > [!WARNING]
 > **Work in progress.** This project is under active development and will
-> change frequently and without notice — data, code, methods, and conclusions
+> change frequently and without notice — data, code, methods, and explorations
 > may all shift. Nothing here should be treated as stable or final.
 
 ## The idea
@@ -46,13 +46,13 @@ Our plan is to start simple and get more ambitious over time:
 4. **Explain** what we find, so the results are more than a black box.
 
 We care about two kinds of answers: understanding *why* something matters, and
-seeing *how well* we can predict it.
+seeing *how well* we can predict it. We also are leveraging AI agents within contextual infrastructure to provide appropriate gaurdrails to accelerate exlorations. 
 
 ## Who this is for
 
 Anyone who loves college football and is curious about what the numbers say —
-whether or not you write code. Findings will be shared as a website with plain
-articles, deeper analysis, and interactive visualizations.
+whether or not you write code. Findings will be shared as a website with 
+data explorations and interactive visualizations.
 
 ## Where to start
 
@@ -75,6 +75,6 @@ public sources over time.
 
 ## Status
 
-Early days. This is a personal project and a work in progress; the goals above
+Early days! This is a personal project and a work in progress; the goals above
 are the north star, and the "how" is deliberately still open as we learn. If you
 want the full working plan behind the scenes, see [VISION.md](VISION.md).

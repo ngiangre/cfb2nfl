@@ -16,8 +16,8 @@ website:
         href: index.html
       - text: Explore
         href: vignettes/explore.html
-      - text: Blog
-        href: vignettes/blog.html
+      - text: Investigations
+        href: vignettes/investigations.html
       - text: Reference
         href: vignettes/reference.html
     right:

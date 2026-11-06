@@ -132,7 +132,7 @@
   finding, also used for `<meta name="description">`) and `followups:` (open
   questions feeding later investigations and pipeline work) in their YAML;
   both are backfilled on the five existing posts, stubbed in
-  `vignettes/_post-template.qmd`, displayed in the `blog.qmd` index table,
+  `vignettes/_post-template.qmd`, displayed in the `investigations.qmd` index table,
   and documented in [AGENTS.md](https://github.com/ngiangre/cfb2nfl/blob/main/AGENTS.md).
 
 - Removed the stale `test-beast.R` suite (it referenced parser functions that
@@ -362,7 +362,7 @@ layer, and the documentation site, all under version control.
   (Home, Explore, Blog, Reference on the left; News/License/Citation + GitHub
   on the right) instead of a sidebar. New hand-wired pages: `explore.qmd` is a
   hub of value-card tiles linking to About, Analysis, Data & provenance,
-  Visualizations, and Pipeline; `blog.qmd` lists dated posts in a table built
+  Visualizations, and Pipeline; `investigations.qmd` lists dated posts in a table built
   from their YAML; `reference.qmd` lists every non-internal function with links
   to its man page. The interactive-charts page formerly called `explore.qmd`
   is renamed `visualizations.qmd`.

@@ -1,12 +1,12 @@
 ---
-title: "Blog"
+title: "Investigations"
 vignette: >
-  %\VignetteIndexEntry{Blog}
+  %\VignetteIndexEntry{Investigations}
   %\VignetteEngine{quarto::html}
   %\VignetteEncoding{UTF-8}
 ---
 
-Vignettes for data investigations and challenging  beliefs and expectations. AI may be indicated in generating blogs. However, all code and data used originate from the validated audited pipeline so no findings are fabricated. The purpose of these vignettes is to explore, investigate, and question the data.
+Vignettes for data investigations and challenging beliefs and expectations. These are not 'blogs' - they do not represent original human thought. Rather, these vignettes are meant to probe the data to generate additional questions. AI may be indicated in generating these investigations. However, all code and data used originate from the validated audited pipeline so no findings are fabricated. The purpose of these vignettes is to explore, investigate, and question the data.
 
 ```{r}
 #| label: setup

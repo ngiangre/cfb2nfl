@@ -250,7 +250,7 @@ all of it. Years 2010–2026.
   sidebar in altdoc 0.7.3, so the pages are hand-wired instead). Content pages
   are vignettes: `explore.qmd` is a hub of bslib value-card tiles linking to
   `about`, `analysis`, `data`, `visualizations` (the interactive charts,
-  renamed from the old explore page), and `pipeline`; `blog.qmd` builds a
+  renamed from the old explore page), and `pipeline`; `investigations.qmd` builds a
   reactable table of all dated posts (`YYYY-MM-DD-*.qmd`) from their YAML at
   render time; `reference.qmd` builds a searchable reactable of every
   non-internal function linking to `../man/<fn>.html` (75 rendered man pages).
@@ -277,7 +277,7 @@ all of it. Years 2010–2026.
   each YAML carrying `description:` (one declarative sentence stating the
   finding, not the topic) and `followups:` (list of open questions / next
   analyses informing later investigations and pipeline work); displayed in the
-  `blog.qmd` index table and grep-able across `vignettes/`,
+  `investigations.qmd` index table and grep-able across `vignettes/`,
   `freeze: auto` + committed `_freeze/` so they don't rebreak on data refresh
   while source edits still propagate (`freeze: true` serves the cache even
   after edits — caused stale deployed titles, fixed 2026-10-24); the `blog`/

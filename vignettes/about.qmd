@@ -21,8 +21,8 @@ project's [VISION.md](https://github.com/ngiangre/cfb2nfl/blob/main/VISION.md).
 - For the players who get drafted, what do they go on to do in the NFL — the
   statistics they put up, and **how long they last**?
 
-There's so many more questions to ask and interrogate. The **Explore** page lets you poke at
-the data with interactive charts, and **Analysis** collects the write-ups as
+There's so many more questions to ask and interrogate. Additionally we use data over vibes to probe our questions. 
+The **Explore** page lets you poke at the data with interactive charts, and **Analysis** collects the write-ups as
 they take shape.
 
 ## What we're looking at first
