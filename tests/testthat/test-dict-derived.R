@@ -210,6 +210,52 @@ test_that("game_production dict matches build_game_production() output schema", 
   check_dict("game_production", build_game_production(player_game))
 })
 
+test_that("player_usage dict matches build_player_usage() output schema", {
+  skip_if_not_installed("yaml")
+  game_player_stats <- tibble::tibble(
+    gameId = 1L,
+    season = 2024L,
+    week = 1L,
+    seasonType = "regular",
+    team = c("Alpha", "Alpha", "Beta"),
+    conference = "SEC",
+    homeAway = c("home", "home", "away"),
+    points = 30L,
+    category = c("passing", "rushing", "defensive"),
+    statType = c("C/ATT", "CAR", "TOT"),
+    playerId = c("1", "1", "2"),
+    player = "Test Player",
+    stat = c("20/30", "4", "6")
+  )
+  games <- tibble::tibble(
+    id = 1L,
+    season = 2024L,
+    week = 1L,
+    seasonType = "regular",
+    homeTeam = "Alpha",
+    awayTeam = "Beta",
+    homeClassification = "fbs",
+    awayClassification = "fbs",
+    homeConference = "SEC",
+    awayConference = "SEC",
+    homePoints = 30L,
+    awayPoints = 20L,
+    homePregameElo = 1500,
+    awayPregameElo = 1400,
+    neutralSite = FALSE,
+    completed = TRUE
+  )
+  roster <- tibble::tibble(
+    playerId = c("1", "2"),
+    season = 2024L,
+    team = c("Alpha", "Beta"),
+    position = c("QB", "DT"),
+    class_year = c(2L, 3L)
+  )
+  pg <- build_player_game(game_player_stats, games)
+  check_dict("player_usage", build_player_usage(pg, roster, games))
+})
+
 team_fixture_dict <- function() {
   list(
     games = tibble::tibble(

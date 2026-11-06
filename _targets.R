@@ -410,6 +410,17 @@ list(
     )
   ),
   tar_target(
+    ok_player_usage,
+    pointblank::all_passed(
+      contract_player_usage(
+        player_usage,
+        player_game,
+        games,
+        stop_on_fail = FALSE
+      )
+    )
+  ),
+  tar_target(
     ok_tiers,
     pointblank::all_passed(
       contract_conference_tiers(
@@ -564,6 +575,7 @@ list(
       player_game = ok_player_game,
       season_arc = ok_season_arc,
       game_production = ok_game_production,
+      player_usage = ok_player_usage,
       stat_taxonomy = ok_stat_taxonomy,
       player_season_stats = ok_player_season_stats,
       outcomes = ok_outcomes,
@@ -665,6 +677,9 @@ list(
   # 0037): derived like player_game, bundled in DuckDB, not published parquet.
   tar_target(season_arcs, build_season_arcs(player_stats)),
   tar_target(game_production, build_game_production(player_game)),
+  # Playing time (issue #50, decision 0038): games appeared out of team games
+  # per player-season-team, from player_game. Derived like player_game.
+  tar_target(player_usage, build_player_usage(player_game, roster, games)),
   # Wide player-season stats for the DuckDB bundle (decision 0026): a derived
   # convenience table, like career/roster_flags above.
   tar_target(player_season_stats, build_player_season_stats(player_stats)),
@@ -742,6 +757,7 @@ list(
         player_game = player_game,
         season_arc = season_arcs,
         game_production = game_production,
+        player_usage = player_usage,
         player_season_stats = player_season_stats,
         team_season = team_season,
         team_draft = team_draft,
@@ -925,6 +941,14 @@ list(
         player_game,
         keys = c("playerId", "gameId", "stat"),
         contract_passed = ok_game_production
+      ),
+      audit_step(
+        player_usage,
+        "build_player_usage",
+        "features",
+        player_game,
+        keys = c("playerId", "season", "team"),
+        contract_passed = ok_player_usage
       ),
       audit_step(
         model_table,

@@ -6,6 +6,19 @@
   kept as their own band). Both are bundled in DuckDB, carry contracts and
   audit rows, and feed the new performance-arcs post (issue #47; decision
   [0037](https://github.com/ngiangre/cfb2nfl/blob/feat/performance-arcs/decisions/0037-season-arcs-opponent-adjusted-production.md)).
+- New derived table `player_usage` in the DuckDB bundle: one row per player,
+  season and team with `games_appeared` over `team_games` (the appearance rate),
+  regular-season counterparts, per-game passing, rushing, receiving and tackle
+  volumes, and the harmonized position group and class year. Players on a roster
+  with no stat line are kept with zero appearances. Checked by a new
+  `contract_player_usage()` that ties the appearances back to `player_game` and
+  `team_record()`. `player_appearance_sequence()` exposes the per-team-game flags
+  for the career-end analyses (issue 51)
+  ([decision 0038](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0038-player-usage-games-appeared.md)).
+- New blog post on playing time: most rostered player-seasons log no stat line,
+  offensive linemen almost never do, and drafted player-seasons log one in more
+  of their team's games
+  ([vignettes/2026-11-05-playing-time.qmd](https://github.com/ngiangre/cfb2nfl/blob/main/vignettes/2026-11-05-playing-time.qmd)).
 - Season-scoped refresh: the scheduled data refresh now re-pulls only the
   current season and splices it into the published tables, costing about 28–40
   CFBD calls instead of ~780 (measured: 28 on 2026-11-05). The
