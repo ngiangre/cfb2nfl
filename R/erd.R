@@ -259,3 +259,152 @@ erd_network <- function(
       ))
     )
 }
+
+#' Render a node tooltip listing a table's definition and every column
+#'
+#' Builds the HTML shown when hovering a node in `data_model_network()`: the
+#' table name, grain, key and description, then a scrollable list of its
+#' columns (name, type, description) read from the dictionary.
+#'
+#' @param id Table name.
+#' @param d The table's dictionary entry (from `app_dict()`), or `NULL`.
+#' @return An HTML string.
+#' @noRd
+erd_node_title <- function(id, d) {
+  esc <- function(x) {
+    if (is.null(x) || !nzchar(x)) "" else htmltools::htmlEscape(x)
+  }
+  header <- sprintf("<b style='font-size:15px;'>%s</b>", esc(id))
+  if (is.null(d)) {
+    return(sprintf(
+      "<div style='text-align:left;'>%s<br/><i>no dictionary</i></div>",
+      header
+    ))
+  }
+  meta <- paste(
+    if (!is.null(d$grain)) sprintf("<i>%s</i>", esc(d$grain)),
+    if (!is.null(d$key)) sprintf("<small>Key: %s</small>", esc(d$key)),
+    if (!is.null(d$description)) {
+      sprintf("<small>%s</small>", esc(d$description))
+    },
+    sep = "<br/>"
+  )
+  cols <- vapply(
+    d$columns %||% list(),
+    function(col) {
+      sprintf(
+        "<li><b>%s</b> <span style='color:#6b7280;'>%s</span>%s</li>",
+        esc(col$name),
+        esc(col$type),
+        if (!is.null(col$description)) {
+          sprintf("<br/><small>%s</small>", esc(col$description))
+        } else {
+          ""
+        }
+      )
+    },
+    character(1)
+  )
+  col_block <- if (length(cols)) {
+    sprintf(
+      paste0(
+        "<hr style='margin:4px 0;'/>",
+        "<ul style='margin:0;padding-left:16px;list-style:square;'>%s</ul>"
+      ),
+      paste(cols, collapse = "")
+    )
+  } else {
+    ""
+  }
+  sprintf(
+    paste0(
+      "<div style='text-align:left;max-width:360px;max-height:340px;",
+      "overflow-y:auto;white-space:normal;'>%s<br/>%s%s</div>"
+    ),
+    header,
+    meta,
+    col_block
+  )
+}
+
+#' Build a visNetwork of the data model from the docs and dictionaries
+#'
+#' A standalone (no Shiny) counterpart to `erd_network()` for static documents.
+#' Nodes are the tables in the ERD; edges are the documented join relationships
+#' (shared-key links) parsed from `inst/data-model.md`, dashed when
+#' name-guarded. Hovering a node shows that table's grain, key, description and
+#' every column definition, read from `inst/dict/*.yml`; hovering an edge shows
+#' the join key. Both the graph and the tooltips are generated from the files in
+#' `inst/`, so the diagram stays in sync with the data model.
+#'
+#' @param model_path Path to the data-model doc carrying the mermaid ERD.
+#'   Defaults to the packaged `inst/data-model.md` (falls back to the checkout).
+#' @param dict A named list of dictionary entries, as returned by `app_dict()`.
+#'   Defaults to reading the packaged `inst/dict/*.yml`.
+#' @param height,width visNetwork dimensions.
+#' @return A `visNetwork` htmlwidget.
+#' @examples
+#' \dontrun{
+#' data_model_network()
+#' }
+#' @export
+data_model_network <- function(
+  model_path = erd_asset("data-model.md"),
+  dict = app_dict(),
+  height = "650px",
+  width = "100%"
+) {
+  g <- parse_erd_mermaid(readLines(model_path))
+
+  nodes <- g$nodes
+  nodes$label <- nodes$id
+  nodes$group <- ifelse(is.na(nodes$group), "Other", nodes$group)
+  nodes$color <- unname(erd_group_colors[nodes$group])
+  nodes$title <- vapply(
+    nodes$id,
+    function(id) erd_node_title(id, dict[[id]]),
+    character(1)
+  )
+  nodes$font <- list(list(size = 16, face = "sans"))
+
+  edges <- g$edges
+  if (nrow(edges) > 0) {
+    ns <- mapply(erd_key_namespace, edges$label, edges$dashes)
+    edges$arrows <- "to"
+    edges$smooth <- FALSE
+    edges$color <- unname(erd_edge_palette[ns])
+    edges$title <- sprintf(
+      "<b>%s &rarr; %s</b><br/>Join key: %s%s",
+      edges$from,
+      edges$to,
+      htmltools::htmlEscape(edges$label),
+      ifelse(
+        ns == "name_guarded",
+        "<br/><i>Name-guarded, not a plain key join</i>",
+        ""
+      )
+    )
+    edges$font <- list(list(size = 13, color = "#333333", face = "sans"))
+  }
+
+  visNetwork::visNetwork(nodes, edges, height = height, width = width) |>
+    visNetwork::visEdges(arrows = "to", smooth = FALSE) |>
+    visNetwork::visOptions(
+      highlightNearest = list(enabled = TRUE, degree = 1, hover = TRUE),
+      nodesIdSelection = FALSE
+    ) |>
+    visNetwork::visHierarchicalLayout(
+      direction = "LR",
+      levelSeparation = 300,
+      nodeSpacing = 120,
+      sortMethod = "hubsize"
+    ) |>
+    visNetwork::visLegend(
+      addNodes = lapply(names(erd_group_colors), function(grp) {
+        list(label = grp, shape = "dot", color = unname(erd_group_colors[grp]))
+      }),
+      useGroups = FALSE,
+      position = "right",
+      zoom = FALSE
+    )
+}

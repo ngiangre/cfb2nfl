@@ -1,5 +1,12 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- New `data_model_network()`: a standalone (no Shiny) visNetwork of the data
+  model, built dynamically from `inst/data-model.md` (join relationships) and
+  `inst/dict/*.yml` (per-table grain, key and column definitions shown in node
+  tooltips). The "Data & provenance" vignette now renders this interactive
+  graph in place of the static mermaid ERD, and loads the package from the
+  checkout with `pkgload::load_all()` like the dated vignettes.
+
 - Blog posts no longer pin their stated numbers with `stopifnot()`
   ([decision 0040](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0040-drop-stopifnot-pins-show-setup.md)).
   A routine data refresh that nudged a count by three had been aborting the
