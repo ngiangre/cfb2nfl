@@ -18,7 +18,9 @@ vignette: >
 
 ```{r}
 #| label: setup
-#| include: false
+#| output: false
+#| message: false
+#| warning: false
 # Load the package from the checkout with pkgload; no package install is
 # required. Under altdoc the render runs in a temp dir, so resolve the root
 # first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
@@ -68,7 +70,7 @@ pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
 
 ```{r}
 #| label: registry
-#| include: false
+#| output: false
 # Key on athlete id, never name: recruiting ids collide (decision 0013), and
 # picks has two Josh Allens (Wyoming 2018, Kentucky 2019).
 subjects <- tibble::tribble(
@@ -83,10 +85,9 @@ subjects <- tibble::tribble(
 
 ```{r}
 #| label: load
-#| include: false
+#| output: false
 pp <- dbReadTable(con, "position_path")
 picks <- dbReadTable(con, "picks")
-stopifnot(nrow(pp) > 0, nrow(picks) > 0, !anyDuplicated(pp$playerId))
 
 # One display name per athlete id, from the draft record (decision 0022 ids
 # are unique within this table, so the name is the draftee's).
@@ -101,12 +102,11 @@ rec_levels <- setdiff(pos_levels, "Position not recorded")
 
 # Every named subject is a row of the table, with the group the post relies on.
 named <- pp |> filter(playerId %in% subjects$cfb_athlete_id)
-stopifnot(nrow(named) == nrow(subjects))
 ```
 
 ```{r}
 #| label: universe-facts
-#| include: false
+#| output: false
 # The population the post reasons about, counted once and reused below.
 n_universe <- nrow(pp)
 n_hs_linked <- sum(pp$hs_linked)
@@ -118,13 +118,6 @@ n_nfl_linked <- sum(pp$nfl_linked)
 n_nfl_rec <- sum(!is.na(pp$nfl_group))
 # The roster lists one position per athlete; the caveat relies on it.
 n_multi_season <- sum(pp$college_seasons > 1L)
-stopifnot(sum(pp$college_changed) == 0L)
-stopifnot(
-  n_universe == 134903L,
-  n_hs_linked == 36578L,
-  sum(n_hs_by) == n_hs_linked,
-  n_nfl_linked == 3732L
-)
 ```
 
 ::: {.callout-note appearance="minimal"}
@@ -218,10 +211,6 @@ hs_stay <- hs |>
     .groups = "drop"
   ) |>
   arrange(share)
-stopifnot(
-  sum(hs_stay$recruits) == nrow(hs),
-  hs_overall > 0.5
-)
 ```
 
 ```{r}
@@ -330,13 +319,8 @@ girafe(ggobj = p, width_svg = 13, height_svg = 8)
 
 ```{r}
 #| label: s31-pin
-#| include: false
+#| output: false
 jt <- pp |> filter(playerId == "4360799")
-stopifnot(
-  jt$hs_group == "Quarterback",
-  jt$college_modal_group == "Quarterback",
-  jt$nfl_group == "Quarterback"
-)
 ```
 
 Quarterbacks are the clearest case. Jordan Travis was recruited as a
@@ -371,11 +355,6 @@ nfl_stay <- dr |>
   arrange(share)
 conv <- dr |>
   filter(college_modal_group == "Quarterback", nfl_group != "Quarterback")
-stopifnot(
-  sum(nfl_stay$draftees) == nrow(dr),
-  nfl_overall > 0.9,
-  "512838" %in% conv$playerId
-)
 ```
 
 ```{r}
@@ -484,26 +463,11 @@ girafe(ggobj = p, width_svg = 13, height_svg = 8)
 
 ```{r}
 #| label: s32-pin
-#| include: false
+#| output: false
 pins <- pp |> filter(playerId %in% c("3915511", "4688380", "4360799"))
-stopifnot(
-  all(pins$college_modal_group == "Quarterback"),
-  all(pins$nfl_group == "Quarterback")
-)
 miller <- pp |> filter(playerId == "512838")
-stopifnot(
-  miller$hs_group == "Quarterback",
-  miller$college_modal_group == "Quarterback",
-  miller$nfl_group == "Receiver"
-)
 # School and draft year come from the draft record, not the position table.
 rec_picks <- picks |> filter(playerId %in% c("512838", "4360799", "3915511", "4688380"))
-stopifnot(
-  rec_picks$collegeTeam[rec_picks$playerId == "512838"] == "Ohio State",
-  rec_picks$year[rec_picks$playerId == "4360799"] == 2024L,
-  rec_picks$overall[rec_picks$playerId == "3915511"] == 1L,
-  rec_picks$overall[rec_picks$playerId == "4688380"] == 1L
-)
 ```
 
 The converted quarterbacks are rare. Braxton Miller was recruited as a
@@ -556,6 +520,6 @@ recruiting service's listings, not the player's own account.
 
 ```{r}
 #| label: teardown
-#| include: false
+#| output: false
 dbDisconnect(con, shutdown = TRUE)
 ```

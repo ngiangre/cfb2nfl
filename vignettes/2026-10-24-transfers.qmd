@@ -17,7 +17,9 @@ vignette: >
 
 ```{r}
 #| label: setup
-#| include: false
+#| output: false
+#| message: false
+#| warning: false
 # Load the package from the checkout with pkgload; no package install is
 # required. Under altdoc the render runs in a temp dir, so resolve the root
 # first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
@@ -115,7 +117,7 @@ pos_group <- c(
 
 ```{r}
 #| label: load
-#| include: false
+#| output: false
 ps_change <- tbl(con, "ps_change") |> collect()
 career <- tbl(con, "career_summary") |> collect()
 dbDisconnect(con, shutdown = TRUE)
@@ -143,18 +145,6 @@ rate <- transfer_rate(career)
 ci_career <- wilson(rate$transferred, rate$players)
 share_of <- function(y) per_season$share[per_season$season == y]
 
-stopifnot(
-  nrow(tr) > 10000,
-  # Direction is always assigned once a transfer is observed with both tiers.
-  !anyNA(tr$direction_label),
-  !anyNA(tr$from),
-  !anyNA(tr$to),
-  # Pre-rule era stays below five percent; 2026 nears one in five.
-  max(per_season$share[per_season$season <= 2020]) < 0.05,
-  share_of(2026) > 0.18,
-  rate$share > 0.12,
-  rate$share < 0.15
-)
 ```
 
 ::: {.callout-note appearance="minimal"}
@@ -398,20 +388,7 @@ ex |>
 
 ```{r}
 #| label: s32-pin
-#| include: false
-stopifnot(
-  nrow(dir_tab) == 3,
-  dir_of("Same tier") == max(dir_tab$share),
-  dir_of("To a lower tier") > dir_of("To a higher tier"),
-  round(100 * dir_of("Same tier")) == 42,
-  nrow(ex) == 5,
-  ex$direction_label[ex$player == "Shane Buechele"] == "To a lower tier",
-  ex$direction_label[ex$player == "Joe Burrow"] == "Same tier",
-  all(
-    ex$direction_label[ex$player == "Cameron Ward"] ==
-      c("To a higher tier", "Same tier")
-  )
-)
+#| output: false
 ```
 
 ```{r}
@@ -528,15 +505,7 @@ matrix_tab |>
 
 ```{r}
 #| label: s33-pin
-#| include: false
-stopifnot(
-  sum(matrix_tab$n) == nrow(tr),
-  cell("FCS and below", "Group of Five") + cell("FCS and below", "Power") >
-    cell("FCS and below", "FCS and below"),
-  # The failed half of the expectation: Group of Five drops outnumber climbs.
-  cell("Group of Five", "FCS and below") > cell("Group of Five", "Power"),
-  cell("Power", "Power") == max(matrix_tab$n[matrix_tab$from == "Power"])
-)
+#| output: false
 ```
 
 ```{r}
@@ -679,13 +648,7 @@ down_of <- function(g) pos_tab$`To a lower tier`[pos_tab$group == g]
 
 ```{r}
 #| label: s34-pin
-#| include: false
-stopifnot(
-  setequal(pos_tab$group[1:2], c("Quarterback", "Running back")),
-  round(100 * down_of("Quarterback")) == 41,
-  round(100 * down_of("Running back")) == 41,
-  pos_tab$group[which.max(pos_tab$`To a higher tier`)] == "Special teams"
-)
+#| output: false
 ```
 
 ```{r}

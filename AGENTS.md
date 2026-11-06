@@ -175,17 +175,26 @@ all of it. Years 2010–2026.
   - **Flow.** The post must read as one argument from beginning to end: each
     section's assertion should follow from the previous section's exhibits, so
     a reader can reconstruct the takeaway from headings and exhibits alone.
-  - Still: `stopifnot()` where a claim could silently rot; code chunks back
-    every exhibit. Start from `vignettes/_post-template.qmd`; every dated
-    post follows this format (revised 2026-10-31).
+  - Code chunks back every exhibit, and **every number in the prose is an
+    inline variable** (`` `r x` ``) computed from the database, never a
+    hardcoded literal — so a data refresh flows through instead of silently
+    rotting. Do **not** use `stopifnot()` pins in posts (removed 2026-11-06,
+    decision 0040): keep prose minimal and let inline variables carry the
+    values. Start from `vignettes/_post-template.qmd`; every dated post follows
+    this format (revised 2026-11-06).
 - **Vignette writing critiques (user review of the 2026-10-24 outcome
   prevalence post, applied going forward):**
   - Define every variable and term in the narrative (person-season, eligible
     season, round groups, status categories, hazard); readers do not know
     column names like `outcome_drafted_d` or codes like `r2_3`. Display
     reader-facing labels, not raw column values, in figures and tables.
-  - Keep implementation messages (e.g. DuckDB connection) out of the reader's
-    view: `include: false` for loading chunks.
+  - **Setup and loading code must be visible so the post is reproducible**
+    (changed 2026-11-06, decision 0040): do not hide loading chunks with
+    `include: false`. Show the code (the default `echo`) and instead suppress
+    only the noise — `message: false`/`warning: false` on the setup chunk, and
+    `output: false` on setup/load/compute chunks so their code shows but
+    nothing prints. The reader can see exactly how every exhibit is produced
+    from the database.
   - Render every vector/data-frame output with `knitr::kable` (with a
     caption), never a bare tibble print.
   - Introduce any statistical machinery in plain language before use (e.g.
@@ -199,8 +208,8 @@ all of it. Years 2010–2026.
   - Write for fans who love the game and want the answers: deductive framing
     ("out of every 100 eligible seasons ...") and named player examples
     (prefer the recurring cast of earlier vignettes: Burrow, Cam Ward, Jordan
-    Travis, Buechele, Kyle Allen), with example facts verified in the data
-    and pinned by `stopifnot()`.
+    Travis, Buechele, Kyle Allen), with example facts carried by inline
+    variables computed from the data (not hardcoded).
   - Discussion is callouts (`callout-important`) plus a short caveats
     paragraph, not prose blocks.
   - **Authorship:** vignette `author:` is "AI directed by Nick Giangreco"

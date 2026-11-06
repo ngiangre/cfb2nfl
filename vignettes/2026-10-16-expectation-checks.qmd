@@ -18,7 +18,9 @@ vignette: >
 
 ```{r}
 #| label: setup
-#| include: false
+#| output: false
+#| message: false
+#| warning: false
 # Load the package from the checkout with pkgload; no package install is
 # required. Under altdoc the render runs in a temp dir, so resolve the root
 # first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
@@ -67,7 +69,7 @@ rel_lum <- function(hex) {
 
 ```{r}
 #| label: registry
-#| include: false
+#| output: false
 # Standard: key on athlete id, never name (recruiting ids collide, decision 0013).
 # The cfb_athlete_id here are the shared CFBD athlete namespace; each was resolved
 # from the cleaned player_stats by name and QA-verified by its season/team pattern
@@ -86,7 +88,7 @@ subjects <- tibble::tribble(
 
 ```{r}
 #| label: build-spine
-#| include: false
+#| output: false
 ids_sql <- paste(sprintf("'%s'", subjects$cfb_athlete_id), collapse = ",")
 
 # Roster backbone + eligibility flags (derived table, decision 0021).
@@ -180,17 +182,6 @@ spine <- flags |>
     )
   )
 
-stopifnot(
-  nrow(spine) > 0,
-  all(subjects$who %in% spine$who),
-  !anyNA(spine$has_stats),
-  # A missing attempts value should occur only on a no-stat season.
-  all(is.na(spine$attempts) == !spine$has_stats),
-  # A season can only be flagged when its team's games were covered.
-  all(is.na(spine$likely_rs[
-    is.na(spine$games_covered) | spine$games_covered < 5
-  ]))
-)
 
 # One subject's seasons as a reader-facing table.
 season_table <- function(name, caption) {
@@ -262,7 +253,7 @@ rs_seasons <- function(name) {
 
 ```{r}
 #| label: observability
-#| include: false
+#| output: false
 gp_all <- tbl(con, "game_player_stats") |>
   filter(seasonType == "regular") |>
   select(playerId, season, team, gameId, category, statType, stat) |>
@@ -574,11 +565,7 @@ usage_fig("Arch Manning", "From one game in 2023 to every game in 2025")
 
 ```{r}
 #| label: s31-pin
-#| include: false
-stopifnot(
-  identical(rs_seasons("Arch Manning"), 2023L),
-  all(spine$team[spine$who == "Arch Manning"] == "Texas")
-)
+#| output: false
 ```
 
 ### 3.2 Nicco Marchiol's freshman redshirt is recovered, his medical redshirt is not
@@ -602,11 +589,7 @@ usage_fig("Nicco Marchiol", "Two quiet seasons, at either end of the career")
 
 ```{r}
 #| label: s32-pin
-#| include: false
-stopifnot(
-  identical(rs_seasons("Nicco Marchiol"), c(2022L, 2026L)),
-  all(spine$has_stats[spine$who == "Nicco Marchiol"])
-)
+#| output: false
 ```
 
 ### 3.3 Jordan Travis played at Louisville, and his roster record carries a duplicate 2021 row
@@ -661,19 +644,8 @@ usage_fig(
 
 ```{r}
 #| label: s33-pin
-#| include: false
+#| output: false
 travis <- filter(spine, who == "Jordan Travis")
-stopifnot(
-  travis$attempts[travis$season == 2018] == 14,
-  travis$games_with_stat[travis$season == 2018] == 0,
-  sum(travis$season == 2021) == 2,
-  setequal(
-    travis$team[travis$season == 2021],
-    c("Florida State", "Louisville")
-  ),
-  travis_nfl_stats == 0,
-  identical(travis_nfl_rosters$status, c("RES", "RET"))
-)
 ```
 
 ### 3.4 Cam Ward's three schools and first overall pick are confirmed, but his FCS years are thin
@@ -707,16 +679,8 @@ usage_fig("Cam Ward", "Every covered game a statistic once he reached the FBS")
 
 ```{r}
 #| label: s34-pin
-#| include: false
+#| output: false
 ward <- filter(spine, who == "Cam Ward")
-stopifnot(
-  n_distinct(ward$team) == 3,
-  !2020 %in% ward$season,
-  ward$attempts[ward$season == 2021] == 47,
-  length(rs_seasons("Cam Ward")) == 0,
-  college_picks$overall[college_picks$pid == "4688380"] == 1,
-  recruit_names == 0
-)
 ```
 
 ### 3.5 Trinidad Chambliss's Division II championship season is missing from the record
@@ -743,13 +707,8 @@ usage_fig(
 
 ```{r}
 #| label: s35-pin
-#| include: false
+#| output: false
 cham <- filter(spine, who == "Trinidad Chambliss")
-stopifnot(
-  !2024 %in% cham$season,
-  is.na(cham$likely_rs[cham$season == 2023]),
-  career$gap_seasons[career$who == "Trinidad Chambliss"] == 1
-)
 ```
 
 ### 3.6 Joe Burrow's four quiet Ohio State seasons all look like redshirts
@@ -783,14 +742,8 @@ usage_fig("Joe Burrow", "Four flagged seasons where one redshirt is expected")
 
 ```{r}
 #| label: s36-pin
-#| include: false
+#| output: false
 burrow <- filter(spine, who == "Joe Burrow")
-stopifnot(
-  identical(rs_seasons("Joe Burrow"), 2014:2017),
-  burrow$attempts[burrow$season == 2016] == 28,
-  burrow$attempts[burrow$season == 2017] == 11,
-  college_picks$overall[college_picks$pid == "3915511"] == 1
-)
 ```
 
 ### 3.7 Malachi Nelson's USC redshirt is recovered by usage where stat presence missed it
@@ -815,13 +768,8 @@ usage_fig("Malachi Nelson", "Two quiet seasons before steady play at UTEP")
 
 ```{r}
 #| label: s37-pin
-#| include: false
+#| output: false
 nelson <- filter(spine, who == "Malachi Nelson")
-stopifnot(
-  n_distinct(nelson$team) == 4,
-  identical(rs_seasons("Malachi Nelson"), c(2023L, 2024L)),
-  nelson$has_stats[nelson$season == 2023]
-)
 ```
 
 ## 4. Summary

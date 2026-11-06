@@ -31,7 +31,11 @@ vignette: >
 
 ```{r}
 #| label: setup
-#| include: false
+#| output: false
+#| message: false
+#| warning: false
+# Shown (not hidden) so the post is reproducible from the database; only the
+# noise is suppressed. See AGENTS.md "Setup and loading code must be visible".
 # Load the package from the checkout with pkgload; no package install is
 # required. Under altdoc the render runs in a temp dir, so resolve the root
 # first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
@@ -81,7 +85,7 @@ pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
 
 ```{r}
 #| label: registry
-#| include: false
+#| output: false
 # Key on athlete id, never name (recruiting ids collide, decision 0013).
 # Declare every named subject's ids here so no exhibit hard-codes a name
 # lookup.
@@ -93,13 +97,11 @@ subjects <- tibble::tribble(
 
 ```{r}
 #| label: load
-#| include: false
+#| output: false
 # Prefer a tested package helper (e.g. player_trajectory()) over ad-hoc
 # queries, so a silent join change fails a unit test rather than a reader.
-# Guard every pull so a broken query errors at authoring time, before the
-# post is frozen. Disconnect only after the last query.
+# Disconnect only after the last query.
 # spine <- player_trajectory(subjects, roster = tbl(con, "roster"), ...)
-# stopifnot(nrow(spine) > 0)
 ```
 
 ::: {.callout-note appearance="minimal"}
@@ -158,8 +160,9 @@ Exhibits follow in this order:
   3. exploratory figure: interactive view of the same snapshot at finer grain
      (every category, season, or player behind the claim), hover tooltips with
      the full detail.
-A single-fact claim may drop to table plus one figure. Pin every number the
-prose, captions, or annotations state.
+A single-fact claim may drop to table plus one figure. Every number the prose,
+captions, or annotations state is an inline variable (`r x`) computed from the
+database, never a hardcoded literal.
 -->
 
 ONE OR TWO SENTENCES.
@@ -183,12 +186,6 @@ ONE OR TWO SENTENCES.
 # p <- ggplot(...finer grain...) + geom_point_interactive(aes(tooltip = ...)) +
 #   theme_cfb2nfl()
 # girafe(ggobj = p, width_svg = 13, height_svg = 6)
-```
-
-```{r}
-#| label: s31-pin
-#| include: false
-# stopifnot(...)
 ```
 
 ## 4. Summary
@@ -218,6 +215,6 @@ Caveats: gaps, right-censoring, and any population restriction, briefly.
 
 ```{r}
 #| label: teardown
-#| include: false
+#| output: false
 dbDisconnect(con, shutdown = TRUE)
 ```

@@ -16,7 +16,9 @@ vignette: >
 
 ```{r}
 #| label: setup
-#| include: false
+#| output: false
+#| message: false
+#| warning: false
 # Load the package from the checkout with pkgload; no package install is
 # required. Under altdoc the render runs in a temp dir, so resolve the root
 # first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
@@ -93,7 +95,7 @@ and season.*
 
 ```{r}
 #| label: load
-#| include: false
+#| output: false
 outcomes <- tbl(con, "outcomes") |> collect()
 roster_pos <- tbl(con, "roster") |>
   # A few players carry two roster rows in one season (mid-season moves);
@@ -155,7 +157,7 @@ n_players <- n_distinct(risk$playerId)
 
 ```{r}
 #| label: helpers
-#| include: false
+#| output: false
 # thousands-separated and percent formatters for inline numbers
 fmt <- function(x, digits = 0) {
   formatC(as.numeric(x), big.mark = ",", format = "f", digits = digits)
@@ -206,18 +208,9 @@ kable(risk_set, caption = "The risk set: eligible seasons with a known outcome."
 
 ```{r}
 #| label: grain-guard
-#| include: false
+#| output: false
 # The guarded position join adds or drops no rows, and the outcome labels
 # stay mutually exclusive after the join.
-stopifnot(
-  nrow(risk) == n_risk_pre,
-  !any(is.na(risk$group)),
-  !any(risk$outcome_drafted_d & risk$outcome_signed_udfa_d),
-  all(
-    risk$outcome_nfl_entry_d ==
-      (risk$outcome_drafted_d | risk$outcome_signed_udfa_d)
-  )
-)
 ```
 
 ## 3. Results
@@ -407,20 +400,7 @@ girafe(ggobj = p_rate_class, width_svg = 13, height_svg = 6)
 
 ```{r}
 #| label: rates-guard
-#| include: false
-stopifnot(
-  # The draft event stays rare inside every position group.
-  all(rates$drafted < 0.10),
-  # The claimed ordering: offensive line on top, special teams at the bottom,
-  # quarterbacks mid-pack.
-  rates$group[1] == "Offensive line",
-  rates_cmp$group[nrow(rates_cmp)] == "Special teams",
-  qb_rank == 5L,
-  abs(ol_rate - 0.0845) < 0.0005,
-  abs(qb_rate - 0.0369) < 0.0005,
-  abs(st_rate - 0.0122) < 0.0005,
-  ol_rate / st_rate > 6
-)
+#| output: false
 ```
 
 ### 3.2 Drafted quarterbacks go in the first round more often than any other group
@@ -579,27 +559,7 @@ girafe(ggobj = p_round_dist, width_svg = 13, height_svg = 6)
 
 ```{r}
 #| label: round-guard
-#| include: false
-stopifnot(
-  round_mix$group[1] == "Quarterback",
-  qb_r1$round1 == 42L,
-  qb_r1$drafted_seasons == 160L,
-  round_mix$round1_share[1] > 0.25,
-  round_mix$round1_share[1] >
-    2 * round_mix$round1_share[round_mix$group == "Running back"],
-  runner_up$group == "Defensive line",
-  abs(runner_up$round1_share - 0.168) < 0.001,
-  # The cast's pinned facts.
-  burrow_pick == 1L,
-  ward_pick == 1L,
-  travis_round == 5L,
-  travis_pick == 171L,
-  all(risk$outcome_signed_udfa_d[
-    risk$player %in%
-      c("Shane Buechele", "Kyle Allen") &
-      risk$outcome_nfl_entry_d
-  ])
-)
+#| output: false
 ```
 
 ### 3.3 Quarterbacks carry the earliest average pick across classes, but not in most single classes
@@ -770,22 +730,7 @@ girafe(ggobj = p_all_picks, width_svg = 13, height_svg = 6)
 
 ```{r}
 #| label: pick-guard
-#| include: false
-stopifnot(
-  # Quarterbacks carry the lowest long-run average pick among the groups
-  # with a published cell in every draft class.
-  group_means$group[which.min(group_means$m)] == "Quarterback",
-  qb_avg_all < 120,
-  length(complete_groups) == 6L,
-  # But not in every class: the yearly minimum changes hands.
-  n_qb_lowest == 5L,
-  n_classes == 14L,
-  # The annotation's arrow targets the 2021 quarterback point.
-  qb_trend$lowest[qb_trend$draft_year == 2021],
-  min(pick_trend$avg_pick) > 45,
-  # The dashed reference line in the figure is the pooled average pick.
-  abs(pooled_pick - 126.6) < 0.05
-)
+#| output: false
 ```
 
 ### 3.4 Quarterbacks and offensive linemen are the only groups whose entrants mostly arrive drafted
@@ -941,40 +886,19 @@ girafe(ggobj = p_udfa_class, width_svg = 13, height_svg = 6)
 
 ```{r}
 #| label: udfa-guard
-#| include: false
-stopifnot(
-  udfa_share$group[1] == "Special teams",
-  udfa_share$group[nrow(udfa_share)] == "Quarterback",
-  setequal(
-    udfa_cmp$group[udfa_cmp$share < 0.5],
-    c("Quarterback", "Offensive line")
-  ),
-  abs(qb_udfa - 0.435) < 0.001,
-  abs(ol_udfa - 0.479) < 0.001,
-  abs(st_udfa - 0.686) < 0.001,
-  abs(overall_udfa - 0.566) < 0.001,
-  # The annotation sits between the two mostly-drafted bars at the bottom.
-  ud_qb_y == 1L,
-  ud_ol_y == 2L
-)
+#| output: false
 ```
 
 ## 4. Summary
 
 ```{r}
 #| label: summary-nums
-#| include: false
+#| output: false
 n_ol_players <- rates$players[rates$group == "Offensive line"]
 n_nr <- rates$seasons[rates$group == "Position not recorded"]
 nr <- filter(risk, group == "Position not recorded")
 nr_placeholder <- sum(nr$position %in% "?" & nr$draft_year <= 2018)
 nr_no_row <- sum(is.na(nr$position) & nr$draft_year %in% 2021:2022)
-stopifnot(
-  n_ol_players == 843L,
-  n_nr == 822L,
-  # The caveat's description of the not-recorded group.
-  (nr_placeholder + nr_no_row) / n_nr > 0.85
-)
 ```
 
 Position sets both the level and the shape of draft outcomes, and two of

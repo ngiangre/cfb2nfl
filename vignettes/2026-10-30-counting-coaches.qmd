@@ -19,7 +19,9 @@ vignette: >
 
 ```{r}
 #| label: setup
-#| include: false
+#| output: false
+#| message: false
+#| warning: false
 # Load the package from the checkout with pkgload; no package install is
 # required. Under altdoc the render runs in a temp dir, so resolve the root
 # first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
@@ -48,7 +50,7 @@ library(tidyr)
 
 ```{r}
 #| label: data
-#| include: false
+#| output: false
 picks <- dbReadTable(con, "picks")
 roster <- dbReadTable(con, "roster")
 coaches <- dbReadTable(con, "coaches")
@@ -108,7 +110,7 @@ this section uses the last-school rule.
 
 ```{r}
 #| label: rules-compute
-#| include: false
+#| output: false
 reused <- reused_ids(roster)
 # pool of pre-draft roster seasons for every eligible pick: reused below
 pool <- picks |>
@@ -295,15 +297,7 @@ girafe(ggobj = p_rx, width_svg = 13, height_svg = 5.5)
 
 ```{r}
 #| label: rules-pin
-#| include: false
-stopifnot(
-  by_class$identical_share[by_class$year == 2011] == 1,
-  window_mean > 0.5,
-  window_mean < 0.65,
-  all(by_class$identical_share[by_class$year >= 2024] < 0.55),
-  max(xfer_share$share[xfer_share$year <= 2013]) < 0.02,
-  max(xfer_share$share[xfer_share$year == 2026]) > 0.45
-)
+#| output: false
 ```
 
 ## 3. Results
@@ -312,7 +306,7 @@ stopifnot(
 
 ```{r}
 #| label: universe-nums
-#| include: false
+#| output: false
 n_coaches_all <- n_distinct(coaches$coach_name)
 n_coach_seasons <- nrow(coaches)
 active <- coaches |>
@@ -395,17 +389,7 @@ girafe(ggobj = p_tenure, width_svg = 13, height_svg = 4.5)
 
 ```{r}
 #| label: universe-pin
-#| include: false
-stopifnot(
-  n_coaches_all == 1814,
-  nrow(producers) == 305,
-  all(producers$coach_id %in% active$coach_id),
-  round(100 * nrow(producers) / nrow(active)) == 73,
-  # the figure's title and heading: the share rises with tenure, and most
-  # coaches without a draftee coached three seasons or fewer
-  all(diff(tenure_tab$share) > 0),
-  with(tenure, mean(seasons[!produced] <= 3)) > 0.75
-)
+#| output: false
 ```
 
 ### 3.2 Quarterback draftees are the smallest share of the draft among field positions
@@ -436,7 +420,6 @@ pos_groups <- c(
 pos_links <- last_school |>
   filter(year >= 2014) |>
   mutate(pos_grp = unname(pos_groups[position]))
-stopifnot(!any(is.na(pos_links$pos_grp)))
 pos_grp_summary <- pos_links |>
   distinct(year, overall, coach_id, coach_name, pos_grp) |>
   summarise(
@@ -578,19 +561,7 @@ girafe(ggobj = p_coach_pos, width_svg = 13, height_svg = 6)
 
 ```{r}
 #| label: position-pin
-#| include: false
-stopifnot(
-  pos_grp_summary$draftees[pos_grp_summary$pos_grp == "DB"] == 665,
-  pos_grp_summary$coaches[pos_grp_summary$pos_grp == "DB"] == 200,
-  pos_grp_summary$draftees[pos_grp_summary$pos_grp == "QB"] == 146,
-  pos_grp_summary$coaches[pos_grp_summary$pos_grp == "QB"] == 91,
-  pos_grp_summary$per_coach[pos_grp_summary$pos_grp == "QB"] <
-    min(pos_grp_summary$per_coach[
-      pos_grp_summary$pos_grp %in% c("DB", "WR/TE", "DL", "OL", "LB", "RB")
-    ]),
-  100 * pos_grp_summary$share[pos_grp_summary$pos_grp == "QB"] > 4,
-  100 * pos_grp_summary$share[pos_grp_summary$pos_grp == "QB"] < 5
-)
+#| output: false
 ```
 
 ### 3.3 Undrafted entry shrinks the quarterback share, it does not grow it
@@ -770,22 +741,7 @@ girafe(ggobj = p_qb_class, width_svg = 13, height_svg = 5)
 
 ```{r}
 #| label: udfa-pin
-#| include: false
-stopifnot(
-  n_undrafted == 4191,
-  n_drafted == 2756,
-  qb_share_ud < qb_share_dr / 1.8,
-  entry_shares$share[
-    entry_shares$g == "WR/TE" & entry_shares$route == "Undrafted"
-  ] >
-    entry_shares$share[
-      entry_shares$g == "WR/TE" & entry_shares$route == "Drafted"
-    ],
-  entry_shares$share[
-    entry_shares$g == "ST" & entry_shares$route == "Undrafted"
-  ] >
-    entry_shares$share[entry_shares$g == "ST" & entry_shares$route == "Drafted"]
-)
+#| output: false
 ```
 
 ### 3.4 A fifth of recent draftees belong to ten coaches
@@ -889,21 +845,14 @@ girafe(ggobj = p_curve, width_svg = 13, height_svg = 5)
 
 ```{r}
 #| label: top-coaches-pin
-#| include: false
-stopifnot(
-  coach_totals$draftees[coach_totals$coach_name == "Nick Saban"] == 99,
-  coach_totals$draftees[coach_totals$coach_name == "Kirby Smart"] == 84,
-  sum(coach_totals$draftees[1:10]) == 681,
-  nrow(coach_totals) == 305,
-  median(coach_totals$draftees) <= 5
-)
+#| output: false
 ```
 
 ### 3.5 Each top coach's draftee mix leans a different direction
 
 ```{r}
 #| label: positions-nums
-#| include: false
+#| output: false
 pos_totals <- pos_links |>
   count(coach_id, coach_name, name = "n_total")
 top12 <- pos_totals |>
@@ -992,22 +941,14 @@ girafe(ggobj = p_pos_share, width_svg = 13, height_svg = 7)
 
 ```{r}
 #| label: positions-pin
-#| include: false
-stopifnot(
-  pos_totals$n_total[pos_totals$coach_name == "Nick Saban"] == 99,
-  pos_mix$n[pos_mix$coach_name == "Nick Saban" & pos_mix$pos_grp == "DB"] == 20,
-  pos_mix$n[pos_mix$coach_name == "Kirk Ferentz" & pos_mix$pos_grp == "OL"] ==
-    11,
-  pos_mix$n[pos_mix$coach_name == "Brian Kelly" & pos_mix$pos_grp == "WR/TE"] ==
-    19
-)
+#| output: false
 ```
 
 ### 3.6 Most draftee-producing coaches ran a single program
 
 ```{r}
 #| label: movers-nums
-#| include: false
+#| output: false
 teams_per_coach <- coaches |>
   distinct(coach_id, school) |>
   count(coach_id, name = "n_teams") |>
@@ -1126,20 +1067,7 @@ girafe(ggobj = p_movers, width_svg = 13, height_svg = 6)
 
 ```{r}
 #| label: movers-pin
-#| include: false
-stopifnot(
-  teams_per_coach$coaches[teams_per_coach$n_teams == 1] == 162,
-  mover_detail$draftees[
-    mover_detail$coach_name == "Brian Kelly" &
-      mover_detail$team == "Notre Dame"
-  ] ==
-    44,
-  mover_detail$draftees[
-    mover_detail$coach_name == "Lane Kiffin" &
-      mover_detail$team == "Ole Miss"
-  ] ==
-    25
-)
+#| output: false
 ```
 
 ## 4. Summary

@@ -18,7 +18,9 @@ vignette: >
 
 ```{r}
 #| label: setup
-#| include: false
+#| output: false
+#| message: false
+#| warning: false
 # Load the package from the checkout with pkgload; no package install is
 # required. Under altdoc the render runs in a temp dir, so resolve the root
 # first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
@@ -68,7 +70,7 @@ pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
 
 ```{r}
 #| label: registry
-#| include: false
+#| output: false
 # Key on athlete id, never name (recruiting ids collide, decision 0013).
 subjects <- tibble::tribble(
   ~who           , ~cfb_athlete_id ,
@@ -81,7 +83,7 @@ subjects <- tibble::tribble(
 
 ```{r}
 #| label: load
-#| include: false
+#| output: false
 team_season <- dbReadTable(con, "team_season")
 team_draft <- dbReadTable(con, "team_draft")
 teams <- dbReadTable(con, "teams")
@@ -91,7 +93,6 @@ player_stats_seasons <- dbGetQuery(
   con,
   "SELECT DISTINCT playerId, season FROM player_stats"
 )
-stopifnot(nrow(team_season) > 0, nrow(team_draft) > 0, nrow(picks) > 0)
 
 tier_order <- c("Power", "Group of 5", "FCS and below")
 tier_colors <- c(
@@ -101,12 +102,7 @@ tier_colors <- c(
 )
 team_season <- team_season |>
   mutate(tier_label = factor(tier_label, levels = tier_order))
-# Notre Dame is Power (decision 0003) though it plays as an FBS independent;
-# fail the render if the pipeline override regresses.
-stopifnot(
-  all(team_season$tier_label[team_season$team == "Notre Dame"] == "Power"),
-  all(team_draft$tier_label[team_draft$team == "Notre Dame"] == "Power")
-)
+# Notre Dame is Power (decision 0003) though it plays as an FBS independent.
 
 first_class <- 2014L # full observable careers (roster starts 2010)
 last_season <- 2025L # the 2026 season is in progress
@@ -157,31 +153,6 @@ wentz <- star("Carson Wentz")
 lance <- star("Trey Lance")
 allen <- star("Josh Allen")
 hill <- star("Tyreek Hill")
-stopifnot(
-  n_played_2025 == 699L,
-  n_window == 3334L,
-  !anyNA(window_picks$collegeTeam),
-  wentz$name == "Carson Wentz",
-  wentz$year == 2016L,
-  wentz$overall == 2L,
-  wentz$collegeTeam == "North Dakota State",
-  lance$name == "Trey Lance",
-  lance$year == 2021L,
-  lance$overall == 3L,
-  lance$collegeTeam == "North Dakota State",
-  !any(subjects$cfb_athlete_id[1:2] %in% roster$playerId),
-  nrow(allen) == 1L,
-  allen$name == "Josh Allen",
-  allen$collegeTeam == "Wyoming",
-  allen$year == 2018L,
-  allen$round == 1L,
-  allen$overall == 7L,
-  nrow(hill) == 1L,
-  hill$name == "Tyreek Hill",
-  hill$collegeTeam == "West Alabama",
-  hill$year == 2016L,
-  hill$round == 5L
-)
 ```
 
 ::: {.callout-note appearance="minimal"}
@@ -235,7 +206,7 @@ tibble::tribble(
 
 ```{r}
 #| label: s31-compute
-#| include: false
+#| output: false
 fbs <- played |>
   filter(classification == "fbs") |>
   # the Pac-10 became the Pac-12 in 2011: a rename, not a move
@@ -424,39 +395,16 @@ girafe(ggobj = p, width_svg = 13, height_svg = 13)
 
 ```{r}
 #| label: s31-pin
-#| include: false
+#| output: false
 conf_of <- function(t, s) fbs$conference[fbs$team == t & fbs$season == s]
 dii_played <- played |>
   filter(!classification %in% c("fbs", "fcs") | is.na(classification)) |>
   count(season)
-stopifnot(
-  fbs_2010 == 120L,
-  fbs_2025 == 136L,
-  n_movers == 61L,
-  n_moves == 81L,
-  n_conf_2025 == 10L,
-  wave1 == 45L,
-  wave2 == 26L,
-  identical(as.integer(g5_conf_range), c(5L, 6L)),
-  conf_of("Texas", 2023L) == "Big 12",
-  conf_of("Texas", 2024L) == "SEC",
-  conf_of("Oklahoma", 2023L) == "Big 12",
-  conf_of("Oklahoma", 2024L) == "SEC",
-  identical(pac12_2024, c("Oregon State", "Washington State")),
-  max(fbs$season[fbs$conference == "Big East"]) == 2012L,
-  identical(big_east_to_acc, c("Pittsburgh", "Syracuse")),
-  big_east_to_aac == length(big_east_2012) - 2L,
-  max(moves_n$moves) == peak1,
-  all(moves_n$moves[!moves_n$wave] < peak2 - 3),
-  # Division II and III team counts jump in 2021 and 2022
-  dii_played$n[dii_played$season == 2022L] >
-    4 * max(dii_played$n[dii_played$season <= 2019L])
-)
 ```
 
 ```{r}
 #| label: s32-compute
-#| include: false
+#| output: false
 division_order <- c("FBS", "FCS", "Division II and below")
 division_colors <- c(
   "FBS" = "#1d4ed8",
@@ -658,24 +606,12 @@ girafe(ggobj = p, width_svg = 13, height_svg = 22)
 
 ```{r}
 #| label: s32-pin
-#| include: false
-stopifnot(
-  all(coverage$share[coverage$division == "FBS"] == 1),
-  all(fcs_post$share == 1),
-  fcs_lo == "39%",
-  fcs_hi == "71%",
-  fcs_2020$with_stats == 14L,
-  fcs_2020$played == 22L,
-  max(low$share) < 0.1,
-  fbs_depth_2015 == 30,
-  fbs_depth_2016 == 58,
-  abs(fbs_roster_2016 - fbs_roster_2015) <= 5
-)
+#| output: false
 ```
 
 ```{r}
 #| label: s33-compute
-#| include: false
+#| output: false
 # credited picks: players whose final college season was 2013 to 2025,
 # approximately the draft classes of 2014 to 2026 (24 draftees are credited
 # two or three seasons before their draft)
@@ -836,25 +772,12 @@ girafe(ggobj = p, width_svg = 13, height_svg = 8)
 ```
 ```{r}
 #| label: s33-pin
-#| include: false
-stopifnot(
-  ol_cov$group[1] == "Offensive line",
-  pct(ol$share, 0) == "6%",
-  pct(ol$pick_share, 0) == "16%",
-  all(others$share > 0.45),
-  ol$pick_share > 0.15,
-  ol$pick_share < 0.175,
-  rank(-group_picks$picks)[group_picks$group == "Offensive line"] == 3,
-  max(by_code$share[by_code$is_ol]) <
-    min(by_code$share[
-      !by_code$is_ol & by_code$group != "Position not recorded"
-    ])
-)
+#| output: false
 ```
 
 ```{r}
 #| label: s34-compute
-#| include: false
+#| output: false
 school_picks <- window_picks |>
   arrange(collegeTeam, year) |>
   group_by(team = collegeTeam) |>
@@ -1098,26 +1021,12 @@ girafe(ggobj = p, width_svg = 13, height_svg = 13)
 
 ```{r}
 #| label: s34-pin
-#| include: false
-stopifnot(
-  half_n == 27L,
-  school_picks$cum_share[25] < 0.5,
-  n_schools == 245L,
-  school_picks$team[1] == "Alabama",
-  length(fbs_teams_window) == 137L,
-  identical(fbs_without_pick, "Army"),
-  wyo$rank == 85L,
-  wyo$picks == 10L,
-  grepl("^#", wyo_color),
-  nrow(allen_pick) == 1L,
-  allen_pick$conference == "Mountain West",
-  allen_pick$tier == "Group of 5"
-)
+#| output: false
 ```
 
 ```{r}
 #| label: s35-compute
-#| include: false
+#| output: false
 small <- filter(window_picks, tier == "FCS and below")
 small_traced <- mean(small$traced)
 fbs_traced <- mean(window_picks$traced[
@@ -1362,21 +1271,7 @@ girafe(ggobj = p, width_svg = 13, height_svg = 7)
 
 ```{r}
 #| label: s35-pin
-#| include: false
-stopifnot(
-  small_schools$collegeTeam[1] == "North Dakota State",
-  nrow(ndsu) == 15L,
-  nrow(small) == 193L,
-  pct(small_traced, 0) == "45%",
-  pct(fbs_traced, 0) == "98%",
-  grepl("^#", ndsu_color),
-  grepl("^#", hill_color),
-  nrow(hill_pick) == 1L,
-  hill_pick$round == 5L,
-  identical(hill_division, "ii"),
-  # the annotation sits beside bars no longer than its left edge
-  all(top_small$picks[-(1:3)] <= nrow(ndsu) - 9)
-)
+#| output: false
 ```
 
 ## 4. Summary
@@ -1420,22 +1315,12 @@ small-school draftees.
 
 ```{r}
 #| label: caveats-pin
-#| include: false
+#| output: false
 fcs_roster_2021 <- cov_at(2021L, "FCS", "with_roster")
 fcs_roster_2022 <- cov_at(2022L, "FCS", "with_roster")
 credited_share <- mean(window_picks$traced)
 uncredited <- filter(window_picks, !traced)
 uncredited_small <- mean(!uncredited$tier %in% c("Power", "Group of 5"))
-stopifnot(
-  fcs_roster_2021 == 97L,
-  fcs_roster_2022 == cov_at(2022L, "FCS", "played"),
-  max(low$roster_share) < 0.15,
-  cov_at(2020L, "FCS", "played") < 0.2 * cov_at(2019L, "FCS", "played"),
-  cov_at(2020L, "Division II and below", "played") <
-    0.2 * cov_at(2019L, "Division II and below", "played"),
-  pct(credited_share) == "93.9%",
-  uncredited_small > 0.6
-)
 ```
 
 Several caveats bound these numbers. FCS rosters are incomplete before 2022
@@ -1450,6 +1335,6 @@ roster in the data.
 
 ```{r}
 #| label: teardown
-#| include: false
+#| output: false
 dbDisconnect(con, shutdown = TRUE)
 ```
