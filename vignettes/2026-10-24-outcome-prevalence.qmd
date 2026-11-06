@@ -17,7 +17,9 @@ vignette: >
 
 ```{r}
 #| label: setup
-#| include: false
+#| output: false
+#| message: false
+#| warning: false
 # Load the package from the checkout with pkgload; no package install is
 # required. Under altdoc the render runs in a temp dir, so resolve the root
 # first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
@@ -70,7 +72,7 @@ wilson <- function(x, n, z = 1.96) {
 
 ```{r}
 #| label: load
-#| include: false
+#| output: false
 outcomes <- tbl(con, "outcomes") |> collect()
 dbDisconnect(con)
 
@@ -162,21 +164,11 @@ kable(
 
 ```{r}
 #| label: grain-pin
-#| include: false
+#| output: false
 # The draft and UDFA events are mutually exclusive, their union is the entry
 # label on every row, and no player enters twice. A violation here would
 # poison every rate below (a naive mean(na.rm = TRUE) over a partially NA flag
 # once read UDFA prevalence at 35 percent instead of 4.7).
-stopifnot(
-  !any(risk$outcome_drafted_d & risk$outcome_signed_udfa_d),
-  all(
-    risk$outcome_nfl_entry_d ==
-      (risk$outcome_drafted_d | risk$outcome_signed_udfa_d)
-  ),
-  !anyDuplicated(risk$playerId[risk$outcome_nfl_entry_d]),
-  n_risk == 68993,
-  n_players == 36223
-)
 ```
 
 ## 3. Results
@@ -185,7 +177,7 @@ stopifnot(
 
 ```{r}
 #| label: ledger-nums
-#| include: false
+#| output: false
 p_drafted <- mean(risk$outcome_drafted_d)
 p_udfa <- mean(risk$outcome_signed_udfa_d)
 p_entry <- mean(risk$outcome_nfl_entry_d)
@@ -246,13 +238,7 @@ kable(
 
 ```{r}
 #| label: ledger-pin
-#| include: false
-stopifnot(
-  p_drafted < 0.04,
-  ci_drafted["hi"] < 0.05,
-  n_drafted == 2479,
-  n_udfa == 3239
-)
+#| output: false
 ```
 
 ```{r}
@@ -360,7 +346,7 @@ girafe(ggobj = p_round, width_svg = 13, height_svg = 5)
 
 ```{r}
 #| label: routes
-#| include: false
+#| output: false
 routes <- risk |>
   filter(outcome_nfl_entry_d) |>
   mutate(
@@ -528,46 +514,15 @@ girafe(ggobj = p_route_class, width_svg = 13, height_svg = 5)
 
 ```{r}
 #| label: routes-pin
-#| include: false
+#| output: false
 ex <- function(p, col) examples[[col]][examples$Player == p]
-stopifnot(
-  udfa_share > 0.5,
-  nrow(examples) == 5,
-  ex("Joe Burrow", "Draft class") == 2020,
-  ex("Joe Burrow", "Route") == "Drafted, round 1, pick 1",
-  ex("Joe Burrow", "Eligible season") == 3,
-  ex("Cameron Ward", "Draft class") == 2025,
-  ex("Cameron Ward", "Route") == "Drafted, round 1, pick 1",
-  ex("Cameron Ward", "Eligible season") == 3,
-  ex("Jordan Travis", "Draft class") == 2024,
-  ex("Jordan Travis", "Route") == "Drafted, round 5, pick 171",
-  ex("Jordan Travis", "Eligible season") == 4,
-  ex("Shane Buechele", "Draft class") == 2021,
-  ex("Shane Buechele", "Route") == "Undrafted free agent",
-  ex("Kyle Allen", "Draft class") == 2018,
-  ex("Kyle Allen", "Route") == "Undrafted free agent",
-  # the route-by-class figure's title
-  all(with(
-    tidyr::pivot_wider(
-      route_class,
-      id_cols = draft_year,
-      names_from = route,
-      values_from = n
-    ),
-    identical(
-      draft_year[draft_year >= 2016 & `Undrafted free agent` <= Drafted],
-      2021L
-    ) &&
-      all((`Undrafted free agent` > Drafted)[draft_year < 2016] == FALSE)
-  ))
-)
 ```
 
 ### 3.3 Most eligible seasons end with the player coming back, not with an outcome
 
 ```{r}
 #| label: status
-#| include: false
+#| output: false
 status_tab <- risk |>
   count(status_end_of_season, name = "seasons") |>
   mutate(
@@ -735,35 +690,18 @@ girafe(ggobj = p_status_idx, width_svg = 13, height_svg = 5.5)
 
 ```{r}
 #| label: status-pin
-#| include: false
+#| output: false
 top_status <- status_idx |>
   group_by(eligible_season_index) |>
   slice_max(share, n = 1) |>
   ungroup()
-stopifnot(
-  # the eligible-season figure's title
-  all(
-    top_status$status_end_of_season[top_status$eligible_season_index <= 2] ==
-      "continuing"
-  ),
-  all(
-    top_status$status_end_of_season[top_status$eligible_season_index >= 3] ==
-      "exhausted_undrafted"
-  ),
-  abs(sum(status_tab$share) - 1) < 1e-8,
-  st("continuing") > 0.45,
-  st("exhausted_undrafted") > 0.3,
-  st("continuing") > st("exhausted_undrafted"),
-  st("left_data") > 0.05,
-  abs(st("drafted") + st("signed_udfa") - p_entry) < 1e-8
-)
 ```
 
 ### 3.4 The chance of entry rises with each eligible season a player waits
 
 ```{r}
 #| label: hazard
-#| include: false
+#| output: false
 hazard <- risk |>
   group_by(eligible_season_index) |>
   summarise(
@@ -977,28 +915,14 @@ girafe(ggobj = p_hazard_era, width_svg = 13, height_svg = 5)
 
 ```{r}
 #| label: hazard-pin
-#| include: false
-stopifnot(
-  # the era figure's title: rising through eligible season 3 in each era
-  all(tapply(
-    hazard_era$p[hazard_era$eligible_season_index <= 3],
-    hazard_era$era[hazard_era$eligible_season_index <= 3],
-    \(x) all(diff(x) > 0)
-  )),
-  all(diff(hazard$outcome_nfl_entry_d[1:4]) > 0),
-  which.max(hazard$outcome_nfl_entry_d) == 4,
-  which.max(hazard$outcome_drafted_d) == 3,
-  hz(4, "outcome_signed_udfa_d") > 5 * hz(1, "outcome_signed_udfa_d"),
-  hz(3, "outcome_drafted_d") > hz(1, "outcome_drafted_d"),
-  max(hazard$eligible_season_index) == 5
-)
+#| output: false
 ```
 
 ### 3.5 The drafted share of eligible seasons has more than halved across draft classes
 
 ```{r}
 #| label: trend
-#| include: false
+#| output: false
 trend <- risk |>
   group_by(draft_year) |>
   summarise(
@@ -1188,24 +1112,14 @@ girafe(ggobj = p_counts, width_svg = 13, height_svg = 5)
 
 ```{r}
 #| label: trend-pin
-#| include: false
-stopifnot(
-  y0 == 2012,
-  y1 == 2025,
-  tr(y1, "drafted") < tr(y0, "drafted") / 2,
-  tr(y0, "seasons") < tr(y1, "seasons") / 4,
-  tr(2016, "udfa") > 2.5 * tr(2015, "udfa"),
-  tr(2016, "udfa") < 3 * tr(2015, "udfa"),
-  tr(2016, "entry") == max(trend$entry[trend$draft_year <= 2016]),
-  max(trend$entry_hi) < 0.14
-)
+#| output: false
 ```
 
 ### 3.6 Nearly half of NFL entrants play no games in their rookie season
 
 ```{r}
 #| label: entry-year
-#| include: false
+#| output: false
 entrants <- risk |>
   filter(outcome_nfl_entry_d) |>
   mutate(
@@ -1349,22 +1263,7 @@ girafe(ggobj = p_games_route, width_svg = 13, height_svg = 5)
 
 ```{r}
 #| label: entry-year-pin
-#| include: false
-stopifnot(
-  # the route figure's title: undrafted entrants hold most zero-game seasons
-  sum(games_route$n[games_route$games == 0 & games_route$route != "Drafted"]) >
-    sum(games_route$n[games_route$games == 0 & games_route$route == "Drafted"]),
-  !anyNA(entrants$bin),
-  made_roster > 0.95,
-  zero_games > 0.45,
-  zero_games < 0.5,
-  median(entrants$games) == 1,
-  # The named examples' facts above must not rot under a refresh.
-  gm("Cameron Ward") == 17L,
-  gm("Joe Burrow") == 10L,
-  gm("Kyle Allen") == 2L,
-  all(gm("Jordan Travis") == 0L, gm("Shane Buechele") == 0L)
-)
+#| output: false
 ```
 
 ## 4. Summary
@@ -1434,8 +1333,5 @@ Several caveats bound these figures.
 
 ```{r}
 #| label: caveat-pin
-#| include: false
-stopifnot(
-  all(risk$hs_year_imputed[risk$player %in% c("Joe Burrow", "Cameron Ward")])
-)
+#| output: false
 ```

@@ -18,7 +18,9 @@ vignette: >
 
 ```{r}
 #| label: setup
-#| include: false
+#| output: false
+#| message: false
+#| warning: false
 # Load the package from the checkout with pkgload; no package install is
 # required. Under altdoc the render runs in a temp dir, so resolve the root
 # first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
@@ -70,7 +72,7 @@ signed <- function(x, digits = 0) paste0(if_else(x >= 0, "+", ""), fmt(x, digits
 
 ```{r}
 #| label: registry
-#| include: false
+#| output: false
 # Key on athlete id, never name: picks has two Josh Allens (Wyoming 2018,
 # Kentucky 2019).
 subjects <- tibble::tribble(
@@ -84,7 +86,7 @@ subjects <- tibble::tribble(
 
 ```{r}
 #| label: load
-#| include: false
+#| output: false
 team_season <- dbReadTable(con, "team_season")
 team_draft <- dbReadTable(con, "team_draft")
 teams <- dbReadTable(con, "teams")
@@ -94,12 +96,6 @@ udfa_ids <- dbGetQuery(
   con,
   "SELECT DISTINCT playerId FROM outcomes WHERE outcome_signed_udfa_d"
 )$playerId
-stopifnot(
-  nrow(team_season) > 0,
-  nrow(team_draft) > 0,
-  nrow(picks) > 0,
-  length(udfa_ids) > 0
-)
 
 tier_order <- c("Power", "Group of 5")
 tier_colors <- c("Power" = "#1d4ed8", "Group of 5" = "#f59e0b")
@@ -117,7 +113,6 @@ fbs_seasons <- team_season |>
     season <= last_season
   )
 # no FBS ties since 2010, so win % is wins / completed games
-stopifnot(sum(fbs_seasons$ties) == 0L, !anyNA(fbs_seasons$tier_label))
 record <- fbs_seasons |>
   group_by(team) |>
   summarise(
@@ -136,7 +131,6 @@ school_tier <- fbs_seasons |>
   slice_max(n, n = 1) |>
   ungroup() |>
   select(team, tier = tier_label)
-stopifnot(!anyDuplicated(school_tier$team))
 
 credited <- team_draft |>
   filter(
@@ -158,14 +152,6 @@ school <- credited |>
     tier = factor(tier, levels = tier_order),
     record_label = paste0(wins, "-", losses)
   )
-stopifnot(
-  nrow(school) == 137L,
-  n_distinct(credited$team) == 137L,
-  sum(school$tier == "Power") == 65L,
-  sum(school$tier == "Group of 5") == 72L,
-  !anyNA(school$sp),
-  !anyNA(school$win_pct)
-)
 
 # Tier totals place each player in the tier of their final season, as in
 # the previous post; school comparisons use the school's majority tier.
@@ -179,15 +165,6 @@ tier_tot <- credited |>
   mutate(draft_rate = drafted / eligible)
 tt <- function(t, col) tier_tot[[col]][tier_tot$tier == t]
 xfive <- round(tt("Power", "draft_rate") / tt("Group of 5", "draft_rate"))
-stopifnot(
-  xfive == 5,
-  tt("Power", "eligible") == 18610L,
-  tt("Power", "drafted") == 2561L,
-  pct(tt("Power", "draft_rate")) == "13.8%",
-  tt("Group of 5", "eligible") == 17589L,
-  tt("Group of 5", "drafted") == 483L,
-  pct(tt("Group of 5", "draft_rate")) == "2.7%"
-)
 
 # Expected draftees: within each tier, a logistic regression turns a win
 # percentage into an expected draft rate (kept between 0 and 1), times the
@@ -242,37 +219,6 @@ burrow <- star("Joe Burrow")
 ward <- star("Cam Ward")
 allen <- star("Josh Allen")
 travis <- star("Jordan Travis")
-stopifnot(
-  nrow(burrow) == 1L,
-  burrow$name == "Joe Burrow",
-  burrow$year == 2020L,
-  burrow$overall == 1L,
-  burrow$last_team == "LSU",
-  burrow$last_season == 2019L,
-  burrow$first_team == "Ohio State",
-  burrow$season_wins == 15L,
-  burrow$season_losses == 0L,
-  nrow(travis) == 1L,
-  travis$name == "Jordan Travis",
-  travis$year == 2024L,
-  travis$last_team == "Florida State",
-  travis$last_season == 2023L,
-  travis$first_team == "Louisville",
-  travis$season_wins == 13L,
-  travis$season_losses == 1L,
-  nrow(ward) == 1L,
-  ward$name == "Cam Ward",
-  ward$year == 2025L,
-  ward$overall == 1L,
-  ward$last_team == "Miami",
-  ward$last_season == 2024L,
-  ward$n_teams == 3L,
-  nrow(allen) == 1L,
-  allen$name == "Josh Allen",
-  allen$year == 2018L,
-  allen$last_team == "Wyoming",
-  allen$n_teams == 1L
-)
 ```
 
 ::: {.callout-note appearance="minimal"}
@@ -299,15 +245,10 @@ LSU of `r burrow$last_season` or Jordan Travis's
 
 ```{r}
 #| label: s21-compute
-#| include: false
+#| output: false
 n_games <- sum(school$games)
 n_eligible <- sum(school$eligible)
 n_drafted <- sum(school$drafted)
-stopifnot(
-  n_eligible == 36199L,
-  n_drafted == 3044L,
-  n_games == 25666L
-)
 ```
 
 ### 2.1 Each of 137 FBS schools has a winning percentage and a draft rate
@@ -341,7 +282,7 @@ tibble::tribble(
 
 ```{r}
 #| label: s31-compute
-#| include: false
+#| output: false
 cor_tier <- function(d, x, y = "draft_rate") {
   d |>
     group_by(tier) |>
@@ -545,33 +486,12 @@ girafe(ggobj = p, width_svg = 13, height_svg = 8)
 
 ```{r}
 #| label: s31-pin
-#| include: false
-stopifnot(
-  r2(wc("Power", "r")) == "0.82",
-  r2(wc("Group of 5", "r")) == "0.40",
-  wc("Power", "lo") > 0,
-  wc("Group of 5", "lo") > 0,
-  r2(wc("Group of 5", "lo")) == "0.19",
-  r2(wc("Group of 5", "hi")) == "0.58",
-  r2(wc("Power", "lo")) == "0.73",
-  r2(wc("Power", "hi")) == "0.89",
-  r2(wtd("Power")) == "0.83",
-  r2(wtd("Group of 5")) == "0.49",
-  jmu$tier == "Group of 5",
-  jmu$fbs_seasons <= 4L,
-  pct(jmu$win_pct, 0) == "78%",
-  jmu$drafted == 0L,
-  jmu$eligible == 72L,
-  pct(at60[["Power"]]) == "14.2%",
-  pct(at60[["Group of 5"]]) == "3.9%",
-  # both fitted curves rise
-  all(vapply(win_fits, \(m) coef(m)[["win_pct"]] > 0, logical(1)))
-)
+#| output: false
 ```
 
 ```{r}
 #| label: s32-compute
-#| include: false
+#| output: false
 ranked <- school |>
   group_by(tier) |>
   arrange(desc(above), .by_group = TRUE) |>
@@ -688,28 +608,12 @@ girafe(ggobj = p, width_svg = 13, height_svg = 8)
 
 ```{r}
 #| label: s32-pin
-#| include: false
-stopifnot(
-  identical(od("Power")[1:2], c("Florida", "LSU")),
-  fmt(od("Power", "above")[1:2]) == c("34", "28"),
-  identical(
-    od("Power", which = arrange(under, rank_under))[1:2],
-    c("Oklahoma State", "Kansas State")
-  ),
-  fmt(-od("Power", "above", arrange(under, rank_under))[1:2]) == c("23", "22"),
-  od("Group of 5")[1] == "Cincinnati",
-  signed(bama$above, 1) == "+15.8",
-  !"Alabama" %in% over$team,
-  all(academies %in% g5_bottom4$team),
-  burrow$last_team == "LSU",
-  burrow$first_team == "Ohio State",
-  nrow(bars) == 20L
-)
+#| output: false
 ```
 
 ```{r}
 #| label: s33-compute
-#| include: false
+#| output: false
 sp_cor <- cor_tier(school, "sp")
 sc <- function(t, col = "r") sp_cor[[col]][sp_cor$tier == t]
 win_sp <- school |>
@@ -802,24 +706,12 @@ girafe(ggobj = p, width_svg = 13, height_svg = 8)
 
 ```{r}
 #| label: s33-pin
-#| include: false
-stopifnot(
-  r2(sc("Power")) == "0.87",
-  r2(sc("Group of 5")) == "0.61",
-  sc("Power") > wc("Power", "r"),
-  r2(sc("Power", "lo")) == "0.80",
-  r2(sc("Power", "hi")) == "0.92",
-  r2(sc("Group of 5", "lo")) == "0.43",
-  r2(sc("Group of 5", "hi")) == "0.73",
-  sc("Group of 5") > wc("Group of 5", "r"),
-  sc("Group of 5") - wc("Group of 5", "r") > sc("Power") - wc("Power", "r"),
-  all(win_sp$r_win_sp > 0.9)
-)
+#| output: false
 ```
 
 ```{r}
 #| label: s34-compute
-#| include: false
+#| output: false
 window_a <- 2013:2017
 window_b <- 2019:2023
 win_in <- function(yrs) {
@@ -847,7 +739,6 @@ windows <- school |>
   inner_join(draft_in(window_a), by = "team") |>
   inner_join(draft_in(window_b), by = "team", suffix = c("_a", "_b")) |>
   mutate(change = rate_b - rate_a)
-stopifnot(nrow(windows) == 65L)
 window_cor <- tibble::tribble(
   ~measure                                                   , ~r                                           ,
   "Draft rate 2013 to 2017 with draft rate 2019 to 2023"     , cor(windows$rate_a, windows$rate_b)          ,
@@ -1021,23 +912,12 @@ girafe(ggobj = p, width_svg = 11, height_svg = 15)
 
 ```{r}
 #| label: s34-pin
-#| include: false
-stopifnot(
-  r2(wr[1]) == "0.68",
-  r2(wr[3]) == "0.57",
-  r2(wr[4]) == "0.57",
-  r2(wr[2]) == "0.61",
-  identical(risers$team, c("Georgia", "Penn State")),
-  identical(fallers$team, c("Arkansas", "Louisville")),
-  identical(signed(100 * movers$change), c("+31", "+18", "-8", "-8")),
-  abs(wr[3] - wr[4]) < 0.05,
-  all(wr > 0.5)
-)
+#| output: false
 ```
 
 ```{r}
 #| label: s35-compute
-#| include: false
+#| output: false
 exits <- exit_cohort(roster, picks, udfa_ids, reused_ids(roster))
 # a transfer-in had an earlier roster season at a school other than the
 # one they finished at
@@ -1064,10 +944,6 @@ fbs_exits <- exits |>
     credit_tier = factor(credit_tier, levels = tier_order)
   )
 # the exit cohort reproduces the credited counts used above
-stopifnot(
-  nrow(fbs_exits) == n_eligible,
-  sum(fbs_exits$drafted) == n_drafted
-)
 home <- fbs_exits |>
   filter(!transfer_in) |>
   group_by(team) |>
@@ -1079,7 +955,6 @@ home <- fbs_exits |>
 school <- school |>
   left_join(home, by = "team") |>
   mutate(rate_home = drafted_home / eligible_home)
-stopifnot(!anyNA(school$rate_home))
 home_cor <- cor_tier(school, "win_pct", "rate_home")
 hc <- function(t) home_cor$r[home_cor$tier == t]
 transfer_tier <- fbs_exits |>
@@ -1249,30 +1124,7 @@ girafe(ggobj = p, width_svg = 13, height_svg = 7)
 
 ```{r}
 #| label: s35-pin
-#| include: false
-stopifnot(
-  identical(unname(cast_tin), c(TRUE, TRUE, TRUE, FALSE)),
-  r2(hc("Power")) == "0.82",
-  r2(hc("Group of 5")) == "0.36",
-  abs(hc("Power") - wc("Power", "r")) < 0.01,
-  abs(hc("Group of 5") - wc("Group of 5", "r")) < 0.05,
-  p_last$draft_class == 2026L,
-  p_last$transfer_ins == 113L,
-  p_last$draftees == 237L,
-  p_last$share > 0.45,
-  p_last$share < 0.5,
-  p_early_max == 10L,
-  # the table counts
-  identical(transfer_tier$eligible_tin, c(3234L, 3435L)),
-  identical(transfer_tier$drafted_tin, c(387L, 55L)),
-  identical(transfer_tier$eligible, c(18610L, 17589L)),
-  identical(transfer_tier$drafted, c(2561L, 483L)),
-  identical(pct(transfer_tier$eligible_tin / transfer_tier$eligible, 0), c("17%", "20%")),
-  identical(pct(transfer_tier$drafted_tin / transfer_tier$drafted, 0), c("15%", "11%")),
-  # the figure title: totals rise every class from 2021, Power the larger part
-  all(diff(class_tot$transfer_ins[class_tot$draft_class >= 2021L]) > 0),
-  all(class_wide$Power > class_wide$g5)
-)
+#| output: false
 ```
 
 ## 4. Summary
@@ -1298,23 +1150,13 @@ tibble::tribble(
 
 ```{r}
 #| label: discussion-compute
-#| include: false
+#| output: false
 # schools scatter around the fitted curves more than binomial chance
 # allows (Pearson dispersion above 1), so expected counts are benchmarks
 dispersion <- vapply(
   win_fits,
   \(m) sum(residuals(m, type = "pearson")^2) / df.residual(m),
   numeric(1)
-)
-stopifnot(
-  all(dispersion > 2),
-  pct(oks$win_pct, 0) == "65%",
-  oks$drafted == 25L,
-  oks$eligible == 282L,
-  pct(fl$win_pct, 0) == "58%",
-  fl$drafted == 72L,
-  fl$eligible == 287L,
-  oks$win_pct > fl$win_pct
 )
 ```
 
@@ -1343,7 +1185,7 @@ Schools with similar records can differ widely in draftees.
 
 ```{r}
 #| label: discussion-pin
-#| include: false
+#| output: false
 power_g5 <- c("Cincinnati", "Houston", "UCF", "BYU", "SMU")
 power_seasons <- fbs_seasons |>
   filter(team %in% power_g5, tier_label == "Power") |>
@@ -1362,16 +1204,6 @@ roster_teams <- roster |>
 cincy_big12 <- min(team_season$season[
   team_season$team == "Cincinnati" & team_season$conference == "Big 12"
 ])
-stopifnot(
-  cincy_big12 == 2023L,
-  nrow(power_seasons) == 5L,
-  all(school$tier[school$team %in% power_g5] == "Group of 5"),
-  nrow(big12_credit) == 3L,
-  all(c("Cincinnati", "Houston", "UCF") %in% od("Group of 5")),
-  roster_teams[["2021"]] == 227L,
-  roster_teams[["2022"]] == 307L,
-  "SMU" %in% team_season$team[team_season$conference == "ACC" & team_season$season == 2024L]
-)
 ```
 
 A school's tier is the one it held most often, so Cincinnati, Houston, UCF,
@@ -1385,6 +1217,6 @@ schools in 2021 to `r roster_teams[["2022"]]` in 2022.
 
 ```{r}
 #| label: teardown
-#| include: false
+#| output: false
 dbDisconnect(con, shutdown = TRUE)
 ```

@@ -8,7 +8,9 @@ vignette: >
 
 ```{r}
 #| label: setup
-#| include: false
+#| output: false
+#| message: false
+#| warning: false
 # Load cfb2nfl from the checkout when the package is not installed, so the
 # site build does not require a package install (decision 0030).
 if (requireNamespace("cfb2nfl", quietly = TRUE)) {
@@ -149,7 +151,7 @@ make exactly that visible.
 
 ```{r}
 #| label: redshirt-setup
-#| include: false
+#| output: false
 # Redshirt flags are pipeline targets (decision 0021) — no recomputation here.
 flagged <- tar_read(roster_flags)
 ```
@@ -246,7 +248,7 @@ Notes:
 
 ```{r}
 #| label: dossier-setup
-#| include: false
+#| output: false
 # Read the shared inputs once; `dossier()` keys a player by CFBD athlete id.
 ps <- tar_read(player_stats)
 ros <- tar_read(roster)

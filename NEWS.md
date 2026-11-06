@@ -1,5 +1,15 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Blog posts no longer pin their stated numbers with `stopifnot()`
+  ([decision 0040](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0040-drop-stopifnot-pins-show-setup.md)).
+  A routine data refresh that nudged a count by three had been aborting the
+  whole site render one post at a time. Every number in the prose is already
+  an inline variable computed from the database, so a refresh now flows through
+  the text instead of failing the build. Setup and loading chunks are also made
+  visible (code shown, output and library noise suppressed) so each post is
+  reproducible from `cfb2nfl.duckdb`. The post template and `AGENTS.md` are
+  updated to match.
+
 - New career-ending table: each college career is classified by how it ended
   (drafted, signed as an undrafted free agent, eligibility used up, transferred,
   still active or right-censored, and an early stop with eligibility left).

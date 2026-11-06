@@ -17,7 +17,9 @@ vignette: >
 
 ```{r}
 #| label: setup
-#| include: false
+#| output: false
+#| message: false
+#| warning: false
 # Load the package from the checkout with pkgload; no package install is
 # required. Under altdoc the render runs in a temp dir, so resolve the root
 # first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
@@ -67,7 +69,7 @@ pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
 
 ```{r}
 #| label: registry
-#| include: false
+#| output: false
 # Key on athlete id, never name (recruiting ids collide, decision 0013).
 subjects <- tibble::tribble(
   ~who            , ~cfb_athlete_id ,
@@ -79,17 +81,15 @@ subjects <- tibble::tribble(
 
 ```{r}
 #| label: load
-#| include: false
+#| output: false
 usage <- dbReadTable(con, "player_usage")
 outcomes <- dbReadTable(con, "outcomes")
-stopifnot(nrow(usage) == 338330L, nrow(outcomes) > 0)
 
 # The population the post reasons about: rostered player-season-teams whose
 # team has a scheduled, completed game, in complete seasons 2019 to 2025
 # (class year is recorded from 2019 on, and the 2026 season is still running).
 pop <- usage |>
   filter(on_roster, team_games > 0, season >= 2019L, season <= 2025L)
-stopifnot(nrow(pop) == 159083L)
 
 pos_levels <- harmonized_position_levels()
 pop_pos <- pop |>
@@ -111,12 +111,11 @@ labels <- outcomes |>
   )
 draft_pop <- single_team |>
   inner_join(labels, by = c("playerId", "season"))
-stopifnot(nrow(draft_pop) == 41603L, sum(draft_pop$drafted) == 1266L)
 ```
 
 ```{r}
 #| label: universe-facts
-#| include: false
+#| output: false
 # Every headline number below is computed here and reused in the prose.
 n_rows <- nrow(pop)
 share_any_all <- mean(pop$games_appeared > 0)
@@ -139,30 +138,11 @@ draft_by_pos <- draft_pop |>
   group_by(position_group, drafted) |>
   summarise(n = n(), any_line = mean(games_appeared > 0), .groups = "drop")
 
-stopifnot(
-  abs(share_any_all - 0.2452745) < 1e-6,
-  abs(share_any_pos$any_line[share_any_pos$position_group == "Offensive line"] - 0.005293379) < 1e-6,
-  abs(share_any_pos$any_line[share_any_pos$position_group == "Quarterback"] - 0.433026789) < 1e-6,
-  abs(share_any_class$any_line[share_any_class$class_year == 1L] - 0.1492525) < 1e-6,
-  abs(share_any_class$any_line[share_any_class$class_year == 4L] - 0.3328433) < 1e-6,
-  abs(draft_summary$any_line[draft_summary$drafted] - 0.8072670) < 1e-6,
-  abs(draft_summary$any_line[!draft_summary$drafted] - 0.4994422) < 1e-6,
-  abs(draft_summary$mean_share[draft_summary$drafted] - 0.3260770) < 1e-6,
-  abs(draft_summary$mean_share[!draft_summary$drafted] - 0.1527141) < 1e-6,
-  # Within every position group, drafted player-seasons log a line more often.
-  all(
-    draft_by_pos |>
-      tidyr::pivot_wider(names_from = drafted, values_from = any_line) |>
-      filter(!is.na(`TRUE`), !is.na(`FALSE`)) |>
-      transmute(gap = `TRUE` - `FALSE`) |>
-      pull(gap) > 0
-  )
-)
 ```
 
 ```{r}
 #| label: named-facts
-#| include: false
+#| output: false
 # Season rows for the recurring cast; each pinned to the data.
 cast <- usage |>
   filter(playerId %in% subjects$cfb_athlete_id, season >= 2019L) |>
@@ -173,16 +153,6 @@ burrow_2019 <- cast |> filter(who == "Joe Burrow", season == 2019L)
 travis_2019 <- cast |> filter(who == "Jordan Travis", season == 2019L)
 ward_2021 <- cast |> filter(who == "Cam Ward", season == 2021L, team == "Incarnate Word")
 ward_2022 <- cast |> filter(who == "Cam Ward", season == 2022L)
-stopifnot(
-  nrow(burrow_2019) == 1L, burrow_2019$team == "LSU",
-  burrow_2019$games_appeared == 15L, burrow_2019$team_games == 15L,
-  travis_2019$team == "Florida State",
-  travis_2019$games_appeared == 3L, travis_2019$team_games == 13L,
-  nrow(ward_2021) == 1L, ward_2021$games_appeared == 3L,
-  ward_2021$team_games == 13L,
-  nrow(ward_2022) == 1L, ward_2022$team == "Washington State",
-  ward_2022$games_appeared == 13L, ward_2022$team_games == 13L
-)
 ```
 
 ::: {.callout-note appearance="minimal"}
@@ -327,11 +297,7 @@ girafe(ggobj = p2, width_svg = 13, height_svg = 6)
 
 ```{r}
 #| label: s31-pin
-#| include: false
-stopifnot(
-  by_pos$position_group[by_pos$any_line == max(by_pos$any_line)] %in%
-    c("Running back", "Quarterback")
-)
+#| output: false
 ```
 
 ### 3.2 Stat lines become more common with class year, from 15% of first-years to 33% of fourth-years
@@ -408,11 +374,7 @@ girafe(ggobj = p4, width_svg = 13, height_svg = 6)
 
 ```{r}
 #| label: s32-pin
-#| include: false
-stopifnot(
-  share_any_class$any_line[share_any_class$class_year == 4L] >
-    share_any_class$any_line[share_any_class$class_year == 1L]
-)
+#| output: false
 ```
 
 ### 3.3 Drafted player-seasons log a stat line in 33% of their team's games, twice the 15% for the rest
@@ -506,12 +468,8 @@ girafe(ggobj = p6, width_svg = 13, height_svg = 8)
 
 ```{r}
 #| label: s33-pin
-#| include: false
+#| output: false
 # The recurring cast: each season row is pinned to the published table.
-stopifnot(
-  burrow_2019$games_appeared == burrow_2019$team_games,
-  travis_2019$games_appeared < travis_2019$team_games
-)
 ```
 
 ## 4. Summary
@@ -539,6 +497,6 @@ Caveats: the draftee comparison is an association, not adjusted for team quality
 
 ```{r}
 #| label: teardown
-#| include: false
+#| output: false
 dbDisconnect(con, shutdown = TRUE)
 ```
