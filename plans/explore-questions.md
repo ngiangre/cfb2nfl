@@ -44,7 +44,7 @@ question.
 - [x] `flag_redshirt(roster, player_stats)` — redshirt logic in one tested
   place (stat-gap rule + fifth-year signal). Pipeline target `roster_flags`
   (decision 0021).
-- [ ] `season_arc(player_stats, stat_pair)` — pivot one stat to a per-player
+- [x] `season_arc(player_stats, stat_pair)` (derived table `season_arc`, decision 0037) — pivot one stat to a per-player
   per-season arc for plotting (question 6).
 - [x] **Shared ggplot theme + team-color scale in `R/viz.R`** —
   `theme_cfbstats()`, `team_color_values()`, `scale_fill_team()`,

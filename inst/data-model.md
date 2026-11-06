@@ -30,6 +30,8 @@ dictionaries next to this file, one YAML per table:
 | `career_end` | one player's college career, classified by how it ended (`early_stop_proxy` is a proxy, not an injury label) | [`dict/career_end.yml`](dict/career_end.yml) |
 | `position_path` | one college athlete id: harmonized HS, college and NFL position groups | [`dict/position_path.yml`](dict/position_path.yml) |
 | `player_game` | one player in one game (stat line + team, opponent, Elo, team games) | [`dict/player_game.yml`](dict/player_game.yml) |
+| `season_arc` | one player-season for one headline stat, with career season index (issue #47) | [`dict/season_arc.yml`](dict/season_arc.yml) |
+| `game_production` | one player-game-yardage stat vs its opponent-Elo-band baseline (decision 0037) | [`dict/game_production.yml`](dict/game_production.yml) |
 | `player_usage` | one player-season-team: games appeared out of team games, per-game usage (issue #50) | [`dict/player_usage.yml`](dict/player_usage.yml) |
 | `team_season` | one team in one season (every division) | [`dict/team_season.yml`](dict/team_season.yml) |
 | `team_draft` | team × final college season × position group | [`dict/team_draft.yml`](dict/team_draft.yml) |
@@ -122,6 +124,8 @@ erDiagram
     game_player_stats ||--|| player_game : "playerId, gameId (one row per stat line)"
     games ||--o{ player_game : "gameId == id"
     team_season ||--o{ player_game : "team, season (team_games)"
+    player_game ||--o{ game_production : "playerId, gameId (yardage stats)"
+    player_stats ||--o{ season_arc : "playerId, season (summed over teams)"
     player_game }o--|| player_usage : "playerId, season, team (games appeared)"
     roster |o--o{ player_usage : "playerId, season, team (position, class year)"
     picks ||--o| nfl_pick_link : "same slot join, name-guarded"

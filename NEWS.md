@@ -7,6 +7,12 @@
   label: CFBD has no injury feed. Derived and bundled in the DuckDB asset, with a
   contract, a dictionary, and an audit row
   ([decision 0039](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0039-career-end-proxy.md)).
+- New derived tables `season_arc` (one player-season for a headline stat, with
+  the player's career season index) and `game_production` (one player-game
+  yardage stat against the opponent-Elo-band baseline, with unrated opponents
+  kept as their own band). Both are bundled in DuckDB, carry contracts and
+  audit rows, and feed the new performance-arcs post (issue #47; decision
+  [0037](https://github.com/ngiangre/cfb2nfl/blob/feat/performance-arcs/decisions/0037-season-arcs-opponent-adjusted-production.md)).
 - New derived table `player_usage` in the DuckDB bundle: one row per player,
   season and team with `games_appeared` over `team_games` (the appearance rate),
   regular-season counterparts, per-game passing, rushing, receiving and tackle

@@ -1361,6 +1361,145 @@ contract_player_game <- function(
   enforce_contract(agent, "player_game", stop_on_fail)
 }
 
+#' Data contract for the season-arc table
+#'
+#' Guards [build_season_arcs()]. Enforces the key `(playerId, season, category,
+#' statType)` and no silent row loss: the output has exactly one row per
+#' player-season that has a numeric value for each headline stat in
+#' `player_stats`. Yardage and tackle totals are bounded loosely, and every
+#' `season_index` is at least 1.
+#'
+#' @param season_arc Output of [build_season_arcs()].
+#' @param player_stats Cleaned long player stats (the input).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_season_arc <- function(season_arc, player_stats, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  keys <- season_arc_stat_map
+  expected <- player_stats |>
+    dplyr::semi_join(keys, by = c("category", "statType")) |>
+    dplyr::mutate(value = suppressWarnings(as.numeric(.data$stat))) |>
+    dplyr::filter(!is.na(.data$value)) |>
+    dplyr::distinct(
+      .data$playerId,
+      .data$season,
+      .data$category,
+      .data$statType
+    ) |>
+    nrow()
+  agent <- pointblank::create_agent(season_arc, label = "season_arc") |>
+    pointblank::col_exists(c(
+      "playerId",
+      "player",
+      "season",
+      "season_index",
+      "team",
+      "category",
+      "statType",
+      "value"
+    )) |>
+    pointblank::rows_distinct(pointblank::vars(
+      playerId,
+      season,
+      category,
+      statType
+    )) |>
+    pointblank::col_vals_not_null(pointblank::vars(
+      playerId,
+      season,
+      season_index,
+      category,
+      statType,
+      value
+    )) |>
+    # No silent row loss: one row per numeric player-season-stat in the input.
+    pointblank::col_vals_equal(
+      "n",
+      expected,
+      preconditions = function(x) tibble::tibble(n = nrow(x))
+    ) |>
+    pointblank::col_vals_between("season", 2010L, 2026L) |>
+    pointblank::col_vals_gte("season_index", 1L) |>
+    pointblank::col_vals_between("value", -500, 6000) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "season_arc", stop_on_fail)
+}
+
+#' Data contract for the opponent-adjusted game-production table
+#'
+#' Guards [build_game_production()] (decision 0037). Enforces the key
+#' `(playerId, gameId, stat)` and no silent row loss: one row per non-`NA`
+#' yardage value in `player_game`. Every opponent Elo band is one of the
+#' declared bands (`"Unrated"` included, never dropped), and every residual is
+#' a finite number.
+#'
+#' @param game_production Output of [build_game_production()].
+#' @param player_game Output of [build_player_game()] (the input).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_game_production <- function(
+  game_production,
+  player_game,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  n_expected <- sum(
+    !is.na(
+      player_game[game_production_stat_cols]
+    )
+  )
+  agent <- pointblank::create_agent(
+    game_production,
+    label = "game_production"
+  ) |>
+    pointblank::col_exists(c(
+      "playerId",
+      "gameId",
+      "season",
+      "week",
+      "team",
+      "opponent",
+      "opponent_elo_band",
+      "stat",
+      "value",
+      "baseline",
+      "band_n",
+      "residual"
+    )) |>
+    pointblank::rows_distinct(pointblank::vars(playerId, gameId, stat)) |>
+    # No silent row loss: one row per non-NA yardage value in player_game.
+    pointblank::col_vals_equal(
+      "n",
+      n_expected,
+      preconditions = function(x) tibble::tibble(n = nrow(x))
+    ) |>
+    pointblank::col_vals_not_null(pointblank::vars(
+      playerId,
+      gameId,
+      season,
+      team,
+      opponent,
+      opponent_elo_band,
+      stat,
+      value,
+      baseline,
+      residual
+    )) |>
+    pointblank::col_vals_in_set(
+      "opponent_elo_band",
+      set = opponent_elo_band_levels
+    ) |>
+    pointblank::col_vals_in_set("stat", set = game_production_stat_cols) |>
+    pointblank::col_vals_in_set("gameId", set = unique(player_game$gameId)) |>
+    pointblank::col_vals_between("season", 2010L, 2026L) |>
+    pointblank::col_vals_gte("band_n", 1L) |>
+    pointblank::col_vals_between("residual", -1e6, 1e6) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "game_production", stop_on_fail)
+}
+
 #' Data contract for the player usage table
 #'
 #' Guards [build_player_usage()] (issue #50, decision 0038). Enforces the key

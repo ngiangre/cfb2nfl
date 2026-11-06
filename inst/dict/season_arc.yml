@@ -1,0 +1,52 @@
+dataset: season_arc
+source: derived in-pipeline (build_season_arcs(player_stats))
+grain: one player in one season, for one headline stat
+key: playerId + season + category + statType
+description: >
+  One row per player-season-stat for the headline stats in season_arc_stat_map
+  (passing yards, rushing yards, receiving yards, tackles). The value is the
+  season total from player_stats, summed across the team rows when the player
+  split the season between two teams (27 player-seasons in the data, all
+  transfers). season_index is the player's career season: 1 for the first
+  season with any stat line in player_stats, counted over all stats so an index
+  means the same season in every arc. The data starts in 2010, so a player who
+  began earlier has index 1 at his first season in the data. Left-censored at
+  2010 and right-censored for recent classes. A DERIVED table: materialized into
+  the DuckDB bundle, not published as parquet (decision 0021). Contract:
+  contract_season_arc() (key uniqueness, one row per numeric player-season-stat
+  in player_stats, index at least 1). Issue #47; plans/explore-questions.md
+  question 6. Carries no NFL outcome fields (leakage, decision 0014). Athlete
+  ids recycled across people (decision 0022) are not excluded here.
+columns:
+  - name: playerId
+    type: string
+    description: CFBD athlete id, the shared college athlete namespace (decision 0003).
+    provenance: derived (player_stats.playerId)
+  - name: player
+    type: string
+    description: Player name as recorded in player_stats for that season.
+    provenance: derived (player_stats.player)
+  - name: season
+    type: int32
+    description: Season year.
+    provenance: derived (player_stats.season)
+  - name: season_index
+    type: int32
+    description: Career season of the player, 1 for the first season in the data (counted over all stats), 2 for the next, and so on.
+    provenance: derived (dense rank of season within playerId in player_stats)
+  - name: team
+    type: string
+    description: The team with the larger share of the season's stat total (equal to the only team for most player-seasons).
+    provenance: derived (player_stats.team)
+  - name: category
+    type: string
+    description: CFBD stat category of the arc (passing, rushing, receiving or defensive).
+    provenance: derived (player_stats.category)
+  - name: statType
+    type: string
+    description: CFBD stat type of the arc (YDS, or TOT for tackles).
+    provenance: derived (player_stats.statType)
+  - name: value
+    type: double
+    description: Season total of the stat (summed across teams in a split season). Passing, receiving and tackle totals are non-negative; rushing yardage can be negative for a sack-heavy season.
+    provenance: derived (player_stats.stat, summed)

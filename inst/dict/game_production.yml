@@ -1,0 +1,70 @@
+dataset: game_production
+source: derived in-pipeline (build_game_production(player_game))
+grain: one player in one game, for one yardage stat
+key: playerId + gameId + stat
+description: >
+  Opponent-adjusted game production (issue #47, decision 0037). One row per
+  player-game-stat for passing, rushing and receiving yardage (stat = pass_yds,
+  rush_yds, rec_yds), taken from player_game. value is the yardage in that game.
+  baseline is the mean value of the same stat over every player-game in the same
+  season and opponent Elo band that has a line in that category, and residual =
+  value - baseline (positive = more than the typical player with a line in that
+  category gained against opponents of the same strength that season). band_n is
+  the number of player-games in that group. The opponent band comes from the
+  opponent's pregame Elo: Under 1400, 1400 to 1599, 1600 to 1799, 1800 and up,
+  and Unrated (no CFBD Elo, mostly FCS and lower-division opponents). Unrated is
+  its own band, never dropped or imputed. A stat that is NA in player_game (no
+  line in that category) has no row. A DERIVED table: materialized into the
+  DuckDB bundle, not published as parquet (decision 0021). Contract:
+  contract_game_production() (key uniqueness, one row per non-NA yardage value in
+  player_game, band in set). Carries no NFL outcome fields (leakage, decision
+  0014). Athlete ids recycled across people (decision 0022) are not excluded here.
+columns:
+  - name: playerId
+    type: string
+    description: CFBD athlete id (decision 0003).
+    provenance: derived (player_game.playerId)
+  - name: gameId
+    type: int32
+    description: CFBD game id; joins to games.id.
+    provenance: derived (player_game.gameId)
+  - name: season
+    type: int32
+    description: Season year (the baseline is computed within season).
+    provenance: derived (player_game.season)
+  - name: week
+    type: int32
+    description: Week number (per seasonType).
+    provenance: derived (player_game.week)
+  - name: team
+    type: string
+    description: The player's school in that game (display only).
+    provenance: derived (player_game.team)
+  - name: opponent
+    type: string
+    description: Opposing school (display only).
+    provenance: derived (player_game.opponent)
+  - name: opponent_elo_band
+    type: string
+    description: Opponent strength band from the opponent's pregame Elo (Under 1400, 1400 to 1599, 1600 to 1799, 1800 and up, Unrated).
+    provenance: derived (player_game.opponent_pregame_elo, opponent_elo_band())
+  - name: stat
+    type: string
+    description: The player_game yardage column this row measures (pass_yds, rush_yds or rec_yds).
+    provenance: derived (player_game column name)
+  - name: value
+    type: double
+    description: Yardage in the game for this stat.
+    provenance: derived (player_game.<stat>)
+  - name: baseline
+    type: double
+    description: Mean value of the stat over player-games with a line in that category in the same season and opponent band.
+    provenance: derived (group mean within season, stat, opponent_elo_band)
+  - name: band_n
+    type: int32
+    description: Number of player-games in the baseline group (season, stat, opponent band).
+    provenance: derived (group count)
+  - name: residual
+    type: double
+    description: value minus baseline. Positive means more yardage than the typical player with a line in that category against opponents of that strength that season.
+    provenance: derived (value - baseline)

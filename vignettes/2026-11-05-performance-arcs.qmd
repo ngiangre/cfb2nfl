@@ -1,0 +1,379 @@
+---
+title: "Cam Ward's passing yards rose in every season in the data and beat the opponent-adjusted baseline each time"
+date: "2026-11-05"
+description: "Cam Ward's passing yardage climbed each season from 2021 to 2024, and it stayed above the league baseline for opponents of the same strength in all four."
+followups:
+  - "Position-specific baselines: compare each passer only with other quarterbacks, not every player with a passing line."
+  - "Carry the opponent band into the season arcs, so a rise in yardage can be read against the schedule it was earned on."
+  - "Extend the arcs to the 2010 to 2013 seasons once game-level stats cover them, so early careers are not cut off at the start of the data."
+author:
+  - "AI directed by Nick Giangreco"
+freeze: auto
+vignette: >
+  %\VignetteIndexEntry{Cam Ward's passing yards rose in every season in the data and beat the opponent-adjusted baseline each time}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r}
+#| label: setup
+#| include: false
+# Load the package from the checkout with pkgload; no package install is
+# required. Under altdoc the render runs in a temp dir, so resolve the root
+# first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
+root <- Sys.getenv("CFB2NFL_ROOT", "")
+if (!nzchar(root)) {
+  dir <- getwd()
+  while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
+    dir <- dirname(dir)
+  }
+  root <- if (file.exists(file.path(dir, "_targets"))) dir else getwd()
+}
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+library(DBI)
+library(dplyr)
+library(duckdb)
+library(ggiraph)
+library(ggplot2)
+library(knitr)
+
+# One interaction style for every girafe figure: a clear hover pop, dimming
+# of non-hovered marks, a dark tooltip, and toolbar zoom + PNG download.
+set_girafe_defaults(
+  opts_hover = opts_hover(
+    css = "stroke:#111827;stroke-width:2.5px;filter:brightness(1.12);"
+  ),
+  opts_hover_inv = opts_hover_inv(css = "opacity:0.45;"),
+  opts_tooltip = opts_tooltip(
+    css = "background:#111827;color:#fff;padding:6px 9px;border-radius:5px;font-weight:bold;font-size:15px;"
+  ),
+  opts_zoom = opts_zoom(min = 1, max = 5),
+  opts_toolbar = opts_toolbar(saveaspng = TRUE, position = "topright"),
+  opts_sizing = opts_sizing(rescale = TRUE)
+)
+
+# thousands-separated and percent formatters for inline numbers
+fmt <- function(x, digits = 0) {
+  formatC(as.numeric(x), big.mark = ",", format = "f", digits = digits)
+}
+pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
+```
+
+```{r}
+#| label: registry
+#| include: false
+# Key on athlete id, never name (recruiting ids collide, decision 0013).
+subjects <- tibble::tribble(
+  ~who            , ~cfb_athlete_id ,
+  "Joe Burrow"    , "3915511"       ,
+  "Cam Ward"      , "4688380"       ,
+  "Jordan Travis" , "4360799"       ,
+  "Shane Buechele" , "4039034"      ,
+  "Kyle Allen"    , "559681"
+)
+```
+
+```{r}
+#| label: load
+#| include: false
+# Season arcs and game production are derived pipeline tables (decision 0037),
+# bundled in the DuckDB, so the post reads exactly what the tests cover.
+sa <- dbReadTable(con, "season_arc")
+gp <- dbReadTable(con, "game_production")
+pg <- dbReadTable(con, "player_game")
+stopifnot(nrow(sa) > 0, nrow(gp) > 0, nrow(pg) > 0)
+
+band_levels <- c(
+  "Under 1400",
+  "1400 to 1599",
+  "1600 to 1799",
+  "1800 and up",
+  "Unrated"
+)
+pass_games <- gp |>
+  filter(.data$stat == "pass_yds") |>
+  mutate(opponent_elo_band = factor(.data$opponent_elo_band, band_levels))
+cast_qb <- sa |>
+  filter(.data$category == "passing") |>
+  inner_join(subjects, by = c(playerId = "cfb_athlete_id"))
+```
+
+```{r}
+#| label: facts
+#| include: false
+# Every figure in the post is computed here and pinned.
+ward <- cast_qb |> filter(.data$who == "Cam Ward") |> arrange(.data$season)
+ward_yds <- ward$value
+stopifnot(
+  identical(ward$season, 2021:2024),
+  identical(as.numeric(ward_yds), c(376, 3218, 3732, 4313))
+)
+
+# Which cast members' passing arcs rise every season they are in the data.
+rises_every_season <- cast_qb |>
+  arrange(.data$who, .data$season) |>
+  group_by(.data$who) |>
+  summarise(rises = all(diff(.data$value) > 0), .groups = "drop")
+stopifnot(
+  sum(rises_every_season$rises) == 1L,
+  rises_every_season$rises[rises_every_season$who == "Cam Ward"]
+)
+
+# Raw yardage by opponent band: a mild decline with opponent strength.
+band_yds <- pass_games |>
+  group_by(.data$opponent_elo_band) |>
+  summarise(
+    games = dplyr::n(),
+    mean_yds = mean(.data$value),
+    .groups = "drop"
+  ) |>
+  arrange(.data$opponent_elo_band)
+stopifnot(
+  all(diff(band_yds$mean_yds[1:4]) < 0),
+  round(band_yds$mean_yds[1] - band_yds$mean_yds[4]) == 16
+)
+unrated_share <- mean(pass_games$opponent_elo_band == "Unrated")
+stopifnot(round(unrated_share, 3) == 0.272)
+
+# Opponent-adjusted residual by season for the cast, from the baseline.
+cast_res <- gp |>
+  filter(.data$stat == "pass_yds") |>
+  inner_join(subjects, by = c(playerId = "cfb_athlete_id")) |>
+  group_by(.data$who, .data$season) |>
+  summarise(
+    games = dplyr::n(),
+    mean_resid = mean(.data$residual),
+    .groups = "drop"
+  )
+stopifnot(
+  all(cast_res$mean_resid[cast_res$who == "Cam Ward"] > 0),
+  sum(cast_res$mean_resid[cast_res$who == "Jordan Travis"] < 0) == 2L
+)
+
+# Share of all player-games with no opponent Elo (the unrated band).
+opp_na <- mean(is.na(pg$opponent_pregame_elo))
+stopifnot(round(opp_na, 3) == 0.267)
+```
+
+::: {.callout-note appearance="minimal"}
+*Data as of the `data-latest` release, retrieved 2026-11-05. Careers of recent
+classes are right-censored; later seasons may not yet be present.*
+:::
+
+## 1. Introduction
+
+A quarterback's yardage moves from season to season and game to game, and
+opponent strength is one reason. This post follows the passing yards of five
+recent college quarterbacks and asks whether each season beat the league
+baseline for opponents of the same strength.
+
++ *Expectation one: Cam Ward's passing yards rose in every season in the data.*
++ *Expectation two: passing yardage falls modestly as opponent Elo rises.*
++ *Expectation three: Cam Ward's yardage beat the opponent-adjusted baseline each season, while Jordan Travis's fell below it in two.*
+
+## 2. Data
+
+### 2.1 Each game is set against the league baseline for its opponent strength
+
+Each player-game is compared with the average for the same season and opponent band.
+
+```{r}
+#| label: terms
+tibble::tribble(
+  ~Term                     , ~Meaning                                          ,
+  "Season arc"              , "Season total of passing yards, one per season.",
+  "Season index"            , "The player's n-th season with a stat line in the data.",
+  "Opponent band"           , "The opponent's pregame Elo: under 1400, 1400 to 1599, 1600 to 1799, 1800 and up, or unrated (no Elo).",
+  "Baseline"                , "Mean yards for that season, band, and stat across all passers.",
+  "Residual"                , "A game's yards minus its baseline."
+) |>
+  kable(caption = "The terms used in the post.")
+```
+
+## 3. Results
+
+### 3.1 Cam Ward's passing yards rose in every season in the data
+
+*Expectation: his yardage rose in each season, and no other cast member's did.* ✅
+
+Only Ward's arc climbs at every step among the five cast members.
+
+```{r}
+#| label: s31-table
+cast_qb |>
+  arrange(.data$who, .data$season) |>
+  transmute(
+    Player = .data$who,
+    Season = .data$season,
+    `Season index` = .data$season_index,
+    Team = .data$team,
+    `Passing yards` = fmt(.data$value)
+  ) |>
+  kable(caption = "Season passing yards for the five cast quarterbacks.")
+```
+
+```{r}
+#| label: s31-explain
+#| fig-height: 6
+p <- cast_qb |>
+  ggplot(aes(.data$season_index, .data$value, colour = .data$who)) +
+  geom_line(linewidth = 1.2) +
+  geom_point_interactive(
+    aes(tooltip = paste0(.data$who, ", ", .data$season, ": ", fmt(.data$value), " yards"))
+  ) +
+  labs(x = "Season index", y = "Passing yards", colour = NULL) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s31-explore
+#| fig-height: 6
+p <- cast_qb |>
+  mutate(label = paste0(.data$who, " (", .data$season, ")")) |>
+  ggplot(aes(.data$season, .data$value, colour = .data$who)) +
+  geom_point_interactive(
+    aes(tooltip = paste0(.data$who, ", ", .data$season, ": ", fmt(.data$value), " yards")),
+    size = 4
+  ) +
+  labs(x = "Season", y = "Passing yards", colour = NULL) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 6)
+```
+
+### 3.2 Passing yardage falls modestly as opponent Elo rises
+
+*Expectation: raw yardage decreases from the weakest to the strongest rated band.* ✅
+
+Raw yards drop by about 16 a game from the weakest rated band to the strongest,
+and unrated opponents sit near the bottom.
+
+```{r}
+#| label: s32-table
+band_yds |>
+  transmute(
+    `Opponent band` = .data$opponent_elo_band,
+    `Passer games` = fmt(.data$games),
+    `Mean passing yards` = fmt(.data$mean_yds, 1)
+  ) |>
+  kable(caption = "Mean passing yards per game by opponent band, all passers.")
+```
+
+```{r}
+#| label: s32-explain
+#| fig-height: 6
+p <- band_yds |>
+  mutate(
+    opponent_elo_band = factor(.data$opponent_elo_band, band_levels),
+    tooltip = paste0(.data$opponent_elo_band, ": ", fmt(.data$mean_yds, 1), " yards")
+  ) |>
+  ggplot(aes(.data$opponent_elo_band, .data$mean_yds, fill = .data$opponent_elo_band == "Unrated")) +
+  geom_col_interactive(aes(tooltip = .data$tooltip), show.legend = FALSE) +
+  scale_fill_manual(values = c(`FALSE` = "#4C78A8", `TRUE` = "#9CA3AF")) +
+  labs(x = "Opponent band", y = "Mean passing yards per game") +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s32-explore
+#| fig-height: 6
+p <- pass_games |>
+  group_by(.data$season, .data$opponent_elo_band) |>
+  summarise(mean_yds = mean(.data$value), games = dplyr::n(), .groups = "drop") |>
+  ggplot(aes(.data$season, .data$mean_yds, colour = .data$opponent_elo_band)) +
+  geom_point_interactive(
+    aes(tooltip = paste0(.data$season, ", ", .data$opponent_elo_band, ": ", fmt(.data$mean_yds, 1), " yards over ", fmt(.data$games), " games")),
+    size = 3
+  ) +
+  labs(x = "Season", y = "Mean passing yards per game", colour = "Opponent band") +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 6)
+```
+
+### 3.3 Cam Ward beat the opponent-adjusted baseline each season, and Jordan Travis fell below it twice
+
+*Expectation: Ward's residuals are positive in every season, and Travis's are negative in two.* ✅
+
+The residual averages a player's gains over the baseline season by season.
+
+```{r}
+#| label: s33-table
+cast_res |>
+  arrange(.data$who, .data$season) |>
+  transmute(
+    Player = .data$who,
+    Season = .data$season,
+    Games = .data$games,
+    `Mean residual (yards)` = fmt(.data$mean_resid, 1)
+  ) |>
+  kable(caption = "Mean passing-yard residual per game, by cast player and season.")
+```
+
+```{r}
+#| label: s33-explain
+#| fig-height: 6
+p <- cast_res |>
+  mutate(
+    tooltip = paste0(.data$who, ", ", .data$season, ": ", fmt(.data$mean_resid, 1), " yards over baseline")
+  ) |>
+  ggplot(aes(.data$season, .data$mean_resid, fill = .data$who)) +
+  geom_col_interactive(aes(tooltip = .data$tooltip), position = "dodge") +
+  geom_hline(yintercept = 0) +
+  labs(x = "Season", y = "Mean residual (yards per game)", fill = NULL) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s33-explore
+#| fig-height: 6
+p <- gp |>
+  filter(.data$stat == "pass_yds") |>
+  inner_join(subjects, by = c(playerId = "cfb_athlete_id")) |>
+  ggplot(aes(.data$season, .data$residual, colour = .data$who)) +
+  geom_point_interactive(
+    aes(tooltip = paste0(.data$who, ", ", .data$season, ", week ", .data$week, " vs ", .data$opponent, ": ", fmt(.data$residual), " yards")),
+    size = 2.5
+  ) +
+  geom_hline(yintercept = 0) +
+  labs(x = "Season", y = "Residual (yards in the game)", colour = NULL) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 6)
+```
+
+## 4. Summary
+
+Cam Ward's arc is the only one among the five that rose at every step, and his
+yardage stayed above baseline in each season.
+
+```{r}
+#| label: summary
+tibble::tribble(
+  ~Expectation                                           , ~Verdict , ~Evidence                              ,
+  "Ward's passing yards rose in every season"            , "✅"     , "376, 3,218, 3,732, 4,313 yards (2021 to 2024)" ,
+  "Passing yardage falls modestly as opponent Elo rises" , "✅"     , "About 16 yards per game, weakest to strongest rated band" ,
+  "Ward above baseline each season; Travis below in two" , "✅"     , "Ward positive in all four seasons; Travis negative in 2020 and 2021"
+) |>
+  kable(caption = "Each expectation and what the data showed.")
+```
+
+## 5. Discussion
+
+::: {.callout-important}
+Ward's residuals stayed positive, so his yardage beat the baseline for opponents of the same strength in every season. The baseline compares every passer, so it cannot separate a quarterback's own play from the offense around him.
+:::
+
+Caveats: unrated opponents (no Elo, mostly lower-division teams) are kept as their own band rather than dropped; about 27% of player-games fall there. The data begin in 2010, so a career's first season in the data is not necessarily its first season in college. Five players is a snapshot, not a sample.
+
+```{r}
+#| label: teardown
+#| include: false
+dbDisconnect(con, shutdown = TRUE)
+```
