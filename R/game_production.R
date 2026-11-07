@@ -1,5 +1,6 @@
-# Opponent-adjusted game production (issue #47, decision 0037). A derived table
-# (decision 0021) built from the player x game table (decision 0035).
+# Opponent-adjusted game production (issue #47, decision 0037). Built on the fly
+# from the player x game table (decision 0035) where an investigation needs it,
+# not bundled into the DuckDB asset (decision 0041).
 
 # The per-game yardage columns of player_game that are adjusted.
 game_production_stat_cols <- c("pass_yds", "rush_yds", "rec_yds")

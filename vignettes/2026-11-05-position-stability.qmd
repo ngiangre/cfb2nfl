@@ -86,7 +86,9 @@ subjects <- tibble::tribble(
 ```{r}
 #| label: load
 #| output: false
-pp <- dbReadTable(con, "position_path")
+# The position path is a contract-checked pipeline step, read from the targets
+# store rather than the DuckDB (decision 0041).
+pp <- targets::tar_read(position_path, store = file.path(root, "_targets"))
 picks <- dbReadTable(con, "picks")
 
 # One display name per athlete id, from the draft record (decision 0022 ids

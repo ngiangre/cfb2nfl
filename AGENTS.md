@@ -300,6 +300,16 @@ all of it. Years 2010–2026.
   `*.{parquet,duckdb}`. Model map + join namespaces documented in
   `inst/data-model.md` (links each table to `inst/dict/*.yml`). New tables must
   be added to the `duckdb_file` table list and to `inst/data-model.md`.
+- **Keep the data model lean** (decision 0041). A new *derived* table starts
+  in the investigation that needs it: write and test the `build_*()` function
+  in `R/`, then call it in the post on the tables it already loads. Promote it
+  to the data model (target + contract + audit row + `inst/dict` + DuckDB +
+  `data-model.md`) only once a **second** post needs it or another table is
+  built from it. Complex logic used by one post can be a contract-checked
+  target read with `tar_read()` but kept out of the DuckDB. Currently on the
+  fly: `flag_redshirt()`, `career_end_status()`, `build_season_arcs()`,
+  `build_game_production()`, `build_player_season_stats()`. Target-only:
+  `picks_nfl`, `position_path`, `player_usage`.
 - **Roster is a first-class target** (`roster_file` → `raw_roster` → `roster`,
   decision 0009): `data/roster.parquet` is ingested by `refresh.R`, published on
   the `data-latest` release, and read like the other tables. `add_roster_weight`

@@ -152,8 +152,8 @@ make exactly that visible.
 ```{r}
 #| label: redshirt-setup
 #| output: false
-# Redshirt flags are pipeline targets (decision 0021) — no recomputation here.
-flagged <- tar_read(roster_flags)
+# Redshirt flags are computed on the fly from roster and stats (decision 0041).
+flagged <- flag_redshirt(tar_read(roster), tar_read(player_stats))
 ```
 
 ```{r}

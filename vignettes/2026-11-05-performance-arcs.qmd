@@ -70,12 +70,18 @@ pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
 ```{r}
 #| label: load
 #| output: false
-# Season arcs and game production are derived pipeline tables (decision 0037),
-# bundled in the DuckDB, so the post reads exactly what the tests cover. Roster
-# carries the position label used to form the three groups.
-sa <- dbReadTable(con, "season_arc")
-gp <- dbReadTable(con, "game_production")
+# Season arcs and game production are built here from the tested package
+# functions (decision 0037). The season index counts every season with any
+# stat line, so the arcs need the full long stats, not just the yardage rows.
+# Roster carries the position label used to form the three groups.
 pg <- dbReadTable(con, "player_game")
+sa <- dbGetQuery(
+  con,
+  "SELECT playerId, player, season, team, category, statType, stat
+   FROM player_stats"
+) |>
+  build_season_arcs()
+gp <- build_game_production(pg)
 rost <- dbReadTable(con, "roster")
 
 band_levels <- c(

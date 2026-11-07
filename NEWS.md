@@ -1,5 +1,19 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- The data model is leaner: it now documents 21 tables instead of 29
+  ([decision 0041](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0041-lean-data-model.md)).
+  A derived table joins the DuckDB bundle only once a second investigation
+  needs it or another table is built from it. Five tables used by at most one
+  post are now built on the fly in that post from their tested package
+  functions: redshirt flags (`flag_redshirt()`), career endings
+  (`career_end_status()`), season arcs (`build_season_arcs()`), game
+  production (`build_game_production()`) and wide player-season stats
+  (`build_player_season_stats()`). Three with join logic worth guarding on
+  every build stay contract-checked pipeline steps, read with
+  `targets::tar_read()`, but leave the bundle: the NFL draft-slot bridge
+  (`picks_nfl`), `position_path` and `player_usage`. The `player_season_inputs`
+  view is dropped. SQL users get the name-guarded `gsis_id` from `outcomes`.
+
 - New `data_model_network()`: a standalone (no Shiny) visNetwork of the data
   model, built dynamically from `inst/data-model.md` (join relationships) and
   `inst/dict/*.yml` (per-table grain, key and column definitions shown in node

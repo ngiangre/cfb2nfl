@@ -25,38 +25,37 @@ dictionaries next to this file, one YAML per table:
 | `nfl_player_stats` | one NFL player-season (regular season) | [`dict/nfl_player_stats.yml`](dict/nfl_player_stats.yml) |
 | `stat_taxonomy` | one (category, statType) pair | [`dict/stat_taxonomy.yml`](dict/stat_taxonomy.yml) |
 | `ps_change` | one player-season (stat-line grain) + change features | [`dict/ps_change.yml`](dict/ps_change.yml) |
-| `roster_flags` | roster player-season + eligibility flags | [`dict/roster_flags.yml`](dict/roster_flags.yml) |
 | `career_summary` | one player's college career | [`dict/career_summary.yml`](dict/career_summary.yml) |
-| `career_end` | one player's college career, classified by how it ended (`early_stop_proxy` is a proxy, not an injury label) | [`dict/career_end.yml`](dict/career_end.yml) |
-| `position_path` | one college athlete id: harmonized HS, college and NFL position groups | [`dict/position_path.yml`](dict/position_path.yml) |
 | `player_game` | one player in one game (stat line + team, opponent, Elo, team games) | [`dict/player_game.yml`](dict/player_game.yml) |
-| `season_arc` | one player-season for one headline stat, with career season index | [`dict/season_arc.yml`](dict/season_arc.yml) |
-| `game_production` | one player-game-yardage stat vs its opponent-Elo-band baseline | [`dict/game_production.yml`](dict/game_production.yml) |
-| `player_usage` | one player-season-team: games appeared out of team games, per-game usage | [`dict/player_usage.yml`](dict/player_usage.yml) |
 | `team_season` | one team in one season (every division) | [`dict/team_season.yml`](dict/team_season.yml) |
 | `team_draft` | team × final college season × position group | [`dict/team_draft.yml`](dict/team_draft.yml) |
-| `player_season_stats` | **wide**: player-season-team stat columns | [`dict/player_season_stats.yml`](dict/player_season_stats.yml) |
-| `nfl_pick_link` | one draft pick + name-guarded nflverse id | [`dict/nfl_pick_link.yml`](dict/nfl_pick_link.yml) |
 | `outcomes` | one player-season in the model population (person-period labels) | [`dict/outcomes.yml`](dict/outcomes.yml) |
 | `audit_log` | one audited pipeline step | [`dict/audit_log.yml`](dict/audit_log.yml) |
 
-**Bundle-only tables.** Several tables are **derived in-pipeline** and not
-published as parquet, like `stat_taxonomy`: they are built from other cleaned
-tables (`ps_change` from the link chain, `roster_flags` from roster +
-player_stats, `career_summary` from roster, `player_season_stats` from
-player_stats), so they are materialized into the DuckDB bundle and documented
-with dictionaries but need no release asset before a track-mode build.
-`ps_change` carries the `drafted` label; `roster_flags` / `career_summary` are
-leakage-free roster-derived features; all carry contracts and audit rows like
-the cleaned tables. `career_end` classifies each career from `career_summary`,
-`outcomes` and the picks bridge; its `early_stop_proxy` marks careers that
-stopped with eligibility left, with no NFL entry and no transfer, a proxy for an
-injury-shaped exit, not an injury.
+**Bundle-only tables.** Five tables are **derived in-pipeline** and not
+published as parquet, like `stat_taxonomy`: `ps_change` (the link chain plus
+change features; it carries the `drafted` label), `career_summary` (roster
+collapsed to the career grain), `player_game` (the player × game grain),
+`team_season` and `team_draft` (the team grain). They are built from other
+cleaned tables, so they are materialized into the DuckDB bundle and documented
+with dictionaries but need no release asset before a track-mode build; all
+carry contracts and audit rows like the cleaned tables. The slimmed
+`audit_log` (the lineage log) is bundled too.
 
-Two more derived tables are bundled only: `nfl_pick_link` (the name-guarded
-draft-slot bridge to nflverse, used instead of re-running the raw slot join in
-SQL) and the slimmed `audit_log` (the lineage log). Every bundle also carries
-two generated metadata tables:
+**What earns a place here (decision 0041).** A derived table joins the data
+model once a second investigation needs it, or once another table is built
+from it. Until then it is built where it is used:
+
+- **On the fly in the post**, from an exported, tested function:
+  `flag_redshirt()` (redshirt flags), `career_end_status()` (how a career
+  ended), `build_season_arcs()`, `build_game_production()`, and
+  `build_player_season_stats()` (wide stats).
+- **As a contract-checked pipeline step**, read with `targets::tar_read()`,
+  when the logic is complex enough that a data contract should guard it on
+  every build: `picks_nfl` (`link_nfl_draft()`, the name-guarded draft-slot
+  bridge to nflverse), `position_path`, and `player_usage`.
+
+Every bundle also carries two generated metadata tables:
 
 - **`_schema_manifest`** — one row per bundled table with its grain/key (read
   from `inst/dict/*.yml` at build time) and the dictionary path. A bundled
@@ -67,11 +66,6 @@ two generated metadata tables:
   Later seasons may be partial (in-progress season, unsigned draft class):
   out-of-time model frames and "career completed" logic must stop at these
   values.
-
-If `ps_change` is bundled, a **`player_season_inputs`** VIEW is also created:
-`ps_change` minus the draft-outcome columns (`draft_year`, `draft_round`,
-`draft_overall`, `drafted`) — the leakage-safe model input surface, so a SQL
-user cannot accidentally select the label into a training frame.
 
 `stat_taxonomy` is **package data**, not a published parquet: it is hand-authored
 in `inst/extdata/stat_taxonomy.csv`, read via `stat_taxonomy()`, and materialized
@@ -111,7 +105,6 @@ dbGetQuery(con, "SELECT COUNT(*) FROM player_stats")
 ```mermaid
 erDiagram
     player_stats }o--|| roster : "playerId, season"
-    player_stats ||--o{ player_season_stats : "pivoted wide (playerId, season, team)"
     player_stats ||--o| picks : "playerId"
     player_stats }o--|| coaches : "team=school, season"
     player_stats }o--|| conference_tiers : "conference, season"
@@ -123,26 +116,21 @@ erDiagram
     game_player_stats ||--|| player_game : "playerId, gameId (one row per stat line)"
     games ||--o{ player_game : "gameId == id"
     team_season ||--o{ player_game : "team, season (team_games)"
-    player_game ||--o{ game_production : "playerId, gameId (yardage stats)"
-    player_stats ||--o{ season_arc : "playerId, season (summed over teams)"
-    player_game }o--|| player_usage : "playerId, season, team (games appeared)"
-    roster |o--o{ player_usage : "playerId, season, team (position, class year)"
-    picks ||--o| nfl_pick_link : "same slot join, name-guarded"
-    nfl_pick_link ||--o| nfl_draft_picks : "draft slot"
+    picks |o..o| nfl_draft_picks : "draft slot (year, round, overall), name-guarded"
+    outcomes }o..o{ nfl_rosters : "gsis_id (name-guarded)"
+    ps_change }o--|| outcomes : "playerId, season"
+    ps_change }o--o| roster : "playerId, season"
     nfl_draft_picks ||--o{ nfl_rosters : "gsis_id, season"
     nfl_draft_picks ||--o{ nfl_player_stats : "gsis_id, season"
-    ps_change }o--|| roster_flags : "playerId, season (flags/weights attach here)"
     roster |o--o{ career_summary : "playerId (collapsed)"
-    career_summary ||--|| career_end : "playerId (one row per career)"
-    roster |o--o| position_path : "playerId (position path)"
     roster |o--o{ team_season : "team, season (aggregated)"
     games |o--o{ team_season : "team, season (aggregated)"
     team_season ||--o{ team_draft : "team, season"
 }
 ```
 
-Solid lines are trustworthy joins; the dotted `recruiting` line is a
-**name-guarded** link, not a plain key join (see below).
+Solid lines are trustworthy joins; dotted lines (`recruiting`, and the NFL
+links) are **name-guarded** links, not plain key joins (see below).
 
 ## Join keys & namespaces
 
@@ -183,10 +171,6 @@ wrong rows, so they are called out explicitly.
    on the same keys: `(playerId, gameId)` is unique, its `gameId` joins
    `games.id`, and `team_games` is the team's games played in the season (the
    denominator for games appeared).
-   `player_usage` is the derived player-season-team grain on the same keys:
-   `games_appeared` over `team_games` is the playing-time rate.
-   The per-game appearance flags behind it come from the
-   `player_appearance_sequence()` helper (not a table).
 
 ### Two namespaces that look joinable but are not
 
@@ -235,8 +219,7 @@ name-guarded links can *drop* them.
 
 Drafted rate by conference tier (label side). NOTE the grain: aggregate the
 **long** `player_stats` to player-season grain BEFORE joining — a naive join at
-stat-line grain counts every player ~15x. (`player_season_stats` already has
-the right grain, so it is the easier base table.)
+stat-line grain counts every player ~15x.
 
 ```sql
 SELECT t.tier_label,
@@ -251,11 +234,12 @@ GROUP BY t.tier_label
 ORDER BY t.tier_label;
 ```
 
-Per-season passing yardage straight off the wide table (no pivot needed):
+Per-season passing yardage from the long table (filter one stat, then sum):
 
 ```sql
-SELECT season, SUM(passing_yds) AS passing_yards
-FROM player_season_stats
+SELECT season, SUM(TRY_CAST(stat AS DOUBLE)) AS passing_yards
+FROM player_stats
+WHERE category = 'passing' AND statType = 'YDS'
 GROUP BY season
 ORDER BY season;
 ```
@@ -275,19 +259,21 @@ ORDER BY games_played DESC
 LIMIT 20;
 ```
 
-NFL longevity (distinct roster seasons) for drafted players, via the
-**name-guarded** bridge table (do NOT rebuild the raw slot join in SQL — the
-name guard that nulls wrong-person matches lives in the pipeline):
+NFL longevity (distinct roster seasons) for players who reached the NFL, via
+the **name-guarded** `gsis_id` that `outcomes` carries (do NOT rebuild the raw
+slot join in SQL — the name guard that nulls wrong-person matches lives in the
+pipeline):
 
 ```sql
-SELECT p.year           AS draft_year,
-       p.name           AS player,
+WITH linked AS (
+  SELECT DISTINCT playerId, gsis_id FROM outcomes WHERE gsis_id IS NOT NULL
+)
+SELECT l.playerId,
        COUNT(DISTINCT r.season) AS nfl_seasons
-FROM nfl_pick_link p
+FROM linked l
 LEFT JOIN nfl_rosters r
-  ON p.gsis_id = r.gsis_id
-WHERE p.gsis_id IS NOT NULL
-GROUP BY p.year, p.name
+  ON l.gsis_id = r.gsis_id
+GROUP BY l.playerId
 ORDER BY nfl_seasons DESC;
 ```
 
@@ -297,15 +283,4 @@ manifest:
 ```sql
 SELECT table_name, grain_key FROM _schema_manifest ORDER BY table_name;
 SELECT * FROM _meta;  -- refreshed_at + last complete season/draft class
-```
-
-Redshirt-shaped seasons per season, with the coverage caveat visible:
-
-```sql
-SELECT season,
-       SUM(has_stats::INT)                                    AS with_stats,
-       SUM((NOT has_stats AND redshirt_season)::INT)          AS redshirt_shaped
-FROM roster_flags
-GROUP BY season
-ORDER BY season;
 ```

@@ -1,5 +1,7 @@
-# Career endings: how each college career stopped (issue #51, part 1). A derived
-# table at the career grain, built on `career_summary()` and `outcomes`. The
+# Career endings: how each college career stopped (issue #51, part 1). Built on
+# the fly at the career grain from `career_summary()` and `outcomes`; not a
+# pipeline target or DuckDB table until an investigation uses it (decision
+# 0041). The
 # early-stop category is a PROXY for an injury-shaped exit: CFBD has no injury
 # feed, so a career that stops with eligibility left is labelled by absence
 # alone (decision 0039).

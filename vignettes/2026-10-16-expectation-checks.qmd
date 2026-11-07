@@ -91,16 +91,27 @@ subjects <- tibble::tribble(
 #| output: false
 ids_sql <- paste(sprintf("'%s'", subjects$cfb_athlete_id), collapse = ",")
 
-# Roster backbone + eligibility flags (derived table, decision 0021).
-flags <- dbGetQuery(
-  con,
-  sprintf(
-    "SELECT playerId, season, team, position, class_year, has_stats,
-          redshirt_season, redshirt_career, fifth_year_career
-   FROM roster_flags WHERE playerId IN (%s) ORDER BY playerId, season",
-    ids_sql
+# Roster backbone + eligibility flags, computed here from roster and stat
+# seasons (flag_redshirt() works per player, so the subjects' rows suffice).
+flags <- flag_redshirt(
+  dbGetQuery(
+    con,
+    sprintf("SELECT * FROM roster WHERE playerId IN (%s)", ids_sql)
+  ),
+  dbGetQuery(
+    con,
+    sprintf(
+      "SELECT DISTINCT playerId, season FROM player_stats
+       WHERE playerId IN (%s)",
+      ids_sql
+    )
   )
 ) |>
+  select(
+    playerId, season, team, position, class_year, has_stats,
+    redshirt_season, redshirt_career, fifth_year_career
+  ) |>
+  arrange(playerId, season) |>
   mutate(who = subjects$who[match(playerId, subjects$cfb_athlete_id)])
 
 career <- dbGetQuery(

@@ -101,7 +101,8 @@ purrr::map_dfr(dict_files, function(f) {
 
 ## Querying the DuckDB bundle
 
-Every cleaned and derived table ships in one SQL-queryable file,
+Every cleaned table, and every derived table shared across investigations,
+ships in one SQL-queryable file,
 `data/cfb2nfl.duckdb` (published on the `data-latest` GitHub release):
 
 ```r
@@ -115,12 +116,11 @@ Besides the documented tables, the bundle carries generated metadata: a
 `documented = FALSE` would flag a schema-drift bug), a `_meta` row with
 `last_complete_cfb_season` / `last_complete_nfl_draft` (later seasons may be
 partial; out-of-time logic should stop at these), a slimmed `audit_log`
-(lineage, queryable in SQL), and a `player_season_inputs` VIEW =
-`ps_change` minus the draft-outcome columns — the leakage-safe model input
-surface. Join-namespace rules and worked SQL examples are in
-[`inst/data-model.md`](https://github.com/ngiangre/cfb2nfl/blob/main/inst/data-model.md);
-the wide `player_season_stats` table (one column per stat) means most
-statistical questions need no pivoting at all.
+(lineage, queryable in SQL). Join-namespace rules and worked SQL examples are
+in [`inst/data-model.md`](https://github.com/ngiangre/cfb2nfl/blob/main/inst/data-model.md).
+A derived table enters the bundle only once more than one investigation (or
+another table) relies on it; until then a post builds it from a tested package
+function (decision 0041).
 
 ## Provenance / audit log
 

@@ -1,7 +1,8 @@
 # Playing time from game_player_stats (issue #50, decision 0038): games
 # appeared out of team games, per player-season-team, plus per-game usage
-# proxies. A derived table like player_game (decision 0035): built from the
-# cleaned game tables, bundled into DuckDB, not published as parquet.
+# proxies. Built from player_game (decision 0035) as a contract-checked
+# pipeline step, read with tar_read(player_usage); not in the DuckDB asset
+# (decision 0041).
 #
 # "Appeared" means the player has at least one stat line in the game. CFBD
 # lists a stat line only when the player recorded something, so offensive

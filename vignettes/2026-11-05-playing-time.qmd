@@ -82,7 +82,9 @@ subjects <- tibble::tribble(
 ```{r}
 #| label: load
 #| output: false
-usage <- dbReadTable(con, "player_usage")
+# Playing time is a contract-checked pipeline step, read from the targets
+# store rather than the DuckDB (decision 0041).
+usage <- targets::tar_read(player_usage, store = file.path(root, "_targets"))
 outcomes <- dbReadTable(con, "outcomes")
 
 # The population the post reasons about: rostered player-season-teams whose
