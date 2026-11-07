@@ -1,0 +1,100 @@
+dataset: combine
+source: nflverse nflreadr::load_combine (combine years 2010–2026), linked to CFBD athlete ids by link_combine()
+grain: one NFL Scouting Combine invitee (unique on season/player_name/school/pos)
+key: (season, player_name, school, pos); athlete_id joins the CFBD athlete namespace
+description: >
+  NFL Scouting Combine measurables (height, weight, 40-yard dash, bench, vertical,
+  broad jump, 3-cone, shuttle) for every invitee, with the draft slot for drafted
+  invitees, linked to the CFBD athlete id (decision 0043). The link is tiered and
+  name-guarded: the draft slot for drafted invitees (link_method draft_slot), then
+  name + school + final college season (name_school); the rest are kept with
+  athlete_id NA (unmatched). PRE-DRAFT information: the combine follows the final
+  college season, so these are fair inputs for a draft-time model but not for the
+  in-career forecasts. Only invitees are measured, so "no combine record" is itself
+  informative; model it as a category, don't impute. The source's draft columns
+  can lag the draft (the 2026 class has no draft slots yet).
+columns:
+  - name: season
+    type: int32
+    description: Combine year (== the draft year the invitee entered).
+    provenance: raw
+  - name: player_name
+    type: string
+    description: Invitee name per nflverse/PFR; used for the link-time name guard. Do not join on name.
+    provenance: raw
+  - name: pos
+    type: string
+    description: Combine position (PFR abbreviations, e.g. QB, OT, OLB).
+    provenance: raw
+  - name: school
+    type: string
+    description: College per nflverse/PFR spelling (e.g. "Ohio St.", "Miami (FL)"); compare to CFBD team names via school_key().
+    provenance: raw
+  - name: height
+    type: int32
+    description: Height in inches (from "6-2"); NA outside 60-85.
+    provenance: derived (clean_combine)
+  - name: weight
+    type: int32
+    description: Weight in pounds; NA outside 100-500.
+    provenance: derived (clean_combine, from wt)
+  - name: forty
+    type: double
+    description: 40-yard dash, seconds; NA if not run or outside 4.0-6.5.
+    provenance: raw (range-checked)
+  - name: bench
+    type: int32
+    description: 225-lb bench press repetitions; NA if not done or outside 0-60.
+    provenance: raw (range-checked)
+  - name: vertical
+    type: double
+    description: Vertical jump, inches; NA if not done or outside 10-55.
+    provenance: raw (range-checked)
+  - name: broad_jump
+    type: double
+    description: Broad jump, inches; NA if not done or outside 60-160.
+    provenance: raw (range-checked)
+  - name: cone
+    type: double
+    description: 3-cone drill, seconds; NA if not run or outside 6-10.
+    provenance: raw (range-checked)
+  - name: shuttle
+    type: double
+    description: 20-yard shuttle, seconds; NA if not run or outside 3.5-6.
+    provenance: raw (range-checked)
+  - name: draft_year
+    type: int32
+    description: Draft year if drafted (NA if undrafted, or when nflverse attached a different year's pick).
+    provenance: raw (nulled when != season)
+  - name: draft_round
+    type: int32
+    description: Draft round if drafted.
+    provenance: raw
+  - name: draft_ovr
+    type: int32
+    description: Overall pick if drafted (== CFBD picks `overall`); the tier-1 link key with draft_year/draft_round.
+    provenance: raw
+  - name: draft_team
+    type: string
+    description: Drafting NFL team name.
+    provenance: raw
+  - name: pfr_id
+    type: string
+    description: Pro-Football-Reference player id (== nfl_draft_picks.pfr_player_id for drafted invitees).
+    provenance: raw
+  - name: cfb_id
+    type: string
+    description: Sports-Reference college football id; NOT the CFBD athlete id.
+    provenance: raw
+  - name: athlete_id
+    type: string
+    description: CFBD athlete id (the playerId namespace of roster/player_stats/picks); NA when unmatched.
+    provenance: derived (link_combine)
+  - name: link_method
+    type: string
+    description: How athlete_id was matched — draft_slot, name_school, or unmatched.
+    provenance: derived (link_combine)
+  - name: pfr_agrees
+    type: logical
+    description: The invitee's pfr_id equals nflverse draft picks' pfr_player_id at the same draft slot (NA when undrafted or either id is missing).
+    provenance: derived (link_combine)

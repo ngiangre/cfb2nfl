@@ -49,6 +49,10 @@ columns:
     type: int32
     description: Distinct key combos in the output.
     provenance: derived (audit_step)
+  - name: pct_linked
+    type: double
+    description: Share of output rows a link step matched (0-1), e.g. combine invitees with a CFBD athlete id; NA for steps that report no link rate.
+    provenance: derived (audit_step)
   - name: n_na_cells
     type: int32
     description: Total NA cells in the output.

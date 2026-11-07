@@ -22,6 +22,7 @@ erd_groups <- c(
   nfl_draft_picks = "Draft & NFL",
   nfl_rosters = "Draft & NFL",
   nfl_player_stats = "Draft & NFL",
+  combine = "Draft & NFL",
   audit_log = "Audit"
 )
 

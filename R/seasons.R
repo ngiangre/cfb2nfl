@@ -8,8 +8,8 @@
 #' Source groups for season-keyed refresh
 #'
 #' Maps each season-keyed source to the calendar rule that decides its
-#' "current" season (decision 0034, section 3). `plays`, `play_stats`, and
-#' `combine` are forward declarations for issues #44 and #45.
+#' "current" season (decision 0034, section 3). `plays` and `play_stats` are
+#' forward declarations for issue #44.
 #'
 #' @keywords internal
 refresh_source_groups <- c(

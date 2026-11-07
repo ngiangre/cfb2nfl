@@ -23,6 +23,7 @@ dictionaries next to this file, one YAML per table:
 | `nfl_draft_picks` | one NFL draft pick | [`dict/nfl_draft_picks.yml`](dict/nfl_draft_picks.yml) |
 | `nfl_rosters` | one player-season on an NFL roster | [`dict/nfl_rosters.yml`](dict/nfl_rosters.yml) |
 | `nfl_player_stats` | one NFL player-season (regular season) | [`dict/nfl_player_stats.yml`](dict/nfl_player_stats.yml) |
+| `combine` | one NFL Scouting Combine invitee (pre-draft measurables) | [`dict/combine.yml`](dict/combine.yml) |
 | `stat_taxonomy` | one (category, statType) pair | [`dict/stat_taxonomy.yml`](dict/stat_taxonomy.yml) |
 | `ps_change` | one player-season (stat-line grain) + change features | [`dict/ps_change.yml`](dict/ps_change.yml) |
 | `career_summary` | one player's college career | [`dict/career_summary.yml`](dict/career_summary.yml) |
@@ -122,6 +123,8 @@ erDiagram
     ps_change }o--o| roster : "playerId, season"
     nfl_draft_picks ||--o{ nfl_rosters : "gsis_id, season"
     nfl_draft_picks ||--o{ nfl_player_stats : "gsis_id, season"
+    combine }o..o| player_stats : "athlete_id = playerId (name-guarded)"
+    combine |o..o| picks : "draft slot (draft_year, draft_round, draft_ovr), name-guarded"
     roster |o--o{ career_summary : "playerId (collapsed)"
     roster |o--o{ team_season : "team, season (aggregated)"
     games |o--o{ team_season : "team, season (aggregated)"
@@ -181,6 +184,11 @@ wrong rows, so they are called out explicitly.
   as a real category rather than imputing.
 - **`picks.nflAthleteId` is NOT the nflverse id.** It shares nothing with
   nflverse `gsis_id`/`espn_id`; use the draft-slot bridge above.
+- **`combine.cfb_id` is a Sports-Reference id, not the CFBD athlete id.** Join
+  combine invitees on `combine.athlete_id`, which the pipeline matches by draft
+  slot, then by name + school + final season (`link_method` says which;
+  `unmatched` rows carry `NA`). Mostly undrafted linemen go unmatched, because
+  CFBD only names players who logged a stat.
 
 ## Reasoning over the tables for the project's questions
 
@@ -206,6 +214,12 @@ primarily as **distinct NFL roster seasons** (counts linemen/special-teamers who
 accrue no box-score stats), complemented by career games and last active season.
 These are **right-censored** for recent classes still active — treat them as "≥"
 outcomes.
+
+**Pre-draft inputs.** `combine` measurables are taken after the final college
+season and before the draft. They are fair inputs for a model scored at draft
+time, but not for the in-career forecasts, which must exclude them. Only
+invitees are measured, so "no combine record" is a real category (selection
+signal), not a value to impute.
 
 **Out-of-time evaluation.** A model must never see data from on/after the draft
 class it predicts. When querying for a training frame, filter seasons strictly
@@ -275,6 +289,23 @@ LEFT JOIN nfl_rosters r
   ON l.gsis_id = r.gsis_id
 GROUP BY l.playerId
 ORDER BY nfl_seasons DESC;
+```
+
+Combine 40-yard dash next to each invitee's final college season, through the
+linked `athlete_id` (`unmatched` invitees drop out of the
+inner join):
+
+```sql
+SELECT c.season AS combine_year, c.player_name, c.pos, c.forty,
+       r.team, r.season AS final_season
+FROM combine c
+JOIN roster r
+  ON r.playerId = c.athlete_id
+ AND r.season = (SELECT MAX(season) FROM roster
+                 WHERE playerId = c.athlete_id AND season < c.season)
+WHERE c.forty IS NOT NULL
+ORDER BY c.forty
+LIMIT 20;
 ```
 
 Self-check the bundle before/after joins using the bundled audit log and

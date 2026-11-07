@@ -983,6 +983,96 @@ contract_nfl_link <- function(picks_nfl, picks, stop_on_fail = TRUE) {
   enforce_contract(agent, "nfl_link", stop_on_fail)
 }
 
+#' Data contract for the linked NFL combine table
+#'
+#' Guards [clean_combine()] + [link_combine()] (decision 0043): one row per
+#' invitee on `(season, player_name, school, pos)`, measurables inside
+#' [combine_ranges], `link_method` in its three values with `athlete_id` set
+#' exactly when linked, an id linked at most once per combine, link-rate
+#' floors (drafted invitees from draft year 2013 on, the window where CFBD
+#' picks carry ids, at `min_drafted_rate`; undrafted invitees from 2011 on,
+#' when their final season is in the CFBD window, at `min_undrafted_rate`),
+#' and the slot `pfr_id` cross-check disagreeing on at most 1% of drafted rows.
+#'
+#' @param combine Linked combine table (the published `combine` parquet).
+#' @param n_expected Optional pre-link row count (the ingested rows); when
+#'   given, the link must preserve it exactly.
+#' @param min_drafted_rate,min_undrafted_rate Link-rate floors.
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_combine <- function(
+  combine,
+  n_expected = NULL,
+  min_drafted_rate = 0.95,
+  min_undrafted_rate = 0.6,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  rate <- function(rows) {
+    if (!any(rows)) {
+      return(1)
+    }
+    mean(!is.na(combine$athlete_id[rows]))
+  }
+  drafted <- !is.na(combine$draft_ovr) & combine$draft_year >= 2013L
+  undrafted <- is.na(combine$draft_ovr) & combine$season >= 2011L
+  slot <- !is.na(combine$pfr_agrees)
+  linked <- combine[!is.na(combine$athlete_id), c("season", "athlete_id")]
+  check <- combine |>
+    dplyr::mutate(
+      n = nrow(combine),
+      id_iff_linked = is.na(.data$athlete_id) ==
+        (.data$link_method == "unmatched"),
+      drafted_rate = rate(drafted),
+      undrafted_rate = rate(undrafted),
+      pfr_disagree = if (any(slot)) mean(!combine$pfr_agrees[slot]) else 0,
+      ids_unique = !anyDuplicated(linked)
+    )
+  agent <- pointblank::create_agent(check, label = "combine") |>
+    pointblank::col_exists(c(
+      "season",
+      "player_name",
+      "school",
+      "pos",
+      "athlete_id",
+      "link_method",
+      "pfr_agrees"
+    )) |>
+    pointblank::col_vals_not_null(pointblank::vars(season, player_name)) |>
+    pointblank::rows_distinct(pointblank::vars(
+      season,
+      player_name,
+      school,
+      pos
+    )) |>
+    pointblank::col_vals_between("season", 2010, 2026)
+  for (col in names(combine_ranges)) {
+    agent <- pointblank::col_vals_between(
+      agent,
+      dplyr::all_of(col),
+      combine_ranges[[col]][1],
+      combine_ranges[[col]][2],
+      na_pass = TRUE
+    )
+  }
+  agent <- agent |>
+    pointblank::col_vals_in_set(
+      "link_method",
+      c("draft_slot", "name_school", "unmatched")
+    ) |>
+    pointblank::col_vals_equal("id_iff_linked", TRUE) |>
+    pointblank::col_vals_equal("ids_unique", TRUE) |>
+    pointblank::col_vals_gte("drafted_rate", min_drafted_rate) |>
+    pointblank::col_vals_gte("undrafted_rate", min_undrafted_rate) |>
+    pointblank::col_vals_lte("pfr_disagree", 0.01)
+  if (!is.null(n_expected)) {
+    agent <- pointblank::col_vals_equal(agent, "n", n_expected)
+  }
+  agent <- pointblank::interrogate(agent)
+  enforce_contract(agent, "combine", stop_on_fail)
+}
+
 #' Data contract for the college->NFL trajectory spine
 #'
 #' Guards [player_trajectory()] output: every spine row must carry a resolved

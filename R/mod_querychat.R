@@ -20,6 +20,7 @@ querychat_setup <- function(con, tables) {
       "Conference tiers are season-aware: join (conference, season) to conference_tiers.",
       "NFL side: use nfl_pick_link (name-guarded draft-slot bridge) to get gsis_id; then join (gsis_id, season) to nfl_rosters/nfl_player_stats. NEVER join picks.nflAthleteId to nflverse.",
       "recruiting.athleteId is an untrusted namespace: never join it to playerId; recruiting links are name-guarded in the pipeline only.",
+      "combine.athlete_id is the CFBD playerId namespace (NA when unmatched; see link_method). Combine measurables are pre-draft: never use them as in-career inputs.",
       "player_stats is LONG (one row per player-season-category-statType-stat); aggregate to player-season grain before joining, or use the wide player_season_stats.",
       "ps_change carries the drafted label; player_season_inputs is the leakage-safe view (label columns dropped).",
       "Join keys:",
@@ -28,6 +29,7 @@ querychat_setup <- function(con, tables) {
       "picks <-> nfl_pick_link on draft slot (year, round, overall) = (season, round, pick);",
       "nfl_pick_link/nfl_draft_picks on (season, round, pick);",
       "nfl_rosters/nfl_player_stats on (gsis_id, season);",
+      "combine on athlete_id = playerId; on draft slot (draft_year, draft_round, draft_ovr) = picks (year, round, overall);",
       "stat_taxonomy on (category, statType).",
       "Data dictionaries follow."
     ),

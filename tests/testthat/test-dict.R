@@ -19,7 +19,8 @@ dict_parquet <- c(
   conference_tiers = "conference_tiers.parquet",
   nfl_draft_picks = "nfl_draft_picks.parquet",
   nfl_rosters = "nfl_rosters.parquet",
-  nfl_player_stats = "nfl_player_stats.parquet"
+  nfl_player_stats = "nfl_player_stats.parquet",
+  combine = "combine.parquet"
 )
 
 # dict `type` token -> the R storage type (typeof) it must map to.
