@@ -1,0 +1,45 @@
+# Mechanical blog-post style gate (R/post_style.R, AGENTS.md "Blog style").
+# R CMD check cannot run it: vignettes/ is .Rbuildignored, so the testthat
+# case over the real posts skips there. This job checks the checkout itself.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+name: post-style.yaml
+
+permissions: read-all
+
+jobs:
+  post-style:
+    name: post-style
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: |
+            any::dplyr
+            any::tibble
+            any::yaml
+
+      - name: Check posts
+        shell: Rscript {0}
+        run: |
+          source("R/post_style.R")
+          bad <- check_posts_style("vignettes")
+          if (nrow(bad) > 0) {
+            cat(
+              sprintf("%s:%s [%s] %s", bad$file, bad$line, bad$rule, bad$message),
+              sep = "\n"
+            )
+            quit(status = 1)
+          }
+          cat("All dated posts pass the mechanical style checks.\n")

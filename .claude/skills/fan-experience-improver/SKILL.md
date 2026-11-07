@@ -3,11 +3,12 @@ name: fan-experience-improver
 description: >-
   Improve the cfb2nfl public site for the non-technical, invested college
   football fan described in VISION.md. Use when writing or editing the README,
-  the fan-facing vignettes (about, analysis, explore), the querychat companion
-  app, or the altdoc site navigation — or when reviewing whether a fan can find
-  answers to the project's questions and pose new ones. Actively makes
-  fan-experience edits; it does not rewrite the technical pages (data, pipeline,
-  reference).
+  the fan-facing vignettes (about, analysis, explore, visualizations), the
+  querychat companion app, or the altdoc site navigation — or when reviewing
+  whether a fan can find answers to the project's questions and pose new ones.
+  Actively makes fan-experience edits; it does not rewrite the technical pages
+  (data, pipeline, reference). Dated blog posts are reviewed by the
+  vignette-reviewer agent, not this skill.
 ---
 
 # fan-experience-improver
@@ -32,7 +33,8 @@ through the plumbing.
 **Edit freely (fan-facing):**
 
 - `README.md` (the site home)
-- `vignettes/about.qmd`, `vignettes/analysis.qmd`, `vignettes/explore.qmd`
+- `vignettes/about.qmd`, `vignettes/analysis.qmd`, `vignettes/explore.qmd` (the
+  hub of tiles), `vignettes/visualizations.qmd` (the interactive charts)
 - Fan-facing copy in `altdoc/quarto_website.yml` (nav labels, ordering)
 - The `querychat` companion app copy/prompts (VISION §7), when it exists
 
@@ -46,31 +48,18 @@ For protected pages, the most you do is add a one-line signpost (e.g. "This page
 is for readers who want to verify how the numbers are built") and make sure fans
 aren't *funneled* into them.
 
-**Explore vignette / viz:** you own the fan-facing framing and copy on
-`explore.qmd` — what question each chart answers and how it invites interaction.
+**Explore hub / visualizations:** you own the fan-facing framing and copy on
+`explore.qmd` and `visualizations.qmd` — what question each chart answers and how it invites interaction.
 Chart *correctness* and count/subset preservation belong to
 `architecture-improver`. Coordinate; don't rewrite the chart logic.
 
-## Vignette review pass (after the first draft)
+## Blog posts
 
-When asked to review a draft blog vignette (or when reviewing one unprompted
-after it is written), do **not** edit yet. Read it start to finish exactly as
-the fan reader would, in order, and report how the read goes:
-
-- **Flow:** does each section's assertion follow from the previous section's
-  exhibits? Could the reader reconstruct the takeaway from headings and
-  tables/figures alone?
-- **Wordiness:** the style is a sentence or two per section, then a table, an
-  explanatory figure, and an exploratory figure (AGENTS.md "Blog style").
-  Flag every paragraph doing a table's job, every
-  "data tour" passage that surveys everything instead of showing the snapshot
-  the argument needs, and any section with more than one idea.
-- **Reception:** where does the reader stall — an undefined term, a code name
-  leaking into an exhibit, a conclusion the exhibits don't visibly support?
-  Note the exact spot and the smallest fix.
-
-Deliver the review as a short ordered list of spots with fixes, then make the
-edits only if asked (or confirm the draft and move on).
+Reviewing a dated post (`vignettes/YYYY-MM-DD-*.qmd`) is the
+`vignette-reviewer` agent's job (`.claude/agents/vignette-reviewer.md`): a
+fresh-context cold read plus the `R/post_style.R` checker. Hand posts to it
+rather than reviewing them here; you edit a post only to apply its findings
+when asked.
 
 ## Rubric — check every fan page against these
 
@@ -103,9 +92,10 @@ edits only if asked (or confirm the draft and move on).
    ```r
    altdoc::render_docs()   # writes to docs/
    ```
-   Vignettes read the pipeline via `tar_read()` and need the package installed
-   and `CFB2NFL_ROOT` set (see AGENTS.md "Site"). If the pipeline isn't built,
-   review the `.qmd` source instead of forcing a render.
+   Vignettes load the package from the checkout with `pkgload::load_all()`
+   (it is never installed, decision 0042) and read the built pipeline and
+   `data/cfb2nfl.duckdb` (see AGENTS.md "Site"). If the pipeline isn't
+   built, review the `.qmd` source instead of forcing a render.
 4. **Stay in bounds.** For substantive site *architecture* (new nav structure,
    reordering pages, a new fan page), follow the repo's decision-record + NEWS
    workflow (AGENTS.md "Decision log" / "Git") rather than changing it silently.
