@@ -304,8 +304,18 @@ all of it. Years 2010–2026.
   `reference` index pages' freeze caches are deleted in `site.yaml` because
   their knit-time reads of other files' YAML are invisible to Quarto's cache
   check; key on athlete id; start from `vignettes/_post-template.qmd`.
+- **Post review (required).** After drafting or revising a dated post, run the
+  **`vignette-reviewer` agent** (`.claude/agents/vignette-reviewer.md`) on it
+  and address its findings before opening the PR. The agent reads the post in a
+  fresh context, as a fan would; it does not edit. The mechanical rules (front
+  matter, a single setup chunk, section and heading numbering, verdict emojis,
+  kable captions, no em dashes, `stopifnot()`, `include: false` or pie charts)
+  are enforced by `check_post_style()` (`R/post_style.R`). That check runs in
+  the `post-style.yaml` CI job and in `devtools::test()`, and the project
+  `PostToolUse` hook (`.claude/hooks/post-style.sh`) runs it after every edit
+  to a post.
 - **CI** (`.github/workflows/`): `check.yaml` (R CMD check + testthat + contract
-  fixtures), `site.yaml` (pull data release asset → `tar_make()` → render →
+  fixtures), `post-style.yaml` (`check_posts_style()` over the dated posts), `site.yaml` (pull data release asset → `tar_make()` → render →
   Pages), `data-current.yaml` (scheduled season-scoped refresh: download the
   release → `tar_make()` with `CFB2NFL_REFRESH_SEASONS=current` → publish
   `*.{parquet,duckdb}` via `piggyback` → dispatch `site.yaml`; decision 0034),

@@ -1,5 +1,14 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Blog posts get a required review step. A new `vignette-reviewer` agent
+  reads a drafted post cold, as a fan would, and reports where the argument or
+  the reader stalls. A new `check_post_style()` enforces the mechanical
+  [blog-style rules](https://github.com/ngiangre/cfb2nfl/blob/main/AGENTS.md)
+  (titles in sync with the index entry, one visible setup chunk, numbered
+  sections and assertion headings, verdict emojis, captioned tables, no em
+  dashes, `stopifnot()` or pie charts). It runs in a new `post-style` CI job,
+  in the test suite, and as a Claude Code hook after each edit to a post.
+
 - New `combine` table: NFL Scouting Combine measurables (height, weight, 40,
   bench, vertical, broad jump, 3-cone, shuttle) for every invitee from 2010 on,
   from nflverse, linked to the CFBD athlete id
