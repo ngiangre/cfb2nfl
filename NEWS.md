@@ -1,5 +1,19 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- The project is never installed as a package
+  ([decision 0042](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0042-never-install-load-from-checkout.md),
+  superseding 0030). Every page loads the code the same way, with
+  `pkgload::load_all()` from the checkout, and the site and data workflows no
+  longer install cfb2nfl. `app_sys()` now reads `inst/` from the checkout
+  first, so a stale installed copy can no longer leave tables undocumented in
+  the DuckDB `_schema_manifest`. The `cfb2nfl_root()` helper is removed
+  (`pkgload::pkg_path()` replaces it).
+- Each investigation now has a single setup chunk before its Introduction,
+  divided into commented sections, instead of a stack of separate code folds.
+  The post template follows the same layout.
+- The pipeline page's dependency graph shows targets only
+  (`tar_visnetwork(targets_only = TRUE)`), leaving out the functions they call.
+
 - The data model is leaner: it now documents 21 tables instead of 29
   ([decision 0041](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0041-lean-data-model.md)).
   A derived table joins the DuckDB bundle only once a second investigation

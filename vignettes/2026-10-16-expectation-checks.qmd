@@ -21,17 +21,12 @@ vignette: >
 #| output: false
 #| message: false
 #| warning: false
-# Load the package from the checkout with pkgload; no package install is
-# required. Under altdoc the render runs in a temp dir, so resolve the root
-# first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
-root <- Sys.getenv("CFB2NFL_ROOT", "")
-if (!nzchar(root)) {
-  dir <- getwd()
-  while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
-    dir <- dirname(dir)
-  }
-  root <- if (file.exists(file.path(dir, "_targets"))) dir else getwd()
-}
+# ---- Packages, data connection and figure defaults -------------------------
+# Load the project's functions straight from the checkout with pkgload; the
+# repo is never installed (decision 0042). The site build sets CFB2NFL_ROOT,
+# a local render finds the checkout from the working directory.
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
 knitr::opts_knit$set(root.dir = root)
 pkgload::load_all(root, quiet = TRUE)
 con <- DBI::dbConnect(
@@ -65,11 +60,8 @@ rel_lum <- function(hex) {
   lin <- ifelse(m <= 0.03928, m / 12.92, ((m + 0.055) / 1.055)^2.4)
   0.2126 * lin[1, ] + 0.7152 * lin[2, ] + 0.0722 * lin[3, ]
 }
-```
 
-```{r}
-#| label: registry
-#| output: false
+# ---- Named players (keyed on athlete id) -----------------------------------
 # Standard: key on athlete id, never name (recruiting ids collide, decision 0013).
 # The cfb_athlete_id here are the shared CFBD athlete namespace; each was resolved
 # from the cleaned player_stats by name and QA-verified by its season/team pattern
@@ -84,11 +76,8 @@ subjects <- tibble::tribble(
   "Joe Burrow"         , "3915511"       , "00-0036442"  ,
   "Malachi Nelson"     , "4870928"       , NA_character_
 )
-```
 
-```{r}
-#| label: build-spine
-#| output: false
+# ---- Build the player spine ------------------------------------------------
 ids_sql <- paste(sprintf("'%s'", subjects$cfb_athlete_id), collapse = ",")
 
 # Roster backbone + eligibility flags, computed here from roster and stat
@@ -260,11 +249,8 @@ usage_fig <- function(name, title) {
 rs_seasons <- function(name) {
   spine$season[spine$who == name & spine$likely_rs %in% TRUE]
 }
-```
 
-```{r}
-#| label: observability
-#| output: false
+# ---- What the data can observe ---------------------------------------------
 gp_all <- tbl(con, "game_player_stats") |>
   filter(seasonType == "regular") |>
   select(playerId, season, team, gameId, category, statType, stat) |>

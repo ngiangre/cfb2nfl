@@ -44,8 +44,7 @@ erd_group_colors <- c(
 #'   dashes) data frames.
 #' Load a file bundled under `inst/`
 #'
-#' Delegates to `app_sys()`, which falls back to the project checkout when
-#' `system.file()` comes back empty on a deployed bundle.
+#' Delegates to `app_sys()`, which reads `inst/` from the project checkout.
 #' @noRd
 erd_asset <- function(rel) {
   p <- app_sys(rel)

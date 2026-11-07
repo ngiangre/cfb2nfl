@@ -195,6 +195,11 @@ all of it. Years 2010–2026.
     `output: false` on setup/load/compute chunks so their code shows but
     nothing prints. The reader can see exactly how every exhibit is produced
     from the database.
+  - **One setup chunk before the Introduction** (2026-11-07): everything the
+    post computes up front (packages, data connection, figure defaults, the
+    named-player registry, table loads, numbers quoted in the prose) lives in
+    a single `setup` chunk, split into sections by `# ---- <section> ----`
+    comment rules, so the page shows one collapsed "Code" fold, not a stack.
   - Render every vector/data-frame output with `knitr::kable` (with a
     caption), never a bare tibble print.
   - Introduce any statistical machinery in plain language before use (e.g.
@@ -254,15 +259,21 @@ all of it. Years 2010–2026.
   reactable table of all dated posts (`YYYY-MM-DD-*.qmd`) from their YAML at
   render time; `reference.qmd` builds a searchable reactable of every
   non-internal function linking to `../man/<fn>.html` (75 rendered man pages).
-  Vignettes read the pipeline via `tar_read()` and set the knit wd to the
-  project root from the `CFB2NFL_ROOT` env var
-  (altdoc renders in a temp dir); they do NOT require an installed cfb2nfl
-  package — setup chunks source `R/*.R` from the checkout when the package is
-  missing, and dicts are read via `file.path(root, "inst", "dict")` (decision
-  0030). altdoc injects `library("cfb2nfl")` into man-page `@examples`, so
-  examples must be `\dontrun{}`-wrapped to render unexecuted (`\donttest` is
-  NOT detected by altdoc's converter). altdoc may not re-copy edited vignettes
-  into `_quarto/` — clear stale copies if a render keeps old code.
+  **The repo is never installed as a package** (decision 0042):
+  `DESCRIPTION`/`NAMESPACE` exist so `pkgload`, roxygen and
+  `devtools::test()`/`check()` work, but no CI job or vignette installs
+  cfb2nfl. Every vignette's setup chunk loads it the same way:
+  `root <- Sys.getenv("CFB2NFL_ROOT")`, falling back to `pkgload::pkg_path()`,
+  then `knitr::opts_knit$set(root.dir = root)` and
+  `pkgload::load_all(root, quiet = TRUE)`. `tar_make()` sources `R/` via
+  `tar_source()`, and `app_sys()` reads `inst/` from the checkout first, so a
+  stale installed copy can never shadow the dictionaries. altdoc injects
+  `library("cfb2nfl")` into man-page `@examples`, so examples must be
+  `\dontrun{}`-wrapped to render unexecuted (`\donttest` is NOT detected by
+  altdoc's converter). altdoc may not re-copy edited vignettes into
+  `_quarto/` — clear stale copies if a render keeps old code. **Quarto finds
+  no input files in a project under a hidden directory** (e.g.
+  `.claude/worktrees/`): render the site from a copy at a plain path.
   Viz is hybrid: R htmlwidgets default (`plotly`/`ggiraph`/`reactable`),
   OJS later. `vignettes/` is `.Rbuildignore`d (they need the pipeline/data,
   not CRAN).

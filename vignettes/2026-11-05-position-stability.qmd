@@ -21,17 +21,12 @@ vignette: >
 #| output: false
 #| message: false
 #| warning: false
-# Load the package from the checkout with pkgload; no package install is
-# required. Under altdoc the render runs in a temp dir, so resolve the root
-# first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
-root <- Sys.getenv("CFB2NFL_ROOT", "")
-if (!nzchar(root)) {
-  dir <- getwd()
-  while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
-    dir <- dirname(dir)
-  }
-  root <- if (file.exists(file.path(dir, "_targets"))) dir else getwd()
-}
+# ---- Packages, data connection and figure defaults -------------------------
+# Load the project's functions straight from the checkout with pkgload; the
+# repo is never installed (decision 0042). The site build sets CFB2NFL_ROOT,
+# a local render finds the checkout from the working directory.
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
 knitr::opts_knit$set(root.dir = root)
 pkgload::load_all(root, quiet = TRUE)
 con <- DBI::dbConnect(
@@ -66,11 +61,8 @@ fmt <- function(x, digits = 0) {
   formatC(as.numeric(x), big.mark = ",", format = "f", digits = digits)
 }
 pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
-```
 
-```{r}
-#| label: registry
-#| output: false
+# ---- Named players (keyed on athlete id) -----------------------------------
 # Key on athlete id, never name: recruiting ids collide (decision 0013), and
 # picks has two Josh Allens (Wyoming 2018, Kentucky 2019).
 subjects <- tibble::tribble(
@@ -81,11 +73,8 @@ subjects <- tibble::tribble(
   "Jordan Travis" , "4360799"       ,
   "Braxton Miller" , "512838"
 )
-```
 
-```{r}
-#| label: load
-#| output: false
+# ---- Load the tables -------------------------------------------------------
 # The position path is a contract-checked pipeline step, read from the targets
 # store rather than the DuckDB (decision 0041).
 pp <- targets::tar_read(position_path, store = file.path(root, "_targets"))
@@ -104,11 +93,8 @@ rec_levels <- setdiff(pos_levels, "Position not recorded")
 
 # Every named subject is a row of the table, with the group the post relies on.
 named <- pp |> filter(playerId %in% subjects$cfb_athlete_id)
-```
 
-```{r}
-#| label: universe-facts
-#| output: false
+# ---- Numbers quoted in the prose: the whole population ---------------------
 # The population the post reasons about, counted once and reused below.
 n_universe <- nrow(pp)
 n_hs_linked <- sum(pp$hs_linked)
