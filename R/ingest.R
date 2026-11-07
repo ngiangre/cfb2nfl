@@ -376,6 +376,28 @@ ingest_nfl_player_stats <- function(seasons = 2010:2026) {
   nflreadr::load_player_stats(seasons = seasons)
 }
 
+#' Ingest NFL Scouting Combine results (nflverse)
+#'
+#' Pulls nflverse combine results (`nflreadr::load_combine()`): one row per
+#' combine invitee, with measurables (height, weight, 40, bench, vertical,
+#' broad jump, 3-cone, shuttle) and, for drafted invitees, the draft slot. No
+#' API key. nflverse publishes every combine year in one file, so the whole
+#' table is read and filtered to `seasons`; a combine year that hasn't happened
+#' yet is simply absent. Linked to CFBD athlete ids by [link_combine()]
+#' (decision 0043).
+#'
+#' @param seasons Integer vector of combine years (== draft years; default
+#'   2010:2026).
+#'
+#' @return A tibble, one row per combine invitee.
+#' @export
+ingest_combine <- function(seasons = 2010:2026) {
+  rlang::check_installed("nflreadr", reason = "to pull nflverse combine data.")
+  nflreadr::load_combine() |>
+    tibble::as_tibble() |>
+    dplyr::filter(.data$season %in% as.integer(seasons))
+}
+
 # ---- game statistics (CFBD /games family) ----------------------------------
 #
 # Three endpoints, three grains (see inst/dict/games*.yml):

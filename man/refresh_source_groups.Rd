@@ -8,7 +8,7 @@ refresh_source_groups
 }
 \description{
 Maps each season-keyed source to the calendar rule that decides its
-"current" season (decision 0034, section 3). \code{plays}, \code{play_stats}, and
-\code{combine} are forward declarations for issues #44 and #45.
+"current" season (decision 0034, section 3). \code{plays} and \code{play_stats} are
+forward declarations for issue #44.
 }
 \keyword{internal}

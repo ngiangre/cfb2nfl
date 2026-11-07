@@ -93,6 +93,8 @@ na_profile <- function(data) {
 #'   on. When present in both `input` and `output`, `pct_keys_matched` and
 #'   `keys_dropped` are computed; otherwise they are `NA`.
 #' @param contract_passed Optional logical: did the step's data contract pass?
+#' @param linked Optional logical vector, one per output row, flagging rows a
+#'   link step matched; reported as `pct_linked` (`NA` when not given).
 #'
 #' @return A one-row tibble of audit fields. `na_by_col` is a list column
 #'   holding a per-column NA profile (`col`, `n_na`, `na_rate`) for columns
@@ -104,7 +106,8 @@ audit_step <- function(
   stage,
   input = NULL,
   keys = NULL,
-  contract_passed = NA
+  contract_passed = NA,
+  linked = NULL
 ) {
   n_keys_out <- if (!is.null(keys) && all(keys %in% names(output))) {
     dplyr::n_distinct(dplyr::select(output, dplyr::all_of(keys)))
@@ -138,6 +141,7 @@ audit_step <- function(
     pct_keys_matched = coverage$pct_keys_matched,
     n_cols_out = ncol(output),
     n_keys_out = n_keys_out,
+    pct_linked = if (is.null(linked)) NA_real_ else mean(linked),
     n_na_cells = sum(vapply(output, \(x) sum(is.na(x)), integer(1))),
     n_cols_with_na = nrow(na_by_col),
     na_by_col = list(na_by_col),

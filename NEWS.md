@@ -1,5 +1,16 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- New `combine` table: NFL Scouting Combine measurables (height, weight, 40,
+  bench, vertical, broad jump, 3-cone, shuttle) for every invitee from 2010 on,
+  from nflverse, linked to the CFBD athlete id
+  ([decision 0043](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0043-combine-link-and-pre-draft-inputs.md),
+  issue #45). Drafted invitees link by draft slot (99.7% from draft year 2013
+  on); the rest by name, school and final college season (78% of undrafted
+  invitees from 2011 on); `link_method` says which, and unmatched invitees are
+  kept. Published as `combine.parquet` and in the DuckDB bundle, guarded by
+  `contract_combine()`, with the link rate in the audit log's new `pct_linked`
+  column. Combine numbers are pre-draft information, documented as such.
+
 - The project is never installed as a package
   ([decision 0042](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0042-never-install-load-from-checkout.md),
   superseding 0030). Every page loads the code the same way, with

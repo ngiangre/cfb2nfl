@@ -63,6 +63,7 @@ all of it. Years 2010–2026.
 | `data/nfl_draft_picks.parquet` | one NFL draft pick | nflverse; key `(season, round, pick)`. Bridge to `gsis_id`/`pfr_player_id` + PFR career summary (decision 0014) |
 | `data/nfl_rosters.parquet` | one player-season on an NFL roster | nflverse; key `(gsis_id, season)`. Longevity source: distinct roster seasons |
 | `data/nfl_player_stats.parquet` | one player-season (regular season) | nflverse; key `(gsis_id, season)`. Weekly stats aggregated to season totals |
+| `data/combine.parquet` | one NFL Scouting Combine invitee | nflverse; key `(season, player_name, school, pos)`. Measurables + draft slot, linked to the CFBD athlete id as `athlete_id` with `link_method` (`draft_slot`/`name_school`/`unmatched`; decision 0043). **Pre-draft** inputs: keep off the in-career model path |
 | `data/outcomes.parquet` | one player-season in the model population (person-period) | **The modeling dependent variables** (decision 0032): eligibility clock (`hs_grad_year`, `draft_eligible`, `eligible_season_index`), `outcome_*` labels (drafted, NFL entry, entry-year success), survival bookkeeping. Contract `contract_outcomes()` |
 
 ### Gotchas (do not ignore)
@@ -114,6 +115,14 @@ all of it. Years 2010–2026.
   **right-censored** for recent classes. `load_player_stats()` errors on a
   future season, so its ingest clamps to `<= most_recent_season()` (no 2026
   stats yet). nflverse needs **no API key** (decision 0014).
+- **Combine rows have no CFBD id; join on `combine.athlete_id`.** It comes
+  from `link_combine()` (decision 0043): draft slot behind a name/school guard,
+  then name + school (`school_key()` crosswalk) + final season, ambiguous
+  matches nulled. `cfb_id` is a Sports-Reference id, not CFBD. Measurables
+  are taken after the final season, so they are draft-time inputs only, never
+  in-career features; "no combine record" is a category, not missing data.
+  Undrafted linemen mostly stay `unmatched` (CFBD names only players with a
+  stat line).
 - **Recruiting `athleteId` is NOT the shared namespace.** Unlike
   `collegeAthleteId`/`roster.id`, the `/recruiting/players` `athleteId` collides
   across different people (e.g. Cam Ward's id → a different recruit, Xavier

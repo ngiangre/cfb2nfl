@@ -277,6 +277,86 @@ clean_nfl_draft_picks <- function(nfl_draft_picks) {
     )
 }
 
+#' Plausible ranges for combine measurables
+#'
+#' Bounds used by [clean_combine()] to coerce data-entry errors to `NA` and by
+#' [contract_combine()] to enforce the same ranges (the roster weight/height
+#' precedent, decision 0009). Units: inches, pounds, seconds, repetitions.
+#'
+#' @keywords internal
+combine_ranges <- list(
+  height = c(60, 85),
+  weight = c(100, 500),
+  forty = c(4.0, 6.5),
+  bench = c(0, 60),
+  vertical = c(10, 55),
+  broad_jump = c(60, 160),
+  cone = c(6.0, 10.0),
+  shuttle = c(3.5, 6.0)
+)
+
+#' Clean NFL Scouting Combine results (nflverse)
+#'
+#' Standardizes the nflverse combine table (decision 0043): height `"6-2"` to
+#' inches, numeric drills, integer draft slot. A drill the invitee did not run
+#' stays `NA`, as do values outside [combine_ranges]. nflverse attaches draft
+#' info by name, and a handful of invitees carry a **different year's** draft
+#' slot (a namesake's pick: the combine is held in the spring of the draft year,
+#' so `draft_year` must equal `season`); those draft columns and the `pfr_id`
+#' that came with them are nulled rather than kept as a wrong-person label.
+#'
+#' @param combine Raw tibble from [ingest_combine()].
+#'
+#' @return A cleaned tibble, one row per combine invitee (unique on
+#'   `season`/`player_name`/`school`/`pos`).
+#' @export
+clean_combine <- function(combine) {
+  in_range <- function(x, col) {
+    r <- combine_ranges[[col]]
+    dplyr::if_else(x >= r[1] & x <= r[2], x, NA)
+  }
+  ht <- strsplit(as.character(combine$ht), "-", fixed = TRUE)
+  height <- vapply(
+    ht,
+    \(p) {
+      if (length(p) != 2) {
+        return(NA_integer_)
+      }
+      suppressWarnings(as.integer(p[1]) * 12L + as.integer(p[2]))
+    },
+    integer(1)
+  )
+  out <- combine |>
+    dplyr::transmute(
+      season = as.integer(.data$season),
+      player_name = as.character(.data$player_name),
+      pos = as.character(.data$pos),
+      school = as.character(.data$school),
+      height = in_range(.env$height, "height"),
+      weight = in_range(as.integer(round(.data$wt)), "weight"),
+      forty = in_range(as.double(.data$forty), "forty"),
+      bench = in_range(as.integer(.data$bench), "bench"),
+      vertical = in_range(as.double(.data$vertical), "vertical"),
+      broad_jump = in_range(as.double(.data$broad_jump), "broad_jump"),
+      cone = in_range(as.double(.data$cone), "cone"),
+      shuttle = in_range(as.double(.data$shuttle), "shuttle"),
+      draft_year = as.integer(.data$draft_year),
+      draft_round = as.integer(.data$draft_round),
+      draft_ovr = as.integer(.data$draft_ovr),
+      draft_team = as.character(.data$draft_team),
+      pfr_id = as.character(.data$pfr_id),
+      cfb_id = as.character(.data$cfb_id)
+    )
+  wrong_year <- !is.na(out$draft_year) & out$draft_year != out$season
+  out$draft_team[wrong_year] <- NA_character_
+  out$draft_year[wrong_year] <- NA_integer_
+  out$draft_round[wrong_year] <- NA_integer_
+  out$draft_ovr[wrong_year] <- NA_integer_
+  # The PFR id arrives with the namesake's draft row, so it is wrong too.
+  out$pfr_id[wrong_year] <- NA_character_
+  out
+}
+
 #' Clean NFL rosters (nflverse)
 #'
 #' Standardizes nflverse rosters to one row per `gsis_id` × `season`, keeping

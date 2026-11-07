@@ -141,6 +141,11 @@ list(
     raw_nfl_player_stats,
     if (refresh_enabled()) ingest_nfl_player_stats()
   ),
+  # NFL Scouting Combine via nflverse (decision 0043); no CFBD calls.
+  tar_target(
+    raw_combine,
+    if (refresh_enabled()) ingest_combine()
+  ),
 
   # ---- clean -> published parquet assets (decision 0018) --------------------
   # The published parquet ARE the cleaned tables, so parquet and the DuckDB
@@ -280,6 +285,28 @@ list(
     format = "file"
   ),
   tar_target(nfl_player_stats, arrow::read_parquet(nfl_player_stats_file)),
+  # Combine measurables linked to CFBD athlete ids (decision 0043). The link
+  # runs inside the asset so the published parquet carries athlete_id and
+  # link_method (parquet == DuckDB == dict); a link change needs a refresh.
+  # Pre-draft information: kept off the in-career model inputs.
+  tar_target(
+    combine_file,
+    parquet_asset(
+      "data/combine.parquet",
+      function() {
+        link_combine(
+          clean_combine(raw_combine),
+          picks,
+          player_stats,
+          roster,
+          nfl_draft_picks,
+          reused = reused
+        )
+      }
+    ),
+    format = "file"
+  ),
+  tar_target(combine, arrow::read_parquet(combine_file)),
   # conference_tiers derived from the cleaned player_stats (decision 0017),
   # published as its own cleaned parquet asset.
   tar_target(
@@ -439,6 +466,16 @@ list(
     )
   ),
   tar_target(
+    ok_combine,
+    pointblank::all_passed(
+      contract_combine(
+        combine,
+        n_expected = if (refresh_enabled()) nrow(raw_combine),
+        stop_on_fail = FALSE
+      )
+    )
+  ),
+  tar_target(
     ok_nfl_link,
     pointblank::all_passed(
       contract_nfl_link(picks_nfl, picks, stop_on_fail = FALSE)
@@ -540,6 +577,7 @@ list(
       nfl_rosters = ok_nfl_rosters,
       nfl_player_stats = ok_nfl_player_stats,
       nfl_link = ok_nfl_link,
+      combine = ok_combine,
       career_summary = ok_career,
       position_mapping = ok_position_mapping,
       position_path = ok_position_path,
@@ -709,6 +747,7 @@ list(
         nfl_draft_picks = nfl_draft_picks,
         nfl_rosters = nfl_rosters,
         nfl_player_stats = nfl_player_stats,
+        combine = combine,
         stat_taxonomy = stat_taxonomy_tbl,
         ps_change = ps_change,
         career_summary = career,
@@ -926,6 +965,15 @@ list(
         picks,
         keys = "playerId",
         contract_passed = ok_nfl_link
+      ),
+      audit_step(
+        combine,
+        "link_combine",
+        "link",
+        raw_combine,
+        keys = c("season", "player_name", "school", "pos"),
+        contract_passed = ok_combine,
+        linked = !is.na(combine$athlete_id)
       ),
       audit_step(
         stat_taxonomy_tbl,

@@ -10,7 +10,8 @@ audit_step(
   stage,
   input = NULL,
   keys = NULL,
-  contract_passed = NA
+  contract_passed = NA,
+  linked = NULL
 )
 }
 \arguments{
@@ -28,6 +29,9 @@ on. When present in both \code{input} and \code{output}, \code{pct_keys_matched}
 \code{keys_dropped} are computed; otherwise they are \code{NA}.}
 
 \item{contract_passed}{Optional logical: did the step's data contract pass?}
+
+\item{linked}{Optional logical vector, one per output row, flagging rows a
+link step matched; reported as \code{pct_linked} (\code{NA} when not given).}
 }
 \value{
 A one-row tibble of audit fields. \code{na_by_col} is a list column
