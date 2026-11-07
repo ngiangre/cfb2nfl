@@ -11,27 +11,15 @@ vignette: >
 #| output: false
 #| message: false
 #| warning: false
-# Load cfb2nfl from the checkout when the package is not installed, so the
-# site build does not require a package install (decision 0030).
-if (requireNamespace("cfb2nfl", quietly = TRUE)) {
-  # vignettes render in a fresh quarto R session: attach the installed package
-  # (CI installs it via local::.) or source the checkout fallback below.
-  library(cfb2nfl)
-} else {
-  dir <- getwd()
-  while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
-    dir <- dirname(dir)
-  }
-  for (src in sort(list.files(file.path(dir, "R"), pattern = "[.]R$", full.names = TRUE))) {
-    source(src, local = FALSE, encoding = "UTF-8")
-  }
-}
+# Load the project's functions straight from the checkout with pkgload; the
+# repo is never installed (decision 0042). The site build sets CFB2NFL_ROOT,
+# a local render finds the checkout from the working directory.
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
 library(targets)
 library(dplyr)
-# Under altdoc, docs render in a temp dir; point the knit working directory at
-# the project root so tar_read()/tar_mermaid() find the store, _targets.R, and R/.
-root <- cfb2nfl_root()
-if (nzchar(root)) knitr::opts_knit$set(root.dir = root)
 ```
 
 The processing pipeline is a [`targets`](https://books.ropensci.org/targets/)
@@ -58,11 +46,13 @@ flowchart LR
 
 `tar_visnetwork()` renders the graph as an interactive `visNetwork` widget:
 nodes carry the target name and runtime, clicking a node shows its output, and
-the widget renders faster than a large static Mermaid diagram.
+the widget renders faster than a large static Mermaid diagram. Only targets are
+drawn (`targets_only = TRUE`); the functions they call are left out so the data
+flow stays readable.
 
 ```{r}
 #| label: dag
-tar_visnetwork(allow = NULL, label = "time")
+tar_visnetwork(targets_only = TRUE, allow = NULL, label = "time")
 ```
 
 ## What remains

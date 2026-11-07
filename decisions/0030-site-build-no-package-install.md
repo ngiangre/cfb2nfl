@@ -1,6 +1,6 @@
 # 0030 — Site build does not require an installed cfbstats package
 
-- **Status:** Accepted
+- **Status:** Superseded by 0042
 - **Date:** 2026-10-18
 
 ## Context

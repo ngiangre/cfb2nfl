@@ -93,7 +93,7 @@ test_that("build_player_season_stats pivots long stats to wide player-season gra
   expect_true(is.na(wide$passing_completions[wide$playerId == "2"]))
 })
 
-test_that("build_duckdb adds _schema_manifest, _meta and the ps_change view", {
+test_that("build_duckdb adds _schema_manifest and _meta, and no views", {
   skip_if_not_installed("DBI")
   skip_if_not_installed("duckdb")
 
@@ -120,17 +120,12 @@ test_that("build_duckdb adds _schema_manifest, _meta and the ps_change view", {
   manifest <- DBI::dbGetQuery(con, "SELECT * FROM _schema_manifest")
   expect_setequal(manifest$table_name, "ps_change")
   expect_true(manifest$documented[manifest$table_name == "ps_change"])
-  # The leakage-safe view exists and drops the outcome columns.
+  # No views: the bundle carries tables only (decision 0041).
   views <- DBI::dbGetQuery(
     con,
     "SELECT view_name FROM duckdb_views() WHERE NOT internal"
   )$view_name
-  expect_setequal(views, "player_season_inputs")
-  input_cols <- DBI::dbGetQuery(
-    con,
-    "SELECT column_name FROM duckdb_columns() WHERE table_name = 'player_season_inputs'"
-  )$column_name
-  expect_setequal(input_cols, c("playerId", "season"))
+  expect_length(views, 0L)
   # _meta records the completeness boundary.
   meta <- DBI::dbGetQuery(con, "SELECT * FROM _meta")
   expect_equal(nrow(meta), 1L)

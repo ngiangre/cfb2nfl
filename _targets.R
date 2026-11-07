@@ -394,22 +394,6 @@ list(
     )
   ),
   tar_target(
-    ok_season_arc,
-    pointblank::all_passed(
-      contract_season_arc(season_arcs, player_stats, stop_on_fail = FALSE)
-    )
-  ),
-  tar_target(
-    ok_game_production,
-    pointblank::all_passed(
-      contract_game_production(
-        game_production,
-        player_game,
-        stop_on_fail = FALSE
-      )
-    )
-  ),
-  tar_target(
     ok_player_usage,
     pointblank::all_passed(
       contract_player_usage(
@@ -467,18 +451,6 @@ list(
     )
   ),
   tar_target(
-    ok_career_end,
-    pointblank::all_passed(
-      contract_career_end(career_end, career, stop_on_fail = FALSE)
-    )
-  ),
-  tar_target(
-    ok_roster_flags,
-    pointblank::all_passed(
-      contract_redshirt(roster_flags, stop_on_fail = FALSE)
-    )
-  ),
-  tar_target(
     ok_position_path,
     pointblank::all_passed(
       contract_position_path(
@@ -513,12 +485,6 @@ list(
         stat_taxonomy_tbl,
         stop_on_fail = FALSE
       )$coverage
-    )
-  ),
-  tar_target(
-    ok_player_season_stats,
-    pointblank::all_passed(
-      contract_player_season_stats(player_season_stats, stop_on_fail = FALSE)
     )
   ),
   tar_target(
@@ -575,16 +541,11 @@ list(
       nfl_player_stats = ok_nfl_player_stats,
       nfl_link = ok_nfl_link,
       career_summary = ok_career,
-      career_end = ok_career_end,
-      redshirt = ok_roster_flags,
       position_mapping = ok_position_mapping,
       position_path = ok_position_path,
       player_game = ok_player_game,
-      season_arc = ok_season_arc,
-      game_production = ok_game_production,
       player_usage = ok_player_usage,
       stat_taxonomy = ok_stat_taxonomy,
-      player_season_stats = ok_player_season_stats,
       outcomes = ok_outcomes,
       team_season = ok_team_season,
       team_draft = ok_team_draft
@@ -645,11 +606,12 @@ list(
   # HS recruiting ratings, name-guarded (decision 0013); kept off the model path.
   tar_target(ps_recruit, link_recruiting(player_season, recruiting)),
   # NFL outcomes bridged to CFBD picks by draft slot (decision 0014); an
-  # outcome/label source, kept off the model input path.
+  # outcome/label source, kept off the model input path. A pipeline step only
+  # (decision 0041): read it with tar_read(picks_nfl), it is not in the DuckDB.
   tar_target(picks_nfl, link_nfl_draft(picks, nfl_draft_picks)),
-  # Per-player position path, HS -> college -> NFL (issue #49, decision 0021):
-  # a derived table, bundled in DuckDB and documented in inst/dict, not
-  # published as parquet. Built from the guarded recruiting/NFL links above.
+  # Per-player position path, HS -> college -> NFL (issue #49, decision 0021).
+  # A contract-checked pipeline step for a single post, not in the DuckDB
+  # (decision 0041): read it with tar_read(position_path).
   tar_target(
     position_path,
     build_position_path(
@@ -669,34 +631,21 @@ list(
   # ---- features -------------------------------------------------------------
   tar_target(ps_change, add_change_features(ps_pop)),
   tar_target(model_table, add_roster_weight(ps_change, roster)),
-  # Career-grain and roster-grain derived features (Explore questions 4/5/12).
-  # These are in-pipeline DERIVED tables: bundled into the DuckDB asset and
-  # documented in inst/dict like stat_taxonomy, but not published as parquet —
-  # they rebuild from other cleaned tables in any mode, so track mode needs no
-  # release asset for them (decision 0021).
+  # Career grain (Explore questions 4/5/12). A DERIVED table: bundled into the
+  # DuckDB asset and documented in inst/dict like stat_taxonomy, but not
+  # published as parquet; it rebuilds from roster in any mode (decision 0021).
   tar_target(career, career_summary(roster)),
-  # How each career ended (issue #51, part 1; decision 0039): a derived table
-  # on career + outcomes + the picks bridge. Its early_stop_proxy is a proxy,
-  # not an injury label. Not published as parquet (decision 0021).
-  tar_target(career_end, career_end_status(career, outcomes, picks_nfl)),
-  tar_target(roster_flags, flag_redshirt(roster, player_stats)),
   # Player x game grain (decision 0035): one row per (playerId, gameId) with a
   # stat line; the shared base for per-game usage and opponent-adjusted
-  # performance. Derived like career/roster_flags, not published parquet.
+  # performance. Derived like career, not published parquet.
   tar_target(player_game, build_player_game(game_player_stats, games)),
-  # Season arcs and opponent-adjusted game production (issue #47, decision
-  # 0037): derived like player_game, bundled in DuckDB, not published parquet.
-  tar_target(season_arcs, build_season_arcs(player_stats)),
-  tar_target(game_production, build_game_production(player_game)),
   # Playing time (issue #50, decision 0038): games appeared out of team games
-  # per player-season-team, from player_game. Derived like player_game.
+  # per player-season-team, from player_game. A pipeline step only, not in the
+  # DuckDB (decision 0041): read it with tar_read(player_usage).
   tar_target(player_usage, build_player_usage(player_game, roster, games)),
-  # Wide player-season stats for the DuckDB bundle (decision 0026): a derived
-  # convenience table, like career/roster_flags above.
-  tar_target(player_season_stats, build_player_season_stats(player_stats)),
   # Team- and conference-grain derived tables (plans/conferences-teams.md,
   # decision 0033): credit each player's exit to their final pre-draft
-  # roster team; derived like career/roster_flags, not published parquet.
+  # roster team; derived like career, not published parquet.
   tar_target(
     team_season,
     build_team_season(roster, games, tiers, player_season, coaches)
@@ -762,18 +711,10 @@ list(
         nfl_player_stats = nfl_player_stats,
         stat_taxonomy = stat_taxonomy_tbl,
         ps_change = ps_change,
-        roster_flags = roster_flags,
         career_summary = career,
-        career_end = career_end,
-        position_path = position_path,
         player_game = player_game,
-        season_arc = season_arcs,
-        game_production = game_production,
-        player_usage = player_usage,
-        player_season_stats = player_season_stats,
         team_season = team_season,
         team_draft = team_draft,
-        nfl_pick_link = picks_nfl,
         outcomes = outcomes,
         audit_log = db_audit_log
       ),
@@ -907,28 +848,12 @@ list(
         contract_passed = ok_change
       ),
       audit_step(
-        roster_flags,
-        "flag_redshirt",
-        "features",
-        roster,
-        keys = c("playerId", "season"),
-        contract_passed = ok_roster_flags
-      ),
-      audit_step(
         career,
         "career_summary",
         "features",
         roster,
         keys = "playerId",
         contract_passed = ok_career
-      ),
-      audit_step(
-        career_end,
-        "career_end_status",
-        "features",
-        career,
-        keys = "playerId",
-        contract_passed = ok_career_end
       ),
       audit_step(
         position_path,
@@ -945,22 +870,6 @@ list(
         game_player_stats,
         keys = c("playerId", "gameId"),
         contract_passed = ok_player_game
-      ),
-      audit_step(
-        season_arcs,
-        "season_arc",
-        "features",
-        player_stats,
-        keys = c("playerId", "season", "category", "statType"),
-        contract_passed = ok_season_arc
-      ),
-      audit_step(
-        game_production,
-        "build_game_production",
-        "features",
-        player_game,
-        keys = c("playerId", "gameId", "stat"),
-        contract_passed = ok_game_production
       ),
       audit_step(
         player_usage,

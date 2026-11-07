@@ -18,7 +18,6 @@ statType-stat) into a wide table, one row per \verb{(playerId, season, team)} wi
 one numeric column per \verb{(category, statType)} pair, named
 \verb{<category>_<statType>} (lowercased, non-alphanumerics to \verb{_}). Values are
 summed over duplicate pairs and coerced to double; pairs a player-season
-never logged are \code{NA}. Meant to be bundled into the DuckDB asset so SQL users
-get a directly queryable wide stat table instead of pivoting 1.5M long rows
-(decision 0026).
+never logged are \code{NA}. Built on the fly where an investigation needs wide
+stats; it is not bundled into the DuckDB asset (decisions 0026, 0041).
 }

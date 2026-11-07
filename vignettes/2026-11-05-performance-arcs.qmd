@@ -20,17 +20,12 @@ vignette: >
 #| output: false
 #| message: false
 #| warning: false
-# Load the package from the checkout with pkgload; no package install is
-# required. Under altdoc the render runs in a temp dir, so resolve the root
-# first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
-root <- Sys.getenv("CFB2NFL_ROOT", "")
-if (!nzchar(root)) {
-  dir <- getwd()
-  while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
-    dir <- dirname(dir)
-  }
-  root <- if (file.exists(file.path(dir, "_targets"))) dir else getwd()
-}
+# ---- Packages, data connection and figure defaults -------------------------
+# Load the project's functions straight from the checkout with pkgload; the
+# repo is never installed (decision 0042). The site build sets CFB2NFL_ROOT,
+# a local render finds the checkout from the working directory.
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
 knitr::opts_knit$set(root.dir = root)
 pkgload::load_all(root, quiet = TRUE)
 con <- DBI::dbConnect(
@@ -65,17 +60,20 @@ fmt <- function(x, digits = 0) {
   formatC(as.numeric(x), big.mark = ",", format = "f", digits = digits)
 }
 pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
-```
 
-```{r}
-#| label: load
-#| output: false
-# Season arcs and game production are derived pipeline tables (decision 0037),
-# bundled in the DuckDB, so the post reads exactly what the tests cover. Roster
-# carries the position label used to form the three groups.
-sa <- dbReadTable(con, "season_arc")
-gp <- dbReadTable(con, "game_production")
+# ---- Load the tables -------------------------------------------------------
+# Season arcs and game production are built here from the tested package
+# functions (decision 0037). The season index counts every season with any
+# stat line, so the arcs need the full long stats, not just the yardage rows.
+# Roster carries the position label used to form the three groups.
 pg <- dbReadTable(con, "player_game")
+sa <- dbGetQuery(
+  con,
+  "SELECT playerId, player, season, team, category, statType, stat
+   FROM player_stats"
+) |>
+  build_season_arcs()
+gp <- build_game_production(pg)
 rost <- dbReadTable(con, "roster")
 
 band_levels <- c(
@@ -133,11 +131,8 @@ cast_gp <- gp |>
     group = factor(.data$group, group_levels),
     band = factor(.data$opponent_elo_band, band_levels)
   )
-```
 
-```{r}
-#| label: facts
-#| output: false
+# ---- Numbers quoted in the prose -------------------------------------------
 # Every figure and inline number is computed here from the database.
 
 # Opponent Elo distribution and the band each cutoff carves out. The cutoffs

@@ -45,10 +45,11 @@ jobs:
         with:
           use-public-rspm: true
 
+      # DESCRIPTION dependencies only; tar_make() sources R/ itself and never
+      # needs cfb2nfl installed (decision 0042).
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: |
-            local::.
             any::piggyback
             any::duckdb
 

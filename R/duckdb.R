@@ -3,9 +3,8 @@
 # the DAG and rebuilt whenever an upstream table changes; published alongside
 # the parquet on the data-latest release. It carries the CLEANED,
 # contract-checked tables — the schemas documented in inst/dict/*.yml — not the
-# raw ingest parquet, plus derived convenience tables (decision 0026): the wide
-# `player_season_stats` pivot and the name-guarded `nfl_pick_link` bridge
-# (decision 0014), a slimmed `audit_log`, a `_meta` table with
+# raw ingest parquet, plus the derived tables that more than one investigation
+# relies on (decision 0041), a slimmed `audit_log`, a `_meta` table with
 # build/season-completeness metadata, and an auto-generated `_schema_manifest`
 # (grain + key read from the dictionaries at build time, so the manifest can
 # never silently drift from inst/dict) (decision 0027).
@@ -17,9 +16,8 @@
 #' one numeric column per `(category, statType)` pair, named
 #' `<category>_<statType>` (lowercased, non-alphanumerics to `_`). Values are
 #' summed over duplicate pairs and coerced to double; pairs a player-season
-#' never logged are `NA`. Meant to be bundled into the DuckDB asset so SQL users
-#' get a directly queryable wide stat table instead of pivoting 1.5M long rows
-#' (decision 0026).
+#' never logged are `NA`. Built on the fly where an investigation needs wide
+#' stats; it is not bundled into the DuckDB asset (decisions 0026, 0041).
 #'
 #' @param player_stats Cleaned long stats from [clean_player_stats()].
 #'
@@ -66,10 +64,7 @@ build_player_season_stats <- function(player_stats) {
 #' a `_schema_manifest` table — grain, key and dictionary path per table, read
 #' from `inst/dict/*.yml` at build time — and a `_meta` table with the refresh
 #' timestamp and the last COMPLETE college season / NFL draft (later seasons
-#' may be partial; see [last_complete_cfb_season()]). If `ps_change` is among
-#' the tables, a `player_season_inputs` view is also created: `ps_change` with
-#' the draft-outcome columns excluded, i.e. the leakage-safe model input
-#' surface.
+#' may be partial; see [last_complete_cfb_season()]).
 #'
 #' @param tables A named list of data frames. Each name becomes a DuckDB table
 #'   (e.g. `conference_tiers = tiers`).
@@ -112,14 +107,6 @@ build_duckdb <- function(tables, db_path = "data/cfb2nfl.duckdb") {
   meta <- build_meta()
   DBI::dbWriteTable(con, "_schema_manifest", manifest)
   DBI::dbWriteTable(con, "_meta", meta)
-  if ("ps_change" %in% names(tables)) {
-    DBI::dbExecute(
-      con,
-      "CREATE VIEW player_season_inputs AS
-       SELECT * EXCLUDE (draft_year, draft_round, draft_overall, drafted)
-       FROM ps_change"
-    )
-  }
 
   cli::cli_alert_success(
     "Built DuckDB {.path {db_path}} with {length(tables)} table{?s}: {.val {names(tables)}}."

@@ -20,17 +20,12 @@ vignette: >
 #| output: false
 #| message: false
 #| warning: false
-# Load the package from the checkout with pkgload; no package install is
-# required. Under altdoc the render runs in a temp dir, so resolve the root
-# first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
-root <- Sys.getenv("CFB2NFL_ROOT", "")
-if (!nzchar(root)) {
-  dir <- getwd()
-  while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
-    dir <- dirname(dir)
-  }
-  root <- if (file.exists(file.path(dir, "_targets"))) dir else getwd()
-}
+# ---- Packages, data connection and figure defaults -------------------------
+# Load the project's functions straight from the checkout with pkgload; the
+# repo is never installed (decision 0042). The site build sets CFB2NFL_ROOT,
+# a local render finds the checkout from the working directory.
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
 knitr::opts_knit$set(root.dir = root)
 pkgload::load_all(root, quiet = TRUE)
 con <- DBI::dbConnect(
@@ -65,11 +60,8 @@ fmt <- function(x, digits = 0) {
   formatC(as.numeric(x), big.mark = ",", format = "f", digits = digits)
 }
 pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
-```
 
-```{r}
-#| label: registry
-#| output: false
+# ---- Named players (keyed on athlete id) -----------------------------------
 # Key on athlete id, never name (recruiting ids collide, decision 0013).
 subjects <- tibble::tribble(
   ~who            , ~cfb_athlete_id ,
@@ -77,12 +69,11 @@ subjects <- tibble::tribble(
   "Cam Ward"      , "4688380"       ,
   "Jordan Travis" , "4360799"
 )
-```
 
-```{r}
-#| label: load
-#| output: false
-usage <- dbReadTable(con, "player_usage")
+# ---- Load the tables -------------------------------------------------------
+# Playing time is a contract-checked pipeline step, read from the targets
+# store rather than the DuckDB (decision 0041).
+usage <- targets::tar_read(player_usage, store = file.path(root, "_targets"))
 outcomes <- dbReadTable(con, "outcomes")
 
 # The population the post reasons about: rostered player-season-teams whose
@@ -111,11 +102,8 @@ labels <- outcomes |>
   )
 draft_pop <- single_team |>
   inner_join(labels, by = c("playerId", "season"))
-```
 
-```{r}
-#| label: universe-facts
-#| output: false
+# ---- Numbers quoted in the prose: the whole population ---------------------
 # Every headline number below is computed here and reused in the prose.
 n_rows <- nrow(pop)
 share_any_all <- mean(pop$games_appeared > 0)
@@ -138,11 +126,7 @@ draft_by_pos <- draft_pop |>
   group_by(position_group, drafted) |>
   summarise(n = n(), any_line = mean(games_appeared > 0), .groups = "drop")
 
-```
-
-```{r}
-#| label: named-facts
-#| output: false
+# ---- Numbers quoted in the prose: the named players ------------------------
 # Season rows for the recurring cast; each pinned to the data.
 cast <- usage |>
   filter(playerId %in% subjects$cfb_athlete_id, season >= 2019L) |>

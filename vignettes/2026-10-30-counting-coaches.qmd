@@ -22,17 +22,12 @@ vignette: >
 #| output: false
 #| message: false
 #| warning: false
-# Load the package from the checkout with pkgload; no package install is
-# required. Under altdoc the render runs in a temp dir, so resolve the root
-# first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
-root <- Sys.getenv("CFB2NFL_ROOT", "")
-if (!nzchar(root)) {
-  dir <- getwd()
-  while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
-    dir <- dirname(dir)
-  }
-  root <- if (file.exists(file.path(dir, "_targets"))) dir else getwd()
-}
+# ---- Packages, data connection and figure defaults -------------------------
+# Load the project's functions straight from the checkout with pkgload; the
+# repo is never installed (decision 0042). The site build sets CFB2NFL_ROOT,
+# a local render finds the checkout from the working directory.
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
 knitr::opts_knit$set(root.dir = root)
 pkgload::load_all(root, quiet = TRUE)
 con <- DBI::dbConnect(
@@ -46,11 +41,8 @@ library(ggiraph)
 library(ggplot2)
 library(knitr)
 library(tidyr)
-```
 
-```{r}
-#| label: data
-#| output: false
+# ---- Load the tables -------------------------------------------------------
 picks <- dbReadTable(con, "picks")
 roster <- dbReadTable(con, "roster")
 coaches <- dbReadTable(con, "coaches")

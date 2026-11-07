@@ -18,17 +18,12 @@ vignette: >
 #| output: false
 #| message: false
 #| warning: false
-# Load the package from the checkout with pkgload; no package install is
-# required. Under altdoc the render runs in a temp dir, so resolve the root
-# first (CFB2NFL_ROOT in the site build, else walk up to the _targets store).
-root <- Sys.getenv("CFB2NFL_ROOT", "")
-if (!nzchar(root)) {
-  dir <- getwd()
-  while (!file.exists(file.path(dir, "_targets")) && dirname(dir) != dir) {
-    dir <- dirname(dir)
-  }
-  root <- if (file.exists(file.path(dir, "_targets"))) dir else getwd()
-}
+# ---- Packages, data connection and figure defaults -------------------------
+# Load the project's functions straight from the checkout with pkgload; the
+# repo is never installed (decision 0042). The site build sets CFB2NFL_ROOT,
+# a local render finds the checkout from the working directory.
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
 knitr::opts_knit$set(root.dir = root)
 pkgload::load_all(root, quiet = TRUE)
 con <- DBI::dbConnect(
@@ -59,11 +54,8 @@ set_girafe_defaults(
   opts_toolbar = opts_toolbar(saveaspng = TRUE, position = "topright"),
   opts_sizing = opts_sizing(rescale = TRUE)
 )
-```
 
-```{r}
-#| label: registry
-#| output: false
+# ---- Named players (keyed on athlete id) -----------------------------------
 # Standard: key on athlete id, never name (recruiting ids collide, decision 0013).
 # NOTE: this post reads parquet inline for now. Follow-up (decision 0015): move
 # this data pull into a tested player_trajectory() helper in R/ and call it here.
@@ -72,11 +64,8 @@ subjects <- tibble::tribble(
   "Shane Buechele" , "4039034"       , "00-0036679" ,
   "Kyle Allen"     , "559681"        , "00-0034577"
 )
-```
 
-```{r}
-#| label: data
-#| output: false
+# ---- Load the tables -------------------------------------------------------
 # thousands-separated formatter for inline numbers in the narrative
 fmt <- function(x, digits = 0) {
   formatC(as.numeric(x), big.mark = ",", format = "f", digits = digits)

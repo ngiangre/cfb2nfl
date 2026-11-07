@@ -1,6 +1,7 @@
 # Season arcs (issue #47, plans/explore-questions.md question 6): one stat per
-# player, one row per season, indexed by the player's career season. A derived
-# table (decision 0021) built from the cleaned player_stats.
+# player, one row per season, indexed by the player's career season. Built on
+# the fly from the cleaned player_stats where an investigation needs it, not
+# bundled into the DuckDB asset (decision 0041).
 
 # The (category, statType) stats carried by the season-arc table. Each is a
 # count or yardage that a fan can read as "how much did he do this year".

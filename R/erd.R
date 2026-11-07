@@ -6,17 +6,11 @@
 # inst/data-model.md (college stats / games / context / draft & NFL / audit).
 erd_groups <- c(
   player_stats = "College stats",
-  player_season_stats = "College stats",
   stat_taxonomy = "College stats",
   ps_change = "College stats",
   career_summary = "College stats",
-  career_end = "College stats",
-  roster_flags = "College stats",
   game_player_stats = "College stats",
   player_game = "College stats",
-  season_arc = "College stats",
-  game_production = "College stats",
-  player_usage = "College stats",
   games = "Games",
   game_team_stats = "Games",
   roster = "Context",
@@ -25,8 +19,6 @@ erd_groups <- c(
   teams = "Context",
   conference_tiers = "Context",
   picks = "Draft & NFL",
-  nfl_pick_link = "Draft & NFL",
-  position_path = "Draft & NFL",
   nfl_draft_picks = "Draft & NFL",
   nfl_rosters = "Draft & NFL",
   nfl_player_stats = "Draft & NFL",
@@ -52,8 +44,7 @@ erd_group_colors <- c(
 #'   dashes) data frames.
 #' Load a file bundled under `inst/`
 #'
-#' Delegates to `app_sys()`, which falls back to the project checkout when
-#' `system.file()` comes back empty on a deployed bundle.
+#' Delegates to `app_sys()`, which reads `inst/` from the project checkout.
 #' @noRd
 erd_asset <- function(rel) {
   p <- app_sys(rel)
