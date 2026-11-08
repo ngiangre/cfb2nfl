@@ -15,8 +15,11 @@ toc: false
 //| echo: false
 import {TABS, parseHash, toHash, resolveTeam} from "./explorer/state.js"
 import {sourceLine, errorCard, loadOnce, escapeHtml} from "./explorer/ui.js"
-import {formatRecord, teamGames, effectiveGame, landscapePanels, timelineFor, parsePlayers} from "./explorer/teams.js"
-import {readGamePlays} from "./explorer/plays.js"
+import {
+  formatRecord, teamGames, effectiveGame, landscapePanels, timelineFor, parsePlayers,
+  defaultShowFcs, focusedConference, shouldLoadPlays, stepPlay, playWhen, playAnnouncement
+} from "./explorer/teams.js"
+import {readGamePlays, hyparquetUrl} from "./explorer/plays.js"
 ```
 
 ```{ojs}
@@ -27,6 +30,11 @@ tabCache = new Map()
 mutable teamsRetry = 0
 mutable focusConf = null
 mutable scrubPlay = null
+// Latches true once the Game section has been in view (or a game was picked):
+// the play-by-play is not fetched until then (plans/explorer.md step 3).
+mutable gameInView = false
+// Which Prev/Next button to refocus after the play card is redrawn.
+navFocus = ({key: null})
 parquetCache = new Map()
 async function fetchJson(path) {
   const response = await fetch(new URL(path, document.baseURI));
@@ -121,11 +129,15 @@ pick = {
     const sticky = head && getComputedStyle(head).position === "sticky";
     const offset = sticky ? head.getBoundingClientRect().height + 60 + 8 : navH + 8;
     window.scrollTo({top: el.getBoundingClientRect().top + window.scrollY - offset, behavior: "smooth"});
+    // Move focus to the opened level's heading, so keyboard and screen-reader
+    // users land on it instead of the body.
+    el.setAttribute("tabindex", "-1");
+    el.focus({preventScroll: true});
   };
   return {
     team: id => { set(viewof team, id); scroll("teams-team"); },
     season: s => { set(viewof season, s); scroll("teams-season"); },
-    game: id => { set(viewof game, id); scroll("teams-game"); },
+    game: id => { mutable gameInView = true; set(viewof game, id); scroll("teams-game"); },
     player: id => { set(viewof player, id); set(viewof tab, "players"); }
   };
 }
@@ -171,6 +183,9 @@ viewof season = Inputs.select(ready.meta.seasons.slice().reverse(), {
 // Write every key back; the first write replaces the bare URL instead of
 // adding a history entry.
 {
+  // A failed season fetch leaves the team's games unknown, so keep the shared
+  // link's game= rather than dropping it.
+  if (seasonGamesData.error) return;
   // Only the reader's own game pick goes into the hash; the default game is implied.
   const gameKey = teamSeasonGames.some(g => g.game_id === game) ? game : null;
   const next = toHash({...hashState, tab, season, team, game: gameKey, player});
@@ -204,7 +219,9 @@ viewof season = Inputs.select(ready.meta.seasons.slice().reverse(), {
 
 ```{ojs}
 //| echo: false
-viewof showFcs = Inputs.toggle({label: "Show FCS", value: false})
+// Starts on when the selected team is FCS in the selected season; picking an
+// FCS team (or changing season) sets it again.
+viewof showFcs = Inputs.toggle({label: "Show FCS", value: defaultShowFcs(ready.teamSeason, team, season)})
 ```
 
 ```{ojs}
@@ -217,7 +234,7 @@ landscape = {
   const value = d => metric === "elo_end" ? `Elo ${d.elo_end}` : `${Math.round(d.win_pct * 100)}% wins`;
   const color = id => ready.teamById.get(id)?.color ?? "#6b7280";
   const name = id => ready.teamById.get(id)?.team ?? String(id);
-  const focused = panels.find(p => p.conference === focusConf);
+  const focused = panels.find(p => p.conference === focusedConference(focusConf, panels, team));
   if (!focused) {
     // Small multiples: the selected team's line in its color, the rest grey.
     const grid = html`<div class="explorer-panels"></div>`;
@@ -378,7 +395,8 @@ seasonStrip = {
     return card;
   }
   if (!teamSeasonGames.length) {
-    return asNode(`<div class="explorer-card">${escapeHtml(info.team)} has no completed games in ${season} yet.</div>`);
+    const yet = season < ready.meta.default_season ? "" : " yet";
+    return asNode(`<div class="explorer-card">${escapeHtml(info.team)} has no completed games in ${season}${yet}.</div>`);
   }
   const rated = teamSeasonGames.map((g, i) => ({...g, i: i + 1})).filter(g => g.elo_post !== null);
   const out = html`<div><h4>${info.team} in ${season}</h4></div>`;
@@ -434,13 +452,38 @@ asNode(sourceLine(ready.meta.sources.team_season))
 ```{ojs}
 //| echo: false
 //| output: false
+// Latch the play-by-play load on the first view of the Game section. The
+// observer starts a little before the heading reaches the viewport; a hidden
+// tab never intersects, so nothing loads off the Teams tab.
+{
+  const el = document.getElementById("teams-game");
+  if (!el || !("IntersectionObserver" in window)) {
+    mutable gameInView = true;
+    return;
+  }
+  const io = new IntersectionObserver(entries => {
+    if (entries.some(e => e.isIntersecting)) {
+      mutable gameInView = true;
+      io.disconnect();
+    }
+  }, {rootMargin: "200px"});
+  io.observe(el);
+  invalidation.then(() => io.disconnect());
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
 gamePlaysData = {
-  if (!gameRow || !gameRow.has_plays) return {rows: []};
+  // Pending until the Teams tab is open and the Game section has been seen.
+  if (!gameRow || !shouldLoadPlays({tab, gameInView, hasPlays: gameRow.has_plays})) return {rows: [], pending: true};
   teamsRetry;
   try {
-    const hp = await loadOnce(tabCache, "hyparquet", () => import("https://cdn.jsdelivr.net/npm/hyparquet@1/+esm"));
-    const url = new URL(`explorer-data/plays_${season}.parquet`, document.baseURI).href;
-    return {rows: await readGamePlays(hp, url, gameRow.game_id, parquetCache)};
+    const url = hyparquetUrl("https://cdn.jsdelivr.net/npm/hyparquet@1/+esm", teamsRetry);
+    const hp = await loadOnce(tabCache, url, () => import(url));
+    const fileUrl = new URL(`explorer-data/plays_${season}.parquet`, document.baseURI).href;
+    return {rows: await readGamePlays(hp, fileUrl, gameRow.game_id, parquetCache)};
   } catch (error) {
     return {error, rows: []};
   }
@@ -466,6 +509,8 @@ gameView = {
     out.append(card);
     return out;
   }
+  // Header and summary only until the Game section is in view.
+  if (gamePlaysData.pending && gameRow.has_plays) return out;
   if (!timeline.length) {
     out.append(asNode(`<div class="explorer-card">No play-by-play for this game.</div>`));
     return out;
@@ -508,17 +553,24 @@ gameView = {
 
 ```{ojs}
 //| echo: false
+// One persistent live region. It only changes when Prev or Next is pressed,
+// so pointer scrubbing does not flood a screen reader. It must stay in the
+// DOM, so this cell's output is shown (it is visually hidden).
+playLive = html`<div class="visually-hidden" aria-live="polite"></div>`
+```
+
+```{ojs}
+//| echo: false
 playCard = {
   if (!timeline.length) return document.createComment("no plays");
   const p = scrubPlay && timeline.includes(scrubPlay) ? scrubPlay : timeline[0];
   const info = ready.teamById.get(team);
   const opp = ready.teamById.get(gameRow.opp_id);
   const ord = ["", "1st", "2nd", "3rd", "4th"];
-  const when = p.period > 4 ? p.clock : `Q${p.period} ${p.clock ?? ""}`;
   const downs = p.down ? ` · ${ord[p.down] ?? p.down} & ${p.distance}` : "";
-  const field = p.yards_to_goal !== null && p.yards_to_goal !== undefined ? ` · ${p.yards_to_goal} yards to go` : "";
-  const card = html`<div class="explorer-card explorer-play" aria-live="polite">
-    <p><strong>${when}</strong>${downs}${field}</p>
+  const field = p.yards_to_goal !== null && p.yards_to_goal !== undefined ? ` · ${p.yards_to_goal} yards from the end zone` : "";
+  const card = html`<div class="explorer-card explorer-play">
+    <p><strong>${playWhen(p)}</strong>${downs}${field}</p>
     <p>${info.abbreviation ?? info.team} ${p.team_score}, ${opp?.abbreviation ?? gameRow.opp_name} ${p.opp_score}</p>
     <p>${p.play_text ?? p.play_type}</p>
   </div>`;
@@ -532,7 +584,32 @@ playCard = {
     }
     card.append(chips);
   }
-  return card;
+  // Prev/Next for keyboard and screen-reader readers; they step from the
+  // play shown, and stop at either end.
+  const step = (delta, key) => {
+    const next = stepPlay(timeline, p, delta);
+    navFocus.key = key;
+    mutable scrubPlay = next.play;
+    playLive.textContent = next.edge === "last" && delta > 0 ? "Last play"
+      : next.edge === "first" && delta < 0 ? "First play"
+      : playAnnouncement(next.play);
+  };
+  const nav = html`<div class="explorer-play-nav">
+    <button type="button" class="explorer-nav" data-nav="prev" aria-label="Previous play">← Previous play</button>
+    <button type="button" class="explorer-nav" data-nav="next" aria-label="Next play">Next play →</button>
+  </div>`;
+  nav.querySelector('[data-nav="prev"]').onclick = () => step(-1, "prev");
+  nav.querySelector('[data-nav="next"]').onclick = () => step(1, "next");
+  const wrap = html`<div class="explorer-play-wrap"></div>`;
+  wrap.append(card, nav);
+  // The card is redrawn on every step, which would drop focus from the button
+  // just pressed, so put it back on the same button.
+  if (navFocus.key) {
+    const key = navFocus.key;
+    navFocus.key = null;
+    requestAnimationFrame(() => wrap.querySelector(`[data-nav="${key}"]`)?.focus({preventScroll: true}));
+  }
+  return wrap;
 }
 ```
 
@@ -549,7 +626,8 @@ expected points. The **cumulative PPA edge** adds the team's offensive PPA
 and subtracts the opponent's, play by play, so it rises while the team is
 outplaying its opponent even when the score doesn't move.
 
-Drag across either chart to read any play.
+Drag across either chart to read any play, or use the Previous and Next
+buttons under the play card.
 :::
 
 ```{ojs}
