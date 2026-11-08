@@ -63,8 +63,13 @@ rsconnect/
 /_site/
 _freeze/
 altdoc/freeze.rds
-_quarto/
-!_quarto/_freeze/
+# Ignore _quarto's contents, not the dir itself: git cannot re-include a path
+# under an ignored directory, so `_quarto/` + `!_quarto/_freeze/` silently
+# dropped every new freeze file (e.g. the visNetwork site_libs).
+/_quarto/*
+!/_quarto/_freeze/
+# Re-executed in CI every build (site.yaml busts it), so never commit it.
+/_quarto/_freeze/vignettes/investigations/
 .Rprofile
 
 *_files/shiny_bookmarks/

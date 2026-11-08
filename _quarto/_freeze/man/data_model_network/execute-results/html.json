@@ -1,0 +1,15 @@
+{
+  "hash": "5cf6c5f4dc8430a8a880154ee1d0147d",
+  "result": {
+    "engine": "knitr",
+    "markdown": "## Build a visNetwork of the data model from the docs and dictionaries {.unnumbered}\n\n\n### Description\n\nA standalone (no Shiny) counterpart to <code>erd_network()</code> for static documents.\nNodes are the tables in the ERD; edges are the documented join relationships\n(shared-key links) parsed from <code>inst/data-model.md</code>, dashed when\nname-guarded. Hovering a node shows that table's grain, key, description and\nevery column definition, read from <code style=\"white-space: pre;\">inst/dict/*.yml</code>; hovering an edge shows\nthe join key. Both the graph and the tooltips are generated from the files in\n<code style=\"white-space: pre;\">inst/</code>, so the diagram stays in sync with the data model.\n\n\n\n### Usage\n\n<pre><code class='language-R'>data_model_network(\n  model_path = erd_asset(\"data-model.md\"),\n  dict = app_dict(),\n  height = \"650px\",\n  width = \"100%\"\n)\n</code></pre>\n\n\n### Arguments\n\n<table role = \"presentation\">\n<tr><td style = \"white-space: collapse; font-family: monospace; vertical-align: top\"><code id=\"model_path\">model_path</code></td>\n<td>\nPath to the data-model doc carrying the mermaid ERD.\nDefaults to the packaged <code>inst/data-model.md</code> (falls back to the checkout).\n</td></tr>\n<tr><td style = \"white-space: collapse; font-family: monospace; vertical-align: top\"><code id=\"dict\">dict</code></td>\n<td>\nA named list of dictionary entries, as returned by <code>app_dict()</code>.\nDefaults to reading the packaged <code style=\"white-space: pre;\">inst/dict/*.yml</code>.\n</td></tr>\n<tr><td style = \"white-space: collapse; font-family: monospace; vertical-align: top\"><code id=\"height\">height</code>, <code id=\"width\">width</code></td>\n<td>\nvisNetwork dimensions.\n</td></tr>\n</table>\n\n\n### Value\n\nA <code>visNetwork</code> htmlwidget.\n\n\n\n### Examples\n\n::: {.cell}\n\n```{.r .cell-code}\nlibrary(\"cfb2nfl\")\n\ndata_model_network()\n```\n:::\n\n",
+    "supporting": [],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {},
+    "engineDependencies": {},
+    "preserve": {},
+    "postProcess": true
+  }
+}
