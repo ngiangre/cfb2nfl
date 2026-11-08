@@ -314,7 +314,7 @@ write_explorer_team_games <- function(
 write_explorer_plays <- function(
   explorer_plays,
   dir = "vignettes/explorer-data",
-  chunk_size = 5000L
+  chunk_size = 2000L
 ) {
   dir.create(dir, showWarnings = FALSE, recursive = TRUE)
   seasons <- sort(unique(explorer_plays$season))
