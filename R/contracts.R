@@ -2135,7 +2135,9 @@ required_seasons <- function(sources, min_season = 2010L, date = Sys.Date()) {
 #' Guards the first-view assets of the explorer (plans/explorer.md): one row
 #' per `(team_id, season)` with a record that adds up; no silent loss (the
 #' team-seasons' games equal the FBS/FCS sides of completed, scored games);
-#' every team-season has a display row with a color and logo; Elo on every
+#' every team-season has a display row with a color, and teams playing in the
+#' default season also a logo (defunct programs like Jacksonville may lack
+#' one); every team-season has a tier; Elo on every
 #' FBS team-season from 2022 on (coverage is ~100% there); `meta` agrees with
 #' the games and names only documented tables; and the gzipped first view fits
 #' the budget (decision 0046).
@@ -2164,11 +2166,11 @@ contract_explorer_shell <- function(
       !is.na(.data$opp_points)
     ) |>
     nrow()
-  shown <- dplyr::filter(
-    teams,
-    !is.na(.data$color),
-    !is.na(.data$logo)
+  has_color <- teams$team_id[!is.na(teams$color)]
+  current_ids <- unique(
+    team_season$team_id[team_season$season == meta$default_season]
   )
+  has_logo <- teams$team_id[!is.na(teams$logo)]
   dicts <- sub("\\.yml$", "", list.files(app_sys("dict"), "\\.yml$"))
   gzip_bytes <- sum(vapply(
     list(meta, teams, team_season),
@@ -2196,7 +2198,7 @@ contract_explorer_shell <- function(
       "ties",
       "elo_end"
     )) |>
-    pointblank::col_vals_not_null(pointblank::vars(team_id, season)) |>
+    pointblank::col_vals_not_null(pointblank::vars(team_id, season, tier)) |>
     pointblank::rows_distinct(pointblank::vars(team_id, season)) |>
     pointblank::col_vals_expr(rlang::expr(
       wins + losses + ties == games
@@ -2211,7 +2213,8 @@ contract_explorer_shell <- function(
     ) |>
     check(nrow(team_season) > 0L) |>
     check(sum(team_season$games) == expected_games) |>
-    check(all(team_season$team_id %in% shown$team_id)) |>
+    check(all(team_season$team_id %in% has_color)) |>
+    check(all(current_ids %in% has_logo)) |>
     check(identical(meta$default_season, explorer_default_season(games))) |>
     check(all(unlist(meta$sources) %in% dicts)) |>
     check(gzip_bytes <= max_gzip_bytes) |>

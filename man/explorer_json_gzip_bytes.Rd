@@ -13,6 +13,7 @@ explorer_json_gzip_bytes(x)
 Integer bytes.
 }
 \description{
-What GitHub Pages actually transfers; the first-view budget is set in these
+Approximates what GitHub Pages transfers (\code{memCompress()} returns a zlib
+stream, a few bytes off true gzip); the first-view budget is set in these
 bytes (decision 0046).
 }

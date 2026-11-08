@@ -83,6 +83,17 @@ build_explorer_team_season <- function(games, tiers) {
       by = c("season", "conference"),
       relationship = "many-to-one"
     ) |>
+    # Tiers come from player_stats, so some FCS conference-seasons are absent;
+    # FCS is tier 1 by definition (decision 0003).
+    dplyr::mutate(
+      fcs_gap = is.na(.data$tier) & .data$classification == "fcs",
+      tier = dplyr::if_else(.data$fcs_gap, 1L, as.integer(.data$tier)),
+      tier_label = dplyr::if_else(
+        .data$fcs_gap,
+        "FCS and below",
+        .data$tier_label
+      )
+    ) |>
     dplyr::select(
       "team_id",
       "season",
@@ -118,7 +129,11 @@ build_explorer_teams <- function(teams, team_season) {
       mascot = .data$mascot,
       abbreviation = .data$abbreviation,
       color = dplyr::coalesce(unname(valid[.data$team]), "#6b7280"),
-      alt_color = .data$alt_color,
+      alt_color = dplyr::if_else(
+        grepl("^#[0-9A-Fa-f]{6}$", .data$alt_color),
+        .data$alt_color,
+        NA_character_
+      ),
       logo = .data$logo_light
     ) |>
     dplyr::arrange(.data$team)
@@ -187,7 +202,8 @@ explorer_json <- function(x) {
 
 #' Gzipped size of an explorer asset
 #'
-#' What GitHub Pages actually transfers; the first-view budget is set in these
+#' Approximates what GitHub Pages transfers (`memCompress()` returns a zlib
+#' stream, a few bytes off true gzip); the first-view budget is set in these
 #' bytes (decision 0046).
 #'
 #' @param x A data frame or list.

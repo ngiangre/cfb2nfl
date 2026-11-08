@@ -120,7 +120,7 @@ explorer_teams_fixture <- function() {
     abbreviation = c("TEX", "ALA", "GRAM", "FSU", "X"),
     classification = c("fbs", "fbs", "fcs", "ii", NA),
     color = c("#bf5700", "#9e1b32", "#null", "#cc0000", "#000000"),
-    alt_color = c("#ffffff", "#ffffff", "#000000", "#000000", "#000000"),
+    alt_color = c("#ffffff", "#null", "#000000", "#000000", "#000000"),
     logo_light = c("t.png", "a.png", "g.png", "f.png", NA),
     logo_dark = c("td.png", "ad.png", "gd.png", "fd.png", NA)
   )
@@ -253,4 +253,58 @@ test_that("contract_explorer_shell catches row loss, stale meta and size", {
     ),
     "explorer_shell"
   )
+})
+
+test_that("build_explorer_teams blanks invalid alt colors", {
+  ts <- build_explorer_team_season(
+    explorer_games_fixture(),
+    explorer_tiers_fixture()
+  )
+  tm <- build_explorer_teams(explorer_teams_fixture(), ts)
+  expect_true(is.na(tm$alt_color[tm$team_id == 2L]))
+  expect_equal(tm$alt_color[tm$team_id == 1L], "#ffffff")
+})
+
+test_that("FCS team-seasons missing from the tier lookup default to tier 1", {
+  tiers <- explorer_tiers_fixture()
+  tiers <- tiers[tiers$conference != "SWAC", ]
+  ts <- build_explorer_team_season(explorer_games_fixture(), tiers)
+  t3 <- ts[ts$team_id == 3L, ]
+  expect_equal(t3$tier, c(1L))
+  expect_equal(t3$tier_label, "FCS and below")
+  expect_false(anyNA(ts$tier))
+})
+
+test_that("contract_explorer_shell requires logos only for current programs", {
+  f <- explorer_shell_fixture()
+  # Team 3 plays only in 2025 (default season 2026): a missing logo is fine.
+  past <- f$teams
+  past$logo[past$team_id == 3L] <- NA
+  expect_true(pointblank::all_passed(contract_explorer_shell(
+    past,
+    f$team_season,
+    f$meta,
+    f$games,
+    stop_on_fail = FALSE
+  )))
+  # Team 1 plays in the default season: a missing logo fails.
+  current <- f$teams
+  current$logo[current$team_id == 1L] <- NA
+  expect_false(pointblank::all_passed(contract_explorer_shell(
+    current,
+    f$team_season,
+    f$meta,
+    f$games,
+    stop_on_fail = FALSE
+  )))
+  # A missing color fails for any season.
+  nocolor <- f$teams
+  nocolor$color[nocolor$team_id == 3L] <- NA
+  expect_false(pointblank::all_passed(contract_explorer_shell(
+    nocolor,
+    f$team_season,
+    f$meta,
+    f$games,
+    stop_on_fail = FALSE
+  )))
 })

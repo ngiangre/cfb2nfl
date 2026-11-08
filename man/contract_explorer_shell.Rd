@@ -33,7 +33,9 @@ The interrogated pointblank agent, invisibly.
 Guards the first-view assets of the explorer (plans/explorer.md): one row
 per \verb{(team_id, season)} with a record that adds up; no silent loss (the
 team-seasons' games equal the FBS/FCS sides of completed, scored games);
-every team-season has a display row with a color and logo; Elo on every
+every team-season has a display row with a color, and teams playing in the
+default season also a logo (defunct programs like Jacksonville may lack
+one); every team-season has a tier; Elo on every
 FBS team-season from 2022 on (coverage is ~100\% there); \code{meta} agrees with
 the games and names only documented tables; and the gzipped first view fits
 the budget (decision 0046).

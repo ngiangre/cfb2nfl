@@ -44,7 +44,8 @@ is gitignored and Quarto can't render from a hidden worktree path.
   Elo line.
 - **`teams`** has `team_id`, `team` (school name), `mascot`, `abbreviation`,
   `classification`, `color`, `alt_color`, `logo_light`, `logo_dark`. All FBS
-  (138) and FCS (128) teams have a color and logo. `team_color_values(teams)`
+  (138) and FCS (128) teams have a color and logo; defunct programs such as
+  Jacksonville (id 294, FCS 2010-2019) may lack a logo and a classification. `team_color_values(teams)`
   (`R/viz.R`) is the shared valid-hex filter; `"#6b7280"` is the shared
   fallback grey.
 - **`tiers`** (target; `conference_tiers` table) has `season`, `conference`,
