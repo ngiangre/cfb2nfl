@@ -2216,6 +2216,13 @@ contract_explorer_shell <- function(
     check(all(team_season$team_id %in% has_color)) |>
     check(all(current_ids %in% has_logo)) |>
     check(identical(meta$default_season, explorer_default_season(games))) |>
+    # The page falls back to the default team and season when the hash names
+    # an unknown one, so both must exist; the season menu is contiguous.
+    check(meta$default_team %in% teams$team_id) |>
+    check(identical(
+      meta$seasons,
+      seq.int(min(meta$seasons), meta$default_season)
+    )) |>
     check(all(unlist(meta$sources) %in% dicts)) |>
     check(gzip_bytes <= max_gzip_bytes) |>
     pointblank::interrogate()

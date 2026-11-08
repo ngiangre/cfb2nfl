@@ -186,12 +186,12 @@ test_that("write_explorer_assets writes one JSON file per asset and returns path
 explorer_shell_fixture <- function() {
   g <- explorer_games_fixture()
   ts <- build_explorer_team_season(g, explorer_tiers_fixture())
-  list(
-    games = g,
-    team_season = ts,
-    teams = build_explorer_teams(explorer_teams_fixture(), ts),
-    meta = build_explorer_meta(g)
-  )
+  teams <- build_explorer_teams(explorer_teams_fixture(), ts)
+  meta <- build_explorer_meta(g)
+  # The real default (Texas, 251) is not in this fixture; point the page's
+  # fallback at a team the fixture does have.
+  meta$default_team <- min(teams$team_id)
+  list(games = g, team_season = ts, teams = teams, meta = meta)
 }
 
 test_that("contract_explorer_shell passes on consistent assets", {
@@ -253,6 +253,29 @@ test_that("contract_explorer_shell catches row loss, stale meta and size", {
     ),
     "explorer_shell"
   )
+})
+
+test_that("contract_explorer_shell requires a known default team and contiguous seasons", {
+  f <- explorer_shell_fixture()
+  unknown_team <- f$meta
+  unknown_team$default_team <- 999999L
+  expect_false(pointblank::all_passed(contract_explorer_shell(
+    f$teams,
+    f$team_season,
+    unknown_team,
+    f$games,
+    stop_on_fail = FALSE
+  )))
+  # A gap in the season menu (2024 missing between 2023 and 2026) fails.
+  gap <- f$meta
+  gap$seasons <- c(2023L, 2026L)
+  expect_false(pointblank::all_passed(contract_explorer_shell(
+    f$teams,
+    f$team_season,
+    gap,
+    f$games,
+    stop_on_fail = FALSE
+  )))
 })
 
 test_that("build_explorer_teams blanks invalid alt colors", {
