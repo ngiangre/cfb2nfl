@@ -12,7 +12,7 @@
   align-items: center;
   border-bottom: 1px solid #e5e7eb;
 }
-.explorer-header select { min-height: 44px; font-size: 1rem; }
+.explorer-header select, .explorer-tab select { min-height: 44px; font-size: 1rem; }
 /* Inputs.radio as a tab bar: hide the dots, make each label a 44px pill. */
 .explorer-tabs form > div { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .explorer-tabs input[type="radio"] { position: absolute; opacity: 0; }
