@@ -107,6 +107,24 @@ test_that("flatten_game_player_stats produces one row per athlete-category-statT
   expect_true(all(flat$team[flat$playerId == "4426688"] == "Alabama"))
 })
 
+test_that("flatten_game_player_stats keeps every athlete in a stat type", {
+  # A box score lists many players per stat type (every tackler under
+  # defensive TOT); all of them must survive, not just the first.
+  raw <- mk_game_raw()
+  raw$teams[[1]]$categories[[1]]$types[[2]]$athletes[[1]] <- tibble::tibble(
+    id = c(4426688L, 4426700L, 4426701L),
+    name = c("QB One", "RB One", "RB Two"),
+    stat = c("5", "12", "3")
+  )
+  flat <- flatten_game_player_stats(raw, 2023L, 5L, "regular")
+  car <- flat[flat$category == "rushing" & flat$statType == "CAR", ]
+  expect_equal(nrow(car), 3L)
+  expect_equal(car$playerId, c("4426688", "4426700", "4426701"))
+  expect_equal(car$player, c("QB One", "RB One", "RB Two"))
+  expect_equal(car$stat, c("5", "12", "3"))
+  expect_true(all(car$team == "Alabama"))
+})
+
 test_that("flatten_game_team_stats produces one row per team-category-stat", {
   flat <- flatten_game_team_stats(mk_team_raw(), 2023L, 5L, "regular")
   expect_equal(nrow(flat), 4L)
@@ -160,6 +178,31 @@ test_that("game contracts pass well-formed tables and catch bad keys", {
   expect_true(
     pointblank::all_passed(contract_game_team_stats(t, stop_on_fail = FALSE))
   )
+
+  # A box score cut to one rusher per team-game fails the player contract.
+  one_rusher <- tibble::tibble(
+    gameId = rep(1:60, each = 2),
+    season = 2023L,
+    week = 1L,
+    seasonType = "regular",
+    team = rep(c("A", "B"), 60),
+    category = "rushing",
+    statType = "CAR",
+    playerId = as.character(seq_len(120)),
+    stat = "5"
+  )
+  expect_false(pointblank::all_passed(contract_game_player_stats(
+    one_rusher,
+    stop_on_fail = FALSE
+  )))
+  two_rushers <- dplyr::bind_rows(
+    one_rusher,
+    dplyr::mutate(one_rusher, playerId = paste0(playerId, "b"))
+  )
+  expect_true(pointblank::all_passed(contract_game_player_stats(
+    two_rushers,
+    stop_on_fail = FALSE
+  )))
 
   # A repeated (gameId, team, category) pair fails the team-grain contract.
   t_dup <- dplyr::bind_rows(t, dplyr::slice(t, 1))

@@ -1,0 +1,836 @@
+---
+title: "Every position shows early career stops, but injury-shaped and benching-shaped seasons can be read only for box-score regulars"
+date: "2026-11-07"
+description: "A stop with eligibility left is the most common ending of a finished stat-line career at every position, while an injury-shaped absence or a benching-shaped decline can be read only for regulars who log box-score stats, which leaves out almost every offensive lineman."
+followups:
+  - "Check the injury-shaped absence rule against a list of publicly reported season-ending injuries for named players, to measure how often it is right."
+  - "Follow offensive linemen through play-by-play participation or snap counts (issue 44), the only route to an absence signal for the position."
+  - "Re-render the playing-time and performance-arcs posts on the corrected box scores, which now list every player per game."
+  - "Ask whether an injury-shaped absence in a draft-eligible season lowers the chance of being drafted, holding position and production fixed."
+author:
+  - "AI directed by Nick Giangreco"
+freeze: auto
+vignette: >
+  %\VignetteIndexEntry{Every position shows early career stops, but injury-shaped and benching-shaped seasons can be read only for box-score regulars}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# ---- Packages, data connection and figure defaults -------------------------
+# Load the project's functions straight from the checkout with pkgload; the
+# repo is never installed (decision 0042). The site build sets CFB2NFL_ROOT,
+# a local render finds the checkout from the working directory.
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+library(DBI)
+library(dplyr)
+library(duckdb)
+library(ggiraph)
+library(ggplot2)
+library(knitr)
+
+# One interaction style for every girafe figure: a clear hover pop, dimming
+# of non-hovered marks, a dark tooltip, and toolbar zoom + PNG download.
+set_girafe_defaults(
+  opts_hover = opts_hover(
+    css = "stroke:#111827;stroke-width:2.5px;filter:brightness(1.12);"
+  ),
+  opts_hover_inv = opts_hover_inv(css = "opacity:0.45;"),
+  opts_tooltip = opts_tooltip(
+    css = "background:#111827;color:#fff;padding:6px 9px;border-radius:5px;font-weight:bold;font-size:15px;"
+  ),
+  opts_zoom = opts_zoom(min = 1, max = 5),
+  opts_toolbar = opts_toolbar(saveaspng = TRUE, position = "topright"),
+  opts_sizing = opts_sizing(rescale = TRUE)
+)
+
+# thousands-separated and percent formatters for inline numbers
+fmt <- function(x, digits = 0) {
+  formatC(as.numeric(x), big.mark = ",", format = "f", digits = digits)
+}
+pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
+
+claim_fill <- "#B45309"
+context_fill <- "#9CA3AF"
+
+# ---- Named players (keyed on athlete id) -----------------------------------
+# Key on athlete id, never name (recruiting ids collide, decision 0013).
+subjects <- tibble::tribble(
+  ~who            , ~cfb_athlete_id ,
+  "Joe Burrow"    , "3915511"       ,
+  "Jordan Travis" , "4360799"
+)
+
+# ---- Signal rules -----------------------------------------------------------
+# The rule thresholds are the functions' defaults, read here so the prose that
+# states them follows any change.
+streak <- formals(absence_runs)$streak
+min_gap <- formals(absence_runs)$min_gap
+min_games <- formals(usage_decline)$min_games
+ratio <- formals(usage_decline)$ratio
+# The share of seasons a signal must reach to count as readable at a position.
+read_floor <- 0.05
+
+# ---- Load the tables -------------------------------------------------------
+# Career endings, the player x game table and playing time are
+# contract-checked pipeline steps, read from the targets store (decision 0041).
+store <- file.path(root, "_targets")
+career_end <- targets::tar_read(career_end, store = store)
+player_game <- targets::tar_read(player_game, store = store)
+usage <- targets::tar_read(player_usage, store = store)
+roster <- dbReadTable(con, "roster")
+games <- dbReadTable(con, "games")
+names_by_id <- dbGetQuery(
+  con,
+  "SELECT playerId, any_value(player) AS player
+   FROM game_player_stats GROUP BY playerId"
+)
+
+# The nine position groups a fan reads; "Athlete" and unrecorded positions are
+# too small or too vague to compare and are left out of the exhibits.
+pos_levels <- setdiff(
+  harmonized_position_levels(),
+  c("Athlete", "Position not recorded")
+)
+
+# ---- Careers: how each one ended -------------------------------------------
+# A career's position is its position in its last roster season.
+last_position <- roster |>
+  mutate(playerId = as.character(playerId)) |>
+  group_by(playerId) |>
+  slice_max(season, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  transmute(playerId, position_group = harmonize_position(position, "roster"))
+careers <- career_end |>
+  inner_join(last_position, by = "playerId") |>
+  filter(position_group %in% pos_levels) |>
+  mutate(position_group = factor(position_group, pos_levels))
+# Finished careers: not right-censored. The proxy can be read only for the
+# stat-line population, which carries the undrafted NFL label.
+finished <- careers |> filter(career_end != "right_censored")
+statline <- finished |> filter(in_model_population)
+
+ending_labels <- c(
+  early_stop = "Stopped with eligibility left",
+  eligibility_exhausted = "Used up eligibility",
+  eligibility_unknown = "Stopped, eligibility unknown",
+  transferred_then_stopped = "Changed schools, then stopped",
+  signed_udfa = "Signed undrafted",
+  drafted = "Drafted"
+)
+endings_by_pos <- statline |>
+  count(position_group, career_end) |>
+  group_by(position_group) |>
+  mutate(share = n / sum(n)) |>
+  ungroup() |>
+  mutate(ending = factor(ending_labels[career_end], ending_labels))
+modal_ending <- endings_by_pos |>
+  group_by(position_group) |>
+  slice_max(share, n = 1, with_ties = FALSE) |>
+  ungroup()
+early_by_pos <- endings_by_pos |> filter(career_end == "early_stop")
+statline_share <- finished |>
+  group_by(position_group) |>
+  summarise(
+    finished = n(),
+    with_line = mean(in_model_population),
+    .groups = "drop"
+  )
+
+# ---- Seasons: the box-score signals, 2016 to 2025 --------------------------
+# CFBD box scores list defensive stats from 2016 on; 2026 is still running.
+game_window <- 2016:2025
+# Rostered player-seasons on one team, so a transfer's split season is not
+# read as a gap.
+pos_seasons <- usage |>
+  filter(on_roster, team_games > 0, season %in% game_window) |>
+  group_by(playerId, season) |>
+  filter(n() == 1L) |>
+  ungroup() |>
+  filter(position_group %in% pos_levels) |>
+  select(playerId, season, team, position_group)
+absence <- player_appearance_sequence(player_game, roster, games) |>
+  filter(season %in% game_window) |>
+  absence_runs(streak = streak, min_gap = min_gap) |>
+  inner_join(pos_seasons, by = c("playerId", "season", "team")) |>
+  mutate(position_group = factor(position_group, pos_levels))
+decline <- player_game |>
+  filter(season %in% game_window) |>
+  usage_decline(pos_seasons, min_games = min_games, ratio = ratio) |>
+  mutate(position_group = factor(position_group, pos_levels))
+
+absence_by_pos <- absence |>
+  group_by(position_group) |>
+  summarise(
+    seasons = n(),
+    readable_n = sum(observable),
+    readable = mean(observable),
+    returned = mean(absence_shape[observable] == "returned"),
+    season_ending = mean(absence_shape[observable] == "season_ending"),
+    injury_shaped = returned + season_ending,
+    .groups = "drop"
+  )
+decline_by_pos <- decline |>
+  group_by(position_group, usage_label) |>
+  summarise(
+    with_line = n(),
+    readable_n = sum(observable),
+    declined = mean(declined[observable]),
+    .groups = "drop"
+  ) |>
+  # Same base as the absence signal: seasons with a box-score sequence.
+  left_join(select(absence_by_pos, position_group, seasons), by = "position_group") |>
+  mutate(readable = readable_n / seasons)
+signals_by_pos <- absence_by_pos |>
+  select(position_group, injury_shaped) |>
+  inner_join(
+    select(decline_by_pos, position_group, declined),
+    by = "position_group"
+  )
+
+# ---- Final seasons: do the two grains agree? -------------------------------
+final_endings <- c(
+  "early_stop",
+  "eligibility_exhausted",
+  "transferred_then_stopped",
+  "signed_udfa",
+  "drafted"
+)
+final <- finished |>
+  filter(last_season %in% game_window, career_end %in% final_endings) |>
+  left_join(
+    select(absence, playerId, season, observable, absence_shape),
+    by = c("playerId", "last_season" = "season")
+  ) |>
+  mutate(
+    observable = observable %in% TRUE,
+    ending = factor(ending_labels[career_end], ending_labels[final_endings])
+  )
+final_by_ending <- final |>
+  group_by(career_end, ending) |>
+  summarise(
+    careers = n(),
+    readable = mean(observable),
+    season_ending = mean(absence_shape[observable] == "season_ending"),
+    .groups = "drop"
+  ) |>
+  arrange(ending)
+
+# ---- Numbers quoted in the prose -------------------------------------------
+e1_holds <- all(modal_ending$career_end == "early_stop")
+runner_up <- endings_by_pos |>
+  filter(career_end != "early_stop") |>
+  group_by(position_group) |>
+  slice_max(share, n = 1, with_ties = FALSE) |>
+  ungroup()
+no_usage <- setdiff(pos_levels, usage_signal_map()$position_group)
+early_lo <- min(early_by_pos$share)
+early_hi <- max(early_by_pos$share)
+ol_with_line <- statline_share$with_line[
+  statline_share$position_group == "Offensive line"
+]
+readable_hi <- max(absence_by_pos$readable)
+readable_hi_pos <- as.character(
+  absence_by_pos$position_group[which.max(absence_by_pos$readable)]
+)
+ol_readable <- absence_by_pos$readable[
+  absence_by_pos$position_group == "Offensive line"
+]
+e2_holds <- all(absence_by_pos$readable >= read_floor)
+e3_holds <- all(signals_by_pos$declined < signals_by_pos$injury_shaped)
+decline_lo <- min(signals_by_pos$declined)
+decline_hi <- max(signals_by_pos$declined)
+injury_lo <- min(signals_by_pos$injury_shaped)
+injury_hi <- max(signals_by_pos$injury_shaped)
+fe <- function(code, col) final_by_ending[[col]][final_by_ending$career_end == code]
+early_final_readable <- fe("early_stop", "readable")
+early_final_end <- fe("early_stop", "season_ending")
+exhausted_final_end <- fe("eligibility_exhausted", "season_ending")
+drafted_final_end <- fe("drafted", "season_ending")
+e4_holds <- early_final_end > exhausted_final_end
+early_confirmed <- early_final_readable * early_final_end
+final_gap <- early_final_end - exhausted_final_end
+
+# ---- Numbers quoted in the prose: the named players ------------------------
+cast <- absence |>
+  filter(playerId %in% subjects$cfb_athlete_id) |>
+  left_join(subjects, by = c("playerId" = "cfb_athlete_id"))
+travis_2023 <- cast |> filter(who == "Jordan Travis", season == 2023L)
+burrow_2019 <- cast |> filter(who == "Joe Burrow", season == 2019L)
+eligibility_seasons <- formals(career_end_status)$eligibility_seasons
+```
+
+::: {.callout-note appearance="minimal"}
+*Data as of the `data-latest` release, retrieved 2026-11-07. Careers of
+recent classes are right-censored; later seasons may not yet be present.*
+:::
+
+## 1. Introduction
+
+Jordan Travis's 2023 season stopped in November, and the data holds no injury report or depth chart to say why, so this post asks what each position's absences let us define: a career that stops early, a regular who disappears from the box score (injury-shaped), a regular who keeps playing with less of the ball (benching-shaped), and whether a player who entered the draft and went unselected can be seen at all.
+
++ *Expectation one: a stop with eligibility left is the most common ending of a finished stat-line career at every position.*
++ *Expectation two: an injury-shaped absence can be read in at least `r pct(read_floor, 0)` of seasons at every position.*
++ *Expectation three: among seasons that can show each, a benching-shaped decline is rarer than an injury-shaped absence at every position.*
++ *Expectation four: early-stop careers end in a season-ending absence more often than careers that used up their eligibility.*
+
+## 2. Data
+
+### 2.1 Every signal here is a shape in the data, not a recorded injury or benching
+
+The table defines each signal and the players it can be read for; none is a recorded injury or benching, so the data cannot say which seasons were injuries.
+
+```{r}
+#| label: terms
+tibble::tribble(
+  ~Term, ~Meaning,
+  "Career", "One player's run of college roster seasons, at any number of schools.",
+  "Finished career", "A career whose end is observed: its last season is not the latest in the data, and the draft after it has happened.",
+  "Stat-line career", "A finished career with at least one season stat line. Only these can be checked for an undrafted NFL signing, so only these can be sorted into an ending.",
+  "Stopped with eligibility left", "A stat-line career at one school that ended with eligibility remaining and no draft pick or undrafted signing. The early-stop proxy.",
+  "Eligibility", sprintf("%s seasons from the first roster season, with 2020 not counted. Medical waivers are not visible.", eligibility_seasons),
+  "Box score", "The per-game stat lines for a team: every player who recorded a stat. College box scores list defensive stats from 2016 on.",
+  "Regular", sprintf("A player with a stat line in %s straight team games that have a box score.", streak),
+  "Injury-shaped absence", sprintf("A regular who then has no stat line in %s or more straight games. It is 'returned' when the player logs a line again that season, 'season-ending' when not.", min_gap),
+  "Benching-shaped decline", sprintf("A player who appeared in %s or more games, at a starter's usage in the first half of them, whose usage in the second half fell to %s of that or less.", min_games, pct(ratio, 0)),
+  "Usage", "Per game: pass attempts for quarterbacks, carries for running backs, receptions for receivers and tight ends, tackles for defenders.",
+  "Can be read", "The share of a position's player-seasons (or careers) the signal applies to at all, before asking whether it fired."
+) |>
+  kable(caption = "The terms used throughout.")
+```
+
+### 2.2 Each position is followed through one box-score count, except `r paste(tolower(no_usage), collapse = " and ")`, which have none
+
+The usage count for each position, and the first-half floor that marks a starter, decide which positions the benching-shaped signal can reach.
+
+```{r}
+#| label: usage-map
+map <- usage_signal_map()
+tibble::tibble(position_group = pos_levels) |>
+  left_join(map, by = "position_group") |>
+  transmute(
+    `Position group` = position_group,
+    `Usage count` = coalesce(usage_label, "None in the box score"),
+    `Starter floor per game` = if_else(is.na(floor), "", fmt(floor))
+  ) |>
+  kable(
+    align = "llr",
+    caption = "The box-score count followed for each position group, and the first-half per-game average that marks a starter."
+  )
+```
+
+## 3. Results
+
+### 3.1 A stop with eligibility left ends `r pct(early_lo, 0)` to `r pct(early_hi, 0)` of finished stat-line careers, the largest share at every position
+
+*Expectation: a stop with eligibility left is the most common ending of a finished stat-line career at every position.* `r if (e1_holds) "✅" else "❌"`
+
+The table sorts each position's finished stat-line careers into their endings; only `r pct(ol_with_line, 0)` of finished offensive line careers have a stat line at all, so the proxy reaches few linemen.
+
+```{r}
+#| label: s31-table
+endings_by_pos |>
+  select(position_group, ending, share) |>
+  tidyr::pivot_wider(names_from = ending, values_from = share, values_fill = 0) |>
+  left_join(statline_share, by = "position_group") |>
+  arrange(position_group) |>
+  mutate(across(all_of(unname(ending_labels)), \(x) pct(x, 0))) |>
+  transmute(
+    `Position group` = as.character(position_group),
+    `Finished careers` = fmt(finished),
+    `With a stat line` = pct(with_line, 0),
+    `Stat-line careers` = fmt(round(finished * with_line)),
+    !!!rlang::syms(unname(ending_labels))
+  ) |>
+  kable(
+    align = paste0("l", strrep("r", 9)),
+    caption = "Finished careers by the position of their last season, and how the stat-line careers among them ended (each row of endings sums to 100%)."
+  )
+```
+
+```{r}
+#| label: s31-explain
+#| fig-height: 6
+# The early stop against each position's next most common ending.
+p <- bind_rows(
+  mutate(early_by_pos, bar = "Stopped with eligibility left"),
+  mutate(runner_up, bar = "Next most common ending")
+) |>
+  mutate(
+    bar = factor(
+      bar,
+      c("Next most common ending", "Stopped with eligibility left")
+    ),
+    tip = sprintf("%s, %s: %s", position_group, ending, pct(share))
+  ) |>
+  ggplot(aes(
+    x = share,
+    y = forcats::fct_rev(position_group),
+    fill = bar
+  )) +
+  geom_col_interactive(
+    aes(tooltip = tip, data_id = paste(position_group, ending)),
+    position = position_dodge(width = 0.8),
+    width = 0.75
+  ) +
+  scale_fill_manual(
+    values = c(
+      `Stopped with eligibility left` = claim_fill,
+      `Next most common ending` = context_fill
+    ),
+    breaks = c("Stopped with eligibility left", "Next most common ending")
+  ) +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    x = "Share of finished stat-line careers",
+    y = NULL,
+    fill = NULL,
+    subtitle = "Hover a grey bar to see which ending comes second"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: s31-explore
+#| fig-height: 7
+by_last <- statline |>
+  filter(last_season %in% game_window) |>
+  group_by(position_group, last_season) |>
+  summarise(n = n(), early = mean(early_stop_proxy), .groups = "drop") |>
+  mutate(
+    tip = sprintf(
+      "%s, last season %s: %s of %s careers stopped with eligibility left",
+      position_group,
+      last_season,
+      pct(early),
+      fmt(n)
+    )
+  )
+p2 <- ggplot(
+  by_last,
+  aes(last_season, early, colour = position_group, group = position_group)
+) +
+  geom_line(linewidth = 0.6) +
+  geom_point_interactive(
+    aes(tooltip = tip, data_id = paste(position_group, last_season)),
+    size = 3
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_continuous(breaks = game_window) +
+  scale_colour_viridis_d(option = "D", end = 0.9) +
+  labs(
+    x = "Last season of the career",
+    y = "Stopped with eligibility left",
+    colour = NULL,
+    subtitle = sprintf(
+      "Careers whose last season is %s to %s",
+      min(game_window),
+      max(game_window)
+    )
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p2, width_svg = 13, height_svg = 7)
+```
+
+### 3.2 An injury-shaped absence can be read in at most `r pct(readable_hi, 0)` of a position's seasons, and in `r pct(ol_readable)` of offensive linemen's
+
+*Expectation: an injury-shaped absence can be read in at least `r pct(read_floor, 0)` of seasons at every position.* `r if (e2_holds) "✅" else "❌"`
+
+A season can show an absence only if the player was a regular in the box score first; Jordan Travis's 2023 season is one, a stat line in each of his first `r travis_2023$games_appeared` games and none in the last `r travis_2023$gap_games`.
+
+```{r}
+#| label: s32-table
+absence_by_pos |>
+  transmute(
+    `Position group` = as.character(position_group),
+    `Player-seasons` = fmt(seasons),
+    `Can be read` = pct(readable),
+    `Seasons that can be read` = fmt(readable_n),
+    `Absence, then returned` = pct(returned),
+    `Season-ending absence` = pct(season_ending)
+  ) |>
+  kable(
+    align = "lrrrrr",
+    caption = sprintf(
+      "Rostered player-seasons on one team, %s to %s. The absence shares are among the seasons that can be read; the offensive line shares rest on very few seasons.",
+      min(game_window),
+      max(game_window)
+    )
+  )
+```
+
+```{r}
+#| label: s32-explain
+#| fig-height: 6
+p3 <- absence_by_pos |>
+  mutate(
+    is_claim = position_group == "Offensive line",
+    tip = sprintf(
+      "%s: %s of %s seasons can be read",
+      position_group,
+      pct(readable),
+      fmt(seasons)
+    )
+  ) |>
+  ggplot(aes(
+    x = readable,
+    y = reorder(as.character(position_group), readable),
+    fill = is_claim
+  )) +
+  geom_col_interactive(
+    aes(tooltip = tip, data_id = as.character(position_group)),
+    show.legend = FALSE
+  ) +
+  scale_fill_manual(values = c(`FALSE` = context_fill, `TRUE` = claim_fill)) +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 0.5)) +
+  annotate(
+    "text",
+    x = 0.02,
+    y = 1,
+    label = "Linemen almost never log a stat line, so no gap can be seen",
+    hjust = 0,
+    colour = claim_fill,
+    fontface = "bold",
+    size = 4.5
+  ) +
+  labs(
+    x = "Share of player-seasons with a regular run that a gap could interrupt",
+    y = NULL
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p3, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s32-explore
+#| fig-height: 7
+by_season <- absence |>
+  group_by(position_group, season) |>
+  summarise(
+    n = n(),
+    readable = mean(observable),
+    shaped = mean(absence_shape[observable] %in% c("returned", "season_ending")),
+    .groups = "drop"
+  ) |>
+  mutate(
+    tip = sprintf(
+      "%s, %s: %s of %s seasons can be read; %s of those show an absence",
+      position_group,
+      season,
+      pct(readable),
+      fmt(n),
+      pct(shaped)
+    )
+  )
+p4 <- ggplot(
+  by_season,
+  aes(season, readable, colour = position_group, group = position_group)
+) +
+  geom_line(linewidth = 0.6) +
+  geom_point_interactive(
+    aes(tooltip = tip, data_id = paste(position_group, season)),
+    size = 3
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_continuous(breaks = game_window) +
+  scale_colour_viridis_d(option = "D", end = 0.9) +
+  labs(x = "Season", y = "Seasons that can be read", colour = NULL) +
+  theme_cfb2nfl()
+girafe(ggobj = p4, width_svg = 13, height_svg = 7)
+```
+
+### 3.3 Benching-shaped declines appear in `r pct(decline_lo, 0)` to `r pct(decline_hi, 0)` of the seasons that can show them, against `r pct(injury_lo, 0)` to `r pct(injury_hi, 0)` for injury-shaped absences
+
+*Expectation: among seasons that can show each, a benching-shaped decline is rarer than an injury-shaped absence at every position.* `r if (e3_holds) "✅" else "❌"`
+
+The table compares the two signals position by position (`r paste(tolower(no_usage), collapse = " and ")` have no usage count, so a decline cannot be read for them), and the scatter shows every quarterback season that can show a decline.
+
+```{r}
+#| label: s33-table
+decline_by_pos |>
+  left_join(
+    select(absence_by_pos, position_group, injury_shaped),
+    by = "position_group"
+  ) |>
+  arrange(position_group) |>
+  transmute(
+    `Position group` = as.character(position_group),
+    `Usage count` = usage_label,
+    `Decline can be read` = pct(readable),
+    `Benching-shaped decline` = pct(declined),
+    `Injury-shaped absence` = pct(injury_shaped)
+  ) |>
+  kable(
+    align = "llrrr",
+    caption = sprintf(
+      "Player-seasons, %s to %s. Each signal's share is among the seasons that can show that signal.",
+      min(game_window),
+      max(game_window)
+    )
+  )
+```
+
+```{r}
+#| label: s33-explain
+#| fig-height: 6
+p5 <- signals_by_pos |>
+  tidyr::pivot_longer(
+    c(declined, injury_shaped),
+    names_to = "signal",
+    values_to = "share"
+  ) |>
+  mutate(
+    signal = if_else(
+      signal == "declined",
+      "Benching-shaped decline",
+      "Injury-shaped absence"
+    ),
+    tip = sprintf("%s, %s: %s", position_group, signal, pct(share))
+  ) |>
+  ggplot(aes(
+    x = share,
+    y = forcats::fct_rev(position_group),
+    fill = signal
+  )) +
+  geom_col_interactive(
+    aes(tooltip = tip, data_id = paste(position_group, signal)),
+    position = position_dodge(width = 0.8),
+    width = 0.7
+  ) +
+  scale_fill_manual(
+    values = c(
+      `Benching-shaped decline` = claim_fill,
+      `Injury-shaped absence` = context_fill
+    )
+  ) +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    x = "Share of the seasons that can show the signal",
+    y = NULL,
+    fill = NULL
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p5, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s33-explore
+#| fig-height: 8
+qb <- decline |>
+  filter(observable, position_group == "Quarterback") |>
+  left_join(names_by_id, by = "playerId") |>
+  mutate(
+    status = if_else(declined, "Benching-shaped decline", "No decline"),
+    tip = sprintf(
+      "%s, %s %s: %.1f pass attempts a game in the first half, %.1f in the second (%s games)",
+      coalesce(player, playerId),
+      team,
+      season,
+      first_half,
+      second_half,
+      games_appeared
+    )
+  )
+p6 <- ggplot(qb, aes(first_half, second_half, colour = status)) +
+  geom_abline(slope = 0.5, intercept = 0, linetype = "dashed", colour = "grey40") +
+  geom_point_interactive(
+    aes(tooltip = tip, data_id = paste(playerId, season, team)),
+    size = 2.2,
+    alpha = 0.7
+  ) +
+  scale_colour_manual(
+    values = c(`Benching-shaped decline` = claim_fill, `No decline` = "#6B7280")
+  ) +
+  labs(
+    x = "Pass attempts per game, first half of games appeared",
+    y = "Pass attempts per game, second half",
+    colour = NULL,
+    subtitle = "Every quarterback season that can show a decline; below the dashed line, usage halved"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p6, width_svg = 13, height_svg = 8)
+```
+
+### 3.4 Early stops end in a season-ending absence `r pct(early_final_end, 0)` of the time against `r pct(exhausted_final_end, 0)` for used-up careers, but only `r pct(early_final_readable, 0)` of them can be read
+
+*Expectation: early-stop careers end in a season-ending absence more often than careers that used up their eligibility.* `r if (e4_holds) "✅" else "❌"`
+
+The table reads each ending's final season for a season-ending absence, a gap of `r fmt(100 * final_gap, 1)` percentage points between early stops and used-up careers, small next to the early stops the box score cannot read; a season-ending absence appears in the final season of `r pct(early_confirmed)` of all early stops.
+
+```{r}
+#| label: s34-table
+final_by_ending |>
+  transmute(
+    Ending = as.character(ending),
+    Careers = fmt(careers),
+    `Final season can be read` = pct(readable),
+    `Final season ends in an absence` = pct(season_ending)
+  ) |>
+  kable(
+    align = "lrrr",
+    caption = sprintf(
+      "Finished stat-line careers whose last season is %s to %s; careers whose eligibility is unknown are left out. The absence share is among the final seasons that can be read.",
+      min(game_window),
+      max(game_window)
+    )
+  )
+```
+
+```{r}
+#| label: s34-explain
+#| fig-height: 5
+p7 <- final_by_ending |>
+  mutate(
+    is_claim = career_end %in% c("early_stop", "eligibility_exhausted"),
+    tip = sprintf(
+      "%s: %s of %s readable final seasons end in an absence",
+      ending,
+      pct(season_ending),
+      fmt(round(careers * readable))
+    )
+  ) |>
+  ggplot(aes(
+    x = season_ending,
+    y = forcats::fct_rev(ending),
+    fill = is_claim
+  )) +
+  geom_col_interactive(
+    aes(tooltip = tip, data_id = career_end),
+    show.legend = FALSE
+  ) +
+  scale_fill_manual(values = c(`FALSE` = context_fill, `TRUE` = claim_fill)) +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    x = "Share of readable final seasons that end in a season-ending absence",
+    y = NULL,
+    subtitle = sprintf(
+      "Drafted careers end that way %s of the time",
+      pct(drafted_final_end, 0)
+    )
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p7, width_svg = 13, height_svg = 5)
+```
+
+```{r}
+#| label: s34-explore
+#| fig-height: 7
+by_pos_final <- final |>
+  filter(observable, career_end %in% c("early_stop", "eligibility_exhausted")) |>
+  group_by(position_group, ending) |>
+  summarise(
+    n = n(),
+    season_ending = mean(absence_shape == "season_ending"),
+    .groups = "drop"
+  ) |>
+  mutate(
+    tip = sprintf(
+      "%s, %s: %s of %s readable final seasons end in an absence",
+      position_group,
+      ending,
+      pct(season_ending),
+      fmt(n)
+    )
+  )
+p8 <- ggplot(
+  by_pos_final,
+  aes(season_ending, forcats::fct_rev(position_group), colour = ending)
+) +
+  geom_point_interactive(
+    aes(tooltip = tip, data_id = paste(position_group, ending), size = n),
+    alpha = 0.85
+  ) +
+  scale_colour_manual(
+    values = c(
+      `Stopped with eligibility left` = claim_fill,
+      `Used up eligibility` = "#1D4ED8"
+    )
+  ) +
+  scale_size_area(max_size = 9, guide = "none") +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    x = "Share of readable final seasons that end in a season-ending absence",
+    y = NULL,
+    colour = NULL,
+    subtitle = "Point size is the number of readable final seasons"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p8, width_svg = 13, height_svg = 7)
+```
+
+## 4. Summary
+
+The early-stop proxy reaches every position that logs a stat line, the two in-season signals reach only regulars in the box score, and no position shows a player who entered the draft and went unselected.
+
+```{r}
+#| label: summary
+tibble::tribble(
+  ~Expectation                                                                  , ~Verdict                       , ~Evidence                                                                                                          ,
+  "An early stop is the most common ending at every position"                   , if (e1_holds) "✅" else "❌"   , paste0(pct(early_lo, 0), " to ", pct(early_hi, 0), " of finished stat-line careers")                             ,
+  "An injury-shaped absence can be read at every position"                      , if (e2_holds) "✅" else "❌" , paste0(pct(ol_readable), " of offensive line seasons can be read")                                       ,
+  "A benching-shaped decline is rarer than an injury-shaped absence"            , if (e3_holds) "✅" else "❌"   , paste0(pct(decline_lo, 0), " to ", pct(decline_hi, 0), " against ", pct(injury_lo, 0), " to ", pct(injury_hi, 0)) ,
+  "Early stops end in a season-ending absence more often than exhausted careers" , if (e4_holds) "✅" else "❌"   , paste0(pct(early_final_end), " against ", pct(exhausted_final_end))
+) |>
+  kable(caption = "Each expectation and what the data showed.")
+```
+
+```{r}
+#| label: summary-matrix
+statline_share |>
+  left_join(select(absence_by_pos, position_group, readable), by = "position_group") |>
+  left_join(
+    select(decline_by_pos, position_group, decline_readable = readable),
+    by = "position_group"
+  ) |>
+  arrange(position_group) |>
+  transmute(
+    `Position group` = as.character(position_group),
+    `Early stop (finished careers with a stat line)` = pct(with_line, 0),
+    `Injury-shaped absence (seasons)` = pct(readable),
+    `Benching-shaped decline (seasons)` = if_else(
+      is.na(decline_readable),
+      "No usage count",
+      pct(decline_readable, 0)
+    ),
+    `Entered the draft, not selected` = "Not in the data"
+  ) |>
+  kable(
+    align = "lrrrl",
+    caption = "What the data can define for each position: the share of careers or seasons each signal can be read for."
+  )
+```
+
+## 5. Discussion
+
+::: {.callout-important}
+Each signal marks a shape, not a cause. A season-ending absence is how a torn ligament looks in the box score, and it is also how a suspension, an illness, or a quiet stretch for a receiver who caught nothing looks.
+
+- Burrow's 2019 season at LSU, a stat line in `r burrow_2019$games_appeared` of `r burrow_2019$box_games` games, shows no absence; Travis's 2023 season ends in one, and only outside reporting can say it was his leg.
+:::
+
+::: {.callout-important}
+Some questions the data cannot answer at any position. CFBD lists draft selections only, so a player who declared, went unselected, and never signed is indistinguishable from one who never declared.
+
+- Undrafted players who reached an NFL roster are visible through the undrafted-signing label; the rest of the unselected entrants are not.
+:::
+
+Caveats: CFBD box scores carry defensive lines only from 2016, so every season-grain signal uses 2016 to 2025. Games without a box score, common against lower-division opponents, are skipped rather than counted as misses. Player-seasons split across two teams are left out. A draft-bound player who skips the bowl game can look like a season-ending absence, which may explain why drafted careers show one. Careers of recent classes are right-censored and excluded from the endings.
+
+```{r}
+#| label: teardown
+#| output: false
+dbDisconnect(con, shutdown = TRUE)
+```

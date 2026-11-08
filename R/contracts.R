@@ -1328,8 +1328,23 @@ contract_game_player_stats <- function(
     pointblank::rows_distinct(
       pointblank::vars(gameId, playerId, category, statType)
     ) |>
+    pointblank::specially(
+      fn = box_scores_list_many_players,
+      label = "most team-games list more than one rusher"
+    ) |>
     pointblank::interrogate()
   enforce_contract(agent, "game_player_stats", stop_on_fail)
+}
+
+# Whole box scores, not one player per stat type: a flatten that keeps only
+# the first athlete (the 2026-11 bug) leaves exactly one rusher per team-game.
+# Real team-games almost always list two or more, so at least half must.
+# Judged only on 100+ team-games, so small test fixtures pass.
+box_scores_list_many_players <- function(x, min_team_games = 100L) {
+  rushers <- x |>
+    dplyr::filter(.data$category == "rushing", .data$statType == "CAR") |>
+    dplyr::count(.data$gameId, .data$team, name = "n_players")
+  nrow(rushers) < min_team_games || mean(rushers$n_players > 1L) >= 0.5
 }
 
 #' Data contract for the player x game table

@@ -96,5 +96,5 @@ mode.
   `viz_drafts_by_team`.
 - [ ] Venues ingest + spatial map — needs the ingested venues table published
   to `data-latest` BEFORE merge (release/CI constraint above).
-- [ ] Limitations section (injuries, entered-not-selected, injured-vs-benched).
+- [x] Limitations section (injuries, entered-not-selected, injured-vs-benched): the 2026-11-07 absence-by-position post (issue #51).
 - [ ] Restructure explore.qmd into the question sections above.
