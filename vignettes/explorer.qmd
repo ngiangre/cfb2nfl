@@ -447,7 +447,7 @@ gameView = {
   const pct = p => p === null || p === undefined ? "not rated" : `${Math.round(p * 100)}%`;
   const out = html`<div class="explorer-game">
     <h4>${info.team} ${gameRow.points}, ${oppName} ${gameRow.opp_points}</h4>
-    <p class="explorer-summary">Elo win chance before kickoff: <strong>${pct(gameRow.wp_pre)}</strong> · CFBD win probability after the game: <strong>${pct(gameRow.wp_post)}</strong></p>
+    <p class="explorer-summary">Elo win chance before kickoff (neutral field): <strong>${pct(gameRow.wp_pre)}</strong> · CFBD win probability after the game: <strong>${pct(gameRow.wp_post)}</strong></p>
   </div>`;
   if (gamePlaysData.error) {
     const card = asNode(errorCard("this game's plays"));
