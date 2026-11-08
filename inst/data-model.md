@@ -20,6 +20,10 @@ dictionaries next to this file, one YAML per table:
 | `games` | one game (metadata + result) | [`dict/games.yml`](dict/games.yml) |
 | `game_team_stats` | **long**: team-game-category-stat | [`dict/game_team_stats.yml`](dict/game_team_stats.yml) |
 | `game_player_stats` | **long**: player-game-category-statType-stat | [`dict/game_player_stats.yml`](dict/game_player_stats.yml) |
+| `plays` | one play (situation, outcome, PPA, play text) | [`dict/plays.yml`](dict/plays.yml) |
+| `play_stats` | **long**: athlete-play-stat (who ran, caught, tackled, ...) | [`dict/play_stats.yml`](dict/play_stats.yml) |
+| `play_types` | one play type (display dimension) | [`dict/play_types.yml`](dict/play_types.yml) |
+| `play_stat_types` | one play-stat type (display dimension) | [`dict/play_stat_types.yml`](dict/play_stat_types.yml) |
 | `nfl_draft_picks` | one NFL draft pick | [`dict/nfl_draft_picks.yml`](dict/nfl_draft_picks.yml) |
 | `nfl_rosters` | one player-season on an NFL roster | [`dict/nfl_rosters.yml`](dict/nfl_rosters.yml) |
 | `nfl_player_stats` | one NFL player-season (regular season) | [`dict/nfl_player_stats.yml`](dict/nfl_player_stats.yml) |
@@ -117,6 +121,11 @@ erDiagram
     game_player_stats ||--|| player_game : "playerId, gameId (one row per stat line)"
     games ||--o{ player_game : "gameId == id"
     team_season ||--o{ player_game : "team, season (team_games)"
+    games ||--o{ plays : "gameId == id"
+    plays ||--o{ play_stats : "playId == id"
+    play_types ||--o{ plays : "playTypeId == id"
+    play_stat_types ||--o{ play_stats : "statTypeId == id"
+    play_stats }o--|| roster : "athleteId == playerId (shared athlete id)"
     picks |o..o| nfl_draft_picks : "draft slot (year, round, overall), name-guarded"
     outcomes }o..o{ nfl_rosters : "gsis_id (name-guarded)"
     ps_change }o--|| outcomes : "playerId, season"
@@ -174,6 +183,13 @@ wrong rows, so they are called out explicitly.
    on the same keys: `(playerId, gameId)` is unique, its `gameId` joins
    `games.id`, and `team_games` is the team's games played in the season (the
    denominator for games appeared).
+   **Play-by-play** sits under the same game id: `plays.gameId` joins
+   `games.id`, `play_stats.playId` joins `plays.id` (play and drive ids are
+   strings), and both carry `season`/`week` (`plays` also `seasonType`).
+   `play_stats.athleteId` is the shared college athlete id (namespace 1; 100%
+   of probed ids are roster `playerId`s, no name guard). `plays` itself names
+   no athlete. `play_stats` is backfilled one season per opt-in pull (decision
+   0031), so seasons not yet pulled have no rows; `plays` covers every season.
 
 ### Two namespaces that look joinable but are not
 

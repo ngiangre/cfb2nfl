@@ -1,0 +1,22 @@
+dataset: play_types
+source: CFBD /plays/types (one call)
+grain: one row per play type
+key: id
+description: >
+  The play-type vocabulary (49 types): outcomes such as Rush, Pass Reception,
+  Punt, Field Goal Good, Penalty, Timeout. Display dimension for plays, joined
+  by plays.playTypeId == id. CFBD's own Uncategorized (999) and placeholder
+  (70) entries are kept because plays can carry them.
+columns:
+  - name: id
+    type: int32
+    description: CFBD play-type id; joins plays.playTypeId.
+    provenance: raw
+  - name: text
+    type: string
+    description: Play-type label (the text plays.playType carries).
+    provenance: raw
+  - name: abbreviation
+    type: string
+    description: Short label (NA for many types).
+    provenance: raw

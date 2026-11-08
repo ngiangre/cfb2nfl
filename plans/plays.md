@@ -1,7 +1,10 @@
 # Plan: incorporate CFBD play-by-play (the /plays family)
 
-Status: design validated (probes + namespace check done 2026-10-22), code not
-started. Decision 0031 records the ratified choices.
+Status: Phase 1 built and published 2026-11-08 (issue #44): `plays` for every
+season, the two dimensions, and an empty `play_stats`. Phase 2 (per-game
+`/plays/stats`, opt-in via `CFB2NFL_PLAYS_STATS=true`) is the open step:
+backfill one season per month, newest first. Decision 0031 records the
+ratified choices and what the build learned.
 
 ## What the endpoints are (probed 2026-10-22)
 

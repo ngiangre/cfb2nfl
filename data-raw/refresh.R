@@ -1,9 +1,9 @@
 # Refresh ALL data by running the pipeline in refresh mode (decision 0017):
 # ingest every season from CFBD/nflverse, derive conference_tiers, process,
 # and write every data asset (cleaned parquet + the DuckDB bundle) in one
-# dependency-ordered pass. Requires CFBD_API_KEY. Costs ~780 CFBD calls: the
-# routine path is the weekly current-season run
-# (.github/workflows/data-current.yaml, ~40 calls), and
+# dependency-ordered pass. Requires CFBD_API_KEY. Costs ~1,060 CFBD calls
+# (~280 of them /plays): the routine path is the weekly current-season run
+# (.github/workflows/data-current.yaml, ~55 calls), and
 # data-raw/refresh-historical.R re-pulls selected seasons (decision 0034).
 # Use this full rebuild only when a schema change needs every season re-cleaned.
 #

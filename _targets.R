@@ -128,6 +128,46 @@ list(
     raw_game_player_stats,
     if (refresh_enabled()) dplyr::bind_rows(raw_game_player_stats_chunk)
   ),
+  # Play-by-play (decision 0031). /plays is one call per played week, mapped
+  # over the same week grid as the game stats; the two dimensions are one call
+  # each. /plays/stats is one call per GAME (~2,100 a season), so it is opt-in
+  # (CFB2NFL_PLAYS_STATS, see play_stats_enabled()) and branched by season,
+  # with the season's games looped inside the chunk.
+  tar_target(raw_play_types, if (refresh_enabled()) ingest_play_types()),
+  tar_target(
+    raw_play_stat_types,
+    if (refresh_enabled()) ingest_play_stat_types()
+  ),
+  tar_target(
+    raw_plays_chunk,
+    if (refresh_enabled()) {
+      ingest_plays_chunk(week_grid$season, week_grid$week, week_grid$seasonType)
+    },
+    pattern = map(week_grid)
+  ),
+  tar_target(
+    raw_plays,
+    if (refresh_enabled()) dplyr::bind_rows(raw_plays_chunk)
+  ),
+  tar_target(play_stats_grid, refresh_seasons(source = "play_stats")),
+  # The games to pull come from the published plays, so only games CFBD has
+  # play-by-play for are queried.
+  tar_target(plays_games, dplyr::distinct(plays, season, gameId)),
+  tar_target(
+    raw_play_stats_chunk,
+    if (refresh_enabled() && play_stats_enabled()) {
+      ingest_play_stats_chunk(
+        plays_games$gameId[plays_games$season == play_stats_grid]
+      )
+    },
+    pattern = map(play_stats_grid)
+  ),
+  tar_target(
+    raw_play_stats,
+    if (refresh_enabled() && play_stats_enabled()) {
+      dplyr::bind_rows(raw_play_stats_chunk)
+    }
+  ),
   # NFL outcomes via nflverse (decision 0014); no CFBD key required to ingest.
   tar_target(
     raw_nfl_draft_picks,
@@ -259,6 +299,55 @@ list(
   ),
   tar_target(game_player_stats, arrow::read_parquet(game_player_stats_file)),
   tar_target(
+    play_types_file,
+    parquet_asset("data/play_types.parquet", function() {
+      clean_play_types(raw_play_types)
+    }),
+    format = "file"
+  ),
+  tar_target(play_types, arrow::read_parquet(play_types_file)),
+  tar_target(
+    play_stat_types_file,
+    parquet_asset("data/play_stat_types.parquet", function() {
+      clean_play_stat_types(raw_play_stat_types)
+    }),
+    format = "file"
+  ),
+  tar_target(play_stat_types, arrow::read_parquet(play_stat_types_file)),
+  # plays is millions of rows, so the in-store copies are parquet, not rds.
+  tar_target(
+    plays_file,
+    parquet_asset("data/plays.parquet", function() {
+      splice_seasons(
+        clean_plays(raw_plays, play_types),
+        "data/plays.parquet",
+        "season",
+        refresh_seasons(source = "plays"),
+        full = refresh_is_full(source = "plays")
+      )
+    }),
+    format = "file"
+  ),
+  tar_target(plays, arrow::read_parquet(plays_file), format = "parquet"),
+  # Left as published unless CFB2NFL_PLAYS_STATS pulled seasons (Phase 2).
+  tar_target(
+    play_stats_file,
+    parquet_asset("data/play_stats.parquet", function() {
+      assemble_play_stats(
+        raw_play_stats,
+        play_stat_types,
+        "data/play_stats.parquet",
+        refresh_seasons(source = "play_stats")
+      )
+    }),
+    format = "file"
+  ),
+  tar_target(
+    play_stats,
+    arrow::read_parquet(play_stats_file),
+    format = "parquet"
+  ),
+  tar_target(
     nfl_draft_picks_file,
     parquet_asset(
       "data/nfl_draft_picks.parquet",
@@ -373,7 +462,8 @@ list(
           recruiting = recruiting$hs_class,
           games = games$season,
           game_team_stats = game_team_stats$season,
-          game_player_stats = game_player_stats$season
+          game_player_stats = game_player_stats$season,
+          plays = plays$season
         ),
         required = required_seasons(c(
           "player_stats",
@@ -381,7 +471,8 @@ list(
           "recruiting",
           "games",
           "game_team_stats",
-          "game_player_stats"
+          "game_player_stats",
+          "plays"
         )),
         stop_on_fail = FALSE
       )
@@ -407,6 +498,40 @@ list(
     ok_game_player_stats,
     pointblank::all_passed(
       contract_game_player_stats(game_player_stats, stop_on_fail = FALSE)
+    )
+  ),
+  tar_target(
+    ok_play_types,
+    pointblank::all_passed(
+      contract_play_dimension(
+        play_types,
+        "text",
+        "play_types",
+        min_rows = 40L,
+        stop_on_fail = FALSE
+      )
+    )
+  ),
+  tar_target(
+    ok_play_stat_types,
+    pointblank::all_passed(
+      contract_play_dimension(
+        play_stat_types,
+        "name",
+        "play_stat_types",
+        min_rows = 25L,
+        stop_on_fail = FALSE
+      )
+    )
+  ),
+  tar_target(
+    ok_plays,
+    pointblank::all_passed(contract_plays(plays, games, stop_on_fail = FALSE))
+  ),
+  tar_target(
+    ok_play_stats,
+    pointblank::all_passed(
+      contract_play_stats(play_stats, plays, roster, stop_on_fail = FALSE)
     )
   ),
   tar_target(
@@ -565,6 +690,10 @@ list(
       games = ok_games,
       game_team_stats = ok_game_team_stats,
       game_player_stats = ok_game_player_stats,
+      play_types = ok_play_types,
+      play_stat_types = ok_play_stat_types,
+      plays = ok_plays,
+      play_stats = ok_play_stats,
       tiers = ok_tiers,
       drafted = ok_drafted,
       coach_link = ok_coach_link,
@@ -744,6 +873,10 @@ list(
         games = games,
         game_team_stats = game_team_stats,
         game_player_stats = game_player_stats,
+        play_types = play_types,
+        play_stat_types = play_stat_types,
+        plays = plays,
+        play_stats = play_stats,
         nfl_draft_picks = nfl_draft_picks,
         nfl_rosters = nfl_rosters,
         nfl_player_stats = nfl_player_stats,
@@ -837,6 +970,38 @@ list(
         raw_game_player_stats,
         keys = c("gameId", "playerId", "category", "statType"),
         contract_passed = ok_game_player_stats
+      ),
+      audit_step(
+        play_types,
+        "clean_play_types",
+        "clean",
+        raw_play_types,
+        keys = "id",
+        contract_passed = ok_play_types
+      ),
+      audit_step(
+        play_stat_types,
+        "clean_play_stat_types",
+        "clean",
+        raw_play_stat_types,
+        keys = "id",
+        contract_passed = ok_play_stat_types
+      ),
+      audit_step(
+        plays,
+        "clean_plays",
+        "clean",
+        raw_plays,
+        keys = "id",
+        contract_passed = ok_plays
+      ),
+      audit_step(
+        play_stats,
+        "clean_play_stats",
+        "clean",
+        raw_play_stats,
+        keys = c("playId", "athleteId", "statTypeId"),
+        contract_passed = ok_play_stats
       ),
       audit_step(
         player_season,

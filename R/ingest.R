@@ -725,3 +725,142 @@ ingest_game_player_stats <- function(years = 2010:2026, games = NULL) {
     }) |>
     purrr::list_rbind()
 }
+
+# ---- play-by-play (CFBD /plays family, decision 0031) ----------------------
+#
+# Four endpoints, four tables (see inst/dict/play*.yml):
+#   /plays/types       -> `play_types`: the play-type dimension (one call)
+#   /plays/stats/types -> `play_stat_types`: the play-stat-type dimension
+#   /plays             -> `plays`: one row per play, one call per week
+#   /plays/stats       -> `play_stats`: one row per athlete-play-stat, one
+#                         call per GAME (the week grain silently caps at
+#                         2,000 rows), so ~2,100 calls per season
+# All share the /games family pacing and retry budget. `play_stats` is opt-in
+# ([play_stats_enabled()]) so a routine refresh never spends that quota.
+
+#' Ingest the play-type dimension
+#'
+#' One `/plays/types` call: the 49 play types (`id`, `text`, `abbreviation`),
+#' including CFBD's own `Uncategorized` (999) and `placeholder` (70) entries,
+#' which are kept because plays can carry them.
+#'
+#' @return A tibble, one row per play type.
+#' @export
+ingest_play_types <- function() {
+  cfbd_get("/plays/types")
+}
+
+#' Ingest the play-stat-type dimension
+#'
+#' One `/plays/stats/types` call: the 31 athlete-attribution stat types
+#' (`id`, `name`) used by `/plays/stats`.
+#'
+#' @return A tibble, one row per play-stat type.
+#' @export
+ingest_play_stat_types <- function() {
+  cfbd_get("/plays/stats/types")
+}
+
+#' Unnest the clock block of a /plays or /plays/stats response
+#'
+#' CFBD nests the game clock as `clock = {minutes, seconds}` (time remaining in
+#' the period); this flattens it to `clock_minutes` / `clock_seconds` so the
+#' parquet stays flat.
+#'
+#' @param raw One `/plays` or `/plays/stats` tibble.
+#' @return `raw` with the clock columns flattened.
+#' @keywords internal
+unnest_clock <- function(raw) {
+  clock <- raw$clock
+  raw$clock <- NULL
+  raw$clock_minutes <- if (is.data.frame(clock)) clock$minutes else NA_integer_
+  raw$clock_seconds <- if (is.data.frame(clock)) clock$seconds else NA_integer_
+  raw
+}
+
+#' Flatten one /plays response
+#'
+#' Unnests the clock ([unnest_clock()]) and stamps the season/week/seasonType
+#' of the pull (`/plays` carries none of them), so the table needs no join to
+#' `games` for period filters. An empty response (no plays that week) returns
+#' `NULL`.
+#'
+#' @param raw One `/plays` tibble.
+#' @param season Season year of the pull.
+#' @param week Week number of the pull.
+#' @param season_type `regular` or `postseason`.
+#' @return A flat tibble, or `NULL` for an empty response.
+#' @keywords internal
+flatten_plays <- function(raw, season, week, season_type) {
+  if (!nrow(raw)) {
+    return(NULL)
+  }
+  raw <- unnest_clock(raw)
+  raw$season <- season
+  raw$week <- week
+  raw$seasonType <- season_type
+  raw
+}
+
+#' Ingest one week of plays
+#'
+#' One `/plays` call for a single season/week/season-type (no row cap at this
+#' grain), flattened via [flatten_plays()]. The week-level branch target in
+#' `_targets.R` maps over this, like the game-stats chunks (decision 0029).
+#'
+#' @inheritParams ingest_game_team_stats_chunk
+#' @return A flat tibble, one row per play, or `NULL` for a week with none.
+#' @keywords internal
+ingest_plays_chunk <- function(year, week, season_type) {
+  raw <- cfbd_game_get(
+    "/plays",
+    list(year = year, week = week, seasonType = season_type)
+  )
+  flatten_plays(raw, year, week, season_type)
+}
+
+#' Is the per-game play-stats pull switched on?
+#'
+#' `/plays/stats` costs one call per game (~2,100 per season), so it runs only
+#' when `CFB2NFL_PLAYS_STATS` is truthy (decision 0031, Phase 2), and only for
+#' an explicit season selection: with the flag on, an unset
+#' `CFB2NFL_REFRESH_SEASONS` (the full window, ~36,000 calls) is an error.
+#'
+#' @param spec The seasons selector (see [refresh_seasons()]).
+#' @return `TRUE` when the flag is set and the selection is narrower than the
+#'   full window.
+#' @keywords internal
+play_stats_enabled <- function(
+  spec = Sys.getenv("CFB2NFL_REFRESH_SEASONS", "")
+) {
+  on <- isTRUE(as.logical(Sys.getenv("CFB2NFL_PLAYS_STATS", "false")))
+  if (on && refresh_is_full(spec, source = "play_stats")) {
+    cli::cli_abort(c(
+      "{.envvar CFB2NFL_PLAYS_STATS} is on for the full season window.",
+      "i" = "Play stats cost one call per game (~2,100 per season); select seasons with {.envvar CFB2NFL_REFRESH_SEASONS}, e.g. {.val 2025}."
+    ))
+  }
+  on
+}
+
+#' Ingest one season of play stats, game by game
+#'
+#' One `/plays/stats` call per `gameId` (the only query unit that returns a
+#' complete game; the week grain is capped at 2,000 rows). Branched at season
+#' grain in `_targets.R` with the games looped here, so a season does not mint
+#' ~2,100 targets (decision 0031).
+#'
+#' @param game_ids Game ids to pull (one season's games with plays).
+#' @return A flat tibble, one row per athlete-play-stat.
+#' @keywords internal
+ingest_play_stats_chunk <- function(game_ids) {
+  purrr::map(unique(game_ids), \(g) {
+    raw <- cfbd_game_get("/plays/stats", list(gameId = g))
+    if (!nrow(raw)) {
+      return(NULL)
+    }
+    # Unlike /plays, the response carries its own season and week.
+    unnest_clock(raw)
+  }) |>
+    purrr::list_rbind()
+}

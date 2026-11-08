@@ -564,3 +564,243 @@ clean_game_player_stats <- function(game_player_stats) {
       stat = as.character(.data$stat)
     )
 }
+
+# ---- play-by-play (see R/ingest.R for the /plays family) --------------------
+
+#' Add any missing columns as `NA`
+#'
+#' Older seasons' `/plays` responses can omit a field entirely, and an unpulled
+#' table (`NULL`) has no columns at all; padding first lets the cleaners'
+#' `transmute()` always produce the full, typed schema (zero rows for `NULL`).
+#'
+#' @param x A data frame or `NULL`.
+#' @param cols Column names the cleaner reads.
+#' @return A tibble carrying every column in `cols`.
+#' @keywords internal
+with_cols <- function(x, cols) {
+  x <- tibble::as_tibble(x %||% tibble::tibble())
+  for (col in setdiff(cols, names(x))) {
+    x[[col]] <- rep(NA, nrow(x))
+  }
+  x
+}
+
+#' Clean the play-type dimension
+#'
+#' Keeps CFBD's `Uncategorized` (999) and `placeholder` (70) rows: they are
+#' part of the vocabulary plays are tagged with, so dropping them would orphan
+#' those plays' `playTypeId`.
+#'
+#' @param play_types Raw tibble from [ingest_play_types()].
+#' @return A tibble, one row per play type, keyed by integer `id`.
+#' @export
+clean_play_types <- function(play_types) {
+  play_types |>
+    with_cols(c("id", "text", "abbreviation")) |>
+    dplyr::transmute(
+      id = as.integer(.data$id),
+      text = as.character(.data$text),
+      abbreviation = as.character(.data$abbreviation)
+    ) |>
+    dplyr::arrange(.data$id)
+}
+
+#' Clean the play-stat-type dimension
+#'
+#' @param play_stat_types Raw tibble from [ingest_play_stat_types()].
+#' @return A tibble, one row per play-stat type, keyed by integer `id`.
+#' @export
+clean_play_stat_types <- function(play_stat_types) {
+  play_stat_types |>
+    with_cols(c("id", "name")) |>
+    dplyr::transmute(
+      id = as.integer(.data$id),
+      name = as.character(.data$name)
+    ) |>
+    dplyr::arrange(.data$id)
+}
+
+#' Clean plays
+#'
+#' Types every column to the schema in inst/dict/plays.yml. Play and drive ids
+#' stay strings (CFBD concatenates the game id into them, past integer range);
+#' `gameId` is an integer like `games.id`. `/plays` names the play type only
+#' by text, so `playTypeId` is looked up from the dimension (`NA` for a text
+#' the dimension does not carry).
+#'
+#' Situational fields are normalized to what the contract enforces: CFBD
+#' marks non-scrimmage plays (kickoffs, extra points) `down = -1` through 2013
+#' and `0` after, so `-1` becomes `0`; the few impossible values left
+#' (`down` 5, `yardsToGoal` outside 0 to 100, `period` 0, more than 15
+#' minutes on the clock; about 125 of 3.1 million plays) become `NA`.
+#'
+#' @param plays Raw plays from [ingest_plays_chunk()] (bound across weeks).
+#' @param play_types Cleaned play-type dimension ([clean_play_types()]).
+#' @return A tibble, one row per play, keyed by `id`.
+#' @export
+clean_plays <- function(plays, play_types) {
+  cols <- c(
+    "id",
+    "gameId",
+    "driveId",
+    "season",
+    "week",
+    "seasonType",
+    "driveNumber",
+    "playNumber",
+    "offense",
+    "offenseConference",
+    "offenseScore",
+    "defense",
+    "defenseConference",
+    "defenseScore",
+    "home",
+    "away",
+    "period",
+    "clock_minutes",
+    "clock_seconds",
+    "offenseTimeouts",
+    "defenseTimeouts",
+    "yardline",
+    "yardsToGoal",
+    "down",
+    "distance",
+    "yardsGained",
+    "scoring",
+    "playType",
+    "playText",
+    "ppa",
+    "wallclock"
+  )
+  na_outside <- function(x, lo, hi) replace(x, x < lo | x > hi, NA)
+  plays |>
+    with_cols(cols) |>
+    dplyr::transmute(
+      id = as.character(.data$id),
+      gameId = as.integer(.data$gameId),
+      driveId = as.character(.data$driveId),
+      season = as.integer(.data$season),
+      week = as.integer(.data$week),
+      seasonType = as.character(.data$seasonType),
+      driveNumber = as.integer(.data$driveNumber),
+      playNumber = as.integer(.data$playNumber),
+      offense = as.character(.data$offense),
+      offenseConference = as.character(.data$offenseConference),
+      offenseScore = as.integer(.data$offenseScore),
+      defense = as.character(.data$defense),
+      defenseConference = as.character(.data$defenseConference),
+      defenseScore = as.integer(.data$defenseScore),
+      home = as.character(.data$home),
+      away = as.character(.data$away),
+      period = na_outside(as.integer(.data$period), 1L, Inf),
+      clock_minutes = na_outside(as.integer(.data$clock_minutes), 0L, 15L),
+      clock_seconds = na_outside(as.integer(.data$clock_seconds), 0L, 59L),
+      offenseTimeouts = as.integer(.data$offenseTimeouts),
+      defenseTimeouts = as.integer(.data$defenseTimeouts),
+      yardline = as.integer(.data$yardline),
+      yardsToGoal = na_outside(as.integer(.data$yardsToGoal), 0L, 100L),
+      down = na_outside(pmax(as.integer(.data$down), 0L), 0L, 4L),
+      distance = as.integer(.data$distance),
+      yardsGained = as.integer(.data$yardsGained),
+      scoring = as.logical(.data$scoring),
+      playTypeId = play_types$id[match(.data$playType, play_types$text)],
+      playType = as.character(.data$playType),
+      playText = as.character(.data$playText),
+      ppa = as.double(.data$ppa),
+      wallclock = as.character(.data$wallclock)
+    )
+}
+
+#' Clean play stats
+#'
+#' Types every column to the schema in inst/dict/play_stats.yml. `athleteId`
+#' is the shared CFBD athlete id (a string, like `roster$playerId`).
+#' `/plays/stats` names the stat type only by text, so `statTypeId` is looked
+#' up from the dimension. `NULL` (no season pulled yet) gives the empty,
+#' typed table that is published until the first per-game pull.
+#'
+#' @param play_stats Raw play stats from [ingest_play_stats_chunk()], or
+#'   `NULL`.
+#' @param play_stat_types Cleaned dimension ([clean_play_stat_types()]).
+#' @return A tibble, one row per athlete-play-stat, keyed by
+#'   `(playId, athleteId, statTypeId)`.
+#' @export
+clean_play_stats <- function(play_stats, play_stat_types) {
+  cols <- c(
+    "gameId",
+    "season",
+    "week",
+    "team",
+    "conference",
+    "opponent",
+    "teamScore",
+    "opponentScore",
+    "driveId",
+    "playId",
+    "period",
+    "clock_minutes",
+    "clock_seconds",
+    "yardsToGoal",
+    "down",
+    "distance",
+    "athleteId",
+    "athleteName",
+    "statType",
+    "stat"
+  )
+  play_stats |>
+    with_cols(cols) |>
+    dplyr::transmute(
+      gameId = as.integer(.data$gameId),
+      season = as.integer(.data$season),
+      week = as.integer(.data$week),
+      team = as.character(.data$team),
+      conference = as.character(.data$conference),
+      opponent = as.character(.data$opponent),
+      teamScore = as.integer(.data$teamScore),
+      opponentScore = as.integer(.data$opponentScore),
+      driveId = as.character(.data$driveId),
+      playId = as.character(.data$playId),
+      period = as.integer(.data$period),
+      clock_minutes = as.integer(.data$clock_minutes),
+      clock_seconds = as.integer(.data$clock_seconds),
+      yardsToGoal = as.integer(.data$yardsToGoal),
+      down = as.integer(.data$down),
+      distance = as.integer(.data$distance),
+      athleteId = as.character(.data$athleteId),
+      athleteName = as.character(.data$athleteName),
+      statTypeId = play_stat_types$id[
+        match(.data$statType, play_stat_types$name)
+      ],
+      statType = as.character(.data$statType),
+      stat = as.double(.data$stat)
+    )
+}
+
+#' Build the published play-stats table
+#'
+#' The per-game pull is opt-in ([play_stats_enabled()]), so most refreshes
+#' must leave the published table exactly as it is. When seasons were pulled,
+#' they are spliced in ([splice_seasons()]); otherwise the published file is
+#' kept, or, before any pull exists, the empty typed table is written.
+#'
+#' @param raw Raw play stats for the pulled seasons, or `NULL` (not pulled).
+#' @param play_stat_types Cleaned dimension ([clean_play_stat_types()]).
+#' @param path The published parquet.
+#' @param seasons The seasons `raw` covers.
+#' @return The play-stats table to publish.
+#' @keywords internal
+assemble_play_stats <- function(raw, play_stat_types, path, seasons) {
+  if (!is.null(raw)) {
+    return(splice_seasons(
+      clean_play_stats(raw, play_stat_types),
+      path,
+      "season",
+      seasons
+    ))
+  }
+  if (file.exists(path)) {
+    return(arrow::read_parquet(path))
+  }
+  clean_play_stats(NULL, play_stat_types)
+}

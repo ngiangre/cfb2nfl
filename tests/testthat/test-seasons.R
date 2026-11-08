@@ -351,7 +351,12 @@ test_that("estimate_refresh_calls counts calls per endpoint", {
   est <- estimate_refresh_calls(seasons, games)
   expect_equal(est[["games"]], 2L)
   expect_equal(est[["game_team_stats"]], 1L)
-  expect_equal(est[["total"]], 2L + 1L + 1L + 1L + 1L + 1L + 3L)
+  expect_equal(est[["plays"]], 1L)
+  expect_equal(est[["play_stats"]], 0L)
+  expect_equal(est[["total"]], 2L + 1L + 1L + 1L + 1L + 1L + 1L + 5L)
+  # The opt-in per-game play-stats pull costs one call per game.
+  est_ps <- estimate_refresh_calls(seasons, games, play_stats_games = 120L)
+  expect_equal(est_ps[["total"]] - est[["total"]], 120L)
   # An unpublished season assumes the default week count.
   est_new <- estimate_refresh_calls(
     list(

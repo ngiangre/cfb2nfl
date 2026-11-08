@@ -1,5 +1,27 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- New play-by-play tables (issue #44,
+  [decision 0031](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0031-plays-ingest-and-quota-phasing.md)):
+  `plays` (3.1 million plays, 2010 to 2026: down, distance, field position,
+  score, clock, play type, yards, predicted points added, play text),
+  `play_stats` (who ran, caught, was targeted, tackled, sacked or broke up a
+  pass on each play, keyed by the shared athlete id), and the `play_types` /
+  `play_stat_types` label tables. Published on `data-latest` and in the DuckDB
+  bundle, each guarded by a contract (every game known, every played FBS week
+  covered, no play-stats game at CFBD's 2,000-row cap, athlete ids in the
+  roster namespace). `plays` refreshes with the season-scoped weekly job (one
+  call per played week, about 280 for every season). `play_stats` costs one
+  call per game, so it is opt-in (`CFB2NFL_PLAYS_STATS=true` with a season
+  selection) and starts empty, to be backfilled one season per month, newest
+  first. CFBD's pre-2014 `down = -1` for kickoffs and extra points is
+  normalized to `0`, and the few impossible situations (about 125 plays) are
+  set to `NA`.
+
+- The weekly current-season refresh (`data-current.yaml`) now runs at 13:17
+  UTC instead of on the hour, where GitHub delays or drops scheduled runs; it
+  had not yet fired since it was added. A full refresh (`data-refresh.yaml`)
+  keeps the published play stats instead of overwriting them.
+
 - **Fix:** per-game box scores (`game_player_stats`) now list every player.
   The ingest kept only the first player per team, stat category and stat type
   in each game, about 7 players per team-game instead of about 33. The table

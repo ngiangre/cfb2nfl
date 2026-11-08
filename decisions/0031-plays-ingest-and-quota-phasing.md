@@ -74,4 +74,24 @@ game-grain dynamic branching (target explosion); skipping the dimensions
 
 ## Outcome / what we learned
 
-_Filled in later._
+Built 2026-11-08 (issue #44). Phase 1 cost exactly the estimated 281 calls
+(279 played weeks + 2 dimensions) and took ~7 minutes locally, giving
+3,091,728 plays (135 MB parquet). Findings:
+
+- `/plays` carries no season, week, or season type, and names the play type
+  only by text (no id); the ingest stamps the period from the query and the
+  cleaner looks `playTypeId` up from `play_types` (every play maps).
+  `/plays/stats` likewise names `statType` only by text; `statTypeId` is
+  looked up the same way.
+- Every FBS week with a completed game has plays; 97.6-100% of FBS-vs-FBS
+  games per season do (100% from 2020 on).
+- CFBD codes non-scrimmage plays `down = -1` through 2013 and `0` after; the
+  cleaner maps `-1` to `0`. About 125 plays carry impossible values (`down`
+  5, `yardsToGoal` -22 to 238, `period` 0, clocks past 15 minutes), set to
+  `NA` so the contract's ranges hold.
+- The game list for Phase 2 comes from the published `plays` (only games with
+  play-by-play), not from `games`, which also lists lower-division games
+  CFBD has no plays for. The flag was renamed `CFB2NFL_PLAYS_STATS`, and it
+  refuses the full window so a typo cannot spend ~36,000 calls.
+- `play_stats` is published empty (typed schema) until the first Phase 2
+  season, so track-mode builds find the file.

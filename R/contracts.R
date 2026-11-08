@@ -1347,6 +1347,179 @@ box_scores_list_many_players <- function(x, min_team_games = 100L) {
   nrow(rushers) < min_team_games || mean(rushers$n_players > 1L) >= 0.5
 }
 
+#' Data contract for a play-by-play dimension
+#'
+#' Shared by `play_types` and `play_stat_types` (decision 0031): a non-null,
+#' unique integer `id`, a label column, and at least `min_rows` rows, so an
+#' empty or truncated dimension fails before the plays lose their labels.
+#'
+#' @param dim Cleaned dimension ([clean_play_types()] or
+#'   [clean_play_stat_types()]).
+#' @param label_col The label column (`"text"` or `"name"`).
+#' @param label Dataset label.
+#' @param min_rows Smallest plausible row count.
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_play_dimension <- function(
+  dim,
+  label_col,
+  label,
+  min_rows,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  agent <- pointblank::create_agent(dim, label = label) |>
+    pointblank::col_exists(dplyr::all_of(c("id", label_col))) |>
+    pointblank::col_vals_not_null(dplyr::all_of(c("id", label_col))) |>
+    pointblank::rows_distinct(pointblank::vars(id)) |>
+    pointblank::specially(
+      fn = function(x) nrow(x) >= min_rows,
+      label = paste("at least", min_rows, "rows")
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, label, stop_on_fail)
+}
+
+#' Data contract for plays
+#'
+#' One row per play, keyed by `id` (decision 0031). Every `gameId` is a real
+#' game, every played FBS week has plays, every play type maps to the
+#' dimension, and the situational columns stay in the ranges [clean_plays()]
+#' normalizes to: `down` 0 to 4 (0 on kickoffs and
+#' other non-scrimmage plays), `yardsToGoal` 0 to 100, `period` 1 or more
+#' (overtimes run past 4).
+#'
+#' @param plays Cleaned plays ([clean_plays()]).
+#' @param games Cleaned games (the game-id reference set).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_plays <- function(plays, games, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  agent <- pointblank::create_agent(plays, label = "plays") |>
+    pointblank::col_exists(c(
+      "id",
+      "gameId",
+      "driveId",
+      "season",
+      "week",
+      "seasonType",
+      "offense",
+      "defense",
+      "period",
+      "down",
+      "distance",
+      "yardsToGoal",
+      "playTypeId",
+      "playType",
+      "ppa"
+    )) |>
+    pointblank::col_vals_not_null(
+      pointblank::vars(id, gameId, season, week, seasonType)
+    ) |>
+    pointblank::rows_distinct(pointblank::vars(id)) |>
+    pointblank::col_vals_between("season", 2010L, 2026L) |>
+    pointblank::col_vals_between("down", 0L, 4L, na_pass = TRUE) |>
+    pointblank::col_vals_between("yardsToGoal", 0L, 100L, na_pass = TRUE) |>
+    pointblank::col_vals_gte("period", 1L, na_pass = TRUE) |>
+    pointblank::specially(
+      fn = function(x) all(unique(x$gameId) %in% games$id),
+      label = "every gameId is in games"
+    ) |>
+    pointblank::specially(
+      fn = function(x) plays_cover_played_weeks(x, games),
+      label = "every played week has plays"
+    ) |>
+    pointblank::specially(
+      fn = function(x) !any(is.na(x$playTypeId) & !is.na(x$playType)),
+      label = "every play type is in play_types"
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "plays", stop_on_fail)
+}
+
+# A week CFBD played with an FBS team in it must have plays: a failed or
+# skipped week pull leaves a hole the row-count checks cannot see. Judged on
+# the seasons present in `plays`, so a partial (test or backfill) table
+# passes; season completeness is the season-coverage contract's job.
+plays_cover_played_weeks <- function(plays, games) {
+  played <- games |>
+    dplyr::filter(
+      .data$completed,
+      .data$season %in% unique(plays$season),
+      .data$homeClassification %in% "fbs" | .data$awayClassification %in% "fbs"
+    ) |>
+    dplyr::distinct(.data$season, .data$seasonType, .data$week)
+  have <- dplyr::distinct(plays, .data$season, .data$seasonType, .data$week)
+  nrow(dplyr::anti_join(
+    played,
+    have,
+    by = c("season", "seasonType", "week")
+  )) ==
+    0L
+}
+
+#' Data contract for play stats
+#'
+#' One row per athlete-play-stat, keyed by `(playId, athleteId, statTypeId)`
+#' (decision 0031). Guards the per-game pull: no game reaches the 2,000-row
+#' cap that silently truncates the week grain, every play is a known play,
+#' every stat type maps to the dimension, and `athleteId` stays in the shared
+#' athlete namespace (at least `min_roster_share` of ids are roster
+#' `playerId`s; 100% on the 2026-10 probe). An empty table (no season pulled
+#' yet) passes.
+#'
+#' @param play_stats Cleaned play stats ([clean_play_stats()]).
+#' @param plays Cleaned plays (the play-id reference set).
+#' @param roster Cleaned roster (the athlete-id reference set).
+#' @param min_roster_share Smallest share of distinct `athleteId`s on a roster.
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_play_stats <- function(
+  play_stats,
+  plays,
+  roster,
+  min_roster_share = 0.95,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  agent <- pointblank::create_agent(play_stats, label = "play_stats") |>
+    pointblank::col_exists(c(
+      "gameId",
+      "season",
+      "playId",
+      "athleteId",
+      "statTypeId",
+      "statType",
+      "stat"
+    )) |>
+    pointblank::col_vals_not_null(
+      pointblank::vars(gameId, season, playId, athleteId, statTypeId)
+    ) |>
+    pointblank::rows_distinct(
+      pointblank::vars(playId, athleteId, statTypeId)
+    ) |>
+    pointblank::specially(
+      fn = function(x) !any(table(x$gameId) >= 2000L),
+      label = "no game hits the 2,000-row cap"
+    ) |>
+    pointblank::specially(
+      fn = function(x) all(unique(x$playId) %in% plays$id),
+      label = "every playId is in plays"
+    ) |>
+    pointblank::specially(
+      fn = function(x) {
+        ids <- unique(x$athleteId)
+        !length(ids) || mean(ids %in% roster$playerId) >= min_roster_share
+      },
+      label = "athleteId is in the roster namespace"
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "play_stats", stop_on_fail)
+}
+
 #' Data contract for the player x game table
 #'
 #' Guards [build_player_game()] (decision 0035). Enforces the key
