@@ -52,7 +52,7 @@ browser from the data (decision 0046).
 ## Methods and data sources on the page
 
 - **Equations in the margin.** Each formula a visual relies on is written out
-  (KaTeX) in a margin note (`.column-margin`) beside that visual: elapsed game
+  (MathJax, the site default) in a margin note (`.column-margin`) beside that visual: elapsed game
   time, cumulative PPA, Elo expected win probability, percentile rank and its
   qualifiers. On narrow screens Quarto folds margin content inline, so this
   works on mobile too.
@@ -177,8 +177,9 @@ each asset, tested on fixtures. These assets are not added to the DuckDB
 
 | Asset | Grain | Est. size | Loaded |
 |---|---|---|---|
-| `teams.json` | team (name, conference by season, colors, logo) | ~50 KB | first view |
-| `team_season.json` | team × season: `team_id`, end Elo, W, L, conference, tier (names/colors only in `teams.json`) | ~7.2k rows, ~60 KB gz | first view |
+| `meta.json` | page metadata: `default_season`, `seasons`, `default_team`, `sources` (visual → tables) | <1 KB | first view |
+| `teams.json` | team: name, mascot, abbreviation, color, alt color, logo (conference by season lives in `team_season.json`) | ~8 KB gz | first view |
+| `team_season.json` | team × season: `team_id`, end Elo, W, L, conference, tier (names/colors only in `teams.json`) | ~4.2k FBS + FCS rows, ~39 KB gz | first view |
 | `games_<season>.json` | game: teams, points, pre/post Elo, postgame WP, week | ~1–2k rows/season | on team-season open |
 | `plays_<season>.parquet` | play, slim columns, sorted by `gameId` | 3.1M rows total | on game open |
 | `player_season_<pos>.parquet` | player × season: stats, percentiles, team, tier | ~160k rows total, split by group | on Players open |
@@ -241,8 +242,8 @@ per file.
   ≤ 250 KB gzipped; every `plays_<season>` `gameId` exists in `games` and every
   row group carries `gameId` min/max statistics; the assets'
   default season equals the max `season` with a completed game.
-- **Source lines** come from one R list (visual → tables) shipped in
-  `teams.json`'s metadata; a test checks that every listed table has a
+- **Source lines** come from one R list (`explorer_sources()`) shipped in
+  `meta.json`; a test checks that every listed table has a
   dictionary in `inst/dict/` and an anchor on the Data page.
 - **Manual mobile check** before merge: Playwright at a 390×844 viewport,
   driving the default path (Teams → Texas → 2026 → a game → scrub → player
@@ -252,11 +253,13 @@ per file.
 
 1. [x] **Spike + decision record** (done 2026-11-08, decision 0046): OJS,
    hyparquet range reads and plotly gl3d all work in the altdoc site.
-2. **Shell.** `explorer.qmd`, id-keyed URL-hash state,
+2. [x] **Shell** (done 2026-11-08). `explorer.qmd`, id-keyed URL-hash state,
    season selector defaulting to the in-progress season, tab bar, lazy tab
    loading, error cards, the margin-equation and "Data:" source-line patterns,
-   per-table anchors on `data.qmd`; `teams.json`/`team_season.json` exports +
-   contracts.
+   per-table anchors on `data.qmd`; `meta.json`/`teams.json`/`team_season.json`
+   exports + `contract_explorer_shell()`. Elo exists for FBS only, so FCS teams
+   show a "no Elo rating" card; the sticky header sits below the pinned navbar
+   (`top: 60px`); every select and tab is a 44px tap target.
 3. **Teams tab** through the game timeline (`games_*`, `plays_*` exports).
 4. **Players tab** (`player_season_*`, `player_outcome` exports).
 5. **Combine tab** (shared builder with #64).
