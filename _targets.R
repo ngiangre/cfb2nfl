@@ -698,6 +698,7 @@ list(
       games = ok_games,
       game_team_stats = ok_game_team_stats,
       game_player_stats = ok_game_player_stats,
+      explorer_plays_files = ok_explorer_plays_files,
       play_types = ok_play_types,
       play_stat_types = ok_play_stat_types,
       plays = ok_plays,
@@ -895,6 +896,13 @@ list(
       explorer_plays,
       plays,
       games,
+      stop_on_fail = FALSE
+    ))
+  ),
+  tar_target(
+    ok_explorer_plays_files,
+    pointblank::all_passed(contract_explorer_plays_files(
+      explorer_game_files[endsWith(explorer_game_files, ".parquet")],
       stop_on_fail = FALSE
     ))
   ),

@@ -276,6 +276,48 @@ test_that("contract_explorer_team_games passes, and catches loss and bad results
   )
 })
 
+test_that("contract_explorer_team_games caps each season file at the gzip budget", {
+  f <- explorer_games_assets_fixture()
+  ok <- function(limit) {
+    pointblank::all_passed(contract_explorer_team_games(
+      f$team_games,
+      f$team_season,
+      max_gzip_bytes = limit,
+      stop_on_fail = FALSE
+    ))
+  }
+  expect_true(ok(150000L))
+  expect_false(ok(10L))
+})
+
+test_that("contract_explorer_plays_files passes on written row groups", {
+  f <- explorer_games_assets_fixture()
+  dir <- withr::local_tempdir()
+  paths <- write_explorer_plays(f$explorer_plays, dir, chunk_size = 2L)
+  stats <- explorer_row_group_stats(paths)
+  expect_equal(nrow(stats), 3L + 1L) # 2025: 5 plays in 3 groups; 2026: 1 play
+  expect_true(all(!is.na(stats$min_value)) && all(!is.na(stats$max_value)))
+  expect_true(pointblank::all_passed(contract_explorer_plays_files(
+    paths,
+    stop_on_fail = FALSE
+  )))
+})
+
+test_that("contract_explorer_plays_files catches files with no game_id statistics", {
+  dir <- withr::local_tempdir()
+  nostat <- file.path(dir, "plays_nostat.parquet")
+  arrow::write_parquet(
+    data.frame(game_id = c("a", "b")),
+    nostat,
+    write_statistics = FALSE
+  )
+  expect_false(pointblank::all_passed(contract_explorer_plays_files(
+    nostat,
+    stop_on_fail = FALSE
+  )))
+  expect_error(contract_explorer_plays_files(nostat), "explorer_plays_files")
+})
+
 test_that("contract_explorer_plays passes, and catches loss and orphans", {
   f <- explorer_games_assets_fixture()
   ok <- function(p, games = f$games) {

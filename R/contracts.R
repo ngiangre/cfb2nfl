@@ -2235,18 +2235,27 @@ contract_explorer_shell <- function(
 #'
 #' Guards [build_explorer_team_games()]: one row per `(team_id, game_id)`; no
 #' loss against the team-season records; a result that matches the score;
-#' win probabilities in 0 to 1; and an Elo change that equals post minus pre.
+#' win probabilities in 0 to 1; an Elo change that equals post minus pre; and
+#' the largest season's gzipped JSON within the first-view budget (decision
+#' 0046), so the page's first load stays small as seasons accumulate.
 #'
 #' @param team_games Output of [build_explorer_team_games()].
 #' @param team_season Output of [build_explorer_team_season()].
+#' @param max_gzip_bytes Largest allowed gzipped size of one season's file.
 #' @param stop_on_fail Abort on failure (default `TRUE`)?
 #' @return The interrogated pointblank agent, invisibly.
 #' @export
 contract_explorer_team_games <- function(
   team_games,
   team_season,
+  max_gzip_bytes = 150000L,
   stop_on_fail = TRUE
 ) {
+  season_bytes <- vapply(
+    split(team_games, team_games$season),
+    explorer_json_gzip_bytes,
+    integer(1)
+  )
   rlang::check_installed("pointblank")
   check <- function(agent, ok) {
     pointblank::col_vals_equal(
@@ -2282,6 +2291,7 @@ contract_explorer_team_games <- function(
     ) |>
     check(nrow(team_games) > 0L) |>
     check(nrow(team_games) == sum(team_season$games)) |>
+    check(max(c(0L, season_bytes)) <= max_gzip_bytes) |>
     pointblank::interrogate()
   enforce_contract(agent, "explorer_team_games", stop_on_fail)
 }
@@ -2342,4 +2352,63 @@ contract_explorer_plays <- function(
     ) |>
     pointblank::interrogate()
   enforce_contract(agent, "explorer_plays", stop_on_fail)
+}
+
+#' Row-group statistics of explorer plays parquet files
+#'
+#' One row per row group of each file: its `game_id` min and max as Parquet
+#' writes them. Read through DuckDB, since arrow's R bindings do not expose
+#' column statistics. A group without statistics comes back `NA`.
+#'
+#' @param paths Parquet file paths.
+#' @return A tibble: `file`, `row_group`, `min_value`, `max_value`.
+#' @export
+explorer_row_group_stats <- function(paths) {
+  rlang::check_installed(c("DBI", "duckdb"))
+  con <- DBI::dbConnect(
+    duckdb::duckdb(shared_home = FALSE),
+    dbdir = ":memory:"
+  )
+  on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
+  stats <- lapply(paths, function(p) {
+    sql <- paste0(
+      "SELECT row_group_id AS row_group, stats_min_value AS min_value, ",
+      "stats_max_value AS max_value FROM parquet_metadata(",
+      DBI::dbQuoteString(con, normalizePath(p, mustWork = TRUE)),
+      ") WHERE path_in_schema = 'game_id'"
+    )
+    out <- DBI::dbGetQuery(con, sql)
+    out$file <- rep(p, nrow(out))
+    out
+  })
+  dplyr::bind_rows(stats) |>
+    dplyr::select("file", "row_group", "min_value", "max_value")
+}
+
+#' Data contract for the explorer plays parquet files
+#'
+#' Guards the files [write_explorer_plays()] writes: every file has a `game_id`
+#' column with row groups, and every row group carries min and max statistics
+#' with min at most max. Those statistics are what lets the page fetch one
+#' game with a couple of range requests (decision 0046).
+#'
+#' @param paths Paths of the written `plays_<season>.parquet` files.
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_explorer_plays_files <- function(paths, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  stats <- explorer_row_group_stats(paths)
+  agent <- pointblank::create_agent(stats, label = "explorer_plays_files") |>
+    pointblank::col_vals_not_null(pointblank::vars(min_value, max_value)) |>
+    pointblank::col_vals_expr(rlang::expr(min_value <= max_value)) |>
+    pointblank::col_vals_equal(
+      "ok",
+      TRUE,
+      preconditions = function(x) {
+        tibble::tibble(ok = all(paths %in% stats$file) && nrow(stats) > 0L)
+      }
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "explorer_plays_files", stop_on_fail)
 }
