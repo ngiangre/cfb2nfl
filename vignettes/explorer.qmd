@@ -110,7 +110,15 @@ pick = {
     view.value = value;
     view.dispatchEvent(new Event("input", {bubbles: true}));
   };
-  const scroll = id => document.getElementById(id)?.scrollIntoView({behavior: "smooth", block: "start"});
+  // The sticky header (about 60px down, taller on phones) would cover the top
+  // of the section, so scroll to the section's top below the header's bottom.
+  const scroll = id => {
+    const el = document.getElementById(id);
+    const head = document.querySelector(".explorer-header");
+    if (!el) return;
+    const offset = head ? head.getBoundingClientRect().height + 60 + 8 : 0;
+    window.scrollTo({top: el.getBoundingClientRect().top + window.scrollY - offset, behavior: "smooth"});
+  };
   return {
     team: id => { set(viewof team, id); scroll("teams-team"); },
     season: s => { set(viewof season, s); scroll("teams-season"); },
