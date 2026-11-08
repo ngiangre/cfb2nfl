@@ -4,12 +4,19 @@
 \alias{contract_explorer_team_games}
 \title{Data contract for the explorer team-games table}
 \usage{
-contract_explorer_team_games(team_games, team_season, stop_on_fail = TRUE)
+contract_explorer_team_games(
+  team_games,
+  team_season,
+  max_gzip_bytes = 150000L,
+  stop_on_fail = TRUE
+)
 }
 \arguments{
 \item{team_games}{Output of \code{\link[=build_explorer_team_games]{build_explorer_team_games()}}.}
 
 \item{team_season}{Output of \code{\link[=build_explorer_team_season]{build_explorer_team_season()}}.}
+
+\item{max_gzip_bytes}{Largest allowed gzipped size of one season's file.}
 
 \item{stop_on_fail}{Abort on failure (default \code{TRUE})?}
 }
@@ -19,5 +26,7 @@ The interrogated pointblank agent, invisibly.
 \description{
 Guards \code{\link[=build_explorer_team_games]{build_explorer_team_games()}}: one row per \verb{(team_id, game_id)}; no
 loss against the team-season records; a result that matches the score;
-win probabilities in 0 to 1; and an Elo change that equals post minus pre.
+win probabilities in 0 to 1; an Elo change that equals post minus pre; and
+the largest season's gzipped JSON within the first-view budget (decision
+0046), so the page's first load stays small as seasons accumulate.
 }

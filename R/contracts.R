@@ -2400,8 +2400,10 @@ contract_explorer_plays_files <- function(paths, stop_on_fail = TRUE) {
   rlang::check_installed("pointblank")
   stats <- explorer_row_group_stats(paths)
   agent <- pointblank::create_agent(stats, label = "explorer_plays_files") |>
-    pointblank::col_vals_not_null(pointblank::vars(min_value, max_value)) |>
-    pointblank::col_vals_expr(rlang::expr(min_value <= max_value)) |>
+    pointblank::col_vals_not_null(c("min_value", "max_value")) |>
+    pointblank::col_vals_expr(rlang::expr(
+      .data$min_value <= .data$max_value
+    )) |>
     pointblank::col_vals_equal(
       "ok",
       TRUE,
