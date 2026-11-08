@@ -2129,3 +2129,92 @@ required_seasons <- function(sources, min_season = 2010L, date = Sys.Date()) {
     sources
   )
 }
+
+#' Data contract for the explorer shell assets
+#'
+#' Guards the first-view assets of the explorer (plans/explorer.md): one row
+#' per `(team_id, season)` with a record that adds up; no silent loss (the
+#' team-seasons' games equal the FBS/FCS sides of completed, scored games);
+#' every team-season has a display row with a color and logo; Elo on every
+#' FBS team-season from 2022 on (coverage is ~100% there); `meta` agrees with
+#' the games and names only documented tables; and the gzipped first view fits
+#' the budget (decision 0046).
+#'
+#' @param teams Output of [build_explorer_teams()].
+#' @param team_season Output of [build_explorer_team_season()].
+#' @param meta Output of [build_explorer_meta()].
+#' @param games Cleaned games.
+#' @param max_gzip_bytes First-view budget in gzipped bytes.
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_explorer_shell <- function(
+  teams,
+  team_season,
+  meta,
+  games,
+  max_gzip_bytes = 250000L,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  expected_games <- explorer_game_sides(games) |>
+    dplyr::filter(
+      .data$classification %in% c("fbs", "fcs"),
+      !is.na(.data$points),
+      !is.na(.data$opp_points)
+    ) |>
+    nrow()
+  shown <- dplyr::filter(
+    teams,
+    !is.na(.data$color),
+    !is.na(.data$logo)
+  )
+  dicts <- sub("\\.yml$", "", list.files(app_sys("dict"), "\\.yml$"))
+  gzip_bytes <- sum(vapply(
+    list(meta, teams, team_season),
+    explorer_json_gzip_bytes,
+    integer(1)
+  ))
+  check <- function(agent, ok) {
+    pointblank::col_vals_equal(
+      agent,
+      "ok",
+      TRUE,
+      preconditions = function(x) tibble::tibble(ok = ok)
+    )
+  }
+  agent <- pointblank::create_agent(team_season, label = "explorer_shell") |>
+    pointblank::col_exists(c(
+      "team_id",
+      "season",
+      "conference",
+      "classification",
+      "tier",
+      "games",
+      "wins",
+      "losses",
+      "ties",
+      "elo_end"
+    )) |>
+    pointblank::col_vals_not_null(pointblank::vars(team_id, season)) |>
+    pointblank::rows_distinct(pointblank::vars(team_id, season)) |>
+    pointblank::col_vals_expr(rlang::expr(
+      wins + losses + ties == games
+    )) |>
+    pointblank::col_vals_gt("games", 0L) |>
+    pointblank::col_vals_lte("season", meta$default_season) |>
+    pointblank::col_vals_not_null(
+      pointblank::vars(elo_end),
+      preconditions = function(x) {
+        dplyr::filter(x, .data$classification == "fbs", .data$season >= 2022L)
+      }
+    ) |>
+    check(nrow(team_season) > 0L) |>
+    check(sum(team_season$games) == expected_games) |>
+    check(all(team_season$team_id %in% shown$team_id)) |>
+    check(identical(meta$default_season, explorer_default_season(games))) |>
+    check(all(unlist(meta$sources) %in% dicts)) |>
+    check(gzip_bytes <= max_gzip_bytes) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "explorer_shell", stop_on_fail)
+}

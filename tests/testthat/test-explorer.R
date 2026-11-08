@@ -182,3 +182,75 @@ test_that("write_explorer_assets writes one JSON file per asset and returns path
     2026L
   )
 })
+
+explorer_shell_fixture <- function() {
+  g <- explorer_games_fixture()
+  ts <- build_explorer_team_season(g, explorer_tiers_fixture())
+  list(
+    games = g,
+    team_season = ts,
+    teams = build_explorer_teams(explorer_teams_fixture(), ts),
+    meta = build_explorer_meta(g)
+  )
+}
+
+test_that("contract_explorer_shell passes on consistent assets", {
+  f <- explorer_shell_fixture()
+  agent <- contract_explorer_shell(
+    f$teams,
+    f$team_season,
+    f$meta,
+    f$games,
+    stop_on_fail = FALSE
+  )
+  expect_true(pointblank::all_passed(agent))
+})
+
+test_that("contract_explorer_shell catches row loss, stale meta and size", {
+  f <- explorer_shell_fixture()
+  # A dropped team-season breaks the no-silent-loss game count.
+  expect_false(pointblank::all_passed(contract_explorer_shell(
+    f$teams,
+    f$team_season[-1, ],
+    f$meta,
+    f$games,
+    stop_on_fail = FALSE
+  )))
+  # A team-season with no display row.
+  expect_false(pointblank::all_passed(contract_explorer_shell(
+    f$teams[f$teams$team_id != 1L, ],
+    f$team_season,
+    f$meta,
+    f$games,
+    stop_on_fail = FALSE
+  )))
+  # Meta that disagrees with the games.
+  stale <- f$meta
+  stale$default_season <- 2025L
+  expect_false(pointblank::all_passed(contract_explorer_shell(
+    f$teams,
+    f$team_season,
+    stale,
+    f$games,
+    stop_on_fail = FALSE
+  )))
+  # Over the first-view budget.
+  expect_false(pointblank::all_passed(contract_explorer_shell(
+    f$teams,
+    f$team_season,
+    f$meta,
+    f$games,
+    max_gzip_bytes = 10L,
+    stop_on_fail = FALSE
+  )))
+  expect_error(
+    contract_explorer_shell(
+      f$teams,
+      f$team_season,
+      stale,
+      f$games,
+      stop_on_fail = TRUE
+    ),
+    "explorer_shell"
+  )
+})
