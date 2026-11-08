@@ -1,7 +1,8 @@
 /* Explorer (plans/explorer.md): touch-first sizing and a sticky header. */
 .explorer-header {
   position: sticky;
-  top: 0;
+  /* Clears the pinned Quarto navbar (~60px on phones), which otherwise hides the header. */
+  top: 60px;
   z-index: 10;
   background: var(--bs-body-bg, #fff);
   padding: 0.5rem 0;
