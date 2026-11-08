@@ -723,7 +723,8 @@ list(
       stat_taxonomy = ok_stat_taxonomy,
       outcomes = ok_outcomes,
       team_season = ok_team_season,
-      team_draft = ok_team_draft
+      team_draft = ok_team_draft,
+      explorer = ok_explorer
     ))
   ),
   # ---- link-step contracts (audit-hygiene workstream C) ----------------------
@@ -837,6 +838,31 @@ list(
     )
   ),
   tar_target(team_draft, build_team_draft(exits, team_season)),
+  # Explorer assets (plans/explorer.md, decision 0046): slim JSON the OJS
+  # page fetches at runtime, rebuilt on every tar_make() (including the
+  # track-mode site build) so the page follows the weekly refresh.
+  tar_target(explorer_team_season, build_explorer_team_season(games, tiers)),
+  tar_target(explorer_teams, build_explorer_teams(teams, explorer_team_season)),
+  tar_target(explorer_meta, build_explorer_meta(games)),
+  tar_target(
+    ok_explorer,
+    pointblank::all_passed(contract_explorer_shell(
+      explorer_teams,
+      explorer_team_season,
+      explorer_meta,
+      games,
+      stop_on_fail = FALSE
+    ))
+  ),
+  tar_target(
+    explorer_shell_files,
+    write_explorer_assets(list(
+      meta = explorer_meta,
+      teams = explorer_teams,
+      team_season = explorer_team_season
+    )),
+    format = "file"
+  ),
   # Person-period outcome table (decision 0032): the modeling dependent
   # variables. Derived from cleaned tables (no new API calls), but PUBLISHED
   # as parquet on data-latest per plan (user request), alongside the DuckDB
@@ -1178,6 +1204,14 @@ list(
         exits,
         keys = c("team", "season", "position_group"),
         contract_passed = ok_team_draft
+      ),
+      audit_step(
+        explorer_team_season,
+        "build_explorer_team_season",
+        "features",
+        games,
+        keys = c("team_id", "season"),
+        contract_passed = ok_explorer
       )
     )
   ),

@@ -115,5 +115,8 @@ utils::globalVariables(c(
   "nfl_linked",
   "nfl_group",
   "college_groups",
-  "college_changed"
+  "college_changed",
+  # data-masked columns in build_explorer_team_season() / contract_explorer_shell()
+  "team_id",
+  "elo_end"
 ))

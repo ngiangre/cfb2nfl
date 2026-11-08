@@ -1,5 +1,13 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- New **Explorer** page (preview, not yet in the navigation): pick a season
+  and a team to see its end-of-season Elo across every season since 2010. The
+  link keeps your place, so it can be shared. It is the shell for the
+  team, game, player and combine views coming next
+  ([decision 0046](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0046-ojs-explorer.md), #70).
+  Each table on the Data page now has its own link target, so other pages can
+  point at it.
+
 - The site's interactive graphs are back: the pipeline dependency graph and
   the data-model diagram rendered blank (on desktop and mobile) because their
   visNetwork libraries were never published, and the same gap hid the two
