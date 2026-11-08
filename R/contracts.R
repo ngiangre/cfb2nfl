@@ -2196,7 +2196,8 @@ contract_explorer_shell <- function(
       "wins",
       "losses",
       "ties",
-      "elo_end"
+      "elo_end",
+      "win_pct"
     )) |>
     pointblank::col_vals_not_null(pointblank::vars(team_id, season, tier)) |>
     pointblank::rows_distinct(pointblank::vars(team_id, season)) |>
@@ -2204,6 +2205,7 @@ contract_explorer_shell <- function(
       wins + losses + ties == games
     )) |>
     pointblank::col_vals_gt("games", 0L) |>
+    pointblank::col_vals_between("win_pct", 0, 1) |>
     pointblank::col_vals_lte("season", meta$default_season) |>
     pointblank::col_vals_not_null(
       pointblank::vars(elo_end),
@@ -2227,4 +2229,188 @@ contract_explorer_shell <- function(
     check(gzip_bytes <= max_gzip_bytes) |>
     pointblank::interrogate()
   enforce_contract(agent, "explorer_shell", stop_on_fail)
+}
+
+#' Data contract for the explorer team-games table
+#'
+#' Guards [build_explorer_team_games()]: one row per `(team_id, game_id)`; no
+#' loss against the team-season records; a result that matches the score;
+#' win probabilities in 0 to 1; an Elo change that equals post minus pre; and
+#' the largest season's gzipped JSON within the first-view budget (decision
+#' 0046), so the page's first load stays small as seasons accumulate.
+#'
+#' @param team_games Output of [build_explorer_team_games()].
+#' @param team_season Output of [build_explorer_team_season()].
+#' @param max_gzip_bytes Largest allowed gzipped size of one season's file.
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_explorer_team_games <- function(
+  team_games,
+  team_season,
+  max_gzip_bytes = 150000L,
+  stop_on_fail = TRUE
+) {
+  season_bytes <- vapply(
+    split(team_games, team_games$season),
+    explorer_json_gzip_bytes,
+    integer(1)
+  )
+  rlang::check_installed("pointblank")
+  check <- function(agent, ok) {
+    pointblank::col_vals_equal(
+      agent,
+      "ok",
+      TRUE,
+      preconditions = function(x) tibble::tibble(ok = ok)
+    )
+  }
+  agent <- pointblank::create_agent(
+    team_games,
+    label = "explorer_team_games"
+  ) |>
+    pointblank::col_vals_not_null(pointblank::vars(
+      team_id,
+      game_id,
+      season,
+      result
+    )) |>
+    pointblank::rows_distinct(pointblank::vars(team_id, game_id)) |>
+    pointblank::col_vals_in_set("result", c("W", "L", "T")) |>
+    pointblank::col_vals_expr(rlang::expr(
+      (result == "W") == (points > opp_points) &
+        (result == "L") == (points < opp_points)
+    )) |>
+    pointblank::col_vals_between("wp_pre", 0, 1, na_pass = TRUE) |>
+    pointblank::col_vals_between("wp_post", 0, 1, na_pass = TRUE) |>
+    pointblank::col_vals_expr(
+      rlang::expr(abs(elo_delta - (elo_post - elo_pre)) <= 1L),
+      preconditions = function(x) {
+        dplyr::filter(x, !is.na(.data$elo_pre), !is.na(.data$elo_post))
+      }
+    ) |>
+    check(nrow(team_games) > 0L) |>
+    check(nrow(team_games) == sum(team_season$games)) |>
+    check(max(c(0L, season_bytes)) <= max_gzip_bytes) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "explorer_team_games", stop_on_fail)
+}
+
+#' Data contract for the explorer plays table
+#'
+#' Guards [build_explorer_plays()]: one row per input play (no loss); every
+#' play's game is in `games`; the margin equals the home score minus the away
+#' score; cumulative PPA is never missing; and at least 99.9% of plays have an
+#' elapsed time (the rest have a missing clock). Plays whose period the cleaner
+#' nulled (CFBD period 0, 37 plays in 2010-2013) are kept with no elapsed time.
+#'
+#' @param explorer_plays Output of [build_explorer_plays()].
+#' @param plays Cleaned plays.
+#' @param games Cleaned games.
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_explorer_plays <- function(
+  explorer_plays,
+  plays,
+  games,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  check <- function(agent, ok) {
+    pointblank::col_vals_equal(
+      agent,
+      "ok",
+      TRUE,
+      preconditions = function(x) tibble::tibble(ok = ok)
+    )
+  }
+  agent <- pointblank::create_agent(explorer_plays, label = "explorer_plays") |>
+    pointblank::col_vals_not_null(pointblank::vars(
+      game_id,
+      play_id,
+      home_cum_ppa
+    )) |>
+    pointblank::rows_distinct(pointblank::vars(play_id)) |>
+    pointblank::col_vals_expr(rlang::expr(
+      home_margin == home_score - away_score
+    )) |>
+    pointblank::col_vals_gte("elapsed", 0L, na_pass = TRUE) |>
+    check(nrow(explorer_plays) == nrow(plays)) |>
+    check(all(explorer_plays$game_id %in% games$id)) |>
+    check(mean(!is.na(explorer_plays$elapsed)) >= 0.999) |>
+    check(
+      !any(
+        explorer_plays |>
+          dplyr::filter(!is.na(.data$elapsed)) |>
+          dplyr::summarise(
+            back = any(diff(.data$elapsed) < 0),
+            .by = "game_id"
+          ) |>
+          dplyr::pull("back")
+      )
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "explorer_plays", stop_on_fail)
+}
+
+#' Row-group statistics of explorer plays parquet files
+#'
+#' One row per row group of each file: its `game_id` min and max as Parquet
+#' writes them. Read through DuckDB, since arrow's R bindings do not expose
+#' column statistics. A group without statistics comes back `NA`.
+#'
+#' @param paths Parquet file paths.
+#' @return A tibble: `file`, `row_group`, `min_value`, `max_value`.
+#' @export
+explorer_row_group_stats <- function(paths) {
+  rlang::check_installed(c("DBI", "duckdb"))
+  con <- DBI::dbConnect(
+    duckdb::duckdb(shared_home = FALSE),
+    dbdir = ":memory:"
+  )
+  on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
+  stats <- lapply(paths, function(p) {
+    sql <- paste0(
+      "SELECT row_group_id AS row_group, stats_min_value AS min_value, ",
+      "stats_max_value AS max_value FROM parquet_metadata(",
+      DBI::dbQuoteString(con, normalizePath(p, mustWork = TRUE)),
+      ") WHERE path_in_schema = 'game_id'"
+    )
+    out <- DBI::dbGetQuery(con, sql)
+    out$file <- rep(p, nrow(out))
+    out
+  })
+  dplyr::bind_rows(stats) |>
+    dplyr::select("file", "row_group", "min_value", "max_value")
+}
+
+#' Data contract for the explorer plays parquet files
+#'
+#' Guards the files [write_explorer_plays()] writes: every file has a `game_id`
+#' column with row groups, and every row group carries min and max statistics
+#' with min at most max. Those statistics are what lets the page fetch one
+#' game with a couple of range requests (decision 0046).
+#'
+#' @param paths Paths of the written `plays_<season>.parquet` files.
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_explorer_plays_files <- function(paths, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  stats <- explorer_row_group_stats(paths)
+  agent <- pointblank::create_agent(stats, label = "explorer_plays_files") |>
+    pointblank::col_vals_not_null(c("min_value", "max_value")) |>
+    pointblank::col_vals_expr(rlang::expr(
+      .data$min_value <= .data$max_value
+    )) |>
+    pointblank::col_vals_equal(
+      "ok",
+      TRUE,
+      preconditions = function(x) {
+        tibble::tibble(ok = all(paths %in% stats$file) && nrow(stats) > 0L)
+      }
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "explorer_plays_files", stop_on_fail)
 }

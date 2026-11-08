@@ -65,7 +65,7 @@ browser from the data (decision 0046).
 |---|---|
 | Teams landscape, team view | `games`, `teams`, `conference_tiers` |
 | Team-season strip | `games`, `teams` |
-| Game timeline | `plays`, `play_types`, `games`, `play_stats` (player chips) |
+| Game timeline | `plays`, `games`, `play_stats` (player chips) |
 | Players beeswarm, career | `player_stats`, `roster`, `teams`, `conference_tiers`, `outcomes`, `picks` |
 | Combine 3D | `combine`, `outcomes`, `picks` |
 | Draft & careers | as in the current charts (`picks`, `nfl_draft_picks`, `nfl_rosters`, `roster`) |
@@ -81,14 +81,16 @@ Each tab's data loads the first time the tab opens.
 1. **Landscape.** Small multiples, one per conference (membership as of the
    selected season; FBS by default, FCS behind a toggle). Each panel shows
    end-of-season Elo lines for its teams across 2010 to now, with the selected
-   season marked by a vertical rule. Tapping a panel highlights its teams;
-   tapping a line opens the team.
+   season marked by a vertical rule (FCS panels plot win share, since FCS has
+   no Elo). The selected team's line is drawn in its color. Tapping a panel
+   opens that conference large, with a chip per team; tapping near a line or a
+   chip opens the team.
 2. **Team view.** End-of-season Elo across seasons (line, team color) above
    a W-L bar per season. Tapping a season opens the team-season.
-3. **Team-season view.** A strip of games by week: one tile per game showing
-   W/L color, score, opponent logo, home/away/neutral, and the Elo change
-   (`postgameElo - pregameElo`). A mini Elo line for the season sits above
-   the strip. Tapping a tile opens the game.
+3. **Team-season view.** A wrapping grid of game tiles by week: one tile per
+   game showing W/L color, score, opponent logo, home/away/neutral, and the Elo
+   change (`postgameElo - pregameElo`). A mini Elo line for the season sits
+   above the tile strip. Tapping a tile opens the game.
 4. **Game timeline** (games with `plays` rows):
    - x = elapsed game time,
      `(period - 1) * 900 + (900 - (clock_minutes * 60 + clock_seconds))`.
@@ -96,9 +98,10 @@ Each tab's data loads the first time the tab opens.
    - Score margin from the selected team's side (step line), and cumulative
      PPA: the team's offensive `ppa` minus the opponent's, summed in play
      order (line).
-   - Start annotation: pregame expected win probability from the Elo gap,
-     `1 / (1 + 10^(-(elo_team - elo_opp) / 400))`. End annotation: CFBD's
-     `postgameWinProbability` from `games`.
+   - A summary line above the charts: the pregame expected win probability
+     from the Elo gap, `1 / (1 + 10^(-(elo_team - elo_opp) / 400))`, as the
+     start, and CFBD's `postgameWinProbability` from `games` as the end. It is
+     text, not a chart annotation.
    - Markers on scoring plays and turnovers (by `playType`).
    - A crosshair (drag on touch, hover on desktop) shows a play card: quarter,
      clock, down & distance, yard line, score, and `playText`.
@@ -180,8 +183,8 @@ each asset, tested on fixtures. These assets are not added to the DuckDB
 | `meta.json` | page metadata: `default_season`, `seasons`, `default_team`, `sources` (visual → tables) | <1 KB | first view |
 | `teams.json` | team: name, mascot, abbreviation, color, alt color, logo (conference by season lives in `team_season.json`) | ~8 KB gz | first view |
 | `team_season.json` | team × season: `team_id`, end Elo, W, L, conference, tier (names/colors only in `teams.json`) | ~4.2k FBS + FCS rows, ~39 KB gz | first view |
-| `games_<season>.json` | game: teams, points, pre/post Elo, postgame WP, week | ~1–2k rows/season | on team-season open |
-| `plays_<season>.parquet` | play, slim columns, sorted by `gameId` | 3.1M rows total | on game open |
+| `team_games_<season>.json` | team × game, from each FBS/FCS team's side: site, home flag, score, result, Elo pre/post/change, neutral-field Elo win chance, postgame WP, `has_plays` | ~3k rows, ≤ ~100 KB gz per season | with the first view (it validates the hash's `game`) |
+| `plays_<season>.parquet` | play: elapsed (non-decreasing within each game), home score/margin, home cumulative PPA, scoring/turnover flags, players JSON; sorted by game, 2,000-row groups | 3.1M rows, ~129 MB total, ≤ 15 MB per season; a game read is ~660 KB first in a season, ~140 KB after | loaded when the Game section comes into view (Teams tab only) |
 | `player_season_<pos>.parquet` | player × season: stats, percentiles, team, tier | ~160k rows total, split by group | on Players open |
 | `player_outcome.json` | player: outcome chip fields | ~70k rows | on Players open |
 | `combine.json` | combine invitee: measurables, outcome, `athlete_id` | ~5.7k rows | on Combine open |
@@ -207,8 +210,8 @@ per file.
   through `team_color_values()` (`R/viz.R`), so the R and JS palettes match.
 - Mobile: single column under 600px, tap targets ≥ 44px, every tooltip also
   opens on tap, no hover-only information, large type (match
-  `theme_cfb2nfl(base_size = 16)`), and swarms/strips that scroll horizontally
-  instead of shrinking.
+  `theme_cfb2nfl(base_size = 16)`), and swarms that scroll horizontally
+  instead of shrinking. The team-season tile grid wraps onto more rows.
 - Reader-facing labels everywhere (position groups, outcome names, stat names
   like "Passing yards"), mapped in R and shipped in the assets.
 - The page has no R chunks; its OJS cells are `echo: false` because it is an
@@ -225,6 +228,8 @@ per file.
   the Back button is not trapped.
 - A season with no completed games yet (preseason, before week 0) falls back
   to the latest season that has one.
+- A game not in the selected team-season is ignored: the shown game falls
+  back to the latest with plays, and it is left out of the hash.
 - A player with no qualifying stats in a season leaves a gap in the career
   line (no zero).
 - A combine point with no link shows the name only.
@@ -266,7 +271,13 @@ per file.
    exports + `contract_explorer_shell()`. Elo exists for FBS only, so FCS teams
    show a "no Elo rating" card; the sticky header sits below the pinned navbar
    (`top: 60px`); every select and tab is a 44px tap target.
-3. **Teams tab** through the game timeline (`games_*`, `plays_*` exports).
+3. [x] **Teams tab** (done 2026-11-08) through the game timeline
+   (`team_games_*`, `plays_*` exports). The levels stack vertically
+   (Conferences → Team → Season → Game) and taps scroll to the next level.
+   The FCS landscape plots win share, because FCS has no Elo. The game view
+   defaults to the team's latest game with play-by-play, and only a reader's
+   own pick goes into the hash. The header is sticky on desktop and static
+   under 600px.
 4. **Players tab** (`player_season_*`, `player_outcome` exports).
 5. **Combine tab** (shared builder with #64).
 6. **Draft & careers tab.** Move the old charts over, drop redshirts, then
@@ -285,10 +296,12 @@ Each step is its own PR, and `main` stays deployable after each one.
   (`games_${season}`).
 - `game`, `pos` and `player` are carried through the hash writer from
   `hashState`. Once they're selectable, each needs an input or mutable fed
-  into the writer, and changing season clears `game`.
+  into the writer. A game not in the selected team-season is ignored (see the
+  season rules above), not cleared.
 - `parseHash` accepts any `pos` string. The Players tab resolves it against
   the position list, the way `resolveTeam` does for teams.
 - The sticky header offset (`top: 60px`) matches the current navbar height.
   Revisit it if the navbar changes.
 - Decision 0046 asks for a real-phone touch check. Playwright only sends mouse
-  events, so do one by hand before step 3 merges.
+  events, so do one by hand before step 3 merges. Status: the step-3 real-phone
+  touch check is pending the owner's review on the live site.

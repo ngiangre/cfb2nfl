@@ -3,7 +3,8 @@
   position: sticky;
   /* Clears the pinned Quarto navbar (~60px on phones), which otherwise hides the header. */
   top: 60px;
-  z-index: 10;
+  /* Above Quarto's column-margin notes (z-index 998), which otherwise paint over it on phones. */
+  z-index: 1000;
   background: var(--bs-body-bg, #fff);
   padding: 0.5rem 0;
   display: flex;
@@ -38,5 +39,45 @@
 .explorer-source { font-size: 0.95rem; color: #4b5563; }
 .explorer-tab svg { max-width: 100%; height: auto; }
 @media (max-width: 600px) {
-  .explorer-header { flex-direction: column; align-items: stretch; }
+  /* On phones the header (~250px) would pin a third of the screen, so it scrolls away. */
+  .explorer-header { flex-direction: column; align-items: stretch; position: static; }
 }
+
+/* Teams tab (step 3). */
+.explorer-panels { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem; }
+.explorer-panel { all: unset; display: block; cursor: pointer; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0.5rem; }
+.explorer-panel:focus-visible { outline: 2px solid #2563eb; }
+.explorer-panel h4 { margin: 0 0 0.25rem; font-size: 1rem; }
+.explorer-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.75rem 0; }
+.explorer-chip {
+  min-height: 44px; display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.4rem 0.8rem; border: 1px solid #d1d5db; border-radius: 999px;
+  background: #fff; font-size: 1rem; cursor: pointer;
+}
+.explorer-chip[aria-pressed="true"] { border-color: #111827; box-shadow: inset 0 0 0 2px #111827; }
+.explorer-chip span { color: #4b5563; font-size: 0.9rem; }
+.explorer-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.5rem; margin: 0.75rem 0; }
+.explorer-tile {
+  min-height: 44px; display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem;
+  padding: 0.5rem; border: 1px solid #d1d5db; border-left-width: 6px; border-radius: 0.4rem;
+  background: #fff; font-size: 0.95rem; text-align: left; cursor: pointer;
+}
+.explorer-tile.explorer-W { border-left-color: #15803d; }
+.explorer-tile.explorer-L { border-left-color: #b91c1c; }
+.explorer-tile.explorer-T { border-left-color: #6b7280; }
+.explorer-tile[aria-pressed="true"] { box-shadow: inset 0 0 0 2px #111827; }
+.explorer-tile-week, .explorer-tile-elo { color: #4b5563; font-size: 0.85rem; }
+.explorer-game svg { touch-action: pan-y; } /* horizontal drags scrub, vertical drags scroll */
+.explorer-play p { margin: 0.2rem 0; }
+.explorer-summary { font-size: 1rem; color: #374151; }
+.explorer-play-nav { display: flex; gap: 0.5rem; margin: 0.5rem 0 1rem; }
+.explorer-nav {
+  min-height: 44px; min-width: 44px; padding: 0.4rem 0.9rem; font-size: 1rem;
+  border: 1px solid #d1d5db; border-radius: 0.4rem; background: #fff; cursor: pointer;
+}
+/* Screen-reader-only: keeps the live region in the DOM without showing it. */
+.visually-hidden {
+  position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+h3[tabindex="-1"]:focus { outline-offset: 4px; }

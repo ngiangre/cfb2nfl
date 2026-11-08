@@ -17,5 +17,6 @@ A tibble keyed by \verb{(team_id, season)}.
 \description{
 One row per FBS or FCS team per season with a completed game: record,
 end-of-season Elo (the postgame Elo after the team's last game that has
-one; FCS teams have none), and the season-aware conference tier.
+one; FCS teams have none), the season-aware conference tier, and \code{win_pct}
+(wins plus half of ties over games).
 }

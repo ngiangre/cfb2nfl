@@ -698,6 +698,7 @@ list(
       games = ok_games,
       game_team_stats = ok_game_team_stats,
       game_player_stats = ok_game_player_stats,
+      explorer_plays_files = ok_explorer_plays_files,
       play_types = ok_play_types,
       play_stat_types = ok_play_stat_types,
       plays = ok_plays,
@@ -724,7 +725,9 @@ list(
       outcomes = ok_outcomes,
       team_season = ok_team_season,
       team_draft = ok_team_draft,
-      explorer = ok_explorer
+      explorer = ok_explorer,
+      explorer_team_games = ok_explorer_team_games,
+      explorer_plays = ok_explorer_plays
     ))
   ),
   # ---- link-step contracts (audit-hygiene workstream C) ----------------------
@@ -861,6 +864,54 @@ list(
       teams = explorer_teams,
       team_season = explorer_team_season
     )),
+    format = "file"
+  ),
+  # Teams tab (plans/explorer.md step 3): each team's side of each game, and
+  # the plays the game timeline draws. explorer_plays is ~3M rows, so it is
+  # stored as parquet rather than rds.
+  tar_target(
+    explorer_team_games,
+    build_explorer_team_games(
+      games,
+      explorer_team_season,
+      unique(plays$gameId)
+    )
+  ),
+  tar_target(
+    explorer_plays,
+    build_explorer_plays(plays, games, teams, play_stats),
+    format = "parquet"
+  ),
+  tar_target(
+    ok_explorer_team_games,
+    pointblank::all_passed(contract_explorer_team_games(
+      explorer_team_games,
+      explorer_team_season,
+      stop_on_fail = FALSE
+    ))
+  ),
+  tar_target(
+    ok_explorer_plays,
+    pointblank::all_passed(contract_explorer_plays(
+      explorer_plays,
+      plays,
+      games,
+      stop_on_fail = FALSE
+    ))
+  ),
+  tar_target(
+    ok_explorer_plays_files,
+    pointblank::all_passed(contract_explorer_plays_files(
+      explorer_game_files[endsWith(explorer_game_files, ".parquet")],
+      stop_on_fail = FALSE
+    ))
+  ),
+  tar_target(
+    explorer_game_files,
+    c(
+      write_explorer_team_games(explorer_team_games),
+      write_explorer_plays(explorer_plays)
+    ),
     format = "file"
   ),
   # Person-period outcome table (decision 0032): the modeling dependent
@@ -1212,6 +1263,22 @@ list(
         games,
         keys = c("team_id", "season"),
         contract_passed = ok_explorer
+      ),
+      audit_step(
+        explorer_team_games,
+        "build_explorer_team_games",
+        "features",
+        games,
+        keys = c("team_id", "game_id"),
+        contract_passed = ok_explorer_team_games
+      ),
+      audit_step(
+        explorer_plays,
+        "build_explorer_plays",
+        "features",
+        plays,
+        keys = "play_id",
+        contract_passed = ok_explorer_plays
       )
     )
   ),
