@@ -1,6 +1,6 @@
 name: data-refresh
 
-# FULL refresh: re-pull every season (~780 CFBD calls) and publish it as the
+# FULL refresh: re-pull every season (~1,060 CFBD calls) and publish it as the
 # data-latest release asset, keeping large data out of git history. On demand
 # only (decision 0034): the scheduled path is data-current.yaml, which re-pulls
 # just the current season. Use this when a schema change needs every season
@@ -37,20 +37,25 @@ jobs:
             any::piggyback
             any::duckdb
 
-      # Carry the schema history across refreshes: CI checkouts start empty,
-      # so the prior history must come from the last published release asset.
-      - name: Download prior schema history
+      # Carry the schema history and the play stats across refreshes: CI
+      # checkouts start empty, and play stats are backfilled one season per
+      # opt-in pull (decision 0031), so a full refresh keeps the published
+      # file rather than re-pulling ~36,000 calls.
+      - name: Download prior schema history and play stats
         run: |
           Rscript -e '
-            try(
-              piggyback::pb_download(
-                "audit_history.csv",
-                repo = Sys.getenv("GITHUB_REPOSITORY"),
-                tag = "data-latest",
-                dest = "data"
-              ),
-              silent = TRUE
-            )
+            dir.create("data", showWarnings = FALSE)
+            for (f in c("audit_history.csv", "play_stats.parquet")) {
+              try(
+                piggyback::pb_download(
+                  f,
+                  repo = Sys.getenv("GITHUB_REPOSITORY"),
+                  tag = "data-latest",
+                  dest = "data"
+                ),
+                silent = TRUE
+              )
+            }
           '
 
       # One pass: ingest (incl. conference_tiers) -> process -> write every raw

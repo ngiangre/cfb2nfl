@@ -10,6 +10,9 @@ utils::globalVariables(c(
   "tier_label",
   "has_tier",
   # pointblank::vars() targets in R/contracts.R
+  "playId",
+  "athleteId",
+  "statTypeId",
   "player_name",
   "pos",
   "collegeAthleteId",

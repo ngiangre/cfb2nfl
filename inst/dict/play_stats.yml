@@ -1,0 +1,96 @@
+dataset: play_stats
+source: CFBD /plays/stats (per gameId; opt-in, one season per refresh)
+grain: LONG — one row per athlete-play-stat
+key: playId + athleteId + statTypeId
+description: >
+  Athlete attribution for each play: who threw, caught, ran, was targeted,
+  tackled, sacked, broke up a pass, or kicked. athleteId is the shared CFBD
+  athlete id, so it joins roster / player_stats / picks directly with no name
+  guard. Pulled one game per call (the week grain caps at 2,000 rows), so
+  seasons are backfilled one per refresh, newest first; seasons not yet
+  pulled have no rows. Joins plays by playId == plays.id.
+columns:
+  - name: gameId
+    type: int32
+    description: CFBD game id; joins games.id.
+    provenance: raw
+  - name: season
+    type: int32
+    description: Season year.
+    provenance: raw
+  - name: week
+    type: int32
+    description: Week number (per season type).
+    provenance: raw
+  - name: team
+    type: string
+    description: The athlete's team (teams.team namespace, display).
+    provenance: raw
+  - name: conference
+    type: string
+    description: The athlete's team's conference this season.
+    provenance: raw
+  - name: opponent
+    type: string
+    description: Opposing team.
+    provenance: raw
+  - name: teamScore
+    type: int32
+    description: The athlete's team's score before the play.
+    provenance: raw
+  - name: opponentScore
+    type: int32
+    description: Opponent's score before the play.
+    provenance: raw
+  - name: driveId
+    type: string
+    description: CFBD drive id (string).
+    provenance: raw
+  - name: playId
+    type: string
+    description: CFBD play id; joins plays.id.
+    provenance: raw
+  - name: period
+    type: int32
+    description: Quarter (5 and up are overtimes).
+    provenance: raw
+  - name: clock_minutes
+    type: int32
+    description: Minutes left in the period.
+    provenance: derived
+  - name: clock_seconds
+    type: int32
+    description: Seconds past clock_minutes left in the period.
+    provenance: derived
+  - name: yardsToGoal
+    type: int32
+    description: Yards from the ball to the offense's goal line.
+    provenance: raw
+  - name: down
+    type: int32
+    description: Down before the play.
+    provenance: raw
+  - name: distance
+    type: int32
+    description: Yards to go for a first down.
+    provenance: raw
+  - name: athleteId
+    type: string
+    description: CFBD athlete id (string); the shared playerId namespace.
+    provenance: raw
+  - name: athleteName
+    type: string
+    description: Athlete display name (display only, do not join on name).
+    provenance: raw
+  - name: statTypeId
+    type: int32
+    description: Play-stat-type id, looked up from play_stat_types by statType.
+    provenance: derived
+  - name: statType
+    type: string
+    description: Credit type (play_stat_types.name), e.g. Target, Sack, Tackle.
+    provenance: raw
+  - name: stat
+    type: double
+    description: Value of the credit (yards for rushes and receptions, else a count).
+    provenance: raw

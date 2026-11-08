@@ -8,8 +8,7 @@
 #' Source groups for season-keyed refresh
 #'
 #' Maps each season-keyed source to the calendar rule that decides its
-#' "current" season (decision 0034, section 3). `plays` and `play_stats` are
-#' forward declarations for issue #44.
+#' "current" season (decision 0034, section 3).
 #'
 #' @keywords internal
 refresh_source_groups <- c(
@@ -309,20 +308,29 @@ splice_seasons <- function(
 #'
 #' Mirrors the ingest call patterns: one call per season for player stats,
 #' roster, and recruiting; two `/games` calls per season (regular and
-#' postseason); one `/games/teams` and one `/games/players` call per played
-#' week; plus one call each for the whole-table `/draft/picks`, `/coaches`,
-#' and `/teams`. Week counts come from the published games; a season not yet
-#' published is assumed to have `default_weeks` played weeks. nflverse sources
-#' cost no CFBD calls.
+#' postseason); one `/games/teams`, one `/games/players`, and one `/plays`
+#' call per played week; plus one call each for the whole-table
+#' `/draft/picks`, `/coaches`, `/teams`, `/plays/types`, and
+#' `/plays/stats/types`. Week counts come from the published games; a season
+#' not yet published is assumed to have `default_weeks` played weeks. The
+#' opt-in per-game `/plays/stats` pull ([play_stats_enabled()]) adds one call
+#' per game in `play_stats_games`. nflverse sources cost no CFBD calls.
 #'
 #' @param seasons Named list of season vectors for `games`, `player_stats`,
 #'   `roster`, and `recruiting` (as from [refresh_seasons()]).
 #' @param games The published games table (`season`, `seasonType`, `week`,
 #'   `completed`), or `NULL`.
 #' @param default_weeks Played weeks assumed for an unpublished season.
+#' @param play_stats_games Games the per-game play-stats pull will query (0
+#'   when it is off).
 #' @return A named integer vector of calls by endpoint, with a `total`.
 #' @keywords internal
-estimate_refresh_calls <- function(seasons, games = NULL, default_weeks = 16L) {
+estimate_refresh_calls <- function(
+  seasons,
+  games = NULL,
+  default_weeks = 16L,
+  play_stats_games = 0L
+) {
   game_seasons <- seasons$games
   weeks <- if (is.null(games)) {
     0L
@@ -338,10 +346,12 @@ estimate_refresh_calls <- function(seasons, games = NULL, default_weeks = 16L) {
     games = 2L * length(game_seasons),
     game_team_stats = as.integer(weeks),
     game_player_stats = as.integer(weeks),
+    plays = as.integer(weeks),
+    play_stats = as.integer(play_stats_games),
     player_stats = length(seasons$player_stats),
     roster = length(seasons$roster),
     recruiting = length(seasons$recruiting),
-    picks_coaches_teams = 3L
+    whole_tables = 5L
   )
   c(calls, total = sum(calls))
 }

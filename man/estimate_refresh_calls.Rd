@@ -4,7 +4,12 @@
 \alias{estimate_refresh_calls}
 \title{Estimate the CFBD calls a refresh will make}
 \usage{
-estimate_refresh_calls(seasons, games = NULL, default_weeks = 16L)
+estimate_refresh_calls(
+  seasons,
+  games = NULL,
+  default_weeks = 16L,
+  play_stats_games = 0L
+)
 }
 \arguments{
 \item{seasons}{Named list of season vectors for \code{games}, \code{player_stats},
@@ -14,6 +19,9 @@ estimate_refresh_calls(seasons, games = NULL, default_weeks = 16L)
 \code{completed}), or \code{NULL}.}
 
 \item{default_weeks}{Played weeks assumed for an unpublished season.}
+
+\item{play_stats_games}{Games the per-game play-stats pull will query (0
+when it is off).}
 }
 \value{
 A named integer vector of calls by endpoint, with a \code{total}.
@@ -21,10 +29,12 @@ A named integer vector of calls by endpoint, with a \code{total}.
 \description{
 Mirrors the ingest call patterns: one call per season for player stats,
 roster, and recruiting; two \verb{/games} calls per season (regular and
-postseason); one \verb{/games/teams} and one \verb{/games/players} call per played
-week; plus one call each for the whole-table \verb{/draft/picks}, \verb{/coaches},
-and \verb{/teams}. Week counts come from the published games; a season not yet
-published is assumed to have \code{default_weeks} played weeks. nflverse sources
-cost no CFBD calls.
+postseason); one \verb{/games/teams}, one \verb{/games/players}, and one \verb{/plays}
+call per played week; plus one call each for the whole-table
+\verb{/draft/picks}, \verb{/coaches}, \verb{/teams}, \verb{/plays/types}, and
+\verb{/plays/stats/types}. Week counts come from the published games; a season
+not yet published is assumed to have \code{default_weeks} played weeks. The
+opt-in per-game \verb{/plays/stats} pull (\code{\link[=play_stats_enabled]{play_stats_enabled()}}) adds one call
+per game in \code{play_stats_games}. nflverse sources cost no CFBD calls.
 }
 \keyword{internal}

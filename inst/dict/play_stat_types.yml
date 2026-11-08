@@ -1,0 +1,18 @@
+dataset: play_stat_types
+source: CFBD /plays/stats/types (one call)
+grain: one row per play-stat type
+key: id
+description: >
+  The athlete-attribution vocabulary (31 types) used by play_stats: passing
+  (Target, Completion, Reception, Incompletion, Pass Breakup, Interception),
+  rushing, defense (Tackle, Sack, QB Hurry, Fumble Forced), and kicking
+  credits. Display dimension for play_stats, joined by statTypeId == id.
+columns:
+  - name: id
+    type: int32
+    description: CFBD play-stat-type id; joins play_stats.statTypeId.
+    provenance: raw
+  - name: name
+    type: string
+    description: Stat-type label (the text play_stats.statType carries).
+    provenance: raw

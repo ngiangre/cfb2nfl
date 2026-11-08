@@ -14,6 +14,12 @@
 # interactively), so nobody re-pulls history by accident. Requires
 # CFBD_API_KEY and the published data in data/ (data-raw/pull-data.R).
 # For a full rebuild of every season, use data-raw/refresh.R instead.
+#
+# Play stats (/plays/stats, one call per game, ~2,100 per season) are pulled
+# only with CFB2NFL_PLAYS_STATS=true (decision 0031, Phase 2), one season at a
+# time, newest first:
+#
+#   CFB2NFL_PLAYS_STATS=true Rscript data-raw/refresh-historical.R 2025
 
 args <- commandArgs(trailingOnly = TRUE)
 spec <- args[!startsWith(args, "--")][1]
@@ -32,6 +38,8 @@ published <- c(
   games_path,
   "data/game_team_stats.parquet",
   "data/game_player_stats.parquet",
+  "data/plays.parquet",
+  "data/play_stats.parquet",
   "data/player_stats.parquet",
   "data/roster.parquet",
   "data/recruiting.parquet"
@@ -43,7 +51,23 @@ if (!all(file.exists(published))) {
     ". Run data-raw/pull-data.R first."
   )
 }
-est <- estimate_refresh_calls(seasons, arrow::read_parquet(games_path))
+# The per-game play-stats pull queries every game the season has plays for.
+play_stats_games <- if (play_stats_enabled(spec)) {
+  plays <- arrow::read_parquet(
+    "data/plays.parquet",
+    col_select = c("season", "gameId")
+  )
+  length(unique(plays$gameId[
+    plays$season %in% refresh_seasons(spec, "play_stats")
+  ]))
+} else {
+  0L
+}
+est <- estimate_refresh_calls(
+  seasons,
+  arrow::read_parquet(games_path),
+  play_stats_games = play_stats_games
+)
 
 cat("Seasons selected by `", spec, "`:\n", sep = "")
 for (s in sources) {
@@ -78,7 +102,8 @@ targets::tar_invalidate(
     tidyselect::starts_with("raw_"),
     tidyselect::ends_with("_file"),
     "games_grid",
-    "week_grid"
+    "week_grid",
+    "play_stats_grid"
   )
 )
 targets::tar_make()

@@ -2,21 +2,25 @@ name: data-current
 
 # Season-scoped refresh (decision 0034): re-pull only the current season (and
 # the incoming recruiting class), splice it into the published tables, and
-# republish everything to the single data-latest release. ~40 CFBD calls per
-# run, against ~780 for a full refresh (data-refresh.yaml, on demand only).
-# Requires the CFBD_API_KEY repository secret.
+# republish everything to the single data-latest release. ~55 CFBD calls per
+# run in season (one /plays call per played week included), against ~1,060
+# for a full refresh (data-refresh.yaml, on demand only). Per-game play stats
+# are never pulled here (decision 0031). Requires the CFBD_API_KEY repository
+# secret.
 #
-# Scheduled only when new data is expected (cron is fixed UTC):
+# Scheduled only when new data is expected (cron is fixed UTC). The minute is
+# off the hour on purpose: GitHub delays or drops scheduled runs queued at
+# :00, when load peaks.
 on:
   schedule:
     # Weekly through the season and bowls: Sundays, August through January.
-    - cron: "0 13 * 1,8-12 0"
+    - cron: "17 13 * 1,8-12 0"
     # After National Signing Day (first Wednesday of February).
-    - cron: "0 13 8 2 *"
+    - cron: "17 13 8 2 *"
     # After the NFL Scouting Combine (late February / early March).
-    - cron: "0 13 10 3 *"
+    - cron: "17 13 10 3 *"
     # After the NFL Draft (late April); draft_season() turns over on May 1.
-    - cron: "0 13 2 5 *"
+    - cron: "17 13 2 5 *"
   workflow_dispatch:
     inputs:
       seasons:

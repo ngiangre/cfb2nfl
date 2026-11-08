@@ -1,0 +1,140 @@
+dataset: plays
+source: CFBD /plays (per year × week × seasonType, 2010–2026)
+grain: one row per play
+key: id
+description: >
+  Play-by-play: every play CFBD records for games with an FBS team, with the
+  situation before the snap (down, distance, field position, score, clock),
+  the outcome (play type, yards gained, scoring), predicted points added
+  (ppa), and the play-by-play text. Joins games by gameId == games.id and the
+  play-type dimension by playTypeId. No athlete id: player attribution lives
+  in play_stats (playId == id).
+columns:
+  - name: id
+    type: string
+    description: CFBD play id (string; game id + sequence, past integer range).
+    provenance: raw
+  - name: gameId
+    type: int32
+    description: CFBD game id; joins games.id.
+    provenance: raw
+  - name: driveId
+    type: string
+    description: CFBD drive id (string).
+    provenance: raw
+  - name: season
+    type: int32
+    description: Season year (attached at ingest).
+    provenance: derived
+  - name: week
+    type: int32
+    description: Week number per seasonType (attached at ingest).
+    provenance: derived
+  - name: seasonType
+    type: string
+    description: regular or postseason (attached at ingest).
+    provenance: derived
+  - name: driveNumber
+    type: int32
+    description: Drive sequence number within the game.
+    provenance: raw
+  - name: playNumber
+    type: int32
+    description: Play sequence number within the drive.
+    provenance: raw
+  - name: offense
+    type: string
+    description: Team with the ball (teams.team namespace, display).
+    provenance: raw
+  - name: offenseConference
+    type: string
+    description: Offense's conference this season.
+    provenance: raw
+  - name: offenseScore
+    type: int32
+    description: Offense's score before the play.
+    provenance: raw
+  - name: defense
+    type: string
+    description: Defending team (teams.team namespace, display).
+    provenance: raw
+  - name: defenseConference
+    type: string
+    description: Defense's conference this season.
+    provenance: raw
+  - name: defenseScore
+    type: int32
+    description: Defense's score before the play.
+    provenance: raw
+  - name: home
+    type: string
+    description: Home team.
+    provenance: raw
+  - name: away
+    type: string
+    description: Away team.
+    provenance: raw
+  - name: period
+    type: int32
+    description: Quarter (5 and up are overtimes).
+    provenance: raw
+  - name: clock_minutes
+    type: int32
+    description: Minutes left in the period (from the nested clock block).
+    provenance: derived
+  - name: clock_seconds
+    type: int32
+    description: Seconds past clock_minutes left in the period.
+    provenance: derived
+  - name: offenseTimeouts
+    type: int32
+    description: Offense's timeouts remaining.
+    provenance: raw
+  - name: defenseTimeouts
+    type: int32
+    description: Defense's timeouts remaining.
+    provenance: raw
+  - name: yardline
+    type: int32
+    description: Ball spot on CFBD's 0-100 home-relative yardline.
+    provenance: raw
+  - name: yardsToGoal
+    type: int32
+    description: Yards from the ball to the offense's goal line (0-100).
+    provenance: raw
+  - name: down
+    type: int32
+    description: Down (1-4; 0 on kickoffs and other non-scrimmage plays).
+    provenance: raw
+  - name: distance
+    type: int32
+    description: Yards to go for a first down.
+    provenance: raw
+  - name: yardsGained
+    type: int32
+    description: Yards gained on the play.
+    provenance: raw
+  - name: scoring
+    type: logical
+    description: Did the play score?
+    provenance: raw
+  - name: playTypeId
+    type: int32
+    description: Play-type id, looked up from play_types by playType text.
+    provenance: derived
+  - name: playType
+    type: string
+    description: Play-type label (play_types.text).
+    provenance: raw
+  - name: playText
+    type: string
+    description: Play-by-play description (jersey numbers, names, formation hints).
+    provenance: raw
+  - name: ppa
+    type: double
+    description: Predicted points added (NA on kicks, returns, and non-plays).
+    provenance: raw
+  - name: wallclock
+    type: string
+    description: Real-world timestamp of the play (ISO string; often NA in older seasons).
+    provenance: raw
