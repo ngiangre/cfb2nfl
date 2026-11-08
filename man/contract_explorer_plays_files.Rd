@@ -2,12 +2,14 @@
 % Please edit documentation in R/contracts.R
 \name{contract_explorer_plays_files}
 \alias{contract_explorer_plays_files}
-\title{Data contract for the explorer plays parquet files}
+\title{Data contract for the explorer per-game plays files}
 \usage{
-contract_explorer_plays_files(paths, stop_on_fail = TRUE)
+contract_explorer_plays_files(plays_dir, explorer_plays, stop_on_fail = TRUE)
 }
 \arguments{
-\item{paths}{Paths of the written \verb{plays_<season>.parquet} files.}
+\item{plays_dir}{The \verb{plays/} directory.}
+
+\item{explorer_plays}{Output of \code{\link[=build_explorer_plays]{build_explorer_plays()}}.}
 
 \item{stop_on_fail}{Abort on failure (default \code{TRUE})?}
 }
@@ -15,8 +17,8 @@ contract_explorer_plays_files(paths, stop_on_fail = TRUE)
 The interrogated pointblank agent, invisibly.
 }
 \description{
-Guards the files \code{\link[=write_explorer_plays]{write_explorer_plays()}} writes: every file has a \code{game_id}
-column with row groups, and every row group carries min and max statistics
-with min at most max. Those statistics are what lets the page fetch one
-game with a couple of range requests (decision 0046).
+Guards the directory \code{\link[=write_explorer_plays]{write_explorer_plays()}} writes: exactly one
+\verb{plays/<season>/<game_id>.parquet} per game in \code{explorer_plays}, and no
+other files. A missing game would blank the timeline; a stray file would
+be served as if it were a game.
 }

@@ -2354,63 +2354,49 @@ contract_explorer_plays <- function(
   enforce_contract(agent, "explorer_plays", stop_on_fail)
 }
 
-#' Row-group statistics of explorer plays parquet files
+#' Data contract for the explorer per-game plays files
 #'
-#' One row per row group of each file: its `game_id` min and max as Parquet
-#' writes them. Read through DuckDB, since arrow's R bindings do not expose
-#' column statistics. A group without statistics comes back `NA`.
+#' Guards the directory [write_explorer_plays()] writes: exactly one
+#' `plays/<season>/<game_id>.parquet` per game in `explorer_plays`, and no
+#' other files. A missing game would blank the timeline; a stray file would
+#' be served as if it were a game.
 #'
-#' @param paths Parquet file paths.
-#' @return A tibble: `file`, `row_group`, `min_value`, `max_value`.
-#' @export
-explorer_row_group_stats <- function(paths) {
-  rlang::check_installed(c("DBI", "duckdb"))
-  con <- DBI::dbConnect(
-    duckdb::duckdb(shared_home = FALSE),
-    dbdir = ":memory:"
-  )
-  on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
-  stats <- lapply(paths, function(p) {
-    sql <- paste0(
-      "SELECT row_group_id AS row_group, stats_min_value AS min_value, ",
-      "stats_max_value AS max_value FROM parquet_metadata(",
-      DBI::dbQuoteString(con, normalizePath(p, mustWork = TRUE)),
-      ") WHERE path_in_schema = 'game_id'"
-    )
-    out <- DBI::dbGetQuery(con, sql)
-    out$file <- rep(p, nrow(out))
-    out
-  })
-  dplyr::bind_rows(stats) |>
-    dplyr::select("file", "row_group", "min_value", "max_value")
-}
-
-#' Data contract for the explorer plays parquet files
-#'
-#' Guards the files [write_explorer_plays()] writes: every file has a `game_id`
-#' column with row groups, and every row group carries min and max statistics
-#' with min at most max. Those statistics are what lets the page fetch one
-#' game with a couple of range requests (decision 0046).
-#'
-#' @param paths Paths of the written `plays_<season>.parquet` files.
+#' @param plays_dir The `plays/` directory.
+#' @param explorer_plays Output of [build_explorer_plays()].
 #' @param stop_on_fail Abort on failure (default `TRUE`)?
 #' @return The interrogated pointblank agent, invisibly.
 #' @export
-contract_explorer_plays_files <- function(paths, stop_on_fail = TRUE) {
+contract_explorer_plays_files <- function(
+  plays_dir,
+  explorer_plays,
+  stop_on_fail = TRUE
+) {
   rlang::check_installed("pointblank")
-  stats <- explorer_row_group_stats(paths)
-  agent <- pointblank::create_agent(stats, label = "explorer_plays_files") |>
-    pointblank::col_vals_not_null(c("min_value", "max_value")) |>
-    pointblank::col_vals_expr(rlang::expr(
-      .data$min_value <= .data$max_value
-    )) |>
-    pointblank::col_vals_equal(
-      "ok",
-      TRUE,
-      preconditions = function(x) {
-        tibble::tibble(ok = all(paths %in% stats$file) && nrow(stats) > 0L)
-      }
-    ) |>
+  games <- dplyr::distinct(explorer_plays, .data$season, .data$game_id)
+  expected <- file.path(
+    "plays",
+    games$season,
+    paste0(games$game_id, ".parquet")
+  )
+  found <- if (dir.exists(plays_dir)) {
+    file.path(
+      "plays",
+      list.files(plays_dir, recursive = TRUE)
+    )
+  } else {
+    character()
+  }
+  counts <- tibble::tibble(
+    count_diff = length(found) - nrow(games),
+    missing = sum(!expected %in% found),
+    extra = sum(!found %in% expected),
+    dir_exists = dir.exists(plays_dir)
+  )
+  agent <- pointblank::create_agent(counts, label = "explorer_plays_files") |>
+    pointblank::col_vals_equal("dir_exists", TRUE) |>
+    pointblank::col_vals_equal("count_diff", 0L) |>
+    pointblank::col_vals_equal("missing", 0L) |>
+    pointblank::col_vals_equal("extra", 0L) |>
     pointblank::interrogate()
   enforce_contract(agent, "explorer_plays_files", stop_on_fail)
 }

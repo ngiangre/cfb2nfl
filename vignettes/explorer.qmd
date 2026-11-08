@@ -35,7 +35,6 @@ mutable scrubPlay = null
 mutable gameInView = false
 // Which Prev/Next button to refocus after the play card is redrawn.
 navFocus = ({key: null})
-parquetCache = new Map()
 async function fetchJson(path) {
   const response = await fetch(new URL(path, document.baseURI));
   if (!response.ok) throw new Error(`${response.status} ${path}`);
@@ -482,8 +481,9 @@ gamePlaysData = {
   try {
     const url = hyparquetUrl("https://cdn.jsdelivr.net/npm/hyparquet@1/+esm", teamsRetry);
     const hp = await loadOnce(tabCache, url, () => import(url));
-    const fileUrl = new URL(`explorer-data/plays_${season}.parquet`, document.baseURI).href;
-    return {rows: await readGamePlays(hp, fileUrl, gameRow.game_id, parquetCache)};
+    // One small file per game, fetched whole (GitHub Pages gzips it, so no range reads).
+    const fileUrl = new URL(`explorer-data/plays/${season}/${gameRow.game_id}.parquet`, document.baseURI).href;
+    return {rows: await loadOnce(tabCache, fileUrl, () => readGamePlays(hp, fileUrl))};
   } catch (error) {
     return {error, rows: []};
   }

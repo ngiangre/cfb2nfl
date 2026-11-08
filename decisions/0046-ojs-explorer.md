@@ -40,13 +40,13 @@ events, not real touch).
 - **Quarto OJS for the explorer page only.** Observable Plot and Inputs for
   2D charts and controls. Every other page stays on R htmlwidgets (0006
   otherwise stands).
-- **Parquet with hyparquet, not DuckDB-WASM.** Large assets (plays per
-  season, player-seasons per position group) are parquet sorted by their
-  lookup key (`gameId`, player id), written with small row groups so the
-  min/max statistics prune to one row group. The page reads them with
-  hyparquet over HTTP range requests and caches each file's metadata per
-  session. DuckDB-WASM costs 330× more bytes for no gain at this access
-  pattern. Per-team JSON is ruled out by size.
+- **Parquet with hyparquet, not DuckDB-WASM.** Large assets (plays, player-
+  seasons per position group) are parquet. Plays ship as one file per game,
+  `plays/<season>/<game_id>.parquet`, and the page fetches the whole file
+  (`(await fetch(url)).arrayBuffer()`, then hyparquet reads the buffer). No
+  range requests: GitHub Pages gzips `application/octet-stream` for browsers,
+  which breaks them (see Outcome). DuckDB-WASM costs 330× more bytes for no
+  gain at this access pattern. Per-team JSON is ruled out by size.
 - **Small assets are JSON**, normalized: team name, color, and logo live once
   in `teams.json`, not on every `team_season` row (the spike's 1.1 MB
   `team_season.json` was mostly repeated strings).
@@ -64,8 +64,8 @@ events, not real touch).
 These are the budgets later steps hold to:
 - First view ≤ 250 KB of gzipped data assets, with no parquet reader or 3D
   library loaded.
-- Opening a game: ≤ 1 MB transferred the first time in a season (footer +
-  one row group), ≤ 300 KB after that, under 200 ms after the transfer.
+- Opening a game: one whole game file (median ~14 KB, max ~23 KB), under
+  200 ms after the transfer.
 - The Combine tab costs ≈ 550 KB gzipped once (plotly gl3d + its data).
 
 ## Consequences
@@ -75,8 +75,9 @@ These are the budgets later steps hold to:
   targets, and the JS only filters and draws.
 - Runtime CDN dependencies (jsDelivr for hyparquet, the plotly CDN), pinned
   to major versions.
-- The export writer has to control the row-group size and sort order, and a
-  contract should check that `gameId` statistics are present.
+- The export writer has to write one file per game in game order, and a
+  contract checks that the plays directory holds exactly one file per game
+  (no missing or stray files).
 - Defects seen in the spike that the real build must avoid: a cell that
   references a heavy library before its guard loads it eagerly; the hash
   writer dropped `game`; season numbers were formatted as "2,025"; a bare
@@ -86,4 +87,20 @@ These are the budgets later steps hold to:
 
 ## Outcome / what we learned
 
-_Filled in later._
+The spike's range reads passed on its local test server, which never
+compresses. The live site broke them: GitHub Pages gzips
+`application/octet-stream` responses when the client sends
+`Accept-Encoding: gzip` (browsers always do, and `fetch` cannot turn it off).
+HEAD reported the compressed length (12,634,270 bytes against 14,918,990
+real), and range requests applied to the compressed stream, so the footer read
+failed with "parquet file invalid (footer != PAR1)". **Range reads of parquet
+do not work on GitHub Pages.**
+
+The fix writes one parquet file per game and fetches it whole, with no footer
+read and no per-file metadata cache. hyparquet stays as the reader. The build
+produces 17,433 game files (median 13.8 KB, max 23.1 KB, 246 MB in total);
+the total is larger than the ~129 MB of season files because each file
+carries its own footer, and a game still costs one request. Checked at a
+390×844 viewport against a server that gzips every response (as Pages does):
+the Game section draws its two charts and a play card with no errors, and
+switching games loads each game's file whole, about 15 KB on the wire.
