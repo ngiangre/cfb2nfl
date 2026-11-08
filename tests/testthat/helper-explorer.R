@@ -82,3 +82,45 @@ explorer_shell_fixture <- function() {
   meta$default_team <- min(teams$team_id)
   list(games = g, team_season = ts, teams = teams, meta = meta)
 }
+
+# Game 1: Texas (home, id 1) vs Alabama (id 2), with an OT play; game 4:
+# Alabama home. Scores are each play's offense/defense score.
+explorer_plays_fixture <- function() {
+  tibble::tibble(
+    id = c("11", "12", "13", "14", "15", "41"),
+    gameId = c(1L, 1L, 1L, 1L, 1L, 4L),
+    season = c(2025L, 2025L, 2025L, 2025L, 2025L, 2026L),
+    driveNumber = c(1L, 1L, 2L, 3L, 4L, 1L),
+    playNumber = c(1L, 2L, 1L, 1L, 1L, 1L),
+    period = c(1L, 1L, 2L, 4L, 5L, 1L),
+    clock_minutes = c(15L, 10L, 7L, 0L, 15L, 14L),
+    clock_seconds = c(0L, 30L, 30L, 5L, 0L, 0L),
+    offense = c("Texas", "Texas", "Alabama", "Texas", "Alabama", "Alabama"),
+    defense = c("Alabama", "Alabama", "Texas", "Alabama", "Texas", "Texas"),
+    offenseScore = c(0L, 7L, 0L, 27L, 24L, 0L),
+    defenseScore = c(0L, 0L, 7L, 24L, 27L, 0L),
+    down = c(1L, 2L, 1L, 3L, 1L, 1L),
+    distance = c(10L, 5L, 10L, 2L, 10L, 10L),
+    yardsToGoal = c(75L, 40L, 80L, 30L, 25L, 75L),
+    playType = c(
+      "Rush",
+      "Passing Touchdown",
+      "Pass Interception Return",
+      "Field Goal Good",
+      "Rush",
+      "Rush"
+    ),
+    playText = c("a", "b", "c", "d", "e", "f"),
+    ppa = c(0.5, 2.0, -1.5, NA, 0.25, 0.1),
+    scoring = c(FALSE, TRUE, FALSE, TRUE, FALSE, FALSE)
+  )
+}
+
+explorer_play_stats_fixture <- function() {
+  tibble::tibble(
+    playId = c("12", "12"),
+    athleteId = c("p1", "p2"),
+    athleteName = c("Passer One", "Receiver Two"),
+    statType = c("Completion", "Reception")
+  )
+}

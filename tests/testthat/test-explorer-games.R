@@ -52,3 +52,68 @@ test_that("build_explorer_team_games gives each FBS/FCS team's side of each game
   expect_true(is.na(g3$wp_pre)) # FCS opponent has no Elo
   expect_false(g3$has_plays)
 })
+
+test_that("explorer_elapsed runs 0-3600 in regulation and gives OT 300 s slots", {
+  expect_equal(explorer_elapsed(1L, 15L, 0L, 0), 0L)
+  expect_equal(explorer_elapsed(2L, 7L, 30L, 0), 1350L)
+  expect_equal(explorer_elapsed(4L, 0L, 0L, 0), 3600L)
+  expect_equal(explorer_elapsed(5L, 15L, 0L, 0), 3600L)
+  expect_equal(explorer_elapsed(5L, 15L, 0L, 0.5), 3750L)
+  expect_equal(explorer_elapsed(6L, 15L, 0L, 0), 3900L)
+  expect_true(is.na(explorer_elapsed(3L, NA, 0L, 0)))
+  # A bad clock is clamped into its quarter.
+  expect_equal(explorer_elapsed(1L, 20L, 0L, 0), 0L)
+})
+
+test_that("build_explorer_plays puts every play on the home team's scale", {
+  p <- build_explorer_plays(
+    explorer_plays_fixture(),
+    explorer_games_fixture(),
+    explorer_teams_fixture(),
+    explorer_play_stats_fixture()
+  )
+  expect_equal(nrow(p), nrow(explorer_plays_fixture()))
+  expect_named(
+    p,
+    c(
+      "season",
+      "game_id",
+      "play_id",
+      "period",
+      "clock",
+      "elapsed",
+      "offense_id",
+      "home_score",
+      "away_score",
+      "home_margin",
+      "home_cum_ppa",
+      "down",
+      "distance",
+      "yards_to_goal",
+      "play_type",
+      "play_text",
+      "scoring",
+      "turnover",
+      "players"
+    )
+  )
+  g1 <- p[p$game_id == 1L, ]
+  expect_equal(g1$play_id, c("11", "12", "13", "14", "15"))
+  expect_equal(g1$elapsed, c(0L, 270L, 1350L, 3595L, 3600L))
+  expect_equal(g1$clock, c("15:00", "10:30", "7:30", "0:05", "OT1"))
+  expect_equal(g1$offense_id, c(1L, 1L, 2L, 1L, 2L))
+  expect_equal(g1$home_score, c(0L, 7L, 7L, 27L, 27L))
+  expect_equal(g1$away_score, c(0L, 0L, 0L, 24L, 24L))
+  expect_equal(g1$home_margin, c(0L, 7L, 7L, 3L, 3L))
+  # Texas's PPA counts up, Alabama's counts down; NA counts as 0.
+  expect_equal(g1$home_cum_ppa, c(0.5, 2.5, 4.0, 4.0, 3.75))
+  expect_equal(g1$turnover, c(FALSE, FALSE, TRUE, FALSE, FALSE))
+  expect_equal(g1$scoring, c(FALSE, TRUE, FALSE, TRUE, FALSE))
+  expect_equal(
+    jsonlite::fromJSON(g1$players[2])$name,
+    c("Passer One", "Receiver Two")
+  )
+  expect_true(is.na(g1$players[1]))
+  g4 <- p[p$game_id == 4L, ]
+  expect_equal(g4$home_cum_ppa, 0.1) # Alabama is home in game 4
+})
