@@ -2196,7 +2196,8 @@ contract_explorer_shell <- function(
       "wins",
       "losses",
       "ties",
-      "elo_end"
+      "elo_end",
+      "win_pct"
     )) |>
     pointblank::col_vals_not_null(pointblank::vars(team_id, season, tier)) |>
     pointblank::rows_distinct(pointblank::vars(team_id, season)) |>
@@ -2204,6 +2205,7 @@ contract_explorer_shell <- function(
       wins + losses + ties == games
     )) |>
     pointblank::col_vals_gt("games", 0L) |>
+    pointblank::col_vals_between("win_pct", 0, 1) |>
     pointblank::col_vals_lte("season", meta$default_season) |>
     pointblank::col_vals_not_null(
       pointblank::vars(elo_end),

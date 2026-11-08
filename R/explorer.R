@@ -51,7 +51,8 @@ explorer_game_sides <- function(games) {
 #'
 #' One row per FBS or FCS team per season with a completed game: record,
 #' end-of-season Elo (the postgame Elo after the team's last game that has
-#' one; FCS teams have none), and the season-aware conference tier.
+#' one; FCS teams have none), the season-aware conference tier, and `win_pct`
+#' (wins plus half of ties over games).
 #'
 #' @param games Cleaned games.
 #' @param tiers Conference tiers (`season`, `conference`, `tier`, `tier_label`).
@@ -94,6 +95,9 @@ build_explorer_team_season <- function(games, tiers) {
         .data$tier_label
       )
     ) |>
+    dplyr::mutate(
+      win_pct = round((.data$wins + 0.5 * .data$ties) / .data$games, 3)
+    ) |>
     dplyr::select(
       "team_id",
       "season",
@@ -105,7 +109,8 @@ build_explorer_team_season <- function(games, tiers) {
       "wins",
       "losses",
       "ties",
-      "elo_end"
+      "elo_end",
+      "win_pct"
     )
 }
 
