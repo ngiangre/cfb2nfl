@@ -20,6 +20,7 @@ A tibble keyed by \verb{(team_id, game_id)}.
 One row per FBS/FCS team per completed, scored game, from that team's side:
 site (and whether the team is the listed home side, kept at neutral sites),
 score, result, Elo before and after, the Elo expected win
-probability before kickoff, CFBD's postgame win probability, and whether
+probability before kickoff (\code{wp_pre}, a neutral-field expectation with no
+home advantage), CFBD's postgame win probability, and whether
 the game has play-by-play. Rows match the team-season records exactly.
 }

@@ -118,6 +118,72 @@ test_that("build_explorer_plays puts every play on the home team's scale", {
   expect_equal(g4$home_cum_ppa, 0.1) # Alabama is home in game 4
 })
 
+test_that("build_explorer_plays keeps elapsed non-decreasing and carries stray 0:00 clocks", {
+  base <- explorer_plays_fixture()[rep(1L, 7L), ]
+  base$id <- sprintf("c%d", 1:7)
+  base$gameId <- 1L
+  base$driveNumber <- 1L
+  base$playNumber <- 1:7
+  base$period <- 1L
+  base$clock_minutes <- c(4L, 0L, 4L, 0L, 0L, 0L, 0L)
+  base$clock_seconds <- c(27L, 0L, 27L, 10L, 11L, 0L, 0L)
+  p <- build_explorer_plays(
+    base,
+    explorer_games_fixture(),
+    explorer_teams_fixture(),
+    explorer_play_stats_fixture()
+  )
+  # Stray 0:00 between 4:27 plays carries the previous play's elapsed but
+  # keeps its clock text; the 0:11 after 0:10 takes the earlier elapsed; the
+  # trailing 0:00 plays are the genuine end of the quarter.
+  expect_equal(p$elapsed, c(633L, 633L, 633L, 890L, 890L, 900L, 900L))
+  expect_equal(p$clock[2], "0:00")
+  expect_false(is.unsorted(p$elapsed, na.rm = TRUE))
+  # A stray 0:00 opening a period starts at the period start.
+  first <- base[1:3, ]
+  first$period <- 2L
+  first$clock_minutes <- c(0L, 5L, 4L)
+  first$clock_seconds <- c(0L, 0L, 0L)
+  p2 <- build_explorer_plays(
+    first,
+    explorer_games_fixture(),
+    explorer_teams_fixture(),
+    explorer_play_stats_fixture()
+  )
+  expect_equal(p2$elapsed, c(900L, 1500L, 1560L))
+  # A genuinely missing clock stays untimed.
+  na <- base[1:3, ]
+  na$clock_minutes[2] <- NA
+  p3 <- build_explorer_plays(
+    na,
+    explorer_games_fixture(),
+    explorer_teams_fixture(),
+    explorer_play_stats_fixture()
+  )
+  expect_true(is.na(p3$elapsed[2]))
+})
+
+test_that("build_explorer_plays gives one players entry per athlete per play", {
+  ps <- rbind(
+    explorer_play_stats_fixture(),
+    tibble::tibble(
+      playId = "12",
+      athleteId = "p1",
+      athleteName = "Passer One",
+      statType = "Attempt"
+    )
+  )
+  p <- build_explorer_plays(
+    explorer_plays_fixture(),
+    explorer_games_fixture(),
+    explorer_teams_fixture(),
+    ps
+  )
+  pl <- jsonlite::fromJSON(p$players[p$play_id == "12"])
+  expect_equal(pl$id, c("p1", "p2"))
+  expect_equal(pl$stat, c("Completion, Attempt", "Reception"))
+})
+
 test_that("write_explorer_team_games writes one JSON file per season", {
   dir <- withr::local_tempdir()
   g <- explorer_games_fixture()
@@ -232,4 +298,20 @@ test_that("plays with no period stay in the table untimed and still pass the con
     f$games,
     stop_on_fail = FALSE
   )))
+})
+
+test_that("contract_explorer_plays catches elapsed that steps backwards", {
+  f <- explorer_games_assets_fixture()
+  ok <- function(p) {
+    pointblank::all_passed(contract_explorer_plays(
+      p,
+      f$plays,
+      f$games,
+      stop_on_fail = FALSE
+    ))
+  }
+  expect_true(ok(f$explorer_plays))
+  bad <- f$explorer_plays
+  bad$elapsed[bad$play_id == "13"] <- 100L # after 270 in game 1
+  expect_false(ok(bad))
 })

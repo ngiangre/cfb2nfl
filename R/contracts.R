@@ -2329,6 +2329,17 @@ contract_explorer_plays <- function(
     check(nrow(explorer_plays) == nrow(plays)) |>
     check(all(explorer_plays$game_id %in% games$id)) |>
     check(mean(!is.na(explorer_plays$elapsed)) >= 0.999) |>
+    check(
+      !any(
+        explorer_plays |>
+          dplyr::filter(!is.na(.data$elapsed)) |>
+          dplyr::summarise(
+            back = any(diff(.data$elapsed) < 0),
+            .by = "game_id"
+          ) |>
+          dplyr::pull("back")
+      )
+    ) |>
     pointblank::interrogate()
   enforce_contract(agent, "explorer_plays", stop_on_fail)
 }

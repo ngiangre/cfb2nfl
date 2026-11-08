@@ -13,5 +13,5 @@ explorer_elo_expectation(elo, opp_elo)
 The team's expected win probability, \code{1 / (1 + 10^(-(elo - opp_elo) / 400))}.
 }
 \description{
-Elo expected win probability
+A neutral-field expectation: no home advantage is applied.
 }

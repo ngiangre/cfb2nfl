@@ -10,5 +10,6 @@ explorer_turnover_types()
 Character vector of CFBD \code{playType} values.
 }
 \description{
-Play types that change possession by turnover
+Plain "Fumble" is not flagged (the recovering team is unknown), nor are
+blocked kicks or turnovers on downs.
 }

@@ -4,6 +4,8 @@
 
 #' Elo expected win probability
 #'
+#' A neutral-field expectation: no home advantage is applied.
+#'
 #' @param elo,opp_elo Ratings of the team and its opponent.
 #' @return The team's expected win probability, `1 / (1 + 10^(-(elo - opp_elo) / 400))`.
 #' @export
@@ -16,7 +18,8 @@ explorer_elo_expectation <- function(elo, opp_elo) {
 #' One row per FBS/FCS team per completed, scored game, from that team's side:
 #' site (and whether the team is the listed home side, kept at neutral sites),
 #' score, result, Elo before and after, the Elo expected win
-#' probability before kickoff, CFBD's postgame win probability, and whether
+#' probability before kickoff (`wp_pre`, a neutral-field expectation with no
+#' home advantage), CFBD's postgame win probability, and whether
 #' the game has play-by-play. Rows match the team-season records exactly.
 #'
 #' @param games Cleaned games.
@@ -95,6 +98,9 @@ build_explorer_team_games <- function(games, team_season, play_game_ids) {
 
 #' Play types that change possession by turnover
 #'
+#' Plain "Fumble" is not flagged (the recovering team is unknown), nor are
+#' blocked kicks or turnovers on downs.
+#'
 #' @return Character vector of CFBD `playType` values.
 #' @export
 explorer_turnover_types <- function() {
@@ -140,6 +146,17 @@ explorer_elapsed <- function(
 #' the players credited on the play as a JSON array (`NA` when none). The page
 #' flips signs for the away team.
 #'
+#' Elapsed time is non-decreasing within each game. CFBD's clock jitters (a
+#' 0:11 play after a 0:10 play, or a stray mid-quarter 0:00), so a stray 0:00
+#' (one followed by a later timed play in its period) takes the previous
+#' play's elapsed, or the period start if it opens the period, and a running
+#' maximum within each period removes backward steps. The raw `clock` text is
+#' kept. Missing clocks stay `NA`.
+#'
+#' The last play's score is not always the final score (the play-by-play is
+#' truncated or stale in about 4% of games), so the final score comes from
+#' [build_explorer_team_games()].
+#'
 #' @param plays Cleaned plays.
 #' @param games Cleaned games.
 #' @param teams Cleaned teams.
@@ -149,12 +166,17 @@ explorer_elapsed <- function(
 build_explorer_plays <- function(plays, games, teams, play_stats) {
   homes <- dplyr::select(games, gameId = "id", home_team = "homeTeam")
   offense_ids <- dplyr::select(teams, offense = "team", offense_id = "team_id")
+  # One entry per athlete per play: a punter carries several stat types.
   players <- play_stats |>
+    dplyr::summarise(
+      stat = paste(unique(.data$statType), collapse = ", "),
+      .by = c("playId", "athleteId", "athleteName")
+    ) |>
     dplyr::summarise(
       players = as.character(jsonlite::toJSON(data.frame(
         id = .data$athleteId,
         name = .data$athleteName,
-        stat = .data$statType
+        stat = .data$stat
       ))),
       .by = "playId"
     )
@@ -172,6 +194,7 @@ build_explorer_plays <- function(plays, games, teams, play_stats) {
     ) |>
     dplyr::arrange(.data$gameId, .data$driveNumber, .data$playNumber) |>
     dplyr::mutate(
+      # Only overtime periods use this; the NA-period group's value is unused.
       overtime_position = (dplyr::row_number() - 1) / dplyr::n(),
       .by = c("gameId", "period")
     ) |>
@@ -196,6 +219,37 @@ build_explorer_plays <- function(plays, games, teams, play_stats) {
       ),
       .by = "gameId"
     ) |>
+    dplyr::mutate(
+      remaining = .data$clock_minutes * 60 + .data$clock_seconds,
+      elapsed = explorer_elapsed(
+        .data$period,
+        .data$clock_minutes,
+        .data$clock_seconds,
+        .data$overtime_position
+      )
+    ) |>
+    dplyr::mutate(
+      # CFBD stamps a stray 0:00 mid-quarter; it takes the previous play's
+      # time (the period start if it opens the period) instead of the clock.
+      later_timed = rev(cumsum(rev(
+        .data$remaining > 0 & !is.na(.data$remaining)
+      ))) -
+        (.data$remaining > 0 & !is.na(.data$remaining)),
+      stray = .data$period <= 4L &
+        .data$remaining %in% 0 &
+        .data$later_timed > 0,
+      elapsed = dplyr::if_else(
+        .data$stray,
+        as.integer((.data$period - 1L) * 900L),
+        .data$elapsed
+      ),
+      elapsed = dplyr::if_else(
+        is.na(.data$elapsed),
+        NA_integer_,
+        as.integer(cummax(dplyr::coalesce(.data$elapsed, 0L)))
+      ),
+      .by = c("gameId", "period")
+    ) |>
     dplyr::transmute(
       season = .data$season,
       game_id = .data$gameId,
@@ -207,12 +261,7 @@ build_explorer_plays <- function(plays, games, teams, play_stats) {
         is.na(.data$clock_minutes) | is.na(.data$clock_seconds) ~ NA_character_,
         .default = sprintf("%d:%02d", .data$clock_minutes, .data$clock_seconds)
       ),
-      elapsed = explorer_elapsed(
-        .data$period,
-        .data$clock_minutes,
-        .data$clock_seconds,
-        .data$overtime_position
-      ),
+      elapsed = .data$elapsed,
       offense_id = .data$offense_id,
       home_score = .data$home_score,
       away_score = .data$away_score,
