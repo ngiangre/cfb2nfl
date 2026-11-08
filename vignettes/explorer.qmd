@@ -110,13 +110,16 @@ pick = {
     view.value = value;
     view.dispatchEvent(new Event("input", {bubbles: true}));
   };
-  // The sticky header (about 60px down, taller on phones) would cover the top
-  // of the section, so scroll to the section's top below the header's bottom.
+  // A pinned header (wider screens) sits 60px down and covers the top of the
+  // section, so land below it. On phones it scrolls away, so land just below
+  // the pinned navbar instead.
   const scroll = id => {
     const el = document.getElementById(id);
     const head = document.querySelector(".explorer-header");
     if (!el) return;
-    const offset = head ? head.getBoundingClientRect().height + 60 + 8 : 0;
+    const navH = document.getElementById("quarto-header")?.offsetHeight || 60;
+    const sticky = head && getComputedStyle(head).position === "sticky";
+    const offset = sticky ? head.getBoundingClientRect().height + 60 + 8 : navH + 8;
     window.scrollTo({top: el.getBoundingClientRect().top + window.scrollY - offset, behavior: "smooth"});
   };
   return {

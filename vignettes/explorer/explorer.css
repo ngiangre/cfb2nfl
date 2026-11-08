@@ -39,7 +39,8 @@
 .explorer-source { font-size: 0.95rem; color: #4b5563; }
 .explorer-tab svg { max-width: 100%; height: auto; }
 @media (max-width: 600px) {
-  .explorer-header { flex-direction: column; align-items: stretch; }
+  /* On phones the header (~250px) would pin a third of the screen, so it scrolls away. */
+  .explorer-header { flex-direction: column; align-items: stretch; position: static; }
 }
 
 /* Teams tab (step 3). */
