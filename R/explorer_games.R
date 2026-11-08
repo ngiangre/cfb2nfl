@@ -150,7 +150,9 @@ explorer_elapsed <- function(
 #' 0:11 play after a 0:10 play, or a stray mid-quarter 0:00), so a stray 0:00
 #' (one followed by a later timed play in its period) takes the previous
 #' play's elapsed, or the period start if it opens the period, and a running
-#' maximum within each period removes backward steps. The raw `clock` text is
+#' maximum within each period removes backward steps. Plays are ordered by
+#' period, then drive and play number, because CFBD sometimes mislabels a
+#' drive's number against its period. The raw `clock` text is
 #' kept. Missing clocks stay `NA`.
 #'
 #' The last play's score is not always the final score (the play-by-play is
@@ -192,7 +194,12 @@ build_explorer_plays <- function(plays, games, teams, play_stats) {
       by = c("id" = "playId"),
       relationship = "one-to-one"
     ) |>
-    dplyr::arrange(.data$gameId, .data$driveNumber, .data$playNumber) |>
+    dplyr::arrange(
+      .data$gameId,
+      .data$period,
+      .data$driveNumber,
+      .data$playNumber
+    ) |>
     dplyr::mutate(
       # Only overtime periods use this; the NA-period group's value is unused.
       overtime_position = (dplyr::row_number() - 1) / dplyr::n(),

@@ -163,6 +163,26 @@ test_that("build_explorer_plays keeps elapsed non-decreasing and carries stray 0
   expect_true(is.na(p3$elapsed[2]))
 })
 
+test_that("build_explorer_plays orders plays by period before drive", {
+  pl <- explorer_plays_fixture()[rep(1L, 3L), ]
+  pl$id <- c("a", "b", "c")
+  pl$gameId <- 1L
+  pl$driveNumber <- c(1L, 2L, 3L)
+  pl$playNumber <- 1L
+  # Drive 3 is mislabeled with an early period; time order wins.
+  pl$period <- c(1L, 3L, 1L)
+  pl$clock_minutes <- c(10L, 5L, 5L)
+  pl$clock_seconds <- 0L
+  p <- build_explorer_plays(
+    pl,
+    explorer_games_fixture(),
+    explorer_teams_fixture(),
+    explorer_play_stats_fixture()
+  )
+  expect_equal(p$play_id, c("a", "c", "b"))
+  expect_false(is.unsorted(p$elapsed))
+})
+
 test_that("build_explorer_plays gives one players entry per athlete per play", {
   ps <- rbind(
     explorer_play_stats_fixture(),
