@@ -156,7 +156,7 @@ explorer_sources <- function() {
     teams_landscape = c("games", "teams", "conference_tiers"),
     team_view = c("games", "teams", "conference_tiers"),
     team_season = c("games", "teams"),
-    game_timeline = c("plays", "play_types", "games", "play_stats"),
+    game_timeline = c("plays", "games", "play_stats"),
     players = c(
       "player_stats",
       "roster",
