@@ -1,5 +1,10 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- The Explorer's **Teams** tab: conference landscapes of every team's
+  end-of-season Elo (FCS by win share), each team's rating and record by
+  season, its games week by week, and a play-by-play timeline of any game
+  with the lead and the cumulative PPA edge you can scrub through (#70).
+
 - New **Explorer** page (preview, not yet in the navigation): pick a season
   and a team to see its end-of-season Elo across every season since 2010. The
   link keeps your place, so it can be shared. It is the shell for the

@@ -81,8 +81,10 @@ Each tab's data loads the first time the tab opens.
 1. **Landscape.** Small multiples, one per conference (membership as of the
    selected season; FBS by default, FCS behind a toggle). Each panel shows
    end-of-season Elo lines for its teams across 2010 to now, with the selected
-   season marked by a vertical rule. Tapping a panel highlights its teams;
-   tapping a line opens the team.
+   season marked by a vertical rule (FCS panels plot win share, since FCS has
+   no Elo). The selected team's line is drawn in its color. Tapping a panel
+   opens that conference large, with a chip per team; tapping near a line or a
+   chip opens the team.
 2. **Team view.** End-of-season Elo across seasons (line, team color) above
    a W-L bar per season. Tapping a season opens the team-season.
 3. **Team-season view.** A strip of games by week: one tile per game showing
@@ -180,8 +182,8 @@ each asset, tested on fixtures. These assets are not added to the DuckDB
 | `meta.json` | page metadata: `default_season`, `seasons`, `default_team`, `sources` (visual → tables) | <1 KB | first view |
 | `teams.json` | team: name, mascot, abbreviation, color, alt color, logo (conference by season lives in `team_season.json`) | ~8 KB gz | first view |
 | `team_season.json` | team × season: `team_id`, end Elo, W, L, conference, tier (names/colors only in `teams.json`) | ~4.2k FBS + FCS rows, ~39 KB gz | first view |
-| `games_<season>.json` | game: teams, points, pre/post Elo, postgame WP, week | ~1–2k rows/season | on team-season open |
-| `plays_<season>.parquet` | play, slim columns, sorted by `gameId` | 3.1M rows total | on game open |
+| `team_games_<season>.json` | team × game, from each FBS/FCS team's side: site, home flag, score, result, Elo pre/post/change, neutral-field Elo win chance, postgame WP, `has_plays` | ~3k rows, ≤ ~100 KB gz per season | with the first view (it validates the hash's `game`) |
+| `plays_<season>.parquet` | play: elapsed (monotonic within a quarter), home score/margin, home cumulative PPA, scoring/turnover flags, players JSON; sorted by game, 2,000-row groups | 3.1M rows, ~129 MB total, ≤ 15 MB per season; a game read is ~660 KB first in a season, ~140 KB after | on game open |
 | `player_season_<pos>.parquet` | player × season: stats, percentiles, team, tier | ~160k rows total, split by group | on Players open |
 | `player_outcome.json` | player: outcome chip fields | ~70k rows | on Players open |
 | `combine.json` | combine invitee: measurables, outcome, `athlete_id` | ~5.7k rows | on Combine open |
@@ -266,7 +268,13 @@ per file.
    exports + `contract_explorer_shell()`. Elo exists for FBS only, so FCS teams
    show a "no Elo rating" card; the sticky header sits below the pinned navbar
    (`top: 60px`); every select and tab is a 44px tap target.
-3. **Teams tab** through the game timeline (`games_*`, `plays_*` exports).
+3. [x] **Teams tab** (done 2026-11-08) through the game timeline
+   (`team_games_*`, `plays_*` exports). The levels stack vertically
+   (Conferences → Team → Season → Game) and taps scroll to the next level.
+   The FCS landscape plots win share, because FCS has no Elo. The game view
+   defaults to the team's latest game with play-by-play, and only a reader's
+   own pick goes into the hash. The header is sticky on desktop and static
+   under 600px.
 4. **Players tab** (`player_season_*`, `player_outcome` exports).
 5. **Combine tab** (shared builder with #64).
 6. **Draft & careers tab.** Move the old charts over, drop redshirts, then
