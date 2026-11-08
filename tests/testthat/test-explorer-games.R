@@ -218,7 +218,7 @@ test_that("write_explorer_team_games writes one JSON file per season", {
   expect_equal(nrow(back), sum(tg$season == 2025L))
 })
 
-test_that("write_explorer_plays writes season parquet in game order with small row groups", {
+test_that("write_explorer_plays writes one parquet file per game, in game order", {
   dir <- withr::local_tempdir()
   p <- build_explorer_plays(
     explorer_plays_fixture(),
@@ -226,13 +226,38 @@ test_that("write_explorer_plays writes season parquet in game order with small r
     explorer_teams_fixture(),
     explorer_play_stats_fixture()
   )
-  paths <- write_explorer_plays(p, dir, chunk_size = 2L)
-  expect_equal(basename(paths), c("plays_2025.parquet", "plays_2026.parquet"))
-  back <- arrow::read_parquet(paths[[1]])
+  root <- write_explorer_plays(p, dir)
+  expect_equal(root, file.path(dir, "plays"))
+  files <- sort(list.files(root, recursive = TRUE))
+  expect_equal(files, c("2025/1.parquet", "2026/4.parquet"))
+  back <- arrow::read_parquet(file.path(root, "2025", "1.parquet"))
   expect_equal(back$play_id, c("11", "12", "13", "14", "15"))
+  expect_true("game_id" %in% names(back))
   expect_false("season" %in% names(back))
-  reader <- arrow::ParquetFileReader$create(paths[[1]])
-  expect_equal(reader$num_row_groups, 3L) # 5 rows in chunks of 2
+  expect_equal(
+    nrow(arrow::read_parquet(file.path(root, "2026", "4.parquet"))),
+    1L
+  )
+})
+
+test_that("write_explorer_plays removes stale per-season files and old game files", {
+  dir <- withr::local_tempdir()
+  p <- build_explorer_plays(
+    explorer_plays_fixture(),
+    explorer_games_fixture(),
+    explorer_teams_fixture(),
+    explorer_play_stats_fixture()
+  )
+  dir.create(file.path(dir, "plays", "2025"), recursive = TRUE)
+  writeLines("old", file.path(dir, "plays", "2025", "99.parquet"))
+  writeLines("old", file.path(dir, "plays_2025.parquet"))
+  write_explorer_plays(p, dir)
+  expect_false(file.exists(file.path(dir, "plays", "2025", "99.parquet")))
+  expect_false(file.exists(file.path(dir, "plays_2025.parquet")))
+  expect_equal(
+    sort(list.files(file.path(dir, "plays"), recursive = TRUE)),
+    c("2025/1.parquet", "2026/4.parquet")
+  )
 })
 
 explorer_games_assets_fixture <- function() {
@@ -290,90 +315,35 @@ test_that("contract_explorer_team_games caps each season file at the gzip budget
   expect_false(ok(10L))
 })
 
-test_that("contract_explorer_plays_files passes on written row groups", {
+test_that("contract_explorer_plays_files passes on one file per game", {
   f <- explorer_games_assets_fixture()
   dir <- withr::local_tempdir()
-  paths <- write_explorer_plays(f$explorer_plays, dir, chunk_size = 2L)
-  stats <- explorer_row_group_stats(paths)
-  expect_equal(nrow(stats), 3L + 1L) # 2025: 5 plays in 3 groups; 2026: 1 play
-  expect_true(all(!is.na(stats$min_value)) && all(!is.na(stats$max_value)))
+  root <- write_explorer_plays(f$explorer_plays, dir)
   expect_true(pointblank::all_passed(contract_explorer_plays_files(
-    paths,
+    root,
+    f$explorer_plays,
     stop_on_fail = FALSE
   )))
 })
 
-test_that("contract_explorer_plays_files catches files with no game_id statistics", {
+test_that("contract_explorer_plays_files catches missing and extra game files", {
+  f <- explorer_games_assets_fixture()
   dir <- withr::local_tempdir()
-  nostat <- file.path(dir, "plays_nostat.parquet")
-  arrow::write_parquet(
-    data.frame(game_id = c("a", "b")),
-    nostat,
-    write_statistics = FALSE
-  )
-  expect_false(pointblank::all_passed(contract_explorer_plays_files(
-    nostat,
-    stop_on_fail = FALSE
-  )))
-  expect_error(contract_explorer_plays_files(nostat), "explorer_plays_files")
-})
-
-test_that("contract_explorer_plays passes, and catches loss and orphans", {
-  f <- explorer_games_assets_fixture()
-  ok <- function(p, games = f$games) {
-    pointblank::all_passed(contract_explorer_plays(
-      p,
-      f$plays,
-      games,
+  root <- write_explorer_plays(f$explorer_plays, dir)
+  ok <- function() {
+    pointblank::all_passed(contract_explorer_plays_files(
+      root,
+      f$explorer_plays,
       stop_on_fail = FALSE
     ))
   }
-  expect_true(ok(f$explorer_plays))
-  expect_false(ok(f$explorer_plays[-1, ]))
-  expect_false(ok(f$explorer_plays, games = f$games[f$games$id != 4L, ]))
-  bad <- f$explorer_plays
-  bad$home_margin[2] <- 99L
-  expect_false(ok(bad))
-})
-
-test_that("plays with no period stay in the table untimed and still pass the contract", {
-  f <- explorer_games_assets_fixture()
-  # Pad with timed plays so the untimed one stays under the 0.1% budget.
-  pad <- f$plays[rep(6L, 2000L), ]
-  pad$id <- sprintf("pad%d", seq_len(2000L))
-  pad$playNumber <- seq_len(2000L) + 1L
-  plays <- rbind(f$plays, pad)
-  plays$period[2] <- NA
-  p <- build_explorer_plays(
-    plays,
-    f$games,
-    explorer_teams_fixture(),
-    explorer_play_stats_fixture()
+  file.remove(file.path(root, "2026", "4.parquet"))
+  expect_false(ok())
+  expect_error(
+    contract_explorer_plays_files(root, f$explorer_plays),
+    "explorer_plays_files"
   )
-  expect_equal(nrow(p), nrow(plays))
-  untimed <- p[p$play_id == "12", ]
-  expect_true(is.na(untimed$elapsed))
-  expect_true(is.na(untimed$clock))
-  expect_true(pointblank::all_passed(contract_explorer_plays(
-    p,
-    plays,
-    f$games,
-    stop_on_fail = FALSE
-  )))
-})
-
-test_that("contract_explorer_plays catches elapsed that steps backwards", {
-  f <- explorer_games_assets_fixture()
-  ok <- function(p) {
-    pointblank::all_passed(contract_explorer_plays(
-      p,
-      f$plays,
-      f$games,
-      stop_on_fail = FALSE
-    ))
-  }
-  expect_true(ok(f$explorer_plays))
-  bad <- f$explorer_plays
-  bad$elapsed[bad$play_id == "13"] <- 100L # after 270 in game 1
-  expect_false(ok(bad))
+  write_explorer_plays(f$explorer_plays, dir)
+  writeLines("x", file.path(root, "2025", "77.parquet"))
+  expect_false(ok())
 })

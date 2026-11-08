@@ -300,30 +300,42 @@ write_explorer_team_games <- function(
   write_explorer_assets(by_season, dir)
 }
 
-#' Write the per-season plays parquet files
+#' Write the per-game plays parquet files
 #'
-#' Rows stay in game order and row groups stay small, so each group's
-#' `game_id` min/max statistics let the page fetch one game with a couple of
-#' range requests (decision 0046).
+#' One file per game, `plays/<season>/<game_id>.parquet`, holding that game's
+#' rows in game order without the `season` column (the folder carries it).
+#' GitHub Pages gzips `application/octet-stream` responses for browsers, which
+#' breaks HTTP range requests (the byte offsets then refer to the compressed
+#' stream), so the page cannot read a slice of a season file. A game file is
+#' small (about 10 to 30 KB) and the page fetches it whole (decision 0046).
+#'
+#' Stale output is removed first: the `plays/` tree and any old per-season
+#' `plays_<season>.parquet` files, so a game that left the data does not
+#' linger on the site.
 #'
 #' @param explorer_plays Output of [build_explorer_plays()].
 #' @param dir Output directory.
-#' @param chunk_size Rows per row group.
-#' @return The written paths, `plays_<season>.parquet`.
+#' @return The plays directory, `file.path(dir, "plays")`.
 #' @export
 write_explorer_plays <- function(
   explorer_plays,
-  dir = "vignettes/explorer-data",
-  chunk_size = 2000L
+  dir = "vignettes/explorer-data"
 ) {
+  root <- file.path(dir, "plays")
   dir.create(dir, showWarnings = FALSE, recursive = TRUE)
-  seasons <- sort(unique(explorer_plays$season))
-  paths <- file.path(dir, sprintf("plays_%d.parquet", seasons))
-  for (i in seq_along(seasons)) {
-    explorer_plays |>
-      dplyr::filter(.data$season == seasons[[i]]) |>
-      dplyr::select(-"season") |>
-      arrow::write_parquet(paths[[i]], chunk_size = chunk_size)
+  unlink(root, recursive = TRUE)
+  unlink(list.files(dir, "^plays_[0-9]+\\.parquet$", full.names = TRUE))
+  # One pass to find each game's rows; split() keeps them in input order.
+  rows <- split(seq_len(nrow(explorer_plays)), explorer_plays$game_id)
+  seasons <- explorer_plays$season
+  game_season <- vapply(rows, function(i) seasons[[i[[1L]]]], integer(1L))
+  for (season in unique(game_season)) {
+    dir.create(file.path(root, season), showWarnings = FALSE, recursive = TRUE)
   }
-  paths
+  plays <- dplyr::select(explorer_plays, -"season")
+  for (game in names(rows)) {
+    path <- file.path(root, game_season[[game]], paste0(game, ".parquet"))
+    arrow::write_parquet(plays[rows[[game]], , drop = FALSE], path)
+  }
+  root
 }

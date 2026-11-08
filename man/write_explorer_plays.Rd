@@ -2,26 +2,28 @@
 % Please edit documentation in R/explorer_games.R
 \name{write_explorer_plays}
 \alias{write_explorer_plays}
-\title{Write the per-season plays parquet files}
+\title{Write the per-game plays parquet files}
 \usage{
-write_explorer_plays(
-  explorer_plays,
-  dir = "vignettes/explorer-data",
-  chunk_size = 2000L
-)
+write_explorer_plays(explorer_plays, dir = "vignettes/explorer-data")
 }
 \arguments{
 \item{explorer_plays}{Output of \code{\link[=build_explorer_plays]{build_explorer_plays()}}.}
 
 \item{dir}{Output directory.}
-
-\item{chunk_size}{Rows per row group.}
 }
 \value{
-The written paths, \verb{plays_<season>.parquet}.
+The plays directory, \code{file.path(dir, "plays")}.
 }
 \description{
-Rows stay in game order and row groups stay small, so each group's
-\code{game_id} min/max statistics let the page fetch one game with a couple of
-range requests (decision 0046).
+One file per game, \verb{plays/<season>/<game_id>.parquet}, holding that game's
+rows in game order without the \code{season} column (the folder carries it).
+GitHub Pages gzips \code{application/octet-stream} responses for browsers, which
+breaks HTTP range requests (the byte offsets then refer to the compressed
+stream), so the page cannot read a slice of a season file. A game file is
+small (about 10 to 30 KB) and the page fetches it whole (decision 0046).
+}
+\details{
+Stale output is removed first: the \verb{plays/} tree and any old per-season
+\verb{plays_<season>.parquet} files, so a game that left the data does not
+linger on the site.
 }

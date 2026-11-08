@@ -902,7 +902,8 @@ list(
   tar_target(
     ok_explorer_plays_files,
     pointblank::all_passed(contract_explorer_plays_files(
-      explorer_game_files[endsWith(explorer_game_files, ".parquet")],
+      explorer_game_files[!endsWith(explorer_game_files, ".json")],
+      explorer_plays,
       stop_on_fail = FALSE
     ))
   ),
