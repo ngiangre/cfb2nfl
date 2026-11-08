@@ -148,3 +148,62 @@ test_that("write_explorer_plays writes season parquet in game order with small r
   reader <- arrow::ParquetFileReader$create(paths[[1]])
   expect_equal(reader$num_row_groups, 3L) # 5 rows in chunks of 2
 })
+
+explorer_games_assets_fixture <- function() {
+  g <- explorer_games_fixture()
+  ts <- build_explorer_team_season(g, explorer_tiers_fixture())
+  plays <- explorer_plays_fixture()
+  list(
+    games = g,
+    team_season = ts,
+    team_games = build_explorer_team_games(g, ts, unique(plays$gameId)),
+    plays = plays,
+    explorer_plays = build_explorer_plays(
+      plays,
+      g,
+      explorer_teams_fixture(),
+      explorer_play_stats_fixture()
+    )
+  )
+}
+
+test_that("contract_explorer_team_games passes, and catches loss and bad results", {
+  f <- explorer_games_assets_fixture()
+  ok <- function(tg) {
+    pointblank::all_passed(contract_explorer_team_games(
+      tg,
+      f$team_season,
+      stop_on_fail = FALSE
+    ))
+  }
+  expect_true(ok(f$team_games))
+  expect_false(ok(f$team_games[-1, ]))
+  bad <- f$team_games
+  bad$result[1] <- "L"
+  expect_false(ok(bad))
+  bad <- f$team_games
+  bad$wp_pre[1] <- 1.5
+  expect_false(ok(bad))
+  expect_error(
+    contract_explorer_team_games(f$team_games[-1, ], f$team_season),
+    "explorer_team_games"
+  )
+})
+
+test_that("contract_explorer_plays passes, and catches loss and orphans", {
+  f <- explorer_games_assets_fixture()
+  ok <- function(p, games = f$games) {
+    pointblank::all_passed(contract_explorer_plays(
+      p,
+      f$plays,
+      games,
+      stop_on_fail = FALSE
+    ))
+  }
+  expect_true(ok(f$explorer_plays))
+  expect_false(ok(f$explorer_plays[-1, ]))
+  expect_false(ok(f$explorer_plays, games = f$games[f$games$id != 4L, ]))
+  bad <- f$explorer_plays
+  bad$home_margin[2] <- 99L
+  expect_false(ok(bad))
+})

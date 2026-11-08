@@ -2230,3 +2230,105 @@ contract_explorer_shell <- function(
     pointblank::interrogate()
   enforce_contract(agent, "explorer_shell", stop_on_fail)
 }
+
+#' Data contract for the explorer team-games table
+#'
+#' Guards [build_explorer_team_games()]: one row per `(team_id, game_id)`; no
+#' loss against the team-season records; a result that matches the score;
+#' win probabilities in 0 to 1; and an Elo change that equals post minus pre.
+#'
+#' @param team_games Output of [build_explorer_team_games()].
+#' @param team_season Output of [build_explorer_team_season()].
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_explorer_team_games <- function(
+  team_games,
+  team_season,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  check <- function(agent, ok) {
+    pointblank::col_vals_equal(
+      agent,
+      "ok",
+      TRUE,
+      preconditions = function(x) tibble::tibble(ok = ok)
+    )
+  }
+  agent <- pointblank::create_agent(
+    team_games,
+    label = "explorer_team_games"
+  ) |>
+    pointblank::col_vals_not_null(pointblank::vars(
+      team_id,
+      game_id,
+      season,
+      result
+    )) |>
+    pointblank::rows_distinct(pointblank::vars(team_id, game_id)) |>
+    pointblank::col_vals_in_set("result", c("W", "L", "T")) |>
+    pointblank::col_vals_expr(rlang::expr(
+      (result == "W") == (points > opp_points) &
+        (result == "L") == (points < opp_points)
+    )) |>
+    pointblank::col_vals_between("wp_pre", 0, 1, na_pass = TRUE) |>
+    pointblank::col_vals_between("wp_post", 0, 1, na_pass = TRUE) |>
+    pointblank::col_vals_expr(
+      rlang::expr(abs(elo_delta - (elo_post - elo_pre)) <= 1L),
+      preconditions = function(x) {
+        dplyr::filter(x, !is.na(.data$elo_pre), !is.na(.data$elo_post))
+      }
+    ) |>
+    check(nrow(team_games) > 0L) |>
+    check(nrow(team_games) == sum(team_season$games)) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "explorer_team_games", stop_on_fail)
+}
+
+#' Data contract for the explorer plays table
+#'
+#' Guards [build_explorer_plays()]: one row per input play (no loss); every
+#' play's game is in `games`; the margin equals the home score minus the away
+#' score; cumulative PPA is never missing; and at least 99.9% of plays have an
+#' elapsed time (the rest have a missing clock).
+#'
+#' @param explorer_plays Output of [build_explorer_plays()].
+#' @param plays Cleaned plays.
+#' @param games Cleaned games.
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_explorer_plays <- function(
+  explorer_plays,
+  plays,
+  games,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  check <- function(agent, ok) {
+    pointblank::col_vals_equal(
+      agent,
+      "ok",
+      TRUE,
+      preconditions = function(x) tibble::tibble(ok = ok)
+    )
+  }
+  agent <- pointblank::create_agent(explorer_plays, label = "explorer_plays") |>
+    pointblank::col_vals_not_null(pointblank::vars(
+      game_id,
+      play_id,
+      period,
+      home_cum_ppa
+    )) |>
+    pointblank::rows_distinct(pointblank::vars(play_id)) |>
+    pointblank::col_vals_expr(rlang::expr(
+      home_margin == home_score - away_score
+    )) |>
+    pointblank::col_vals_gte("elapsed", 0L, na_pass = TRUE) |>
+    check(nrow(explorer_plays) == nrow(plays)) |>
+    check(all(explorer_plays$game_id %in% games$id)) |>
+    check(mean(!is.na(explorer_plays$elapsed)) >= 0.999) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "explorer_plays", stop_on_fail)
+}

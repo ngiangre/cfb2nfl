@@ -118,5 +118,19 @@ utils::globalVariables(c(
   "college_changed",
   # data-masked columns in build_explorer_team_season() / contract_explorer_shell()
   "team_id",
-  "elo_end"
+  "elo_end",
+  # data-masked columns in contract_explorer_team_games() / _plays()
+  "game_id",
+  "result",
+  "points",
+  "opp_points",
+  "elo_delta",
+  "elo_post",
+  "elo_pre",
+  "play_id",
+  "period",
+  "home_cum_ppa",
+  "home_margin",
+  "home_score",
+  "away_score"
 ))
