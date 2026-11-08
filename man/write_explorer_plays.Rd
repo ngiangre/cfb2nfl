@@ -7,7 +7,7 @@
 write_explorer_plays(
   explorer_plays,
   dir = "vignettes/explorer-data",
-  chunk_size = 5000L
+  chunk_size = 2000L
 )
 }
 \arguments{
