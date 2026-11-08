@@ -1,7 +1,7 @@
 ---
-title: "Quarterback yardage keeps climbing across a college career while running back and receiver production plateaus after the third season"
+title: "Quarterback yardage keeps climbing across a college career while running back yardage peaks and receiver yardage slows"
 date: "2026-11-05"
-description: "Across quarterbacks, running backs and receivers, median passing yardage rises through every career season in the data while rushing and receiving yardage levels off after the third, and all three fall against higher-rated opponents."
+description: "Median passing yardage rises through every career season in the data while rushing yardage peaks in the fourth season and receiving yardage grows only slowly after it, and running back yardage falls the most against stronger opponents."
 followups:
   - "Position-specific baselines: adjust each group against its own position rather than every player with a line in the category."
   - "Split the career arcs by whether a player was eventually drafted, to see when the drafted and undrafted paths separate."
@@ -10,7 +10,7 @@ author:
   - "AI directed by Nick Giangreco"
 freeze: auto
 vignette: >
-  %\VignetteIndexEntry{Quarterback yardage keeps climbing across a college career while running back and receiver production plateaus after the third season}
+  %\VignetteIndexEntry{Quarterback yardage keeps climbing across a college career while running back yardage peaks and receiver yardage slows}
   %\VignetteEngine{quarto::html}
   %\VignetteEncoding{UTF-8}
 ---
@@ -196,6 +196,10 @@ qb_med_1 <- qb_arc$med[qb_arc$season_index == 1]
 qb_med_max <- qb_arc$med[qb_arc$season_index == max_idx]
 rb_arc <- arc_med |> filter(.data$group == "Running backs")
 rb_med_peak <- max(rb_arc$med)
+rb_peak_idx <- rb_arc$season_index[which.max(rb_arc$med)]
+wr_arc <- arc_med |> filter(.data$group == "Receivers")
+wr_med_at_rb_peak <- wr_arc$med[wr_arc$season_index == rb_peak_idx]
+wr_med_max <- wr_arc$med[wr_arc$season_index == max_idx]
 
 # Viz 2: opponent-band gradient. Mean signature yards per game by group x band,
 # with a +/- 1 SD range marking how much games vary within each band.
@@ -222,6 +226,10 @@ drop_tbl <- rated |>
 qb_drop <- drop_tbl$drop[drop_tbl$group == "Quarterbacks"]
 rb_drop <- drop_tbl$drop[drop_tbl$group == "Running backs"]
 wr_drop <- drop_tbl$drop[drop_tbl$group == "Receivers"]
+# Quarterback means across the three lower rated bands, before the top band.
+qb_rated <- rated |> filter(.data$group == "Quarterbacks")
+qb_low_range <- range(qb_rated$mean_yds[qb_rated$band != "1800 and up"])
+qb_top <- qb_rated$mean_yds[qb_rated$band == "1800 and up"]
 
 # Viz 3: residual spread. The residual is opponent- and season-adjusted, so it
 # centres near zero by construction; the spread is what differs by group.
@@ -232,10 +240,15 @@ resid_spread <- cast_gp |>
     sd = sd(.data$residual),
     iqr = IQR(.data$residual),
     p90 = quantile(.data$residual, 0.9),
+    # Spread relative to the group's own typical game, so groups on different
+    # yardage scales compare.
+    rel_sd = sd(.data$residual) / mean(.data$value),
     .groups = "drop"
   )
 qb_sd <- resid_spread$sd[resid_spread$group == "Quarterbacks"]
 wr_sd <- resid_spread$sd[resid_spread$group == "Receivers"]
+rel <- function(g) resid_spread$rel_sd[resid_spread$group == g]
+rel_most <- resid_spread$group[which.max(resid_spread$rel_sd)]
 
 # Per-group x band residual summary, for the exploratory boxplot tooltips.
 resid_box <- cast_gp |>
@@ -266,7 +279,7 @@ resid_box <- cast_gp |>
 ```
 
 ::: {.callout-note appearance="minimal"}
-*Data as of the `data-latest` release, retrieved 2026-11-05. Careers of recent
+*Data as of the `data-latest` release, retrieved 2026-11-07. Careers of recent
 classes are right-censored; later seasons may not yet be present.*
 :::
 
@@ -321,7 +334,9 @@ elo_bands |>
     `Lowest Elo` = ifelse(is.finite(.data$min_elo), fmt(.data$min_elo), "--"),
     `Highest Elo` = ifelse(is.finite(.data$max_elo), fmt(.data$max_elo), "--")
   ) |>
-  kable(caption = "Games and Elo range in each opponent band.")
+  kable(
+    caption = "Player-game stat lines (all players and stats) and the Elo range in each opponent band."
+  )
 ```
 
 ```{r}
@@ -369,12 +384,13 @@ grp_pop |>
 
 ## 3. Results
 
-### 3.1 Quarterback yardage keeps climbing across a career while running backs and receivers plateau
+### 3.1 Quarterback yardage keeps climbing across a career while running backs peak and receivers slow
 
 Median passing yards rise at every career season shown, from
 `r fmt(qb_med_1)` in a quarterback's first season to `r fmt(qb_med_max)` by his
-`r max_idx`th, while rushing and receiving medians flatten after about the third
-season near `r fmt(rb_med_peak)` yards.
+`r max_idx`th, while the rushing median peaks at `r fmt(rb_med_peak)` yards in
+season `r rb_peak_idx` and the receiving median edges from
+`r fmt(wr_med_at_rb_peak)` to `r fmt(wr_med_max)` after it.
 
 ```{r}
 #| label: s31-table
@@ -469,12 +485,13 @@ p <- cast_sa |>
 girafe(ggobj = p, width_svg = 13, height_svg = 6)
 ```
 
-### 3.2 Production falls against stronger opponents, steepest for running backs
+### 3.2 Running back yardage falls the most against stronger opponents, while quarterbacks dip only against the strongest
 
 From the weakest rated band to the strongest, mean yards per game fall about
-`r fmt(qb_drop)` for quarterbacks, `r fmt(rb_drop)` for running backs and
-`r fmt(wr_drop)` for receivers; the running back decline is the steepest in both
-yards and share. The point and range on each bar mark the mean and plus or minus
+`r fmt(rb_drop)` for running backs, `r fmt(wr_drop)` for receivers and
+`r fmt(qb_drop)` for quarterbacks, whose mean holds between
+`r fmt(qb_low_range[1], 1)` and `r fmt(qb_low_range[2], 1)` until the top band
+(`r fmt(qb_top, 1)`). The point and range on each bar mark the mean and plus or minus
 one standard deviation of game-to-game yards, so the spread can be read beside
 the average.
 
@@ -488,7 +505,9 @@ band_grad |>
     Games = fmt(.data$games)
   ) |>
   arrange(`Position group`, `Opponent band`) |>
-  kable(caption = "Mean signature yards per game by group and opponent band.")
+  kable(
+    caption = "Mean signature yards per game by group and opponent band. Unrated opponents (no Elo) are not the weakest rated band and are left out of the drop comparison."
+  )
 ```
 
 ```{r}
@@ -557,7 +576,7 @@ p <- cast_gp |>
 girafe(ggobj = p, width_svg = 13, height_svg = 6)
 ```
 
-### 3.3 Game-to-game production swings most widely for quarterbacks
+### 3.3 Quarterbacks swing the most yards from game to game, but `r tolower(rel_most)` swing the most relative to their own average
 
 Each game's residual is its yards minus the baseline, the mean yards of every
 player with a line in that category in the same season and opponent band.
@@ -565,9 +584,12 @@ player with a line in that category in the same season and opponent band.
 $$\text{residual} = \text{game yards} - \text{baseline (season, band)}$$
 
 Because the baseline already removes season and opponent strength, residuals
-centre near zero for every group; what differs is their spread, widest for
-quarterbacks (standard deviation `r fmt(qb_sd)` yards) and narrowest for
-receivers (`r fmt(wr_sd)` yards).
+centre near zero for every group; what differs is their spread, widest in yards
+for quarterbacks (standard deviation `r fmt(qb_sd)` yards) and narrowest for
+receivers (`r fmt(wr_sd)` yards), but against each group's mean yards per game
+it is `r fmt(rel("Quarterbacks"), 2)` for quarterbacks,
+`r fmt(rel("Running backs"), 2)` for running backs and
+`r fmt(rel("Receivers"), 2)` for receivers.
 
 ```{r}
 #| label: s33-table
@@ -577,9 +599,12 @@ resid_spread |>
     Games = fmt(.data$games),
     `Residual SD` = fmt(.data$sd, 1),
     `Residual IQR` = fmt(.data$iqr, 1),
-    `90th percentile` = fmt(.data$p90, 1)
+    `90th percentile` = fmt(.data$p90, 1),
+    `SD over mean yards` = fmt(.data$rel_sd, 2)
   ) |>
-  kable(caption = "Spread of per-game residuals by group (yards).")
+  kable(
+    caption = "Spread of per-game residuals by group (yards), and the SD as a share of the group's mean yards per game."
+  )
 ```
 
 ```{r}
@@ -639,9 +664,9 @@ The three groups behave differently along all three axes the post looked at.
 #| label: summary
 tibble::tribble(
   ~Question                                        , ~`What the data showed`                                                                                                                                                  ,
-  "How does production grow across a career?"      , paste0("Quarterback median passing yards rose every career season (", fmt(qb_med_1), " to ", fmt(qb_med_max), "); rushing and receiving plateaued after the third.")     ,
-  "How does it change against stronger opponents?" , paste0("Mean yards per game fell from the weakest to strongest rated band for all three, steepest for running backs (", fmt(rb_drop), " yards).")                        ,
-  "How much does it swing game to game?"           , paste0("Opponent-adjusted residuals centre near zero but spread widest for quarterbacks (SD ", fmt(qb_sd, 1), ") and narrowest for receivers (SD ", fmt(wr_sd, 1), ").")
+  "How does production grow across a career?"      , paste0("Quarterback median passing yards rose every career season (", fmt(qb_med_1), " to ", fmt(qb_med_max), "); rushing peaked in season ", rb_peak_idx, " and receiving grew slowly after it.")     ,
+  "How does it change against stronger opponents?" , paste0("Mean yards per game fell most for running backs (", fmt(rb_drop), " yards from the weakest to the strongest rated band); quarterbacks dipped only against the strongest.")                        ,
+  "How much does it swing game to game?"           , paste0("Opponent-adjusted residuals spread widest in yards for quarterbacks (SD ", fmt(qb_sd, 1), "), but widest relative to their mean for ", tolower(rel_most), ".")
 ) |>
   kable(caption = "Each question and what the data showed.")
 ```
@@ -650,9 +675,10 @@ tibble::tribble(
 
 ::: {.callout-important}
 Production grows across a career for quarterbacks in a way it does not for
-running backs or receivers, whose medians level off after the third season. All
-three groups produce less against stronger opponents, and once that is removed
-quarterback output remains the most volatile from game to game.
+running backs, whose median peaks in season `r rb_peak_idx`, or receivers, whose
+median grows slowly after it. Running backs lose the most against stronger
+opponents, and once opponent strength is removed quarterbacks swing the most
+yards from game to game, though not the most relative to a typical game.
 :::
 
 Caveats: the baseline pools every player with a line in the category rather than
@@ -660,8 +686,8 @@ comparing within position, so a running back's receiving-band baseline mixes in
 receivers; a position-specific baseline is a natural refinement. Groups are
 assigned from a player's most frequent roster position and a group is reduced to
 one signature stat, so a quarterback's rushing or a running back's receiving is
-set aside. Game-level stats begin around 2013, so the game exhibits cover fewer
-seasons than the career arcs. Unrated opponents (no Elo, mostly lower-division
+set aside. Game-level stats cover `r min(cast_gp$season)` to
+`r max(cast_gp$season)`. Unrated opponents (no Elo, mostly lower-division
 teams) are kept as their own band rather than dropped.
 
 ```{r}

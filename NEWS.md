@@ -6,8 +6,12 @@
   was re-pulled and republished on `data-latest`. A new contract check fails
   any box score cut back to one player per stat type
   ([decision 0044](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0044-absence-shaped-season-signals.md)).
-  Playing-time and game-production numbers built on the old table undercount
-  players until their posts are re-rendered.
+  The playing-time and performance-arcs posts are re-rendered on the corrected
+  table, and their claims are revised. Most rostered player-seasons now log a
+  stat line in some game, so the playing-time post's first expectation fails.
+  The arcs post now says running back yardage peaks in the fourth season. Its
+  earlier "plateau after the third" claim was wrong in the season totals
+  regardless of the fix.
 
 - New post on what the data can define for each position (issue #51): an
   early-stop proxy for finished careers, an injury-shaped absence and a

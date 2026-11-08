@@ -1,7 +1,7 @@
 ---
-title: "Most rostered players never log a stat line, and drafted players log one in more of their team's games"
+title: "Most rostered player-seasons log a stat line in some game, offensive linemen rarely do, and drafted players log one in more of their team's games"
 date: "2026-11-05"
-description: "Most rostered player-seasons from 2019 to 2025 log no stat line in any game, offensive linemen almost never do, and drafted player-seasons log one in a larger share of games than the rest."
+description: "Most rostered player-seasons from 2019 to 2025 log a stat line in at least one game, offensive linemen rarely do, and drafted player-seasons log one in a larger share of their team's games than the rest."
 followups:
   - "Measure snap counts or play participation for offensive linemen, the group the box score cannot show (issue 44 play-by-play)."
   - "Adjust the draftee comparison for depth-chart position and team quality, so the gap is not a difference in who gets the ball."
@@ -10,7 +10,7 @@ author:
   - "AI directed by Nick Giangreco"
 freeze: auto
 vignette: >
-  %\VignetteIndexEntry{Most rostered players never log a stat line, and drafted players log one in more of their team's games}
+  %\VignetteIndexEntry{Most rostered player-seasons log a stat line in some game, offensive linemen rarely do, and drafted players log one in more of their team's games}
   %\VignetteEngine{quarto::html}
   %\VignetteEncoding{UTF-8}
 ---
@@ -66,7 +66,6 @@ pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
 subjects <- tibble::tribble(
   ~who            , ~cfb_athlete_id ,
   "Joe Burrow"    , "3915511"       ,
-  "Cam Ward"      , "4688380"       ,
   "Jordan Travis" , "4360799"
 )
 
@@ -114,6 +113,14 @@ share_any_class <- pop |>
   filter(!is.na(class_year)) |>
   group_by(class_year) |>
   summarise(any_line = mean(games_appeared > 0), n = n(), .groups = "drop")
+ol_any <- share_any_pos$any_line[share_any_pos$position_group == "Offensive line"]
+# The other named groups: "Athlete" (a few dozen seasons) and unrecorded
+# positions are not compared.
+others_any <- share_any_pos$any_line[
+  !share_any_pos$position_group %in%
+    c("Offensive line", "Athlete", "Position not recorded")
+]
+class_any <- function(k) share_any_class$any_line[share_any_class$class_year == k]
 draft_summary <- draft_pop |>
   group_by(drafted) |>
   summarise(
@@ -124,10 +131,14 @@ draft_summary <- draft_pop |>
   )
 draft_by_pos <- draft_pop |>
   group_by(position_group, drafted) |>
-  summarise(n = n(), any_line = mean(games_appeared > 0), .groups = "drop")
+  summarise(n = n(), mean_share = mean(appearance_rate), .groups = "drop")
+share_drafted <- draft_summary$mean_share[draft_summary$drafted]
+share_rest <- draft_summary$mean_share[!draft_summary$drafted]
+e1_holds <- share_any_all < 0.5
+e2_holds <- share_drafted > share_rest
 
 # ---- Numbers quoted in the prose: the named players ------------------------
-# Season rows for the recurring cast; each pinned to the data.
+# Season rows for the recurring cast.
 cast <- usage |>
   filter(playerId %in% subjects$cfb_athlete_id, season >= 2019L) |>
   select(playerId, season, team, games_appeared, team_games) |>
@@ -135,12 +146,10 @@ cast <- usage |>
   arrange(who, season, team)
 burrow_2019 <- cast |> filter(who == "Joe Burrow", season == 2019L)
 travis_2019 <- cast |> filter(who == "Jordan Travis", season == 2019L)
-ward_2021 <- cast |> filter(who == "Cam Ward", season == 2021L, team == "Incarnate Word")
-ward_2022 <- cast |> filter(who == "Cam Ward", season == 2022L)
 ```
 
 ::: {.callout-note appearance="minimal"}
-*Data as of the `data-latest` release, retrieved 2026-11-05. The 2026 season is still in progress, so it is left out of the comparisons.*
+*Data as of the `data-latest` release, retrieved 2026-11-07. The 2026 season is still in progress, so it is left out of the comparisons.*
 :::
 
 ## 1. Introduction
@@ -165,7 +174,7 @@ tibble::tribble(
   "Appeared in a game"   , "The player has at least one stat line in that game. Offensive linemen and many special teamers rarely log one, so this understates their play." ,
   "Appearance rate"      , "Games appeared divided by team games."                                                                      ,
   "Position group"       , "The roster position for that season, in one of eleven shared groups."                                       ,
-  "Drafted"              , "Selected in the draft after that season, among seasons in which the player was draft-eligible."             ,
+  "Drafted"              , "Selected in the draft after that season, among seasons in which the player was draft-eligible and logged a season stat line."             ,
   "Class year"           , "The player's eligibility class, 1 to 5, as CFBD records it; missing for some player-seasons, which are left out."
 ) |>
   kable(caption = "The terms used throughout.")
@@ -173,11 +182,11 @@ tibble::tribble(
 
 ## 3. Results
 
-### 3.1 Offensive linemen almost never log a stat line, and no other group logs one in more than 44% of seasons
+### 3.1 Offensive linemen log a stat line in `r pct(ol_any)` of seasons, while the other groups log one in `r pct(min(others_any), 0)` to `r pct(max(others_any), 0)`
 
-*Expectation: most rostered player-seasons log no stat line in any game.* ✅
+*Expectation: most rostered player-seasons log no stat line in any game.* `r if (e1_holds) "✅" else "❌"`
 
-The table counts each position group's rostered player-seasons, and the share that logged a line in at least one game.
+Out of every 100 rostered player-seasons, `r round(100 * share_any_all)` log a stat line in at least one game, so most do; offensive linemen are the one group in which almost none do.
 
 ```{r}
 #| label: s31-table
@@ -195,12 +204,12 @@ by_pos |>
     `Position group` = as.character(position_group),
     `Player-seasons` = fmt(player_seasons),
     `Logged a stat line in any game` = pct(any_line),
-    `Median share of games, among those who logged one` = pct(median_share_if_any, 0)
+    `Typical (median) share of games, among those who logged one` = pct(median_share_if_any, 0)
   ) |>
   kable(
     align = "lrrr",
     caption = sprintf(
-      "Rostered player-seasons, 2019 to 2025. Overall, %s logged a stat line; the rest logged none.",
+      "Rostered player-seasons, 2019 to 2025. Overall, %s logged a stat line; the rest logged none. Athlete and unrecorded positions are shown but not compared.",
       pct(share_any_all)
     )
   )
@@ -232,9 +241,13 @@ p <- by_pos |>
   scale_x_continuous(labels = scales::percent) +
   annotate(
     "text",
-    x = 0.07,
-    y = 1.6,
-    label = "Linemen rarely log a line, so the box score cannot show their play",
+    x = ol_any + 0.02,
+    y = 1,
+    label = paste0(
+      "Linemen log a line in ",
+      pct(ol_any),
+      " of seasons: the box score cannot show their play"
+    ),
     hjust = 0,
     size = 4.5
   ) +
@@ -279,12 +292,7 @@ p2 <- ggplot(
 girafe(ggobj = p2, width_svg = 13, height_svg = 6)
 ```
 
-```{r}
-#| label: s31-pin
-#| output: false
-```
-
-### 3.2 Stat lines become more common with class year, from 15% of first-years to 33% of fourth-years
+### 3.2 Stat lines rise from the third class year on, from `r pct(class_any(2L), 0)` of second-years to `r pct(class_any(4L), 0)` of fourth-years
 
 The table and figures split the same population by class year, which is missing for some player-seasons and left out here.
 
@@ -356,16 +364,11 @@ p4 <- ggplot(
 girafe(ggobj = p4, width_svg = 13, height_svg = 6)
 ```
 
-```{r}
-#| label: s32-pin
-#| output: false
-```
+### 3.3 Drafted player-seasons log a stat line in `r pct(share_drafted, 0)` of their team's games, against `r pct(share_rest, 0)` for the rest
 
-### 3.3 Drafted player-seasons log a stat line in 33% of their team's games, twice the 15% for the rest
+*Expectation: drafted player-seasons log a stat line in a larger share of their team's games than other player-seasons.* `r if (e2_holds) "✅" else "❌"`
 
-*Expectation: drafted player-seasons log a stat line in a larger share of their team's games than other player-seasons.* ✅
-
-The comparison covers draft-eligible seasons, and the gap holds within every position group.
+Draft-eligible seasons count only players with a season stat line, so `r pct(min(draft_summary$any_line))` of them have a line in some game and the comparison is the share of team games with one; Joe Burrow logged a line in `r burrow_2019$games_appeared` of LSU's `r burrow_2019$team_games` games in 2019, and Jordan Travis, a backup that year, in `r travis_2019$games_appeared` of `r travis_2019$team_games`.
 
 ```{r}
 #| label: s33-table
@@ -373,11 +376,10 @@ draft_summary |>
   transmute(
     Group = if_else(drafted, "Drafted", "Not drafted"),
     `Player-seasons` = fmt(n),
-    `Logged a stat line in any game` = pct(any_line),
-    `Mean share of team games with a line` = pct(mean_share)
+    `Average (mean) share of team games with a line` = pct(mean_share)
   ) |>
   kable(
-    align = "lrrr",
+    align = "lrr",
     caption = "Draft-eligible player-seasons, 2019 to 2025, one team per player-season."
   )
 ```
@@ -389,16 +391,16 @@ p5 <- draft_by_pos |>
   mutate(
     grp = if_else(drafted, "Drafted", "Not drafted"),
     tip = sprintf(
-      "%s, %s: %s of %s logged a line",
+      "%s, %s: a line in %s of team games, on average over %s player-seasons",
       position_group,
       grp,
-      pct(any_line),
+      pct(mean_share),
       fmt(n)
     )
   ) |>
   ggplot(aes(
-    x = any_line,
-    y = reorder(as.character(position_group), any_line),
+    x = mean_share,
+    y = reorder(as.character(position_group), mean_share),
     fill = grp
   )) +
   geom_col_interactive(
@@ -409,7 +411,7 @@ p5 <- draft_by_pos |>
   scale_fill_manual(values = c(Drafted = "#B45309", `Not drafted` = "#9CA3AF")) +
   scale_x_continuous(labels = scales::percent) +
   labs(
-    x = "Share of player-seasons with a stat line in at least one game",
+    x = "Mean share of team games with a stat line",
     y = NULL,
     fill = NULL
   ) +
@@ -423,20 +425,20 @@ girafe(ggobj = p5, width_svg = 13, height_svg = 6)
 p6 <- draft_pop |>
   filter(!is.na(class_year)) |>
   group_by(position_group, class_year, drafted) |>
-  summarise(any_line = mean(games_appeared > 0), n = n(), .groups = "drop") |>
+  summarise(mean_share = mean(appearance_rate), n = n(), .groups = "drop") |>
   filter(n >= 10) |>
   mutate(
     grp = if_else(drafted, "Drafted", "Not drafted"),
     tip = sprintf(
-      "%s, class %s, %s: %s of %s logged a line",
+      "%s, class %s, %s: a line in %s of team games, over %s player-seasons",
       position_group,
       class_year,
       grp,
-      pct(any_line),
+      pct(mean_share),
       fmt(n)
     )
   ) |>
-  ggplot(aes(factor(class_year), any_line, colour = grp)) +
+  ggplot(aes(factor(class_year), mean_share, colour = grp)) +
   geom_point_interactive(
     aes(tooltip = tip, data_id = paste(position_group, class_year, grp)),
     size = 3,
@@ -445,27 +447,21 @@ p6 <- draft_pop |>
   facet_wrap(~position_group) +
   scale_colour_manual(values = c(Drafted = "#B45309", `Not drafted` = "#6B7280")) +
   scale_y_continuous(labels = scales::percent) +
-  labs(x = "Class year", y = "Share with a stat line in at least one game", colour = NULL) +
+  labs(x = "Class year", y = "Mean share of team games with a stat line", colour = NULL) +
   theme_minimal(base_size = 13)
 girafe(ggobj = p6, width_svg = 13, height_svg = 8)
 ```
 
-```{r}
-#| label: s33-pin
-#| output: false
-# The recurring cast: each season row is pinned to the published table.
-```
-
 ## 4. Summary
 
-Most rostered player-seasons log no stat line, offensive linemen almost never do, and drafted player-seasons log one in more of their team's games.
+Most rostered player-seasons log a stat line in some game, offensive linemen rarely do, and drafted player-seasons log one in more of their team's games.
 
 ```{r}
 #| label: summary
 tibble::tribble(
   ~Expectation                                                    , ~Verdict , ~Evidence                                                                                 ,
-  "Most rostered player-seasons log no stat line in any game"    , "✅"      , paste0(pct(1 - share_any_all), " logged none")                                             ,
-  "Drafted player-seasons log a stat line in more of their games" , "✅"      , paste0(pct(draft_summary$mean_share[draft_summary$drafted]), " of games vs ", pct(draft_summary$mean_share[!draft_summary$drafted]), " for the rest")
+  "Most rostered player-seasons log no stat line in any game"    , if (e1_holds) "✅" else "❌" , paste0(pct(1 - share_any_all), " logged none")                  ,
+  "Drafted player-seasons log a stat line in more of their games" , if (e2_holds) "✅" else "❌" , paste0(pct(share_drafted), " of games vs ", pct(share_rest), " for the rest")
 ) |>
   kable(caption = "Each expectation and what the data showed.")
 ```
@@ -473,7 +469,9 @@ tibble::tribble(
 ## 5. Discussion
 
 ::: {.callout-important}
-Drafted player-seasons log more stat lines, which reads as more usage in the box score, not as snaps played. The box score records players who touch the ball or make a tackle, so it cannot separate a starter from a player who was on the field for every snap.
+Drafted player-seasons log more stat lines, which reads as more usage in the box score, not as snaps played. The box score records players who touch the ball or make a tackle, so it cannot separate a lineman who played every snap from a reserve who never left the sideline.
+
+- Offensive linemen log a line in `r pct(ol_any)` of seasons, so the box score is silent on the position whatever their snaps.
 
 :::
 
