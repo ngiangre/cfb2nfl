@@ -3,7 +3,8 @@
   position: sticky;
   /* Clears the pinned Quarto navbar (~60px on phones), which otherwise hides the header. */
   top: 60px;
-  z-index: 10;
+  /* Above Quarto's column-margin notes (z-index 998), which otherwise paint over it on phones. */
+  z-index: 1000;
   background: var(--bs-body-bg, #fff);
   padding: 0.5rem 0;
   display: flex;
