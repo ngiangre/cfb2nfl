@@ -7,8 +7,8 @@ position → player → NFL outcome, plus combine measurables.
 
 ## Goals and non-goals
 
-- **Goal:** a reader opens the page, sees a landscape for the last completed
-  season, and keeps tapping deeper without losing their place. It works on a
+- **Goal:** a reader opens the page, sees a landscape for the season in progress
+  (refreshed weekly), and keeps tapping deeper without losing their place. It works on a
   phone as well as on a desktop.
 - **Goal:** zero CFBD calls. Everything is built in track mode from the
   published tables during `site.yaml`.
@@ -23,28 +23,66 @@ position → player → NFL outcome, plus combine measurables.
 
 | State | Default | Notes |
 |---|---|---|
-| year | `last_complete_cfb_season()` (2025 as of 2026-11-08) | Selector covers 2010 to the max season with a completed game. The default stays on the last complete season until that rule moves it, so an in-progress season is opt-in |
-| team | Texas (`team == "Texas"`, team_id 251) | Join by school name, decision 0008 |
+| season | the in-progress season: the max `season` with a completed game in `games` (2026 as of 2026-11-08) | Selector covers 2010 to that season. It moves forward on its own as the weekly refresh ingests new games |
+| team | Texas (`team_id` 251) | The hash and every explorer asset key teams by CFBD `team_id` (`teams.team_id` == `games.homeId`/`awayId`). Tables keyed by school name (`roster`, `player_stats`) are mapped to `team_id` in the export step |
 | position group | Quarterback | From `position_group()` (`R/teams.R`); OL excluded |
 | player | none | Set by tapping a dot or by search |
 | tab | Teams | Map is added last |
 
-All state lives in the URL hash (`#tab=teams&year=2025&team=Texas&game=<id>&pos=QB&player=<athleteId>`),
-read on load and written on change, so any view can be shared as a link and the
-back button works. Selection is shared across tabs: picking a player in a game
-timeline opens Players with that player highlighted.
+All state lives in the URL hash, keyed by ids (team, game, player) rather
+than names: `#tab=teams&season=2026&team=251&game=<gameId>&pos=QB&player=<athleteId>`.
+It is read on load and written on change, so any view can be shared as a link
+and the back button works. Selection is shared across tabs: picking a player in
+a game timeline opens Players with that player highlighted.
+
+## Weekly freshness
+
+The plots update every week with no source edit. `data-current.yaml`
+(Sundays in season) publishes the refreshed tables and dispatches
+`site.yaml`. The site's `tar_make()` rebuilds the `export_*` assets from them,
+and the page fetches those assets at runtime. Two things keep the page from
+serving stale data:
+
+- `explorer.qmd` sets `freeze: false`. Under the site's `freeze: auto`, a page
+  whose source hasn't changed serves its cached render, so the default season
+  and any knit-time numbers would stop moving.
+- The `export_*` targets depend on the cleaned table targets, so any refresh
+  that changes a table rebuilds its assets. A contract checks that the default
+  season in the assets equals the max `season` with a completed game.
+
+## Methods and data sources on the page
+
+- **Equations in the margin.** Each formula a visual relies on is written out
+  (KaTeX) in a margin note (`.column-margin`) beside that visual: elapsed game
+  time, cumulative PPA, Elo expected win probability, percentile rank and its
+  qualifiers. On narrow screens Quarto folds margin content inline, so this
+  works on mobile too.
+- **Data sources for each visual.** Each visual carries a "Data:" line naming
+  the tables it is built from, each a link to that table's entry on the Data
+  page (`data.html#table-<name>`). The shell step adds a per-table anchor to
+  `vignettes/data.qmd`. Sources:
+
+| Visual | Tables |
+|---|---|
+| Teams landscape, team view | `games`, `teams`, `conference_tiers` |
+| Team-season strip | `games`, `teams` |
+| Game timeline | `plays`, `play_types`, `games`, `play_stats` (player chips) |
+| Players beeswarm, career | `player_stats`, `roster`, `teams`, `conference_tiers`, `outcomes`, `picks` |
+| Combine 3D | `combine`, `outcomes`, `picks` |
+| Draft & careers | as in the current charts (`picks`, `nfl_draft_picks`, `nfl_rosters`, `roster`) |
+| Map | `teams` (location, #48), `games` |
 
 ## Page layout
 
-One page, a sticky header (year selector + tab bar), then the active tab.
+One page, a sticky header (season selector + tab bar), then the active tab.
 Each tab's data loads the first time the tab opens.
 
 ### Tab 1: Teams
 
 1. **Landscape.** Small multiples, one per conference (membership as of the
-   selected year; FBS by default, FCS behind a toggle). Each panel shows
+   selected season; FBS by default, FCS behind a toggle). Each panel shows
    end-of-season Elo lines for its teams across 2010 to now, with the selected
-   year marked by a vertical rule. Tapping a panel highlights its teams;
+   season marked by a vertical rule. Tapping a panel highlights its teams;
    tapping a line opens the team.
 2. **Team view.** End-of-season Elo across seasons (line, team color) above
    a W-L bar per season. Tapping a season opens the team-season.
@@ -74,7 +112,7 @@ Each tab's data loads the first time the tab opens.
 
 ### Tab 2: Players
 
-1. **Landscape.** A beeswarm for the selected position group and year: one
+1. **Landscape.** A beeswarm for the selected position group and season: one
    dot per player with a stat line in the stat's category. The stat is
    selectable and defaults to the first in the table below. Dots are colored
    by outcome. The selected player is drawn larger with a team-color outline
@@ -112,7 +150,7 @@ no NFL, still playing), with reader-facing labels.
   dash; each axis is selectable from height, weight, 40, vertical, broad
   jump, bench, shuttle, 3-cone.
 - Points are colored by draft outcome (round group / undrafted) and filtered
-  by position group (default Quarterback) and combine year range. Tapping a
+  by position group (default Quarterback) and combine season range. Tapping a
   point opens the player when `athlete_id` is linked. `link_method ==
   "unmatched"` points show their name with no link.
 - Touch rotate/zoom plus a "reset view" button. Combine data is pre-draft and
@@ -126,7 +164,7 @@ Each chart moves as is or is cut where a dated post already covers it.
 
 ### Tab 5: Map (ships last)
 
-Teams on a US map (AK/HI insets) for the selected year: dot size = wins,
+Teams on a US map (AK/HI insets) for the selected season: dot size = wins,
 color/shape = conference. Tapping a team opens Teams → team view. Blocked on
 #48 publishing team locations.
 
@@ -181,7 +219,8 @@ well under both.
   in that panel. The rest of the page keeps working.
 - An unknown hash value (team renamed, bad id) falls back to the default for
   that key and drops it from the hash.
-- A year with no completed games falls back to the last complete season.
+- A season with no completed games yet (preseason, before week 0) falls back
+  to the latest season that has one.
 - A player with no qualifying stats in a season leaves a gap in the career
   line (no zero).
 - A combine point with no link shows the name only.
@@ -193,14 +232,18 @@ well under both.
 - **testthat** for every `build_explorer_*()`: elapsed-time math (incl. OT),
   cumulative PPA sign by side, Elo expectation formula, percentile direction
   (INT reversed), rate-stat qualifiers, OL exclusion, outcome labels, default
-  year rule.
+  season rule.
 - **pointblank contracts** (`contract_explorer_*()`, wired into
   `contract_gate`): row counts match sources (no silent join loss), e.g.
   `team_season` rows == distinct team × season in completed `games`; percentiles
   in [0, 1]; every team in `team_season` has a color and logo; first-view assets
-  ≤ 1 MB; every `plays_<season>` `gameId` exists in `games`.
+  ≤ 1 MB; every `plays_<season>` `gameId` exists in `games`; the assets'
+  default season equals the max `season` with a completed game.
+- **Source lines** come from one R list (visual → tables) shipped in
+  `teams.json`'s metadata; a test checks that every listed table has a
+  dictionary in `inst/dict/` and an anchor on the Data page.
 - **Manual mobile check** before merge: Playwright at a 390×844 viewport,
-  driving the default path (Teams → Texas → 2025 → a game → scrub → player
+  driving the default path (Teams → Texas → 2026 → a game → scrub → player
   chip → Players → Combine), with screenshots in the PR.
 
 ## Build order
@@ -209,9 +252,11 @@ well under both.
    inside the altdoc Quarto site; measure first-view weight and game-open time
    on a phone viewport. Record the architecture (revises decision 0006's
    "OJS later").
-2. **Shell.** `explorer.qmd`, URL-hash state, year selector with fallback,
-   tab bar, lazy tab loading, error cards; `teams.json`/`team_season.json`
-   exports + contracts.
+2. **Shell.** `explorer.qmd` (`freeze: false`), id-keyed URL-hash state,
+   season selector defaulting to the in-progress season, tab bar, lazy tab
+   loading, error cards, the margin-equation and "Data:" source-line patterns,
+   per-table anchors on `data.qmd`; `teams.json`/`team_season.json` exports +
+   contracts.
 3. **Teams tab** through the game timeline (`games_*`, `plays_*` exports).
 4. **Players tab** (`player_season_*`, `player_outcome` exports).
 5. **Combine tab** (shared builder with #64).
