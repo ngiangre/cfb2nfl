@@ -205,6 +205,13 @@ test_that("assemble_play_stats replaces pulled games and keeps the rest", {
   )
   expect_equal(nrow(out), 4L)
   expect_equal(out$stat[out$gameId == 401L], c(12, 1))
+  # The measurement is logged when CFB2NFL_REVISION_LOG is set.
+  log <- withr::local_tempfile(fileext = ".tsv")
+  withr::local_envvar(CFB2NFL_REVISION_LOG = log)
+  suppressMessages(assemble_play_stats(revised, types, path))
+  line <- strsplit(readLines(log), "\t")[[1]]
+  expect_equal(line[2:5], c("1", "1", "2", "2"))
+  expect_equal(line[6], "Rush:2")
 })
 
 test_that("play_stats_games_to_pull: new and recent games now, past on demand", {

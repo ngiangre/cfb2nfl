@@ -21,8 +21,10 @@ Play stats grow game by game (decision 0045), so the pulled games replace
 exactly their own rows in the published table and every other game is kept
 as published. A game the pull returned nothing for keeps its published
 rows, so an empty response can never delete good data. For re-pulled
-games, the number of rows that changed is reported: the measure of how
-often CFBD revises a game after the fact. Before any pull exists, the empty
-typed table is written.
+games, the number of rows that changed is reported, and appended to the
+file named by \code{CFB2NFL_REVISION_LOG} when set: the measure of how often
+CFBD revises a game after the fact (decision 0045; temporary, removed once
+the rate is known). Before any pull exists, the empty typed table is
+written.
 }
 \keyword{internal}
