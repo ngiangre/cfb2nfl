@@ -1,14 +1,15 @@
 dataset: play_stats
-source: CFBD /plays/stats (per gameId; opt-in, one season per refresh)
+source: CFBD /plays/stats (per gameId; current season weekly, past seasons on demand)
 grain: LONG — one row per athlete-play-stat
 key: playId + athleteId + statTypeId
 description: >
   Athlete attribution for each play: who threw, caught, ran, was targeted,
   tackled, sacked, broke up a pass, or kicked. athleteId is the shared CFBD
   athlete id, so it joins roster / player_stats / picks directly with no name
-  guard. Pulled one game per call (the week grain caps at 2,000 rows), so
-  seasons are backfilled one per refresh, newest first; seasons not yet
-  pulled have no rows. Joins plays by playId == plays.id.
+  guard. Pulled one game per call (the week grain caps at 2,000 rows): the
+  current season grows game by game each week (games from the last 8 days
+  are re-pulled once), and past seasons are backfilled on demand, so seasons
+  not yet pulled have no rows. Joins plays by playId == plays.id.
 columns:
   - name: gameId
     type: int32

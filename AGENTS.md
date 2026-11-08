@@ -48,13 +48,17 @@ points: `data-current.yaml` (scheduled: Sundays Aug–Jan + after signing day,
 combine, draft; `current`), `data-raw/refresh-historical.R <selector> --yes
 [--publish]` (local, on demand, prints a call estimate and needs
 confirmation), `data-raw/refresh.R` / `data-refresh.yaml` (full rebuild, ~1,060
-calls, on demand only). **Play stats are opt-in** (decision 0031, Phase 2):
-`/plays/stats` costs one call per game (~2,100 per season), so it runs only
-with `CFB2NFL_PLAYS_STATS=true` *and* an explicit season selection (the full
-window aborts), e.g. `CFB2NFL_PLAYS_STATS=true Rscript
-data-raw/refresh-historical.R 2025 --yes --publish`; backfill one season per
-month, newest first. Every other refresh leaves the published
-`play_stats.parquet` as is (`data-refresh.yaml` downloads it first). "Current" recruiting is the **enrolled** class: the
+calls, on demand only). **Play stats grow game by game** (decision 0045):
+`/plays/stats` costs one call per game (~1,700 per season). Every refresh
+pulls the *current* season's games not yet published plus a once-only
+re-pull of games from the last 8 days (~220-280 calls an in-season Sunday,
+reporting how many rows the re-pull changed), and the pulled games replace
+their own rows in `play_stats.parquet`. **Past seasons are opt-in**
+(decision 0031): `CFB2NFL_PLAYS_STATS=true` *and* an explicit season
+selection (the full window aborts), e.g. `CFB2NFL_PLAYS_STATS=true Rscript
+data-raw/refresh-historical.R 2025 --yes --publish`; backfill ad hoc, newest
+first. A full refresh needs the published `play_stats.parquet` to start from
+(`data-refresh.yaml` downloads it). "Current" recruiting is the **enrolled** class: the
 incoming class has no CFBD athlete ids until enrollment, so the cleaner drops
 all of it. Years 2010–2026.
 
@@ -71,7 +75,7 @@ all of it. Years 2010–2026.
 | `data/nfl_rosters.parquet` | one player-season on an NFL roster | nflverse; key `(gsis_id, season)`. Longevity source: distinct roster seasons |
 | `data/nfl_player_stats.parquet` | one player-season (regular season) | nflverse; key `(gsis_id, season)`. Weekly stats aggregated to season totals |
 | `data/plays.parquet` | one play | key `id` (string); `gameId` → `games.id`; `season`/`week`/`seasonType` stamped at ingest; down/distance/field position/score/clock (`clock_minutes`, `clock_seconds`), `playType` + `playTypeId`, `ppa`, `playText`. No athlete id. ~280 calls for every season (one per played week) |
-| `data/play_stats.parquet` | **long**: athlete-play-stat | key `(playId, athleteId, statTypeId)`; `athleteId` is the shared athlete namespace (no name guard); `playId` → `plays.id`. Opt-in, pulled per game; seasons not yet backfilled have no rows |
+| `data/play_stats.parquet` | **long**: athlete-play-stat | key `(playId, athleteId, statTypeId)`; `athleteId` is the shared athlete namespace (no name guard); `playId` → `plays.id`. Pulled per game: the current season weekly (2026 on), past seasons only when backfilled, so they have no rows yet |
 | `data/play_types.parquet`, `data/play_stat_types.parquet` | one play / play-stat type | key `id`; display dimensions for `plays.playTypeId` / `play_stats.statTypeId`. CFBD's `Uncategorized`/`placeholder` types are kept |
 | `data/combine.parquet` | one NFL Scouting Combine invitee | nflverse; key `(season, player_name, school, pos)`. Measurables + draft slot, linked to the CFBD athlete id as `athlete_id` with `link_method` (`draft_slot`/`name_school`/`unmatched`; decision 0043). **Pre-draft** inputs: keep off the in-career model path |
 | `data/outcomes.parquet` | one player-season in the model population (person-period) | **The modeling dependent variables** (decision 0032): eligibility clock (`hs_grad_year`, `draft_eligible`, `eligible_season_index`), `outcome_*` labels (drafted, NFL entry, entry-year success), survival bookkeeping. Contract `contract_outcomes()` |

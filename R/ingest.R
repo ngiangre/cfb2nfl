@@ -734,9 +734,10 @@ ingest_game_player_stats <- function(years = 2010:2026, games = NULL) {
 #   /plays             -> `plays`: one row per play, one call per week
 #   /plays/stats       -> `play_stats`: one row per athlete-play-stat, one
 #                         call per GAME (the week grain silently caps at
-#                         2,000 rows), so ~2,100 calls per season
-# All share the /games family pacing and retry budget. `play_stats` is opt-in
-# ([play_stats_enabled()]) so a routine refresh never spends that quota.
+#                         2,000 rows), so ~1,700 calls per season
+# All share the /games family pacing and retry budget. `play_stats` is pulled
+# incrementally for the current season (new games plus a one-week re-pull,
+# decision 0045); past seasons are opt-in ([play_stats_enabled()]).
 
 #' Ingest the play-type dimension
 #'
@@ -819,12 +820,14 @@ ingest_plays_chunk <- function(year, week, season_type) {
   flatten_plays(raw, year, week, season_type)
 }
 
-#' Is the per-game play-stats pull switched on?
+#' Is the whole-season play-stats backfill switched on?
 #'
-#' `/plays/stats` costs one call per game (~2,100 per season), so it runs only
-#' when `CFB2NFL_PLAYS_STATS` is truthy (decision 0031, Phase 2), and only for
-#' an explicit season selection: with the flag on, an unset
-#' `CFB2NFL_REFRESH_SEASONS` (the full window, ~36,000 calls) is an error.
+#' `/plays/stats` costs one call per game (~1,700 per season), so pulling a
+#' past season runs only when `CFB2NFL_PLAYS_STATS` is truthy (decision 0031,
+#' Phase 2), and only for an explicit season selection: with the flag on, an
+#' unset `CFB2NFL_REFRESH_SEASONS` (the full window, ~28,000 calls) is an
+#' error. The current season does not need the flag; it is pulled game by game
+#' as games are played ([play_stats_games_to_pull()], decision 0045).
 #'
 #' @param spec The seasons selector (see [refresh_seasons()]).
 #' @return `TRUE` when the flag is set and the selection is narrower than the
@@ -841,6 +844,43 @@ play_stats_enabled <- function(
     ))
   }
   on
+}
+
+#' Games the play-stats pull should query
+#'
+#' Decision 0045. For the **current** season: every game with plays that the
+#' published `play_stats` does not have yet (a game CFBD had not posted stats
+#' for comes back empty, so it is retried on the next run), plus every game
+#' that kicked off in the last `settle_days` days, re-pulled once so a
+#' correction CFBD makes in the days after a game is picked up. For a **past**
+#' season: every game with plays, but only when `backfill` is `TRUE`
+#' ([play_stats_enabled()]); otherwise none.
+#'
+#' @param season One season.
+#' @param plays_games Distinct `(season, gameId)` from `plays`.
+#' @param games Cleaned games (`id`, `startDate`).
+#' @param published_ids `gameId`s already in the published `play_stats`.
+#' @param backfill Pull a whole past season?
+#' @param settle_days Re-pull window, in days before `date`.
+#' @param date The date of the pull.
+#' @return An integer vector of game ids.
+#' @keywords internal
+play_stats_games_to_pull <- function(
+  season,
+  plays_games,
+  games,
+  published_ids,
+  backfill = FALSE,
+  settle_days = 8L,
+  date = Sys.Date()
+) {
+  ids <- unique(plays_games$gameId[plays_games$season == season])
+  if (season != current_season(date)) {
+    return(if (isTRUE(backfill)) ids else integer())
+  }
+  kickoff <- as.Date(substr(games$startDate, 1L, 10L))
+  recent <- games$id[!is.na(kickoff) & kickoff >= as.Date(date) - settle_days]
+  ids[!ids %in% published_ids | ids %in% recent]
 }
 
 #' Ingest one season of play stats, game by game

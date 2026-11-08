@@ -1,5 +1,13 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- `play_stats` now covers the 2026 season (who ran, caught, was targeted,
+  tackled or sacked on each play) and grows every week: the Sunday refresh
+  pulls each newly completed game and re-pulls the past 8 days' games once,
+  reporting how many rows changed, so CFBD's corrections are both picked up
+  and measured
+  ([decision 0045](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0045-incremental-current-season-play-stats.md)).
+  Past seasons are still backfilled on demand.
+
 - New play-by-play tables (issue #44,
   [decision 0031](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0031-plays-ingest-and-quota-phasing.md)):
   `plays` (3.1 million plays, 2010 to 2026: down, distance, field position,

@@ -779,28 +779,45 @@ clean_play_stats <- function(play_stats, play_stat_types) {
 
 #' Build the published play-stats table
 #'
-#' The per-game pull is opt-in ([play_stats_enabled()]), so most refreshes
-#' must leave the published table exactly as it is. When seasons were pulled,
-#' they are spliced in ([splice_seasons()]); otherwise the published file is
-#' kept, or, before any pull exists, the empty typed table is written.
+#' Play stats grow game by game (decision 0045), so the pulled games replace
+#' exactly their own rows in the published table and every other game is kept
+#' as published. A game the pull returned nothing for keeps its published
+#' rows, so an empty response can never delete good data. For re-pulled
+#' games, the number of rows that changed is reported: the measure of how
+#' often CFBD revises a game after the fact. Before any pull exists, the empty
+#' typed table is written.
 #'
-#' @param raw Raw play stats for the pulled seasons, or `NULL` (not pulled).
+#' @param raw Raw play stats for the pulled games, or `NULL` (nothing pulled).
 #' @param play_stat_types Cleaned dimension ([clean_play_stat_types()]).
 #' @param path The published parquet.
-#' @param seasons The seasons `raw` covers.
 #' @return The play-stats table to publish.
 #' @keywords internal
-assemble_play_stats <- function(raw, play_stat_types, path, seasons) {
-  if (!is.null(raw)) {
-    return(splice_seasons(
-      clean_play_stats(raw, play_stat_types),
-      path,
-      "season",
-      seasons
+assemble_play_stats <- function(raw, play_stat_types, path) {
+  old <- if (file.exists(path)) {
+    arrow::read_parquet(path)
+  } else {
+    clean_play_stats(NULL, play_stat_types)
+  }
+  if (is.null(raw) || !nrow(raw)) {
+    return(old)
+  }
+  fresh <- clean_play_stats(raw, play_stat_types)
+  if (!setequal(names(fresh), names(old))) {
+    cli::cli_abort(c(
+      "Fresh play stats do not match the published columns in {.path {path}}.",
+      "i" = "A schema change needs every pulled season re-pulled."
     ))
   }
-  if (file.exists(path)) {
-    return(arrow::read_parquet(path))
+  pulled <- unique(fresh$gameId)
+  repulled <- intersect(pulled, old$gameId)
+  if (length(repulled)) {
+    before <- old[old$gameId %in% repulled, names(fresh)]
+    after <- fresh[fresh$gameId %in% repulled, ]
+    changed <- nrow(dplyr::setdiff(after, before)) +
+      nrow(dplyr::setdiff(before, after))
+    cli::cli_inform(
+      "Re-pulled {length(repulled)} game{?s}: {changed} play-stat row{?s} changed."
+    )
   }
-  clean_play_stats(NULL, play_stat_types)
+  dplyr::bind_rows(old[!old$gameId %in% pulled, ], fresh[, names(old)])
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/ingest.R
 \name{play_stats_enabled}
 \alias{play_stats_enabled}
-\title{Is the per-game play-stats pull switched on?}
+\title{Is the whole-season play-stats backfill switched on?}
 \usage{
 play_stats_enabled(spec = Sys.getenv("CFB2NFL_REFRESH_SEASONS", ""))
 }
@@ -14,9 +14,11 @@ play_stats_enabled(spec = Sys.getenv("CFB2NFL_REFRESH_SEASONS", ""))
 full window.
 }
 \description{
-\verb{/plays/stats} costs one call per game (~2,100 per season), so it runs only
-when \code{CFB2NFL_PLAYS_STATS} is truthy (decision 0031, Phase 2), and only for
-an explicit season selection: with the flag on, an unset
-\code{CFB2NFL_REFRESH_SEASONS} (the full window, ~36,000 calls) is an error.
+\verb{/plays/stats} costs one call per game (~1,700 per season), so pulling a
+past season runs only when \code{CFB2NFL_PLAYS_STATS} is truthy (decision 0031,
+Phase 2), and only for an explicit season selection: with the flag on, an
+unset \code{CFB2NFL_REFRESH_SEASONS} (the full window, ~28,000 calls) is an
+error. The current season does not need the flag; it is pulled game by game
+as games are played (\code{\link[=play_stats_games_to_pull]{play_stats_games_to_pull()}}, decision 0045).
 }
 \keyword{internal}
