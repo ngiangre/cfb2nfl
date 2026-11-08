@@ -1,5 +1,21 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- **Fix:** per-game box scores (`game_player_stats`) now list every player.
+  The ingest kept only the first player per team, stat category and stat type
+  in each game, about 7 players per team-game instead of about 33. The table
+  was re-pulled and republished on `data-latest`. A new contract check fails
+  any box score cut back to one player per stat type
+  ([decision 0044](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0044-absence-shaped-season-signals.md)).
+  Playing-time and game-production numbers built on the old table undercount
+  players until their posts are re-rendered.
+
+- New post on what the data can define for each position (issue #51): an
+  early-stop proxy for finished careers, an injury-shaped absence and a
+  benching-shaped usage decline within a season, and the limits (no injury
+  feed, no unselected draft entrants). The two season signals come from the new
+  `absence_runs()` and `usage_decline()`
+  ([decision 0044](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0044-absence-shaped-season-signals.md)).
+
 - Blog posts get a required review step. A new `vignette-reviewer` agent
   reads a drafted post cold, as a fan would, and reports where the argument or
   the reader stalls. A new `check_post_style()` enforces the mechanical

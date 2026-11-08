@@ -338,7 +338,8 @@ all of it. Years 2010–2026.
   built from it. Complex logic used by one post can be a contract-checked
   target read with `tar_read()` but kept out of the DuckDB. Currently on the
   fly: `flag_redshirt()`, `career_end_status()`, `build_season_arcs()`,
-  `build_game_production()`, `build_player_season_stats()`. Target-only:
+  `build_game_production()`, `build_player_season_stats()`, `absence_runs()`,
+  `usage_decline()`. Target-only:
   `picks_nfl`, `position_path`, `player_usage`.
 - **Roster is a first-class target** (`roster_file` → `raw_roster` → `roster`,
   decision 0009): `data/roster.parquet` is ingested by `refresh.R`, published on

@@ -495,6 +495,8 @@ flatten_game_player_stats <- function(raw, season, week, season_type) {
       purrr::map_dfr(seq_len(nrow(cats)), \(k) {
         ty <- cats$types[[k]]
         purrr::map_dfr(seq_len(nrow(ty)), \(m) {
+          # One row per athlete: a stat type lists every player who recorded
+          # it, so take the whole columns, not their first element.
           athlete <- ty$athletes[[m]]
           tibble::tibble(
             gameId = game_id,
@@ -507,9 +509,9 @@ flatten_game_player_stats <- function(raw, season, week, season_type) {
             points = t$points,
             category = cats$name[[k]],
             statType = ty$name[[m]],
-            playerId = as.character(athlete$id[[1]]),
-            player = athlete$name[[1]],
-            stat = athlete$stat[[1]]
+            playerId = as.character(athlete$id),
+            player = as.character(athlete$name),
+            stat = as.character(athlete$stat)
           )
         })
       })
