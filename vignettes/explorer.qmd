@@ -22,10 +22,14 @@ import {sourceLine, errorCard, loadOnce} from "./explorer/ui.js"
 //| output: false
 mutable retry = 0
 tabCache = new Map()
+// Raw markup from ui.js becomes a DOM node. OJS inspects a node that still
+// has a parent instead of mounting it, so detach it from the wrapper first.
 function asNode(markup) {
   const el = document.createElement("div");
   el.innerHTML = markup;
-  return el.firstElementChild;
+  const node = el.firstElementChild;
+  node.remove();
+  return node;
 }
 ```
 
