@@ -39,13 +39,13 @@ a game timeline opens Players with that player highlighted.
 
 The plots update every week with no source edit. `data-current.yaml`
 (Sundays in season) publishes the refreshed tables and dispatches
-`site.yaml`. The site's `tar_make()` rebuilds the `export_*` assets from them,
+`site.yaml`. The site's `tar_make()` rebuilds the `explorer_*` assets from them,
 and the page fetches those assets at runtime. The spike showed a frozen render
 still serves regenerated assets, so no `freeze: false` is needed as long as
 the page computes nothing at knit time: the default season is computed in the
 browser from the data (decision 0046).
 
-- The `export_*` targets depend on the cleaned table targets, so any refresh
+- The `explorer_*` targets depend on the cleaned table targets, so any refresh
   that changes a table rebuilds its assets. A contract checks that the default
   season in the assets equals the max `season` with a completed game.
 
@@ -169,7 +169,7 @@ color/shape = conference. Tapping a team opens Teams → team view. Blocked on
 
 ## Data assets
 
-New `export_*` targets in `_targets.R` (track mode, downstream of the cleaned
+New `explorer_*` targets in `_targets.R` (track mode, downstream of the cleaned
 tables) write static files to `vignettes/explorer-data/`, which the page
 fetches at runtime. A `build_explorer_*()` function in `R/explorer.R` backs
 each asset, tested on fixtures. These assets are not added to the DuckDB
@@ -211,8 +211,9 @@ per file.
   instead of shrinking.
 - Reader-facing labels everywhere (position groups, outcome names, stat names
   like "Passing yards"), mapped in R and shipped in the assets.
-- The setup chunk follows the vignette convention (visible code, output
-  suppressed). The page is not a dated post, so `check_post_style()` and the
+- The page has no R chunks; its OJS cells are `echo: false` because it is an
+  app page, and the source stays a click away through the site's code tools.
+  The page is not a dated post, so `check_post_style()` and the
   vignette-reviewer don't apply. The fan-experience-improver skill reviews it.
 
 ## Errors and edge cases
@@ -220,7 +221,8 @@ per file.
 - An asset fetch failure shows an inline "Couldn't load <thing>, retry" card
   in that panel. The rest of the page keeps working.
 - An unknown hash value (team renamed, bad id) falls back to the default for
-  that key and drops it from the hash.
+  that key, and the hash is rewritten in canonical form with `replaceState`, so
+  the Back button is not trapped.
 - A season with no completed games yet (preseason, before week 0) falls back
   to the latest season that has one.
 - A player with no qualifying stats in a season leaves a gap in the career
@@ -238,13 +240,17 @@ per file.
 - **pointblank contracts** (`contract_explorer_*()`, wired into
   `contract_gate`): row counts match sources (no silent join loss), e.g.
   `team_season` rows == distinct team × season in completed `games`; percentiles
-  in [0, 1]; every team in `team_season` has a color and logo; first-view assets
+  in [0, 1]; every team in `team_season` has a color, and teams playing in the default
+  season a logo (defunct programs like Jacksonville have none); every
+  team-season has a tier (FCS conferences missing from `conference_tiers` are
+  tier 1); first-view assets
   ≤ 250 KB gzipped; every `plays_<season>` `gameId` exists in `games` and every
   row group carries `gameId` min/max statistics; the assets'
   default season equals the max `season` with a completed game.
 - **Source lines** come from one R list (`explorer_sources()`) shipped in
   `meta.json`; a test checks that every listed table has a
-  dictionary in `inst/dict/` and an anchor on the Data page.
+  dictionary in `inst/dict/`; the Data page generates one anchor per
+  dictionary, so a dictionary implies an anchor.
 - **Manual mobile check** before merge: Playwright at a 390×844 viewport,
   driving the default path (Teams → Texas → 2026 → a game → scrub → player
   chip → Players → Combine), with screenshots in the PR.
@@ -269,3 +275,20 @@ per file.
 7. **Map tab** after #48 publishes.
 
 Each step is its own PR, and `main` stays deployable after each one.
+
+## Notes for steps 3–5 (from the step-2 review)
+
+- Each tab's Retry gets its own `mutable` (e.g. `tabRetry`). Reusing the
+  shell's `retry` refetches the shell and rebuilds every cell downstream of
+  `ready`.
+- `loadOnce` cache keys for per-season assets include the season
+  (`games_${season}`).
+- `game`, `pos` and `player` are carried through the hash writer from
+  `hashState`. Once they're selectable, each needs an input or mutable fed
+  into the writer, and changing season clears `game`.
+- `parseHash` accepts any `pos` string. The Players tab resolves it against
+  the position list, the way `resolveTeam` does for teams.
+- The sticky header offset (`top: 60px`) matches the current navbar height.
+  Revisit it if the navbar changes.
+- Decision 0046 asks for a real-phone touch check. Playwright only sends mouse
+  events, so do one by hand before step 3 merges.
