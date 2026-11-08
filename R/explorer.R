@@ -223,7 +223,11 @@ write_explorer_assets <- function(assets, dir = "vignettes/explorer-data") {
   dir.create(dir, showWarnings = FALSE, recursive = TRUE)
   paths <- file.path(dir, paste0(names(assets), ".json"))
   for (i in seq_along(assets)) {
-    writeLines(explorer_json(assets[[i]]), paths[[i]])
+    writeLines(
+      enc2utf8(explorer_json(assets[[i]])),
+      paths[[i]],
+      useBytes = TRUE
+    )
   }
   paths
 }
