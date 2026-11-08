@@ -783,9 +783,11 @@ clean_play_stats <- function(play_stats, play_stat_types) {
 #' exactly their own rows in the published table and every other game is kept
 #' as published. A game the pull returned nothing for keeps its published
 #' rows, so an empty response can never delete good data. For re-pulled
-#' games, the number of rows that changed is reported: the measure of how
-#' often CFBD revises a game after the fact. Before any pull exists, the empty
-#' typed table is written.
+#' games, the number of rows that changed is reported, and appended to the
+#' file named by `CFB2NFL_REVISION_LOG` when set: the measure of how often
+#' CFBD revises a game after the fact (decision 0045; temporary, removed once
+#' the rate is known). Before any pull exists, the empty typed table is
+#' written.
 #'
 #' @param raw Raw play stats for the pulled games, or `NULL` (nothing pulled).
 #' @param play_stat_types Cleaned dimension ([clean_play_stat_types()]).
@@ -813,11 +815,29 @@ assemble_play_stats <- function(raw, play_stat_types, path) {
   if (length(repulled)) {
     before <- old[old$gameId %in% repulled, names(fresh)]
     after <- fresh[fresh$gameId %in% repulled, ]
-    changed <- nrow(dplyr::setdiff(after, before)) +
-      nrow(dplyr::setdiff(before, after))
+    added <- dplyr::setdiff(after, before)
+    dropped <- dplyr::setdiff(before, after)
+    changed <- nrow(added) + nrow(dropped)
+    games_changed <- length(union(added$gameId, dropped$gameId))
     cli::cli_inform(
-      "Re-pulled {length(repulled)} game{?s}: {changed} play-stat row{?s} changed."
+      "Re-pulled {length(repulled)} game{?s}: {changed} play-stat row{?s} changed in {games_changed} game{?s}."
     )
+    log <- Sys.getenv("CFB2NFL_REVISION_LOG")
+    if (nzchar(log)) {
+      by_type <- dplyr::count(dplyr::bind_rows(added, dropped), .data$statType)
+      cat(
+        format(Sys.Date()),
+        length(repulled),
+        games_changed,
+        nrow(before),
+        changed,
+        paste(by_type$statType, by_type$n, sep = ":", collapse = ";"),
+        sep = "\t",
+        file = log,
+        append = TRUE
+      )
+      cat("\n", file = log, append = TRUE)
+    }
   }
   dplyr::bind_rows(old[!old$gameId %in% pulled, ], fresh[, names(old)])
 }

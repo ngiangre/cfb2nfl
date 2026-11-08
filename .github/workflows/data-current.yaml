@@ -43,6 +43,8 @@ jobs:
       CFB2NFL_REFRESH: "true"
       CFB2NFL_REFRESH_SEASONS: ${{ github.event.inputs.seasons || 'current' }}
       CFB2NFL_CALL_LOG: ${{ github.workspace }}/cfbd-calls.tsv
+      # Temporary (decision 0045): how many re-pulled play-stat rows changed.
+      CFB2NFL_REVISION_LOG: ${{ github.workspace }}/play-stats-revisions.tsv
     steps:
       - uses: actions/checkout@v4
 
@@ -82,6 +84,21 @@ jobs:
         run: |
           n=$( [ -f cfbd-calls.tsv ] && wc -l < cfbd-calls.tsv || echo 0 )
           echo "CFBD calls made: $n" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # Temporary (decision 0045): the play-stats revision measurement.
+      - name: Report play-stats revisions
+        if: always()
+        run: |
+          {
+            echo "### Play-stats re-pull (decision 0045)"
+            if [ -f play-stats-revisions.tsv ]; then
+              echo "| date | games re-pulled | games changed | rows before | rows changed | changed by stat type |"
+              echo "|---|---|---|---|---|---|"
+              sed 's/\t/ | /g; s/^/| /; s/$/ |/' play-stats-revisions.tsv
+            else
+              echo "No games were re-pulled this run."
+            fi
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Publish data as release asset
         run: |
