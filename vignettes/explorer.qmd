@@ -189,6 +189,97 @@ viewof season = Inputs.select(ready.meta.seasons.slice().reverse(), {
 ::: {#tab-teams .explorer-tab hidden=""}
 ## Teams
 
+### Conferences {#teams-landscape}
+
+```{ojs}
+//| echo: false
+viewof showFcs = Inputs.toggle({label: "Show FCS", value: false})
+```
+
+```{ojs}
+//| echo: false
+landscape = {
+  const classification = showFcs ? "fcs" : "fbs";
+  const panels = landscapePanels(ready.teamSeason, season, classification);
+  const metric = classification === "fbs" ? "elo_end" : "win_pct";
+  const yLabel = metric === "elo_end" ? "End-of-season Elo" : "Win share";
+  const value = d => metric === "elo_end" ? `Elo ${d.elo_end}` : `${Math.round(d.win_pct * 100)}% wins`;
+  const color = id => ready.teamById.get(id)?.color ?? "#6b7280";
+  const name = id => ready.teamById.get(id)?.team ?? String(id);
+  const focused = panels.find(p => p.conference === focusConf);
+  if (!focused) {
+    // Small multiples: the selected team's line in its color, the rest grey.
+    const grid = html`<div class="explorer-panels"></div>`;
+    for (const p of panels) {
+      const fig = Plot.plot({
+        height: 150, marginLeft: 44, style: {fontSize: "13px"},
+        x: {label: null, tickFormat: String, ticks: 4},
+        y: {label: null, ticks: 3},
+        marks: [
+          Plot.ruleX([season], {stroke: "#9ca3af", strokeDasharray: "3,3"}),
+          Plot.line(p.rows, {
+            x: "season", y: metric, z: "team_id",
+            stroke: d => d.team_id === team ? color(team) : "#9ca3af",
+            strokeWidth: d => d.team_id === team ? 3 : 1,
+            strokeOpacity: d => d.team_id === team ? 1 : 0.5
+          })
+        ]
+      });
+      const card = html`<button type="button" class="explorer-panel" aria-label=${`Open ${p.conference}`}><h4>${p.conference}</h4>${fig}</button>`;
+      card.onclick = () => { mutable focusConf = p.conference; };
+      grid.append(card);
+    }
+    return grid;
+  }
+  // One conference, large: tap near a line (or a chip) to open that team.
+  const fig = Plot.plot({
+    height: 360, marginLeft: 56, style: {fontSize: "16px"},
+    x: {label: "Season", tickFormat: String},
+    y: {label: yLabel, grid: true},
+    marks: [
+      Plot.ruleX([season], {stroke: "#9ca3af", strokeDasharray: "4,4"}),
+      Plot.line(focused.rows, {
+        x: "season", y: metric, z: "team_id",
+        stroke: d => color(d.team_id),
+        strokeWidth: d => d.team_id === team ? 4 : 1.5,
+        strokeOpacity: d => d.team_id === team ? 1 : 0.6
+      }),
+      Plot.dot(focused.rows, Plot.pointer({
+        x: "season", y: metric, fill: d => color(d.team_id), r: 6,
+        title: d => `${name(d.team_id)} ${d.season}: ${value(d)}, ${formatRecord(d)}`,
+        tip: true
+      }))
+    ]
+  });
+  fig.addEventListener("click", () => { if (fig.value) pick.team(fig.value.team_id); });
+  const back = html`<button type="button" class="explorer-chip">← All conferences</button>`;
+  back.onclick = () => { mutable focusConf = null; };
+  const chips = html`<div class="explorer-chips"></div>`;
+  const now = focused.rows.filter(d => d.season === season).sort((a, b) => b[metric] - a[metric]);
+  for (const d of now) {
+    const t = ready.teamById.get(d.team_id);
+    const chip = html`<button type="button" class="explorer-chip" aria-pressed=${String(d.team_id === team)}>${t?.logo ? html`<img src=${t.logo} alt="" width="24" height="24" loading="lazy">` : ""}${name(d.team_id)} <span>${formatRecord(d)}</span></button>`;
+    chip.onclick = () => pick.team(d.team_id);
+    chips.append(chip);
+  }
+  return html`<div>${back}<h4>${focused.conference} in ${season}</h4>${fig}${chips}</div>`;
+}
+```
+
+::: {.column-margin}
+Each line is one team's rating at the end of every season. Membership is as
+of the selected season, so a team that changed conference keeps its whole
+history on one line. FCS teams have no Elo rating; their panels show **win
+share**, $(W + T/2) / G$ over the season's $G$ games.
+:::
+
+```{ojs}
+//| echo: false
+asNode(sourceLine(ready.meta.sources.teams_landscape))
+```
+
+### Team {#teams-team}
+
 ```{ojs}
 //| echo: false
 // Every FBS/FCS team, independent of the season: an input that depended on
@@ -201,29 +292,50 @@ viewof team = Inputs.select(
 
 ```{ojs}
 //| echo: false
-eloChart = {
+teamView = {
   const info = ready.teamById.get(team);
-  const rows = ready.teamSeason.filter(d => d.team_id === team && d.elo_end !== null);
-  if (rows.length === 0) {
-    return asNode(`<div class="explorer-card">${escapeHtml(info.team)} has no Elo rating: CFBD rates FBS teams only.</div>`);
+  const rows = ready.teamSeason.filter(d => d.team_id === team);
+  const elo = rows.filter(d => d.elo_end !== null);
+  const out = html`<div></div>`;
+  if (elo.length) {
+    const fig = Plot.plot({
+      height: 300, marginLeft: 56, style: {fontSize: "16px"},
+      x: {label: "Season", tickFormat: String},
+      y: {label: "End-of-season Elo", grid: true},
+      marks: [
+        Plot.ruleX([season], {stroke: "#9ca3af", strokeDasharray: "4,4"}),
+        Plot.line(elo, {x: "season", y: "elo_end", stroke: info.color, strokeWidth: 3}),
+        Plot.dot(elo, Plot.pointerX({
+          x: "season", y: "elo_end", fill: info.color, r: 7,
+          title: d => `${d.season}: Elo ${d.elo_end}, record ${formatRecord(d)}`,
+          tip: true
+        }))
+      ]
+    });
+    fig.addEventListener("click", () => { if (fig.value) pick.season(fig.value.season); });
+    out.append(fig);
+  } else {
+    out.append(asNode(`<div class="explorer-card">${escapeHtml(info.team)} has no Elo rating: CFBD rates FBS teams only.</div>`));
   }
-  const record = d => `${d.wins}-${d.losses}${d.ties ? "-" + d.ties : ""}`;
-  return Plot.plot({
-    height: 340,
-    marginLeft: 56,
-    style: {fontSize: "16px"},
-    x: {label: "Season", tickFormat: String},
-    y: {label: "End-of-season Elo", grid: true},
+  // Wins and losses by season; tap a season to open its games.
+  const bars = rows.flatMap(d => [
+    {season: d.season, outcome: "Wins", n: d.wins},
+    {season: d.season, outcome: "Losses", n: d.losses},
+    {season: d.season, outcome: "Ties", n: d.ties}
+  ]).filter(d => d.n > 0);
+  const wl = Plot.plot({
+    height: 200, marginLeft: 40, style: {fontSize: "16px"},
+    x: {label: "Season", type: "band", tickFormat: d => d % 4 === 2 ? String(d) : ""},
+    y: {label: "Games", grid: true},
+    color: {domain: ["Wins", "Losses", "Ties"], range: [info.color, "#9ca3af", "#d1d5db"], legend: true},
     marks: [
-      Plot.ruleX([season], {stroke: "#9ca3af", strokeDasharray: "4,4"}),
-      Plot.line(rows, {x: "season", y: "elo_end", stroke: info.color, strokeWidth: 3}),
-      Plot.dot(rows, {
-        x: "season", y: "elo_end", fill: info.color, r: 6,
-        title: d => `${d.season}: Elo ${d.elo_end}, record ${record(d)}`,
-        tip: true
-      })
+      Plot.barY(bars, {x: "season", y: "n", fill: "outcome", fillOpacity: d => d.season === season ? 1 : 0.55}),
+      Plot.tip(rows, Plot.pointerX({x: "season", y: "games", title: d => `${d.season}: ${formatRecord(d)}`}))
     ]
   });
+  wl.addEventListener("click", () => { if (wl.value) pick.season(wl.value.season); });
+  out.append(wl);
+  return out;
 }
 ```
 
@@ -234,12 +346,204 @@ expected win probability of
 
 $$E = \frac{1}{1 + 10^{-D/400}}$$
 
-so a 100-point edge is about a 64% favorite.
+so a 100-point edge is about a 64% favorite. Tap a season in either chart to
+open its games.
 :::
 
 ```{ojs}
 //| echo: false
 asNode(sourceLine(ready.meta.sources.team_view))
+```
+
+### Season {#teams-season}
+
+```{ojs}
+//| echo: false
+seasonStrip = {
+  const info = ready.teamById.get(team);
+  if (seasonGamesData.error) {
+    const card = asNode(errorCard(`the ${season} games`));
+    card.querySelector("button").onclick = () => { mutable teamsRetry = teamsRetry + 1; };
+    return card;
+  }
+  if (!teamSeasonGames.length) {
+    return asNode(`<div class="explorer-card">${escapeHtml(info.team)} has no completed games in ${season} yet.</div>`);
+  }
+  const rated = teamSeasonGames.map((g, i) => ({...g, i: i + 1})).filter(g => g.elo_post !== null);
+  const out = html`<div><h4>${info.team} in ${season}</h4></div>`;
+  if (rated.length) {
+    out.append(Plot.plot({
+      height: 130, marginLeft: 52, style: {fontSize: "14px"},
+      x: {label: "Game", ticks: Math.min(rated.length, 8)},
+      y: {label: "Elo", grid: true},
+      marks: [
+        Plot.line(rated, {x: "i", y: "elo_post", stroke: info.color, strokeWidth: 2}),
+        Plot.dot(rated, {
+          x: "i", y: "elo_post", stroke: info.color,
+          fill: d => d.game_id === shownGame ? info.color : "white",
+          r: d => d.game_id === shownGame ? 7 : 4
+        })
+      ]
+    }));
+  }
+  const tiles = html`<div class="explorer-tiles"></div>`;
+  for (const g of teamSeasonGames) {
+    const opp = ready.teamById.get(g.opp_id);
+    const where = g.site === "home" ? "vs" : g.site === "away" ? "at" : "vs (neutral)";
+    const label = g.season_type === "regular" ? `Week ${g.week}` : "Postseason";
+    const delta = g.elo_delta === null ? "" : `Elo ${g.elo_delta > 0 ? "+" : ""}${g.elo_delta}`;
+    const tile = html`<button type="button" class=${`explorer-tile explorer-${g.result}`} aria-pressed=${String(g.game_id === shownGame)}>
+      <span class="explorer-tile-week">${label}</span>
+      ${opp?.logo ? html`<img src=${opp.logo} alt="" width="32" height="32" loading="lazy">` : ""}
+      <span>${where} ${opp?.team ?? g.opp_name}</span>
+      <strong>${g.result} ${g.points}-${g.opp_points}</strong>
+      <span class="explorer-tile-elo">${delta}</span>
+    </button>`;
+    tile.onclick = () => pick.game(g.game_id);
+    tiles.append(tile);
+  }
+  out.append(tiles);
+  return out;
+}
+```
+
+::: {.column-margin}
+**Elo change** is the rating after the game minus the rating before it. The
+mini line shows the rating after each game; the filled dot is the game shown
+below.
+:::
+
+```{ojs}
+//| echo: false
+asNode(sourceLine(ready.meta.sources.team_season))
+```
+
+### Game {#teams-game}
+
+```{ojs}
+//| echo: false
+//| output: false
+gamePlaysData = {
+  if (!gameRow || !gameRow.has_plays) return {rows: []};
+  teamsRetry;
+  try {
+    const hp = await loadOnce(tabCache, "hyparquet", () => import("https://cdn.jsdelivr.net/npm/hyparquet@1/+esm"));
+    const url = new URL(`explorer-data/plays_${season}.parquet`, document.baseURI).href;
+    return {rows: await readGamePlays(hp, url, gameRow.game_id, parquetCache)};
+  } catch (error) {
+    return {error, rows: []};
+  }
+}
+timeline = gameRow ? timelineFor(gamePlaysData.rows, gameRow.home) : []
+```
+
+```{ojs}
+//| echo: false
+gameView = {
+  if (!gameRow) return document.createComment("no game");
+  const info = ready.teamById.get(team);
+  const opp = ready.teamById.get(gameRow.opp_id);
+  const oppName = opp?.team ?? gameRow.opp_name;
+  const pct = p => p === null || p === undefined ? "not rated" : `${Math.round(p * 100)}%`;
+  const out = html`<div class="explorer-game">
+    <h4>${info.team} ${gameRow.points}, ${oppName} ${gameRow.opp_points}</h4>
+    <p class="explorer-summary">Elo win chance before kickoff: <strong>${pct(gameRow.wp_pre)}</strong> · CFBD win probability after the game: <strong>${pct(gameRow.wp_post)}</strong></p>
+  </div>`;
+  if (gamePlaysData.error) {
+    const card = asNode(errorCard("this game's plays"));
+    card.querySelector("button").onclick = () => { mutable teamsRetry = teamsRetry + 1; };
+    out.append(card);
+    return out;
+  }
+  if (!timeline.length) {
+    out.append(asNode(`<div class="explorer-card">No play-by-play for this game.</div>`));
+    return out;
+  }
+  const oppColor = opp?.color ?? "#6b7280";
+  const x = {label: null, ticks: [0, 900, 1800, 2700, 3600], tickFormat: s => ["Q1", "Q2", "Q3", "Q4", "OT"][s / 900] ?? ""};
+  const label = info.abbreviation ?? info.team;
+  const margin = Plot.plot({
+    height: 240, marginLeft: 52, style: {fontSize: "16px"}, x,
+    y: {label: `${label} lead`, grid: true},
+    marks: [
+      Plot.ruleY([0], {stroke: "#9ca3af"}),
+      Plot.line(timeline, {x: "elapsed", y: "margin", curve: "step-after", stroke: info.color, strokeWidth: 3}),
+      Plot.dot(timeline.filter(d => d.scoring), {
+        x: "elapsed", y: "margin", r: 5,
+        fill: d => d.offense_id === team ? info.color : oppColor
+      }),
+      Plot.dot(timeline.filter(d => d.turnover), {
+        x: "elapsed", y: "margin", symbol: "times", r: 7, stroke: "#b91c1c", strokeWidth: 2
+      }),
+      Plot.ruleX(timeline, Plot.pointerX({x: "elapsed", stroke: "#111827"}))
+    ]
+  });
+  const ppa = Plot.plot({
+    height: 200, marginLeft: 52, style: {fontSize: "16px"}, x,
+    y: {label: "Cumulative PPA edge", grid: true},
+    marks: [
+      Plot.ruleY([0], {stroke: "#9ca3af"}),
+      Plot.line(timeline, {x: "elapsed", y: "cum_ppa", stroke: info.color, strokeWidth: 2}),
+      Plot.ruleX(timeline, Plot.pointerX({x: "elapsed", stroke: "#111827"}))
+    ]
+  });
+  for (const fig of [margin, ppa]) {
+    fig.addEventListener("input", () => { if (fig.value) mutable scrubPlay = fig.value; });
+  }
+  out.append(margin, ppa);
+  return out;
+}
+```
+
+```{ojs}
+//| echo: false
+playCard = {
+  if (!timeline.length) return document.createComment("no plays");
+  const p = scrubPlay && timeline.includes(scrubPlay) ? scrubPlay : timeline[0];
+  const info = ready.teamById.get(team);
+  const opp = ready.teamById.get(gameRow.opp_id);
+  const ord = ["", "1st", "2nd", "3rd", "4th"];
+  const when = p.period > 4 ? p.clock : `Q${p.period} ${p.clock ?? ""}`;
+  const downs = p.down ? ` · ${ord[p.down] ?? p.down} & ${p.distance}` : "";
+  const field = p.yards_to_goal !== null && p.yards_to_goal !== undefined ? ` · ${p.yards_to_goal} yards to go` : "";
+  const card = html`<div class="explorer-card explorer-play" aria-live="polite">
+    <p><strong>${when}</strong>${downs}${field}</p>
+    <p>${info.abbreviation ?? info.team} ${p.team_score}, ${opp?.abbreviation ?? gameRow.opp_name} ${p.opp_score}</p>
+    <p>${p.play_text ?? p.play_type}</p>
+  </div>`;
+  const players = parsePlayers(p.players);
+  if (players.length) {
+    const chips = html`<div class="explorer-chips"></div>`;
+    for (const a of players) {
+      const chip = html`<button type="button" class="explorer-chip">${a.name} <span>${a.stat}</span></button>`;
+      chip.onclick = () => pick.player(a.id);
+      chips.append(chip);
+    }
+    card.append(chips);
+  }
+  return card;
+}
+```
+
+::: {.column-margin}
+**Game clock** runs left to right as elapsed seconds: $(q - 1) \times 900 +
+(900 - r)$ for quarter $q$ with $r$ seconds left. Each overtime period gets a
+300-second slot.
+
+**Lead** is the selected team's score minus its opponent's after each play.
+Filled dots are scoring plays and red crosses are turnovers.
+
+**PPA** (predicted points added) is how much a play changed the offense's
+expected points. The **cumulative PPA edge** adds the team's offensive PPA
+and subtracts the opponent's, play by play, so it rises while the team is
+outplaying its opponent even when the score doesn't move.
+
+Drag across either chart to read any play.
+:::
+
+```{ojs}
+//| echo: false
+asNode(sourceLine(ready.meta.sources.game_timeline))
 ```
 :::
 
