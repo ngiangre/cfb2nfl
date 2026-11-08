@@ -111,3 +111,74 @@ test_that("build_explorer_team_season gets W-L-T, end Elo and tier right", {
     )
   )
 })
+
+explorer_teams_fixture <- function() {
+  tibble::tibble(
+    team_id = c(1L, 2L, 3L, 4L, 99L),
+    team = c("Texas", "Alabama", "Grambling", "Ferris State", "Unused"),
+    mascot = c("Longhorns", "Crimson Tide", "Tigers", "Bulldogs", "X"),
+    abbreviation = c("TEX", "ALA", "GRAM", "FSU", "X"),
+    classification = c("fbs", "fbs", "fcs", "ii", NA),
+    color = c("#bf5700", "#9e1b32", "#null", "#cc0000", "#000000"),
+    alt_color = c("#ffffff", "#ffffff", "#000000", "#000000", "#000000"),
+    logo_light = c("t.png", "a.png", "g.png", "f.png", NA),
+    logo_dark = c("td.png", "ad.png", "gd.png", "fd.png", NA)
+  )
+}
+
+test_that("build_explorer_teams keeps teams in the export with a valid color", {
+  ts <- build_explorer_team_season(
+    explorer_games_fixture(),
+    explorer_tiers_fixture()
+  )
+  tm <- build_explorer_teams(explorer_teams_fixture(), ts)
+  expect_setequal(tm$team_id, c(1L, 2L, 3L))
+  expect_named(
+    tm,
+    c("team_id", "team", "mascot", "abbreviation", "color", "alt_color", "logo")
+  )
+  # "#null" is not a color: the shared fallback grey stands in.
+  expect_equal(tm$color[tm$team_id == 3L], "#6b7280")
+  expect_equal(tm$color[tm$team_id == 1L], "#bf5700")
+})
+
+test_that("explorer_sources names only tables that have a dictionary", {
+  src <- explorer_sources()
+  expect_true(all(c("team_view", "teams_landscape") %in% names(src)))
+  dicts <- sub("\\.yml$", "", list.files(app_sys("dict"), "\\.yml$"))
+  expect_true(all(unlist(src) %in% dicts))
+  expect_true(all(lengths(src) >= 2L)) # keeps them JSON arrays
+})
+
+test_that("build_explorer_meta carries the default season and sources", {
+  m <- build_explorer_meta(explorer_games_fixture())
+  expect_equal(m$default_season, 2026L)
+  expect_equal(m$seasons, c(2025L, 2026L))
+  expect_equal(m$default_team, 251L)
+  expect_equal(m$sources, explorer_sources())
+})
+
+test_that("explorer_json writes rows, nulls and scalars the page expects", {
+  js <- explorer_json(tibble::tibble(a = c(1L, NA), b = c("x", NA)))
+  expect_equal(as.character(js), '[{"a":1,"b":"x"},{"a":null,"b":null}]')
+  meta <- explorer_json(list(default_season = 2026L, seasons = c(2025L, 2026L)))
+  expect_equal(
+    as.character(meta),
+    '{"default_season":2026,"seasons":[2025,2026]}'
+  )
+  expect_gt(explorer_json_gzip_bytes(tibble::tibble(a = 1:10)), 0)
+})
+
+test_that("write_explorer_assets writes one JSON file per asset and returns paths", {
+  dir <- withr::local_tempdir()
+  paths <- write_explorer_assets(
+    list(meta = list(default_season = 2026L), teams = tibble::tibble(a = 1L)),
+    dir
+  )
+  expect_equal(basename(paths), c("meta.json", "teams.json"))
+  expect_true(all(file.exists(paths)))
+  expect_equal(
+    jsonlite::read_json(file.path(dir, "meta.json"))$default_season,
+    2026L
+  )
+})

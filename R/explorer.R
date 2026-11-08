@@ -97,3 +97,117 @@ build_explorer_team_season <- function(games, tiers) {
       "elo_end"
     )
 }
+
+#' Explorer team dimension
+#'
+#' Display fields for every team in the team-season export, stored once so
+#' `team_season.json` carries ids only (decision 0046). Colors go through the
+#' shared valid-hex filter, falling back to the shared grey.
+#'
+#' @param teams Cleaned teams.
+#' @param team_season Output of [build_explorer_team_season()].
+#' @return A tibble keyed by `team_id`.
+#' @export
+build_explorer_teams <- function(teams, team_season) {
+  valid <- team_color_values(teams)
+  teams |>
+    dplyr::filter(.data$team_id %in% team_season$team_id) |>
+    dplyr::transmute(
+      team_id = .data$team_id,
+      team = .data$team,
+      mascot = .data$mascot,
+      abbreviation = .data$abbreviation,
+      color = dplyr::coalesce(unname(valid[.data$team]), "#6b7280"),
+      alt_color = .data$alt_color,
+      logo = .data$logo_light
+    ) |>
+    dplyr::arrange(.data$team)
+}
+
+#' Source tables behind each explorer visual
+#'
+#' The page prints these as a "Data:" line linking to each table on the Data
+#' page, so readers can look up where a chart comes from.
+#'
+#' @return A named list: visual key -> character vector of table names.
+#' @export
+explorer_sources <- function() {
+  list(
+    teams_landscape = c("games", "teams", "conference_tiers"),
+    team_view = c("games", "teams", "conference_tiers"),
+    team_season = c("games", "teams"),
+    game_timeline = c("plays", "play_types", "games", "play_stats"),
+    players = c(
+      "player_stats",
+      "roster",
+      "teams",
+      "conference_tiers",
+      "outcomes",
+      "picks"
+    ),
+    combine = c("combine", "outcomes", "picks"),
+    careers = c("picks", "nfl_draft_picks", "nfl_rosters", "roster"),
+    map = c("teams", "games")
+  )
+}
+
+#' Explorer page metadata
+#'
+#' @param games Cleaned games.
+#' @return A list: `default_season`, `seasons`, `default_team` (Texas, CFBD
+#'   team id 251), `sources`.
+#' @export
+build_explorer_meta <- function(games) {
+  done <- games$season[games$completed %in% TRUE]
+  list(
+    default_season = explorer_default_season(games),
+    seasons = sort(unique(as.integer(done))),
+    default_team = 251L,
+    sources = explorer_sources()
+  )
+}
+
+#' Serialize an explorer asset
+#'
+#' Data frames become arrays of row objects with `null` for NA; length-1
+#' vectors become scalars, so `meta.json` reads naturally in JS.
+#'
+#' @param x A data frame or list.
+#' @return A `json` string.
+#' @export
+explorer_json <- function(x) {
+  jsonlite::toJSON(
+    x,
+    dataframe = "rows",
+    na = "null",
+    auto_unbox = TRUE,
+    digits = NA
+  )
+}
+
+#' Gzipped size of an explorer asset
+#'
+#' What GitHub Pages actually transfers; the first-view budget is set in these
+#' bytes (decision 0046).
+#'
+#' @param x A data frame or list.
+#' @return Integer bytes.
+#' @export
+explorer_json_gzip_bytes <- function(x) {
+  length(memCompress(charToRaw(explorer_json(x)), "gzip"))
+}
+
+#' Write explorer assets
+#'
+#' @param assets Named list of data frames / lists; names become file names.
+#' @param dir Output directory (created if missing).
+#' @return The written file paths, for a `format = "file"` target.
+#' @export
+write_explorer_assets <- function(assets, dir = "vignettes/explorer-data") {
+  dir.create(dir, showWarnings = FALSE, recursive = TRUE)
+  paths <- file.path(dir, paste0(names(assets), ".json"))
+  for (i in seq_along(assets)) {
+    writeLines(explorer_json(assets[[i]]), paths[[i]])
+  }
+  paths
+}
