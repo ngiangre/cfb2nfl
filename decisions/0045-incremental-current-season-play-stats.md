@@ -36,7 +36,7 @@ in the first days after a game were not observed either way.
    is **temporary**: after the 2026-11-15 and 2026-11-22 runs (weeks 10 and
    11, each re-pulled about a week after its first pull), the result is
    recorded below and the re-pull is either kept (if games do change) or
-   removed with its logging (if they do not).
+   removed with its logging (if they do not). Tracked in issue #68.
 4. **Past seasons** stay opt-in exactly as in 0031:
    `CFB2NFL_PLAYS_STATS=true` with an explicit season selection.
 5. The 2026 season to date (1,277 games) is caught up once, by a one-off run
