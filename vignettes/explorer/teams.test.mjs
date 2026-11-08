@@ -1,6 +1,9 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {formatRecord, teamGames, effectiveGame, landscapePanels, timelineFor, parsePlayers} from "./teams.js";
+import {
+  formatRecord, teamGames, effectiveGame, landscapePanels, timelineFor, parsePlayers,
+  defaultShowFcs, focusedConference, shouldLoadPlays, stepPlay, playWhen, playAnnouncement
+} from "./teams.js";
 
 const games = [
   {game_id: 2, team_id: 251, start: "2025-09-08T00:00:00.000Z", has_plays: true},
@@ -62,4 +65,56 @@ test("parsePlayers reads the JSON array and tolerates nothing", () => {
   assert.deepEqual(parsePlayers('[{"id":"p1","name":"A","stat":"Rush"}]'), [{id: "p1", name: "A", stat: "Rush"}]);
   assert.deepEqual(parsePlayers(null), []);
   assert.deepEqual(parsePlayers("not json"), []);
+});
+
+test("defaultShowFcs is on only when the team is FCS in that season", () => {
+  const rows = [
+    {team_id: 149, season: 2026, classification: "fcs"},
+    {team_id: 251, season: 2026, classification: "fbs"},
+    {team_id: 251, season: 2025, classification: "fbs"}
+  ];
+  assert.equal(defaultShowFcs(rows, 149, 2026), true);
+  assert.equal(defaultShowFcs(rows, 251, 2026), false);
+  // A season the team has no row for falls back to FBS.
+  assert.equal(defaultShowFcs(rows, 149, 2025), false);
+});
+
+test("focusedConference keeps the focus only while the team is in that panel", () => {
+  const panels = [
+    {conference: "SEC", teamIds: [251, 333]},
+    {conference: "Big Sky", teamIds: [149]}
+  ];
+  assert.equal(focusedConference("SEC", panels, 251), "SEC");
+  assert.equal(focusedConference("SEC", panels, 149), null);
+  assert.equal(focusedConference(null, panels, 251), null);
+  assert.equal(focusedConference("Nope", panels, 251), null);
+});
+
+test("shouldLoadPlays needs the Teams tab, a seen Game section and plays", () => {
+  assert.equal(shouldLoadPlays({tab: "teams", gameInView: true, hasPlays: true}), true);
+  assert.equal(shouldLoadPlays({tab: "players", gameInView: true, hasPlays: true}), false);
+  assert.equal(shouldLoadPlays({tab: "teams", gameInView: false, hasPlays: true}), false);
+  assert.equal(shouldLoadPlays({tab: "teams", gameInView: true, hasPlays: false}), false);
+});
+
+test("stepPlay moves one play and reports the ends instead of wrapping", () => {
+  const tl = [{id: "a"}, {id: "b"}, {id: "c"}];
+  assert.deepEqual(stepPlay(tl, tl[0], 1), {play: tl[1], edge: null});
+  assert.deepEqual(stepPlay(tl, tl[1], -1), {play: tl[0], edge: null});
+  assert.deepEqual(stepPlay(tl, tl[2], 1), {play: tl[2], edge: "last"});
+  assert.deepEqual(stepPlay(tl, tl[0], -1), {play: tl[0], edge: "first"});
+  assert.deepEqual(stepPlay([], null, 1), {play: null, edge: "last"});
+});
+
+test("playWhen labels regulation quarters and overtime", () => {
+  assert.equal(playWhen({period: 2, clock: "7:30"}), "Q2 7:30");
+  assert.equal(playWhen({period: 5, clock: "OT1"}), "OT1");
+});
+
+test("playAnnouncement reads the play for the live region", () => {
+  assert.equal(
+    playAnnouncement({period: 1, clock: "14:02", play_text: "Kickoff for 60 yards"}),
+    "Q1 14:02: Kickoff for 60 yards"
+  );
+  assert.equal(playAnnouncement({period: 3, clock: "0:44", play_type: "Punt"}), "Q3 0:44: Punt");
 });

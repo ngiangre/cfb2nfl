@@ -2,6 +2,12 @@
 // 0046). The hyparquet module is passed in, so node tests use a fake and
 // never touch the network.
 
+// The hyparquet bundle's URL. A retry appends a query string so the browser
+// re-fetches a module that failed to load (the failed import is not cached).
+export function hyparquetUrl(base, retry) {
+  return retry > 0 ? `${base}?retry=${retry}` : base;
+}
+
 // Row ranges of the groups whose game_id min/max spans the game. Groups
 // without statistics are always read.
 export function pickRowGroups(metadata, gameId) {

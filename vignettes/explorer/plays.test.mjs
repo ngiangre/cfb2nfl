@@ -1,6 +1,6 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {pickRowGroups, readGamePlays} from "./plays.js";
+import {pickRowGroups, readGamePlays, hyparquetUrl} from "./plays.js";
 
 const stats = (lo, hi) => ({meta_data: {path_in_schema: ["game_id"], statistics: {min_value: lo, max_value: hi}}});
 const metadata = {
@@ -41,4 +41,10 @@ test("readGamePlays reads only the picked groups, filters to the game, caches me
   assert.deepEqual(reads, [[0, 3], [3, 5]]);
   await readGamePlays(hp, "plays_2025.parquet", 7, cache);
   assert.equal(metaCalls, 1);
+});
+
+test("hyparquetUrl busts the CDN cache only after a retry", () => {
+  const base = "https://cdn.jsdelivr.net/npm/hyparquet@1/+esm";
+  assert.equal(hyparquetUrl(base, 0), base);
+  assert.equal(hyparquetUrl(base, 2), base + "?retry=2");
 });

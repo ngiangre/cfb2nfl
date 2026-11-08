@@ -58,6 +58,47 @@ export function timelineFor(plays, isHome) {
     }));
 }
 
+// The Show FCS toggle's starting value: on when the team is FCS that season.
+export function defaultShowFcs(teamSeason, team, season) {
+  return teamSeason.some(d => d.team_id === team && d.season === season && d.classification === "fcs");
+}
+
+// The conference panel the reader opened, kept only while the selected team
+// is in it; otherwise the landscape shows every conference again.
+export function focusedConference(focusConf, panels, team) {
+  if (focusConf === null || focusConf === undefined) return null;
+  const panel = panels.find(p => p.conference === focusConf);
+  return panel && panel.teamIds.includes(team) ? focusConf : null;
+}
+
+// The game timeline loads only on the Teams tab, once its Game section has
+// been in view, and only for a game that has plays.
+export function shouldLoadPlays({tab, gameInView, hasPlays}) {
+  return tab === "teams" && gameInView === true && hasPlays === true;
+}
+
+// The play Prev/Next moves to. Stops at either end and reports the edge, so
+// the live region can say so instead of the control wrapping around.
+export function stepPlay(timeline, current, delta) {
+  if (!timeline.length) return {play: null, edge: "last"};
+  const i = timeline.indexOf(current);
+  const from = i < 0 ? 0 : i;
+  const to = from + delta;
+  if (to < 0) return {play: timeline[0], edge: "first"};
+  if (to >= timeline.length) return {play: timeline.at(-1), edge: "last"};
+  return {play: timeline[to], edge: null};
+}
+
+// "Q2 7:30", or the overtime label, which already carries its period.
+export function playWhen(p) {
+  return p.period > 4 ? p.clock : `Q${p.period} ${p.clock ?? ""}`.trimEnd();
+}
+
+// What the screen reader hears when a reader steps to a play.
+export function playAnnouncement(p) {
+  return `${playWhen(p)}: ${p.play_text ?? p.play_type ?? ""}`;
+}
+
 export function parsePlayers(json) {
   if (!json) return [];
   try {
