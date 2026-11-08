@@ -15,6 +15,8 @@ toc: false
 //| echo: false
 import {TABS, parseHash, toHash, resolveTeam} from "./explorer/state.js"
 import {sourceLine, errorCard, loadOnce, escapeHtml} from "./explorer/ui.js"
+import {formatRecord, teamGames, effectiveGame, landscapePanels, timelineFor, parsePlayers} from "./explorer/teams.js"
+import {readGamePlays} from "./explorer/plays.js"
 ```
 
 ```{ojs}
@@ -22,6 +24,15 @@ import {sourceLine, errorCard, loadOnce, escapeHtml} from "./explorer/ui.js"
 //| output: false
 mutable retry = 0
 tabCache = new Map()
+mutable teamsRetry = 0
+mutable focusConf = null
+mutable scrubPlay = null
+parquetCache = new Map()
+async function fetchJson(path) {
+  const response = await fetch(new URL(path, document.baseURI));
+  if (!response.ok) throw new Error(`${response.status} ${path}`);
+  return response.json();
+}
 // Raw markup from ui.js becomes a DOM node. OJS inspects a node that still
 // has a parent instead of mounting it, so detach it from the wrapper first.
 function asNode(markup) {
@@ -82,6 +93,49 @@ hashState = Generators.observe(notify => {
 })
 ```
 
+```{ojs}
+//| echo: false
+//| output: false
+// The reader's game and player picks; set from taps, carried in the hash.
+viewof game = Inputs.input(hashState.game)
+viewof player = Inputs.input(hashState.player)
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+// A tap sets an input the way a reader would, then scrolls to the next level.
+pick = {
+  const set = (view, value) => {
+    view.value = value;
+    view.dispatchEvent(new Event("input", {bubbles: true}));
+  };
+  const scroll = id => document.getElementById(id)?.scrollIntoView({behavior: "smooth", block: "start"});
+  return {
+    team: id => { set(viewof team, id); scroll("teams-team"); },
+    season: s => { set(viewof season, s); scroll("teams-season"); },
+    game: id => { set(viewof game, id); scroll("teams-game"); },
+    player: id => { set(viewof player, id); set(viewof tab, "players"); }
+  };
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+seasonGamesData = {
+  teamsRetry;
+  try {
+    return {rows: await loadOnce(tabCache, `team_games_${season}`, () => fetchJson(`explorer-data/team_games_${season}.json`))};
+  } catch (error) {
+    return {error, rows: []};
+  }
+}
+teamSeasonGames = teamGames(seasonGamesData.rows, team)
+shownGame = effectiveGame(game, teamSeasonGames)
+gameRow = teamSeasonGames.find(g => g.game_id === shownGame) ?? null
+```
+
 ::: {.explorer-header}
 ::: {.explorer-tabs}
 ```{ojs}
@@ -106,12 +160,15 @@ viewof season = Inputs.select(ready.meta.seasons.slice().reverse(), {
 // Write every key back; the first write replaces the bare URL instead of
 // adding a history entry.
 {
-  const next = toHash({...hashState, tab, season, team});
+  // Only the reader's own game pick goes into the hash; the default game is implied.
+  const gameKey = teamSeasonGames.some(g => g.game_id === game) ? game : null;
+  const next = toHash({...hashState, tab, season, team, game: gameKey, player});
   if (next === location.hash) return;
   // Push only input-driven changes. A write that merely canonicalizes the
   // live URL replaces it, so Back never lands on a non-canonical entry.
   const cur = parseHash(location.hash, ready.meta);
   cur.team = resolveTeam(cur.team, ready.teams, ready.meta);
+  if (cur.team === team && cur.season === season && !teamSeasonGames.some(g => g.game_id === cur.game)) cur.game = null;
   if (!location.hash || toHash(cur) === next) history.replaceState(null, "", next);
   else history.pushState(null, "", next);
 }
