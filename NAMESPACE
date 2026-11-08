@@ -170,6 +170,8 @@ export(viz_team_logos)
 export(viz_theme)
 export(viz_transfers_by_season)
 export(write_explorer_assets)
+export(write_explorer_plays)
+export(write_explorer_team_games)
 import(shiny)
 importFrom(rlang,
   "%||%",

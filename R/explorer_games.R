@@ -227,3 +227,46 @@ build_explorer_plays <- function(plays, games, teams, play_stats) {
       players = .data$players
     )
 }
+
+#' Write the per-season team-games JSON files
+#'
+#' @param team_games Output of [build_explorer_team_games()].
+#' @param dir Output directory.
+#' @return The written paths, `team_games_<season>.json`.
+#' @export
+write_explorer_team_games <- function(
+  team_games,
+  dir = "vignettes/explorer-data"
+) {
+  by_season <- split(team_games, team_games$season)
+  names(by_season) <- paste0("team_games_", names(by_season))
+  write_explorer_assets(by_season, dir)
+}
+
+#' Write the per-season plays parquet files
+#'
+#' Rows stay in game order and row groups stay small, so each group's
+#' `game_id` min/max statistics let the page fetch one game with a couple of
+#' range requests (decision 0046).
+#'
+#' @param explorer_plays Output of [build_explorer_plays()].
+#' @param dir Output directory.
+#' @param chunk_size Rows per row group.
+#' @return The written paths, `plays_<season>.parquet`.
+#' @export
+write_explorer_plays <- function(
+  explorer_plays,
+  dir = "vignettes/explorer-data",
+  chunk_size = 5000L
+) {
+  dir.create(dir, showWarnings = FALSE, recursive = TRUE)
+  seasons <- sort(unique(explorer_plays$season))
+  paths <- file.path(dir, sprintf("plays_%d.parquet", seasons))
+  for (i in seq_along(seasons)) {
+    explorer_plays |>
+      dplyr::filter(.data$season == seasons[[i]]) |>
+      dplyr::select(-"season") |>
+      arrow::write_parquet(paths[[i]], chunk_size = chunk_size)
+  }
+  paths
+}

@@ -117,3 +117,34 @@ test_that("build_explorer_plays puts every play on the home team's scale", {
   g4 <- p[p$game_id == 4L, ]
   expect_equal(g4$home_cum_ppa, 0.1) # Alabama is home in game 4
 })
+
+test_that("write_explorer_team_games writes one JSON file per season", {
+  dir <- withr::local_tempdir()
+  g <- explorer_games_fixture()
+  ts <- build_explorer_team_season(g, explorer_tiers_fixture())
+  tg <- build_explorer_team_games(g, ts, play_game_ids = 1L)
+  paths <- write_explorer_team_games(tg, dir)
+  expect_equal(
+    basename(paths),
+    c("team_games_2025.json", "team_games_2026.json")
+  )
+  back <- jsonlite::read_json(paths[[1]], simplifyVector = TRUE)
+  expect_equal(nrow(back), sum(tg$season == 2025L))
+})
+
+test_that("write_explorer_plays writes season parquet in game order with small row groups", {
+  dir <- withr::local_tempdir()
+  p <- build_explorer_plays(
+    explorer_plays_fixture(),
+    explorer_games_fixture(),
+    explorer_teams_fixture(),
+    explorer_play_stats_fixture()
+  )
+  paths <- write_explorer_plays(p, dir, chunk_size = 2L)
+  expect_equal(basename(paths), c("plays_2025.parquet", "plays_2026.parquet"))
+  back <- arrow::read_parquet(paths[[1]])
+  expect_equal(back$play_id, c("11", "12", "13", "14", "15"))
+  expect_false("season" %in% names(back))
+  reader <- arrow::ParquetFileReader$create(paths[[1]])
+  expect_equal(reader$num_row_groups, 3L) # 5 rows in chunks of 2
+})
