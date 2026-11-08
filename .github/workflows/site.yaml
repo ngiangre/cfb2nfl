@@ -60,12 +60,13 @@ jobs:
         run: Rscript -e 'targets::tar_make()'
 
       # Pages whose code reads OTHER files at knit time (investigations.qmd reads the
-      # posts' YAML titles; reference.qmd reads function metadata) have that
-      # dependency hidden from Quarto's per-document cache check, so their
-      # freeze entries go stale whenever those inputs change. Bust them so the
-      # index pages always re-execute.
-      - name: Bust freeze cache for index pages
-        run: rm -rf _quarto/_freeze/vignettes/investigations _quarto/_freeze/vignettes/reference
+      # posts' YAML titles; reference.qmd reads function metadata; pipeline.qmd
+      # reads the targets store built by the step above) have that dependency
+      # hidden from Quarto's per-document cache check, so their freeze entries
+      # go stale whenever those inputs change. Bust them so these pages always
+      # re-execute.
+      - name: Bust freeze cache for pages with hidden inputs
+        run: rm -rf _quarto/_freeze/vignettes/investigations _quarto/_freeze/vignettes/reference _quarto/_freeze/vignettes/pipeline
 
       # freeze = TRUE reuses the committed _quarto/_freeze/ cache so CI does not
       # re-execute vignette code; renders are faster and deterministic (dec 0007).
