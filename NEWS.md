@@ -1,5 +1,14 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- The site's interactive graphs are back: the pipeline dependency graph and
+  the data-model diagram rendered blank (on desktop and mobile) because their
+  visNetwork libraries were never published, and the same gap hid the two
+  static figures in the performance-arcs post and the fonts behind the
+  interactive charts. A `.gitignore` rule was silently skipping every new
+  file in the committed render cache; it now tracks them. The pipeline page
+  now re-renders on every site build, so its graph shows the live build
+  status rather than a stale local snapshot.
+
 - `play_stats` now covers the 2026 season (who ran, caught, was targeted,
   tackled or sacked on each play) and grows every week: the Sunday refresh
   pulls each newly completed game and re-pulls the past 8 days' games once,
