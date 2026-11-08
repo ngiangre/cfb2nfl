@@ -1,0 +1,208 @@
+---
+title: "Explorer"
+description: "Drill from conferences to teams, games and players, season by season."
+vignette: >
+  %\VignetteIndexEntry{Explorer}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+resources:
+  - explorer-data/**
+css: explorer/explorer.css
+toc: false
+---
+
+```{ojs}
+//| echo: false
+import {TABS, parseHash, toHash, resolveTeam} from "./explorer/state.js"
+import {sourceLine, errorCard, loadOnce} from "./explorer/ui.js"
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+mutable retry = 0
+tabCache = new Map()
+function asNode(markup) {
+  const el = document.createElement("div");
+  el.innerHTML = markup;
+  return el.firstElementChild;
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+// The first view: meta, teams and team seasons (~60 KB gzipped).
+shell = {
+  retry;
+  try {
+    const [meta, teams, teamSeason] = await Promise.all([
+      FileAttachment("explorer-data/meta.json").json(),
+      FileAttachment("explorer-data/teams.json").json(),
+      FileAttachment("explorer-data/team_season.json").json()
+    ]);
+    return {meta, teams, teamSeason, teamById: new Map(teams.map(t => [t.team_id, t]))};
+  } catch (error) {
+    return {error};
+  }
+}
+// Cells below read `ready`, which never resolves after a failed load, so
+// they wait quietly behind the error card instead of throwing.
+ready = shell.error ? new Promise(() => {}) : shell
+```
+
+```{ojs}
+//| echo: false
+shellStatus = {
+  if (!shell.error) return document.createComment("loaded");
+  const card = asNode(errorCard("the explorer data"));
+  card.querySelector("button").onclick = () => { mutable retry = retry + 1; };
+  return card;
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+// Hash state, re-read when the reader edits the hash or presses back.
+hashState = Generators.observe(notify => {
+  const read = () => {
+    const s = parseHash(location.hash, ready.meta);
+    s.team = resolveTeam(s.team, ready.teams, ready.meta);
+    notify(s);
+  };
+  read();
+  addEventListener("hashchange", read);
+  addEventListener("popstate", read);
+  return () => {
+    removeEventListener("hashchange", read);
+    removeEventListener("popstate", read);
+  };
+})
+```
+
+::: {.explorer-header}
+::: {.explorer-tabs}
+```{ojs}
+//| echo: false
+viewof tab = Inputs.radio(new Map(TABS.map(t => [t.label, t.key])), {value: hashState.tab})
+```
+:::
+
+```{ojs}
+//| echo: false
+viewof season = Inputs.select(ready.meta.seasons.slice().reverse(), {
+  label: "Season",
+  value: hashState.season,
+  format: String
+})
+```
+:::
+
+```{ojs}
+//| echo: false
+//| output: false
+// Write every key back; the first write replaces the bare URL instead of
+// adding a history entry.
+{
+  const next = toHash({...hashState, tab, season, team});
+  if (next === location.hash) return;
+  if (location.hash) history.pushState(null, "", next);
+  else history.replaceState(null, "", next);
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+// Show one tab's section at a time.
+{
+  for (const t of TABS) {
+    const el = document.getElementById(`tab-${t.key}`);
+    if (el) el.hidden = t.key !== tab;
+  }
+}
+```
+
+::: {#tab-teams .explorer-tab}
+## Teams
+
+```{ojs}
+//| echo: false
+// Every FBS/FCS team, independent of the season: an input that depended on
+// `season` would be rebuilt (and reset to the hash's team) on each change.
+viewof team = Inputs.select(
+  new Map(ready.teams.map(t => [t.team, t.team_id])),
+  {label: "Team", value: hashState.team}
+)
+```
+
+```{ojs}
+//| echo: false
+eloChart = {
+  const info = ready.teamById.get(team);
+  const rows = ready.teamSeason.filter(d => d.team_id === team && d.elo_end !== null);
+  if (rows.length === 0) {
+    return asNode(`<div class="explorer-card">${info.team} has no Elo rating: CFBD rates FBS teams only.</div>`);
+  }
+  const record = d => `${d.wins}-${d.losses}${d.ties ? "-" + d.ties : ""}`;
+  return Plot.plot({
+    height: 340,
+    marginLeft: 56,
+    style: {fontSize: "16px"},
+    x: {label: "Season", tickFormat: String},
+    y: {label: "End-of-season Elo", grid: true},
+    marks: [
+      Plot.ruleX([season], {stroke: "#9ca3af", strokeDasharray: "4,4"}),
+      Plot.line(rows, {x: "season", y: "elo_end", stroke: info.color, strokeWidth: 3}),
+      Plot.dot(rows, {
+        x: "season", y: "elo_end", fill: info.color, r: 6,
+        title: d => `${d.season}: Elo ${d.elo_end}, record ${record(d)}`,
+        tip: true
+      })
+    ]
+  });
+}
+```
+
+::: {.column-margin}
+**End-of-season Elo** is the team's CFBD Elo rating after its last rated game
+of the season. A rating gap of $D$ points gives the higher-rated team an
+expected win probability of
+
+$$E = \frac{1}{1 + 10^{-D/400}}$$
+
+so a 100-point edge is about a 64% favorite.
+:::
+
+```{ojs}
+//| echo: false
+asNode(sourceLine(ready.meta.sources.team_view))
+```
+:::
+
+::: {#tab-players .explorer-tab}
+## Players
+
+::: {.explorer-card}
+The players landscape (every player at a position, season by season) is the
+next piece of the explorer.
+:::
+:::
+
+::: {#tab-combine .explorer-tab}
+## Combine
+
+::: {.explorer-card}
+The combine view (height, weight and 40 in 3D, by draft outcome) is coming.
+:::
+:::
+
+::: {#tab-careers .explorer-tab}
+## Draft & careers
+
+::: {.explorer-card}
+Draft classes, NFL careers and transfers move here from the Visualizations
+page.
+:::
+:::

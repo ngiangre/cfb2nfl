@@ -17,3 +17,15 @@ export function errorCard(what) {
   return `<div class="explorer-card explorer-error" role="alert"><p>Couldn't load ${escapeHtml(what)}.</p>` +
     `<button type="button" class="explorer-retry">Retry</button></div>`;
 }
+
+// Lazy tab data: the first open starts the load, later opens reuse it, and a
+// failed load is forgotten so Retry can try again.
+export function loadOnce(cache, key, load) {
+  if (!cache.has(key)) {
+    cache.set(key, Promise.resolve().then(load).catch(error => {
+      cache.delete(key);
+      throw error;
+    }));
+  }
+  return cache.get(key);
+}
