@@ -91,7 +91,7 @@ is gitignored and Quarto can't render from a hidden worktree path.
 - [ ] **Step 1: Branch**
 
 ```bash
-git checkout main && git pull -q && git checkout -b feat/explorer-shell
+git checkout feat/explorer-shell   # already exists; it carries this plan
 ```
 
 - [ ] **Step 2: Write the failing tests** (`tests/testthat/test-explorer.R`)
