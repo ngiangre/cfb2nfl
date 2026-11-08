@@ -202,6 +202,7 @@ build_explorer_plays <- function(plays, games, teams, play_stats) {
       play_id = .data$id,
       period = .data$period,
       clock = dplyr::case_when(
+        is.na(.data$period) ~ NA_character_,
         .data$period > 4L ~ paste0("OT", .data$period - 4L),
         is.na(.data$clock_minutes) | is.na(.data$clock_seconds) ~ NA_character_,
         .default = sprintf("%d:%02d", .data$clock_minutes, .data$clock_seconds)

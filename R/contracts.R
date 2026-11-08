@@ -2291,7 +2291,8 @@ contract_explorer_team_games <- function(
 #' Guards [build_explorer_plays()]: one row per input play (no loss); every
 #' play's game is in `games`; the margin equals the home score minus the away
 #' score; cumulative PPA is never missing; and at least 99.9% of plays have an
-#' elapsed time (the rest have a missing clock).
+#' elapsed time (the rest have a missing clock). Plays whose period the cleaner
+#' nulled (CFBD period 0, 37 plays in 2010-2013) are kept with no elapsed time.
 #'
 #' @param explorer_plays Output of [build_explorer_plays()].
 #' @param plays Cleaned plays.
@@ -2318,7 +2319,6 @@ contract_explorer_plays <- function(
     pointblank::col_vals_not_null(pointblank::vars(
       game_id,
       play_id,
-      period,
       home_cum_ppa
     )) |>
     pointblank::rows_distinct(pointblank::vars(play_id)) |>

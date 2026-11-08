@@ -22,5 +22,6 @@ The interrogated pointblank agent, invisibly.
 Guards \code{\link[=build_explorer_plays]{build_explorer_plays()}}: one row per input play (no loss); every
 play's game is in \code{games}; the margin equals the home score minus the away
 score; cumulative PPA is never missing; and at least 99.9\% of plays have an
-elapsed time (the rest have a missing clock).
+elapsed time (the rest have a missing clock). Plays whose period the cleaner
+nulled (CFBD period 0, 37 plays in 2010-2013) are kept with no elapsed time.
 }

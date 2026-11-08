@@ -207,3 +207,29 @@ test_that("contract_explorer_plays passes, and catches loss and orphans", {
   bad$home_margin[2] <- 99L
   expect_false(ok(bad))
 })
+
+test_that("plays with no period stay in the table untimed and still pass the contract", {
+  f <- explorer_games_assets_fixture()
+  # Pad with timed plays so the untimed one stays under the 0.1% budget.
+  pad <- f$plays[rep(6L, 2000L), ]
+  pad$id <- sprintf("pad%d", seq_len(2000L))
+  pad$playNumber <- seq_len(2000L) + 1L
+  plays <- rbind(f$plays, pad)
+  plays$period[2] <- NA
+  p <- build_explorer_plays(
+    plays,
+    f$games,
+    explorer_teams_fixture(),
+    explorer_play_stats_fixture()
+  )
+  expect_equal(nrow(p), nrow(plays))
+  untimed <- p[p$play_id == "12", ]
+  expect_true(is.na(untimed$elapsed))
+  expect_true(is.na(untimed$clock))
+  expect_true(pointblank::all_passed(contract_explorer_plays(
+    p,
+    plays,
+    f$games,
+    stop_on_fail = FALSE
+  )))
+})
