@@ -4,24 +4,25 @@
 \alias{assemble_play_stats}
 \title{Build the published play-stats table}
 \usage{
-assemble_play_stats(raw, play_stat_types, path, seasons)
+assemble_play_stats(raw, play_stat_types, path)
 }
 \arguments{
-\item{raw}{Raw play stats for the pulled seasons, or \code{NULL} (not pulled).}
+\item{raw}{Raw play stats for the pulled games, or \code{NULL} (nothing pulled).}
 
 \item{play_stat_types}{Cleaned dimension (\code{\link[=clean_play_stat_types]{clean_play_stat_types()}}).}
 
 \item{path}{The published parquet.}
-
-\item{seasons}{The seasons \code{raw} covers.}
 }
 \value{
 The play-stats table to publish.
 }
 \description{
-The per-game pull is opt-in (\code{\link[=play_stats_enabled]{play_stats_enabled()}}), so most refreshes
-must leave the published table exactly as it is. When seasons were pulled,
-they are spliced in (\code{\link[=splice_seasons]{splice_seasons()}}); otherwise the published file is
-kept, or, before any pull exists, the empty typed table is written.
+Play stats grow game by game (decision 0045), so the pulled games replace
+exactly their own rows in the published table and every other game is kept
+as published. A game the pull returned nothing for keeps its published
+rows, so an empty response can never delete good data. For re-pulled
+games, the number of rows that changed is reported: the measure of how
+often CFBD revises a game after the fact. Before any pull exists, the empty
+typed table is written.
 }
 \keyword{internal}

@@ -2,11 +2,12 @@ name: data-current
 
 # Season-scoped refresh (decision 0034): re-pull only the current season (and
 # the incoming recruiting class), splice it into the published tables, and
-# republish everything to the single data-latest release. ~55 CFBD calls per
-# run in season (one /plays call per played week included), against ~1,060
-# for a full refresh (data-refresh.yaml, on demand only). Per-game play stats
-# are never pulled here (decision 0031). Requires the CFBD_API_KEY repository
-# secret.
+# republish everything to the single data-latest release. In season a run
+# makes ~40-55 CFBD calls (one /plays call per played week included) plus
+# ~220-280 /plays/stats calls: one per game not yet published and one per
+# game from the last 8 days, re-pulled once (decision 0045). A full refresh
+# (data-refresh.yaml, on demand only) is ~1,060 calls. Requires the
+# CFBD_API_KEY repository secret.
 #
 # Scheduled only when new data is expected (cron is fixed UTC). The minute is
 # off the hour on purpose: GitHub delays or drops scheduled runs queued at

@@ -15,9 +15,10 @@
 # CFBD_API_KEY and the published data in data/ (data-raw/pull-data.R).
 # For a full rebuild of every season, use data-raw/refresh.R instead.
 #
-# Play stats (/plays/stats, one call per game, ~2,100 per season) are pulled
-# only with CFB2NFL_PLAYS_STATS=true (decision 0031, Phase 2), one season at a
-# time, newest first:
+# Play stats (/plays/stats, one call per game, ~1,700 per season): the
+# current season pulls only new and recent games (decision 0045); a past
+# season needs CFB2NFL_PLAYS_STATS=true (decision 0031, Phase 2), one season
+# at a time, newest first:
 #
 #   CFB2NFL_PLAYS_STATS=true Rscript data-raw/refresh-historical.R 2025
 
@@ -51,18 +52,31 @@ if (!all(file.exists(published))) {
     ". Run data-raw/pull-data.R first."
   )
 }
-# The per-game play-stats pull queries every game the season has plays for.
-play_stats_games <- if (play_stats_enabled(spec)) {
-  plays <- arrow::read_parquet(
-    "data/plays.parquet",
-    col_select = c("season", "gameId")
-  )
-  length(unique(plays$gameId[
-    plays$season %in% refresh_seasons(spec, "play_stats")
-  ]))
-} else {
-  0L
-}
+# Play stats: the current season's new and recent games, plus every game of
+# a past season when CFB2NFL_PLAYS_STATS is on (decision 0045).
+plays_games <- arrow::read_parquet(
+  "data/plays.parquet",
+  col_select = c("season", "gameId")
+) |>
+  dplyr::distinct()
+published_ids <- arrow::read_parquet(
+  "data/play_stats.parquet",
+  col_select = "gameId"
+)$gameId
+backfill <- play_stats_enabled(spec)
+play_stats_games <- sum(vapply(
+  refresh_seasons(spec, "play_stats"),
+  \(s) {
+    length(play_stats_games_to_pull(
+      s,
+      plays_games,
+      arrow::read_parquet(games_path),
+      published_ids,
+      backfill = backfill
+    ))
+  },
+  integer(1)
+))
 est <- estimate_refresh_calls(
   seasons,
   arrow::read_parquet(games_path),

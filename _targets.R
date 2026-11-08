@@ -130,9 +130,10 @@ list(
   ),
   # Play-by-play (decision 0031). /plays is one call per played week, mapped
   # over the same week grid as the game stats; the two dimensions are one call
-  # each. /plays/stats is one call per GAME (~2,100 a season), so it is opt-in
-  # (CFB2NFL_PLAYS_STATS, see play_stats_enabled()) and branched by season,
-  # with the season's games looped inside the chunk.
+  # each. /plays/stats is one call per GAME (~1,700 a season), branched by
+  # season with the games looped inside the chunk. The current season pulls
+  # only new games plus a one-week re-pull (decision 0045); a past season only
+  # with CFB2NFL_PLAYS_STATS (see play_stats_enabled()).
   tar_target(raw_play_types, if (refresh_enabled()) ingest_play_types()),
   tar_target(
     raw_play_stat_types,
@@ -150,23 +151,31 @@ list(
     if (refresh_enabled()) dplyr::bind_rows(raw_plays_chunk)
   ),
   tar_target(play_stats_grid, refresh_seasons(source = "play_stats")),
-  # The games to pull come from the published plays, so only games CFBD has
-  # play-by-play for are queried.
+  # The games to pull come from the plays, so only games CFBD has
+  # play-by-play for are queried, minus those already published (read from
+  # the downloaded play_stats.parquet, decision 0045).
   tar_target(plays_games, dplyr::distinct(plays, season, gameId)),
   tar_target(
     raw_play_stats_chunk,
-    if (refresh_enabled() && play_stats_enabled()) {
-      ingest_play_stats_chunk(
-        plays_games$gameId[plays_games$season == play_stats_grid]
+    if (refresh_enabled()) {
+      path <- "data/play_stats.parquet"
+      published <- if (file.exists(path)) {
+        arrow::read_parquet(path, col_select = "gameId")$gameId
+      }
+      ids <- play_stats_games_to_pull(
+        play_stats_grid,
+        plays_games,
+        games,
+        published_ids = published,
+        backfill = play_stats_enabled()
       )
+      if (length(ids)) ingest_play_stats_chunk(ids)
     },
     pattern = map(play_stats_grid)
   ),
   tar_target(
     raw_play_stats,
-    if (refresh_enabled() && play_stats_enabled()) {
-      dplyr::bind_rows(raw_play_stats_chunk)
-    }
+    if (refresh_enabled()) dplyr::bind_rows(raw_play_stats_chunk)
   ),
   # NFL outcomes via nflverse (decision 0014); no CFBD key required to ingest.
   tar_target(
@@ -329,15 +338,14 @@ list(
     format = "file"
   ),
   tar_target(plays, arrow::read_parquet(plays_file), format = "parquet"),
-  # Left as published unless CFB2NFL_PLAYS_STATS pulled seasons (Phase 2).
+  # The pulled games replace their own rows; every other game is kept.
   tar_target(
     play_stats_file,
     parquet_asset("data/play_stats.parquet", function() {
       assemble_play_stats(
         raw_play_stats,
         play_stat_types,
-        "data/play_stats.parquet",
-        refresh_seasons(source = "play_stats")
+        "data/play_stats.parquet"
       )
     }),
     format = "file"

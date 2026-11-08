@@ -176,25 +176,79 @@ test_that("clean_play_stats types the schema; NULL gives the empty table", {
   expect_type(empty$athleteId, "character")
 })
 
-test_that("assemble_play_stats keeps, seeds, or splices the published table", {
+test_that("assemble_play_stats replaces pulled games and keeps the rest", {
   types <- mk_play_stat_types()
   path <- withr::local_tempfile(fileext = ".parquet")
   # Nothing pulled, nothing published: the empty typed table.
-  seeded <- assemble_play_stats(NULL, types, path, 2026L)
+  seeded <- assemble_play_stats(NULL, types, path)
   expect_equal(nrow(seeded), 0L)
   arrow::write_parquet(seeded, path)
-  # A pulled season is spliced in.
-  pulled <- assemble_play_stats(
-    unnest_clock(mk_play_stats_raw()),
-    types,
-    path,
-    2026L
-  )
+  # A pulled game is added.
+  raw <- unnest_clock(mk_play_stats_raw())
+  pulled <- assemble_play_stats(raw, types, path)
   expect_equal(nrow(pulled), 2L)
   arrow::write_parquet(pulled, path)
-  # Not pulled: the published file is kept as is.
-  kept <- assemble_play_stats(NULL, types, path, 2026L)
-  expect_equal(nrow(kept), 2L)
+  # Not pulled (or an empty pull): the published file is kept as is.
+  expect_equal(nrow(assemble_play_stats(NULL, types, path)), 2L)
+  expect_equal(nrow(assemble_play_stats(tibble::tibble(), types, path)), 2L)
+  # A new game is appended; a re-pulled game replaces its own rows and the
+  # revision count is reported.
+  other <- dplyr::mutate(raw, gameId = 402L, playId = "40210")
+  revised <- dplyr::mutate(raw, stat = c(12L, 1L))
+  expect_message(
+    out <- assemble_play_stats(
+      dplyr::bind_rows(revised, other),
+      types,
+      path
+    ),
+    "Re-pulled 1 game: 2 play-stat rows changed"
+  )
+  expect_equal(nrow(out), 4L)
+  expect_equal(out$stat[out$gameId == 401L], c(12, 1))
+})
+
+test_that("play_stats_games_to_pull: new and recent games now, past on demand", {
+  d <- as.Date("2026-11-15")
+  plays_games <- tibble::tibble(
+    season = c(2026L, 2026L, 2026L, 2025L),
+    gameId = c(1L, 2L, 3L, 9L)
+  )
+  games <- tibble::tibble(
+    id = c(1L, 2L, 3L, 9L),
+    startDate = c(
+      "2026-10-31T19:00:00.000Z",
+      "2026-11-07T19:00:00.000Z",
+      "2026-11-14T19:00:00.000Z",
+      "2025-11-08T19:00:00.000Z"
+    )
+  )
+  # Game 1 is published and settled; game 2 is published but inside the
+  # re-pull window; game 3 is new.
+  expect_equal(
+    play_stats_games_to_pull(2026L, plays_games, games, c(1L, 2L), date = d),
+    c(2L, 3L)
+  )
+  # Nothing published yet: the whole season so far.
+  expect_equal(
+    play_stats_games_to_pull(2026L, plays_games, games, NULL, date = d),
+    c(1L, 2L, 3L)
+  )
+  # A past season only with the backfill flag.
+  expect_length(
+    play_stats_games_to_pull(2025L, plays_games, games, NULL, date = d),
+    0L
+  )
+  expect_equal(
+    play_stats_games_to_pull(
+      2025L,
+      plays_games,
+      games,
+      NULL,
+      backfill = TRUE,
+      date = d
+    ),
+    9L
+  )
 })
 
 test_that("play_stats_enabled is opt-in and refuses the full window", {

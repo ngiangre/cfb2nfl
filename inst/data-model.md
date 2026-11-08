@@ -188,8 +188,9 @@ wrong rows, so they are called out explicitly.
    strings), and both carry `season`/`week` (`plays` also `seasonType`).
    `play_stats.athleteId` is the shared college athlete id (namespace 1; 100%
    of probed ids are roster `playerId`s, no name guard). `plays` itself names
-   no athlete. `play_stats` is backfilled one season per opt-in pull (decision
-   0031), so seasons not yet pulled have no rows; `plays` covers every season.
+   no athlete. `play_stats` covers the current season (2026 on, added game by
+   game each week, decision 0045) and any past season backfilled on demand;
+   seasons not yet pulled have no rows. `plays` covers every season.
 
 ### Two namespaces that look joinable but are not
 
