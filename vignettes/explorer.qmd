@@ -253,7 +253,7 @@ landscape = {
           })
         ]
       });
-      const card = html`<button type="button" class="explorer-panel" aria-label=${`Open ${p.conference}`}><h4>${p.conference}</h4>${fig}</button>`;
+      const card = html`<button type="button" class="explorer-panel" aria-label="${`Open ${p.conference}`}"><h4>${p.conference}</h4>${fig}</button>`;
       card.onclick = () => { mutable focusConf = p.conference; };
       grid.append(card);
     }
