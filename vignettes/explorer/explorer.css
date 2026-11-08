@@ -31,7 +31,7 @@
   color: #fff;
   border-color: #111827;
 }
-.explorer-tabs input[type="radio"]:focus-visible + * { outline: 2px solid #2563eb; }
+.explorer-tabs form > div > label:has(input:focus-visible) { outline: 2px solid #2563eb; outline-offset: 2px; }
 .explorer-card { border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 1rem; margin: 1rem 0; font-size: 1.05rem; }
 .explorer-error { border-color: #b91c1c; }
 .explorer-retry { min-height: 44px; min-width: 44px; padding: 0.5rem 1rem; font-size: 1rem; }

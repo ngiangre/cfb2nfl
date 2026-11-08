@@ -14,7 +14,7 @@ toc: false
 ```{ojs}
 //| echo: false
 import {TABS, parseHash, toHash, resolveTeam} from "./explorer/state.js"
-import {sourceLine, errorCard, loadOnce} from "./explorer/ui.js"
+import {sourceLine, errorCard, loadOnce, escapeHtml} from "./explorer/ui.js"
 ```
 
 ```{ojs}
@@ -36,7 +36,7 @@ function asNode(markup) {
 ```{ojs}
 //| echo: false
 //| output: false
-// The first view: meta, teams and team seasons (~60 KB gzipped).
+// The first view: meta, teams and team seasons (~50 KB gzipped).
 shell = {
   retry;
   try {
@@ -76,12 +76,9 @@ hashState = Generators.observe(notify => {
     notify(s);
   };
   read();
+  // hashchange also fires for Back/Forward between hash entries.
   addEventListener("hashchange", read);
-  addEventListener("popstate", read);
-  return () => {
-    removeEventListener("hashchange", read);
-    removeEventListener("popstate", read);
-  };
+  return () => removeEventListener("hashchange", read);
 })
 ```
 
@@ -111,8 +108,12 @@ viewof season = Inputs.select(ready.meta.seasons.slice().reverse(), {
 {
   const next = toHash({...hashState, tab, season, team});
   if (next === location.hash) return;
-  if (location.hash) history.pushState(null, "", next);
-  else history.replaceState(null, "", next);
+  // Push only input-driven changes. A write that merely canonicalizes the
+  // live URL replaces it, so Back never lands on a non-canonical entry.
+  const cur = parseHash(location.hash, ready.meta);
+  cur.team = resolveTeam(cur.team, ready.teams, ready.meta);
+  if (!location.hash || toHash(cur) === next) history.replaceState(null, "", next);
+  else history.pushState(null, "", next);
 }
 ```
 
@@ -128,7 +129,7 @@ viewof season = Inputs.select(ready.meta.seasons.slice().reverse(), {
 }
 ```
 
-::: {#tab-teams .explorer-tab}
+::: {#tab-teams .explorer-tab hidden=""}
 ## Teams
 
 ```{ojs}
@@ -147,7 +148,7 @@ eloChart = {
   const info = ready.teamById.get(team);
   const rows = ready.teamSeason.filter(d => d.team_id === team && d.elo_end !== null);
   if (rows.length === 0) {
-    return asNode(`<div class="explorer-card">${info.team} has no Elo rating: CFBD rates FBS teams only.</div>`);
+    return asNode(`<div class="explorer-card">${escapeHtml(info.team)} has no Elo rating: CFBD rates FBS teams only.</div>`);
   }
   const record = d => `${d.wins}-${d.losses}${d.ties ? "-" + d.ties : ""}`;
   return Plot.plot({
@@ -185,7 +186,7 @@ asNode(sourceLine(ready.meta.sources.team_view))
 ```
 :::
 
-::: {#tab-players .explorer-tab}
+::: {#tab-players .explorer-tab hidden=""}
 ## Players
 
 ::: {.explorer-card}
@@ -194,7 +195,7 @@ next piece of the explorer.
 :::
 :::
 
-::: {#tab-combine .explorer-tab}
+::: {#tab-combine .explorer-tab hidden=""}
 ## Combine
 
 ::: {.explorer-card}
@@ -202,7 +203,7 @@ The combine view (height, weight and 40 in 3D, by draft outcome) is coming.
 :::
 :::
 
-::: {#tab-careers .explorer-tab}
+::: {#tab-careers .explorer-tab hidden=""}
 ## Draft & careers
 
 ::: {.explorer-card}
