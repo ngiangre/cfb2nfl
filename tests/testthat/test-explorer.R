@@ -57,3 +57,57 @@ test_that("explorer_game_sides gives one row per team per completed game", {
   expect_equal(g1$points[g1$team_id == 2L], 27L)
   expect_equal(g1$opp_points[g1$team_id == 2L], 30L)
 })
+
+explorer_tiers_fixture <- function() {
+  tibble::tibble(
+    season = c(2025L, 2025L, 2026L, 2026L),
+    conference = c("SEC", "SWAC", "SEC", "SWAC"),
+    tier = c(3L, 1L, 3L, 1L),
+    tier_label = c("Power", "FCS and below", "Power", "FCS and below")
+  )
+}
+
+test_that("build_explorer_team_season keeps FBS/FCS sides and counts the record", {
+  ts <- build_explorer_team_season(
+    explorer_games_fixture(),
+    explorer_tiers_fixture()
+  )
+  # Teams 4 and 5 are D-II; game 6 is unplayed. 2025: teams 1, 2, 3;
+  # 2026: teams 1, 2.
+  expect_false(any(ts$team_id %in% c(4L, 5L)))
+  expect_equal(nrow(ts), 5L)
+})
+
+test_that("build_explorer_team_season gets W-L-T, end Elo and tier right", {
+  ts <- build_explorer_team_season(
+    explorer_games_fixture(),
+    explorer_tiers_fixture()
+  )
+  t1 <- ts[ts$team_id == 1L & ts$season == 2025L, ]
+  # Team 1 2025: beat 2 (30-27), tied 3 (20-20).
+  expect_equal(c(t1$games, t1$wins, t1$losses, t1$ties), c(2L, 1L, 0L, 1L))
+  # End Elo = postgame Elo after the last game with an Elo (game 3).
+  expect_equal(t1$elo_end, 1600L)
+  expect_equal(t1$tier, 3L)
+  expect_equal(t1$classification, "fbs")
+  t3 <- ts[ts$team_id == 3L, ]
+  expect_true(is.na(t3$elo_end)) # FCS: no Elo
+  expect_equal(t3$tier_label, "FCS and below")
+  expect_equal(ts$wins + ts$losses + ts$ties, ts$games)
+  expect_named(
+    ts,
+    c(
+      "team_id",
+      "season",
+      "conference",
+      "classification",
+      "tier",
+      "tier_label",
+      "games",
+      "wins",
+      "losses",
+      "ties",
+      "elo_end"
+    )
+  )
+})

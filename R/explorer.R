@@ -46,3 +46,54 @@ explorer_game_sides <- function(games) {
   }
   dplyr::bind_rows(side("home", "away"), side("away", "home"))
 }
+
+#' Explorer team-season table
+#'
+#' One row per FBS or FCS team per season with a completed game: record,
+#' end-of-season Elo (the postgame Elo after the team's last game that has
+#' one; FCS teams have none), and the season-aware conference tier.
+#'
+#' @param games Cleaned games.
+#' @param tiers Conference tiers (`season`, `conference`, `tier`, `tier_label`).
+#' @return A tibble keyed by `(team_id, season)`.
+#' @export
+build_explorer_team_season <- function(games, tiers) {
+  explorer_game_sides(games) |>
+    dplyr::filter(
+      .data$classification %in% c("fbs", "fcs"),
+      !is.na(.data$points),
+      !is.na(.data$opp_points)
+    ) |>
+    dplyr::arrange(.data$team_id, .data$season, .data$start) |>
+    dplyr::summarise(
+      conference = dplyr::last(.data$conference),
+      classification = dplyr::last(.data$classification),
+      games = dplyr::n(),
+      wins = sum(.data$points > .data$opp_points),
+      losses = sum(.data$points < .data$opp_points),
+      ties = sum(.data$points == .data$opp_points),
+      elo_end = as.integer(round(dplyr::last(
+        .data$elo_post[!is.na(.data$elo_post)],
+        default = NA_real_
+      ))),
+      .by = c("team_id", "season")
+    ) |>
+    dplyr::left_join(
+      dplyr::select(tiers, "season", "conference", "tier", "tier_label"),
+      by = c("season", "conference"),
+      relationship = "many-to-one"
+    ) |>
+    dplyr::select(
+      "team_id",
+      "season",
+      "conference",
+      "classification",
+      "tier",
+      "tier_label",
+      "games",
+      "wins",
+      "losses",
+      "ties",
+      "elo_end"
+    )
+}
