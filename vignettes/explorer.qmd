@@ -494,7 +494,7 @@ timeline = gameRow ? timelineFor(gamePlaysData.rows, gameRow.home) : []
 ```{ojs}
 //| echo: false
 gameView = {
-  if (!gameRow) return document.createComment("no game");
+  if (!gameRow) return html`<div class="explorer-game"></div>`;
   const info = ready.teamById.get(team);
   const opp = ready.teamById.get(gameRow.opp_id);
   const oppName = opp?.team ?? gameRow.opp_name;
@@ -562,7 +562,10 @@ playLive = html`<div class="visually-hidden" aria-live="polite"></div>`
 ```{ojs}
 //| echo: false
 playCard = {
-  if (!timeline.length) return document.createComment("no plays");
+  // Always an element, never a bare comment: Quarto hides an OJS output whose
+  // container is empty or holds only comments, and a later element swap would
+  // stay hidden.
+  if (!timeline.length) return html`<div class="explorer-play-wrap"></div>`;
   const p = scrubPlay && timeline.includes(scrubPlay) ? scrubPlay : timeline[0];
   const info = ready.teamById.get(team);
   const opp = ready.teamById.get(gameRow.opp_id);
