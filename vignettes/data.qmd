@@ -68,6 +68,24 @@ purrr::map_dfr(dict_files, function(f) {
   reactable(searchable = TRUE, striped = TRUE, defaultPageSize = 10)
 ```
 
+### Tables
+
+Each table below is linked from the explorer's "Data:" lines.
+
+```{r}
+#| label: table-anchors
+#| results: asis
+for (f in dict_files) {
+  d <- yaml::read_yaml(f)
+  cat(sprintf(
+    "- []{#table-%s}**`%s`**: %s\n",
+    d$dataset,
+    d$dataset,
+    d$grain
+  ))
+}
+```
+
 ### Column-level detail
 
 ```{r}
