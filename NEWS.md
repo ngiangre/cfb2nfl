@@ -1,5 +1,9 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Fixed: the Explorer's game timeline failed to load on the live site (GitHub
+  Pages compresses the play files, which breaks partial reads); each game's
+  plays now ship as their own small file.
+
 - The Explorer's **Teams** tab: conference landscapes of every team's
   end-of-season Elo (FCS by win share), each team's rating and record by
   season, its games week by week, and a play-by-play timeline of any game

@@ -184,19 +184,17 @@ each asset, tested on fixtures. These assets are not added to the DuckDB
 | `teams.json` | team: name, mascot, abbreviation, color, alt color, logo (conference by season lives in `team_season.json`) | ~8 KB gz | first view |
 | `team_season.json` | team × season: `team_id`, end Elo, W, L, conference, tier (names/colors only in `teams.json`) | ~4.2k FBS + FCS rows, ~39 KB gz | first view |
 | `team_games_<season>.json` | team × game, from each FBS/FCS team's side: site, home flag, score, result, Elo pre/post/change, neutral-field Elo win chance, postgame WP, `has_plays` | ~3k rows, ≤ ~100 KB gz per season | with the first view (it validates the hash's `game`) |
-| `plays_<season>.parquet` | play: elapsed (non-decreasing within each game), home score/margin, home cumulative PPA, scoring/turnover flags, players JSON; sorted by game, 2,000-row groups | 3.1M rows, ~129 MB total, ≤ 15 MB per season; a game read is ~660 KB first in a season, ~140 KB after | loaded when the Game section comes into view (Teams tab only) |
+| `plays/<season>/<game_id>.parquet` | play: elapsed (non-decreasing within each game), home score/margin, home cumulative PPA, scoring/turnover flags, players JSON; one file per game, in play order | 3.1M rows, 17,433 files, ~246 MB total; median ~14 KB, max ~23 KB per game | loaded when the Game section comes into view (Teams tab only); one whole-file fetch per game |
 | `player_season_<pos>.parquet` | player × season: stats, percentiles, team, tier | ~160k rows total, split by group | on Players open |
 | `player_outcome.json` | player: outcome chip fields | ~70k rows | on Players open |
 | `combine.json` | combine invitee: measurables, outcome, `athlete_id` | ~5.7k rows | on Combine open |
 
-Budget (decision 0046): first view ≤ 250 KB of gzipped data assets, game
-open ≤ 1 MB the first time in a season and ≤ 300 KB after. The heavy files
-(plays, player-season) are parquet sorted by their lookup key with small row
-groups, read with **hyparquet** (21 KB gz) over HTTP range requests: the
-footer plus the one row group whose `gameId` min/max covers the game, with
-the metadata cached per file. The spike measured season plays files at
-4–14 MB and a game read at 20–29 ms. GitHub Pages limits: 1 GB site, 100 MB
-per file.
+Budget (decision 0046): first view ≤ 250 KB of gzipped data assets, and a
+game open is one request for one file (median ~14 KB). **No range requests:**
+GitHub Pages gzips `application/octet-stream` for browsers and that breaks
+partial reads, so the plays are one parquet file per game, fetched whole and
+read with **hyparquet** (21 KB gz). The page caches each game's rows per
+session. GitHub Pages limits: 1 GB site, 100 MB per file.
 
 ## Front end
 
@@ -249,8 +247,8 @@ per file.
   season a logo (defunct programs like Jacksonville have none); every
   team-season has a tier (FCS conferences missing from `conference_tiers` are
   tier 1); first-view assets
-  ≤ 250 KB gzipped; every `plays_<season>` `gameId` exists in `games` and every
-  row group carries `gameId` min/max statistics; the assets'
+  ≤ 250 KB gzipped; every `plays/<season>/<game_id>.parquet` exists for each game in
+  `explorer_plays`, and no other file is in the plays directory; the assets'
   default season equals the max `season` with a completed game.
 - **Source lines** come from one R list (`explorer_sources()`) shipped in
   `meta.json`; a test checks that every listed table has a
