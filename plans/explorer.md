@@ -40,12 +40,11 @@ a game timeline opens Players with that player highlighted.
 The plots update every week with no source edit. `data-current.yaml`
 (Sundays in season) publishes the refreshed tables and dispatches
 `site.yaml`. The site's `tar_make()` rebuilds the `export_*` assets from them,
-and the page fetches those assets at runtime. Two things keep the page from
-serving stale data:
+and the page fetches those assets at runtime. The spike showed a frozen render
+still serves regenerated assets, so no `freeze: false` is needed as long as
+the page computes nothing at knit time: the default season is computed in the
+browser from the data (decision 0046).
 
-- `explorer.qmd` sets `freeze: false`. Under the site's `freeze: auto`, a page
-  whose source hasn't changed serves its cached render, so the default season
-  and any knit-time numbers would stop moving.
 - The `export_*` targets depend on the cleaned table targets, so any refresh
   that changes a table rebuilds its assets. A contract checks that the default
   season in the assets equals the max `season` with a completed game.
@@ -179,28 +178,30 @@ each asset, tested on fixtures. These assets are not added to the DuckDB
 | Asset | Grain | Est. size | Loaded |
 |---|---|---|---|
 | `teams.json` | team (name, conference by season, colors, logo) | ~50 KB | first view |
-| `team_season.json` | team × season: end Elo, W, L, conference, tier | ~4.5k rows, ~150 KB | first view |
+| `team_season.json` | team × season: `team_id`, end Elo, W, L, conference, tier (names/colors only in `teams.json`) | ~7.2k rows, ~60 KB gz | first view |
 | `games_<season>.json` | game: teams, points, pre/post Elo, postgame WP, week | ~1–2k rows/season | on team-season open |
 | `plays_<season>.parquet` | play, slim columns, sorted by `gameId` | 3.1M rows total | on game open |
 | `player_season_<pos>.parquet` | player × season: stats, percentiles, team, tier | ~160k rows total, split by group | on Players open |
 | `player_outcome.json` | player: outcome chip fields | ~70k rows | on Players open |
 | `combine.json` | combine invitee: measurables, outcome, `athlete_id` | ~5.7k rows | on Combine open |
 
-Budget: first view (`teams.json` + `team_season.json`) ≤ 1 MB transferred.
-The heavy files (plays, player-season) are parquet read with DuckDB-WASM
-HTTP range requests, so a game open fetches only that game's row groups.
-DuckDB-WASM itself (several MB) loads only on the first game or Players
-open. The spike (step 1) confirms this or falls back to per-team-season JSON
-chunks. GitHub Pages limits: 1 GB site, 100 MB per file. The total must stay
-well under both.
+Budget (decision 0046): first view ≤ 250 KB of gzipped data assets, game
+open ≤ 1 MB the first time in a season and ≤ 300 KB after. The heavy files
+(plays, player-season) are parquet sorted by their lookup key with small row
+groups, read with **hyparquet** (21 KB gz) over HTTP range requests: the
+footer plus the one row group whose `gameId` min/max covers the game, with
+the metadata cached per file. The spike measured season plays files at
+4–14 MB and a game read at 20–29 ms. GitHub Pages limits: 1 GB site, 100 MB
+per file.
 
 ## Front end
 
 - Quarto OJS cells inside `vignettes/explorer.qmd` (altdoc copies it like any
   vignette). Observable Plot for 2D, Observable Inputs for controls,
-  DuckDB-WASM for parquet, and plotly.js (via `require`) for the 3D scatter.
-  If the spike finds plotly too heavy, the alternative is a three.js-based
-  scatter; the spike decides.
+  hyparquet for parquet, and the plotly.js gl3d partial bundle (533 KB gz,
+  loaded only when Combine opens) for the 3D scatter (decision 0046).
+- The page listens for `hashchange`, so editing the hash updates the view
+  without a reload, and the hash writer emits every state key.
 - Team colors/logos come from `teams.json`, which the export target builds
   through `team_color_values()` (`R/viz.R`), so the R and JS palettes match.
 - Mobile: single column under 600px, tap targets ≥ 44px, every tooltip also
@@ -237,7 +238,8 @@ well under both.
   `contract_gate`): row counts match sources (no silent join loss), e.g.
   `team_season` rows == distinct team × season in completed `games`; percentiles
   in [0, 1]; every team in `team_season` has a color and logo; first-view assets
-  ≤ 1 MB; every `plays_<season>` `gameId` exists in `games`; the assets'
+  ≤ 250 KB gzipped; every `plays_<season>` `gameId` exists in `games` and every
+  row group carries `gameId` min/max statistics; the assets'
   default season equals the max `season` with a completed game.
 - **Source lines** come from one R list (visual → tables) shipped in
   `teams.json`'s metadata; a test checks that every listed table has a
@@ -248,11 +250,9 @@ well under both.
 
 ## Build order
 
-1. **Spike + decision record.** Prove OJS + DuckDB-WASM range reads + plotly
-   inside the altdoc Quarto site; measure first-view weight and game-open time
-   on a phone viewport. Record the architecture (revises decision 0006's
-   "OJS later").
-2. **Shell.** `explorer.qmd` (`freeze: false`), id-keyed URL-hash state,
+1. [x] **Spike + decision record** (done 2026-11-08, decision 0046): OJS,
+   hyparquet range reads and plotly gl3d all work in the altdoc site.
+2. **Shell.** `explorer.qmd`, id-keyed URL-hash state,
    season selector defaulting to the in-progress season, tab bar, lazy tab
    loading, error cards, the margin-equation and "Data:" source-line patterns,
    per-table anchors on `data.qmd`; `teams.json`/`team_season.json` exports +
