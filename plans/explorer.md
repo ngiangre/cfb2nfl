@@ -67,7 +67,7 @@ browser from the data (decision 0046).
 | Team-season strip | `games`, `teams` |
 | Game timeline | `plays`, `games`, `play_stats` (player chips) |
 | Players beeswarm, career | `player_stats`, `roster`, `teams`, `conference_tiers`, `outcomes`, `picks` |
-| Combine 3D | `combine`, `outcomes`, `picks` |
+| Combine 3D | `combine`, `player_stats` (the Players group a point opens) |
 | Draft & careers | as in the current charts (`picks`, `nfl_draft_picks`, `nfl_rosters`, `roster`) |
 | Map | `teams` (location, #48), `games` |
 
@@ -194,7 +194,7 @@ each asset, tested on fixtures. These assets are not added to the DuckDB
 | `team_games_<season>.json` | team × game, from each FBS/FCS team's side: site, home flag, score, result, Elo pre/post/change, neutral-field Elo win chance, postgame WP, `has_plays` | ~3k rows, ≤ ~100 KB gz per season | with the first view (it validates the hash's `game`) |
 | `plays/<season>/<shard>.parquet` | play: elapsed (non-decreasing within each game), home score/margin, home cumulative PPA, scoring/turnover flags, players JSON; `shard = game_id % 100`, one file per season and shard holding its games in play order | 3.1M rows, ~1.7k files, ~250 MB total; ~100 to 250 KB per shard (contract cap 400 KB) | loaded when the Game section comes into view (Teams tab only); one whole-file fetch per shard, cached, so games in the same shard are free |
 | `players/<pos>.parquet` | player × season × team in one stat group: headline stats, percentiles (0–100), team id (name only for teams without one), tier, outcome code and chip label | 141k rows in 8 files, uncompressed parquet (Pages gzips it), 180–725 KB raw, ≤ ~410 KB gz; contract cap 1 MB | on Players open, one group at a time |
-| `combine.json` | combine invitee: measurables, outcome, `athlete_id` | ~5.7k rows | on Combine open |
+| `combine.json` | combine invitee: measurables, outcome (draft round group, not drafted, or draft pending for a class with no slots yet), `athlete_id`, the Players group to open; columnar (one array per field) | 5.7k rows, ~145 KB gz (contract cap 200 KB) | on Combine open, with the plotly gl3d bundle |
 
 Budget (decision 0046): first view ≤ 250 KB of gzipped data assets, and a
 game open is one request for one shard file (~100 to 250 KB; many per-game files made the Pages deploy time out). **No range requests:**
@@ -287,7 +287,12 @@ session. GitHub Pages limits: 1 GB site, 100 MB per file.
    exports, the beeswarm, search, the career percentile chart and table,
    and the outcome chip. Outcomes ride on each player-season row, so there is
    no separate `player_outcome.json`.
-5. **Combine tab** (shared builder with #64).
+5. [x] **Combine tab** (done 2026-11-08): `combine.json`, the plotly 3D
+   scatter with selectable axes, position (linemen included) and class
+   range, a tap card with every measurement and an "Open in Players" link
+   when the invitee has a stat line. `combine_position_group()` is the
+   position crosswalk #64 reuses. Outcomes come from the combine's own draft
+   slot (the draft that spring), so the 2026 class is "Draft pending".
 6. **Draft & careers tab.** Move the old charts over, drop redshirts, then
    retire `visualizations.qmd`, point the `explore.qmd` tile at the explorer,
    and update NEWS.

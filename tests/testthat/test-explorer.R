@@ -115,6 +115,8 @@ test_that("build_explorer_meta carries the default season and sources", {
   )
   expect_true(is.na(m$positions$qualifier[[1]]))
   expect_equal(m$outcomes$outcome[[1]], "r1")
+  expect_equal(m$combine_measures$key[1:3], c("height", "weight", "forty"))
+  expect_true("OL" %in% m$combine_groups$pos)
 })
 
 test_that("explorer_json writes rows, nulls and scalars the page expects", {

@@ -52,7 +52,7 @@
 .explorer-chip {
   min-height: 44px; display: inline-flex; align-items: center; gap: 0.4rem;
   padding: 0.4rem 0.8rem; border: 1px solid #d1d5db; border-radius: 999px;
-  background: #fff; font-size: 1rem; cursor: pointer;
+  background: #fff; color: #111827; font-size: 1rem; cursor: pointer;
 }
 .explorer-chip[aria-pressed="true"] { border-color: #111827; box-shadow: inset 0 0 0 2px #111827; }
 .explorer-chip span { color: #4b5563; font-size: 0.9rem; }
@@ -98,3 +98,8 @@ h3[tabindex="-1"]:focus { outline-offset: 4px; }
 .explorer-table th, .explorer-table td { padding: 0.35rem 0.6rem; border-bottom: 1px solid #e5e7eb; text-align: left; }
 .explorer-table td span { color: #6b7280; font-size: 0.85rem; }
 .explorer-search input { min-height: 44px; font-size: 1rem; }
+
+/* Combine tab (step 5). */
+.explorer-axes { display: flex; flex-wrap: wrap; gap: 0 1rem; }
+.explorer-3d-plot { touch-action: none; } /* drags rotate the scene */
+.explorer-combine-card h4 { margin-top: 0; }

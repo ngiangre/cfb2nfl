@@ -24,6 +24,9 @@ import {
   TIERS, positionGroups, resolvePlayersPos, positionStats, formatStat, ordinal, swarmRows,
   beeswarm, careerRows, seasonForPlayer, careerPercentiles, searchPlayers, groupPlural
 } from "./explorer/players.js"
+import {
+  columnsToRows, resolveCombinePos, combinePoints, missingCount, formatMeasure, canOpenPlayer, combineTraces
+} from "./explorer/combine.js"
 ```
 
 ```{ojs}
@@ -40,6 +43,9 @@ mutable gameInView = false
 // Which Prev/Next button to refocus after the play card is redrawn.
 navFocus = ({key: null})
 mutable playersRetry = 0
+mutable combineRetry = 0
+// The invitee the reader tapped in the 3D scatter.
+mutable combinePick = null
 // The hyparquet module, imported once per page (a retry busts the failed import).
 function loadHyparquet(n) {
   const url = hyparquetUrl("https://cdn.jsdelivr.net/npm/hyparquet@1/+esm", n);
@@ -148,9 +154,11 @@ pick = {
     team: id => { set(viewof team, id); scroll("teams-team"); },
     season: s => { set(viewof season, s); scroll("teams-season"); },
     game: id => { mutable gameInView = true; set(viewof game, id); scroll("teams-game"); },
-    // A player opens on the Players tab, at their position group when known.
-    player: (id, group) => {
+    // A player opens on the Players tab, at their position group when known
+    // (and in a given season, e.g. the last college season before a combine).
+    player: (id, group, inSeason) => {
       if (group) set(viewof pos, group);
+      if (inSeason && ready.meta.seasons.includes(inSeason)) set(viewof season, inSeason);
       set(viewof player, id === null ? null : String(id));
       if (viewof tab.value !== "players") {
         set(viewof tab, "players");
@@ -893,9 +901,188 @@ asNode(sourceLine(ready.meta.sources.players))
 ::: {#tab-combine .explorer-tab hidden=""}
 ## Combine
 
-::: {.explorer-card}
-The combine view (height, weight and 40 in 3D, by draft outcome) is coming.
+```{ojs}
+//| echo: false
+//| output: false
+combinePos = resolveCombinePos(pos, ready.meta)
+combineMeasures = ready.meta.combine_measures
+combineOutcomeColor = new Map([
+  ["r1", "#1e3a8a"], ["r2_3", "#2563eb"], ["r4_7", "#93c5fd"],
+  ["undrafted", "#9ca3af"], ["pending", "#059669"]
+])
+// The invitees and the plotly 3D bundle (~530 KB gzipped), both fetched the
+// first time the Combine tab opens.
+combineData = {
+  if (tab !== "combine") return {rows: [], pending: true};
+  combineRetry;
+  try {
+    const [cols, Plotly] = await Promise.all([
+      loadOnce(tabCache, "combine", () => fetchJson("explorer-data/combine.json")),
+      loadOnce(tabCache, `plotly_${combineRetry}`, () => require("https://cdn.plot.ly/plotly-gl3d-2.35.2.min.js"))
+    ]);
+    return {rows: columnsToRows(cols), Plotly};
+  } catch (error) {
+    return {error, rows: []};
+  }
+}
+combineSeasons = {
+  const s = combineData.rows.map(d => d.season);
+  return s.length ? [Math.min(...s), Math.max(...s)] : [2010, ready.meta.default_season];
+}
+```
+
+```{ojs}
+//| echo: false
+// Shares the hidden `pos` input with the Players tab; linemen are allowed here.
+combinePosPicker = {
+  const sel = Inputs.select(new Map(ready.meta.combine_groups.map(g => [g.group, g.pos])), {
+    label: "Position", value: combinePos
+  });
+  sel.addEventListener("input", () => { mutable combinePick = null; pick.pos(sel.value); });
+  return sel;
+}
+```
+
+```{ojs}
+//| echo: false
+viewof combineAxes = {
+  const opts = new Map(combineMeasures.map(m => [m.label, m.key]));
+  const make = (label, value) => Inputs.select(opts, {label, value});
+  const xs = make("Left-right axis", "height"), ys = make("Front-back axis", "weight"), zs = make("Up-down axis", "forty");
+  const form = html`<div class="explorer-axes">${xs}${ys}${zs}</div>`;
+  form.value = [xs.value, ys.value, zs.value];
+  for (const el of [xs, ys, zs]) {
+    el.addEventListener("input", event => {
+      event.stopPropagation();
+      form.value = [xs.value, ys.value, zs.value];
+      form.dispatchEvent(new Event("input", {bubbles: true}));
+    });
+  }
+  return form;
+}
+```
+
+```{ojs}
+//| echo: false
+viewof combineRange = {
+  const years = [];
+  for (let y = combineSeasons[0]; y <= combineSeasons[1]; y++) years.push(y);
+  const from = Inputs.select(years, {label: "From class", value: years[0], format: String});
+  const to = Inputs.select(years, {label: "To class", value: years.at(-1), format: String});
+  const form = html`<div class="explorer-axes">${from}${to}</div>`;
+  form.value = [from.value, to.value];
+  for (const el of [from, to]) {
+    el.addEventListener("input", event => {
+      event.stopPropagation();
+      form.value = [from.value, to.value];
+      form.dispatchEvent(new Event("input", {bubbles: true}));
+    });
+  }
+  return form;
+}
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+combineFilter = ({pos: combinePos, from: combineRange[0], to: combineRange[1], axes: combineAxes})
+combineShown = combinePoints(combineData.rows, combineFilter)
+```
+
+```{ojs}
+//| echo: false
+combinePlot = {
+  if (combineData.error) {
+    const card = asNode(errorCard("the combine data"));
+    card.querySelector("button").onclick = () => { mutable combineRetry = combineRetry + 1; };
+    return card;
+  }
+  if (combineData.pending) return html`<div class="explorer-3d"></div>`;
+  const group = ready.meta.combine_groups.find(g => g.pos === combinePos).group;
+  if (!combineShown.length) {
+    return asNode(`<div class="explorer-card">No ${escapeHtml(group.toLowerCase())} invitee has all three measurements in these classes.</div>`);
+  }
+  const Plotly = combineData.Plotly;
+  const byKey = new Map(combineMeasures.map(m => [m.key, m]));
+  const title = k => `${byKey.get(k).label} (${byKey.get(k).unit})`;
+  const camera = {eye: {x: 1.6, y: 1.6, z: 1.1}};
+  const el = html`<div class="explorer-3d-plot"></div>`;
+  Plotly.newPlot(el, combineTraces(combineShown, {
+    axes: combineAxes, measures: combineMeasures, outcomes: ready.meta.combine_outcomes,
+    colors: combineOutcomeColor, selected: player
+  }), {
+    width, height: Math.min(560, Math.max(420, width)),
+    margin: {l: 0, r: 0, t: 0, b: 0},
+    font: {size: 14},
+    legend: {orientation: "h", y: -0.02, font: {size: 13}},
+    scene: {
+      camera,
+      xaxis: {title: title(combineAxes[0])},
+      yaxis: {title: title(combineAxes[1])},
+      zaxis: {title: title(combineAxes[2])}
+    }
+  }, {displaylogo: false, responsive: true, modeBarButtonsToRemove: ["toImage"]});
+  el.on("plotly_click", e => {
+    const p = e.points?.[0];
+    if (p && p.customdata !== undefined) mutable combinePick = combineShown[p.customdata];
+  });
+  const reset = html`<button type="button" class="explorer-chip">Reset view</button>`;
+  reset.onclick = () => Plotly.relayout(el, {"scene.camera": camera});
+  const skipped = missingCount(combineData.rows, combineFilter);
+  return html`<div class="explorer-3d">
+    <h4>${group} invitees, ${Math.min(...combineRange)}–${Math.max(...combineRange)} classes</h4>
+    ${el}
+    <div class="explorer-chips">${reset}</div>
+    <p class="explorer-note">${combineShown.length.toLocaleString("en-US")} invitees with all three measurements${skipped ? `; ${skipped.toLocaleString("en-US")} skipped at least one of these drills and aren't shown` : ""}. Drag to rotate, pinch or scroll to zoom, tap a point for the player.</p>
+  </div>`;
+}
+```
+
+```{ojs}
+//| echo: false
+combineCard = {
+  // The tapped point, else the selected player if they were at the combine.
+  // The selected player may have skipped a drill on these axes: still show
+  // their card, with a note.
+  const d = combinePick !== null && combineShown.includes(combinePick)
+    ? combinePick
+    : combineData.rows.find(r => player !== null && r.pos === combinePos && String(r.athlete_id) === String(player));
+  if (!d) return html`<div class="explorer-combine-card"></div>`;
+  const off = !combineShown.includes(d);
+  const rows = combineMeasures.map(m => `<tr><th scope="row">${escapeHtml(m.label)}</th><td>${escapeHtml(formatMeasure(d[m.key], m))}</td></tr>`).join("");
+  const card = asNode(`<div class="explorer-card explorer-combine-card">
+    <h4>${escapeHtml(d.name)}</h4>
+    <p>${escapeHtml(d.school)} · ${escapeHtml(d.combine_pos)} · ${d.season} combine</p>
+    ${off ? `<p class="explorer-note">Not in the chart: no measurement on one of these axes, or outside the classes shown.</p>` : ""}
+    <p><span class="explorer-outcome" style="--c:${combineOutcomeColor.get(d.outcome)}">${escapeHtml(d.outcome_label)}</span></p>
+    <div class="explorer-table"><table><tbody>${rows}</tbody></table></div>
+  </div>`);
+  if (canOpenPlayer(d)) {
+    const b = html`<button type="button" class="explorer-chip">Open ${d.name} in Players →</button>`;
+    // The combine follows the last college season, so open that season.
+    b.onclick = () => pick.player(d.athlete_id, d.players_pos, d.season - 1);
+    card.append(b);
+  } else {
+    card.append(html`<p class="explorer-note">${d.athlete_id ? "No box-score stat line to show in Players." : "Not linked to a college player record, so there's no Players view."}</p>`);
+  }
+  return card;
+}
+```
+
+::: {.column-margin}
+Each point is one invitee at the NFL Scouting Combine, colored by what
+happened in the draft that spring. Height is in inches, weight in pounds,
+the 40-yard dash, shuttle and 3-cone in seconds (lower is faster), the
+vertical and broad jumps in inches, and the bench press in repetitions of
+225 pounds. Players skip drills, so each view only shows invitees with all
+three measurements. Combine numbers are taken after the college career and
+describe draft prospects; they are not used to forecast careers.
 :::
+
+```{ojs}
+//| echo: false
+asNode(sourceLine(ready.meta.sources.combine))
+```
 :::
 
 ::: {#tab-careers .explorer-tab hidden=""}
