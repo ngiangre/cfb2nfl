@@ -2,7 +2,7 @@
 % Please edit documentation in R/explorer_games.R
 \name{write_explorer_plays}
 \alias{write_explorer_plays}
-\title{Write the per-game plays parquet files}
+\title{Write the per-season plays shard parquet files}
 \usage{
 write_explorer_plays(explorer_plays, dir = "vignettes/explorer-data")
 }
@@ -15,12 +15,16 @@ write_explorer_plays(explorer_plays, dir = "vignettes/explorer-data")
 The plays directory, \code{file.path(dir, "plays")}.
 }
 \description{
-One file per game, \verb{plays/<season>/<game_id>.parquet}, holding that game's
-rows in game order without the \code{season} column (the folder carries it).
-GitHub Pages gzips \code{application/octet-stream} responses for browsers, which
-breaks HTTP range requests (the byte offsets then refer to the compressed
-stream), so the page cannot read a slice of a season file. A game file is
-small (about 10 to 30 KB) and the page fetches it whole (decision 0046).
+\verb{plays/<season>/<shard>.parquet}, where \code{shard} is
+\code{\link[=explorer_plays_shard]{explorer_plays_shard()}} of the game id. Each file holds all of that
+season's games in the shard, rows in game then play order, without the
+\code{season} column (the folder carries it); \code{game_id} stays so the page can
+pick out one game. Shards, not one file per game (17,000+ files), because
+GitHub Pages deploys slowly when an artifact holds many files. GitHub Pages
+also gzips \code{application/octet-stream} responses for browsers, which breaks
+HTTP range requests (the byte offsets then refer to the compressed
+stream), so the page fetches each shard whole (about 100 to 250 KB;
+decision 0046).
 }
 \details{
 Stale output is removed first: the \verb{plays/} tree and any old per-season

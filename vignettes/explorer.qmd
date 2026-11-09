@@ -19,7 +19,7 @@ import {
   formatRecord, teamGames, effectiveGame, landscapePanels, timelineFor, parsePlayers,
   defaultShowFcs, focusedConference, shouldLoadPlays, stepPlay, playWhen, playAnnouncement
 } from "./explorer/teams.js"
-import {readGamePlays, hyparquetUrl} from "./explorer/plays.js"
+import {readShard, gameRows, playsShardPath, hyparquetUrl} from "./explorer/plays.js"
 ```
 
 ```{ojs}
@@ -481,9 +481,12 @@ gamePlaysData = {
   try {
     const url = hyparquetUrl("https://cdn.jsdelivr.net/npm/hyparquet@1/+esm", teamsRetry);
     const hp = await loadOnce(tabCache, url, () => import(url));
-    // One small file per game, fetched whole (GitHub Pages gzips it, so no range reads).
-    const fileUrl = new URL(`explorer-data/plays/${season}/${gameRow.game_id}.parquet`, document.baseURI).href;
-    return {rows: await loadOnce(tabCache, fileUrl, () => readGamePlays(hp, fileUrl))};
+    // One small shard per season and game_id % 100, fetched whole (GitHub Pages
+    // gzips it, so no range reads). The parsed shard is cached, so the other
+    // games in it load for free.
+    const fileUrl = new URL(playsShardPath(season, gameRow.game_id), document.baseURI).href;
+    const shard = await loadOnce(tabCache, fileUrl, () => readShard(hp, fileUrl));
+    return {rows: gameRows(shard, Number(gameRow.game_id))};
   } catch (error) {
     return {error, rows: []};
   }

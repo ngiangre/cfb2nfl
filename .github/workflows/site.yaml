@@ -79,3 +79,6 @@ jobs:
 
       - id: deploy
         uses: actions/deploy-pages@v4
+        with:
+          # Safety margin: Pages processes the artifact slowly (default 10 min).
+          timeout: 1800000

@@ -300,14 +300,31 @@ write_explorer_team_games <- function(
   write_explorer_assets(by_season, dir)
 }
 
-#' Write the per-game plays parquet files
+#' The plays shard a game belongs to
 #'
-#' One file per game, `plays/<season>/<game_id>.parquet`, holding that game's
-#' rows in game order without the `season` column (the folder carries it).
-#' GitHub Pages gzips `application/octet-stream` responses for browsers, which
-#' breaks HTTP range requests (the byte offsets then refer to the compressed
-#' stream), so the page cannot read a slice of a season file. A game file is
-#' small (about 10 to 30 KB) and the page fetches it whole (decision 0046).
+#' Games are grouped into 100 shards by `game_id %% 100`, so a season's plays
+#' ship as at most 100 files. The page computes the same number to find a
+#' game's file.
+#'
+#' @param game_id Integer-valued game id(s).
+#' @return Integer shard number(s), 0 to 99.
+#' @export
+explorer_plays_shard <- function(game_id) {
+  as.integer(game_id %% 100L)
+}
+
+#' Write the per-season plays shard parquet files
+#'
+#' `plays/<season>/<shard>.parquet`, where `shard` is
+#' [explorer_plays_shard()] of the game id. Each file holds all of that
+#' season's games in the shard, rows in game then play order, without the
+#' `season` column (the folder carries it); `game_id` stays so the page can
+#' pick out one game. Shards, not one file per game (17,000+ files), because
+#' GitHub Pages deploys slowly when an artifact holds many files. GitHub Pages
+#' also gzips `application/octet-stream` responses for browsers, which breaks
+#' HTTP range requests (the byte offsets then refer to the compressed
+#' stream), so the page fetches each shard whole (about 100 to 250 KB;
+#' decision 0046).
 #'
 #' Stale output is removed first: the `plays/` tree and any old per-season
 #' `plays_<season>.parquet` files, so a game that left the data does not
@@ -325,17 +342,21 @@ write_explorer_plays <- function(
   dir.create(dir, showWarnings = FALSE, recursive = TRUE)
   unlink(root, recursive = TRUE)
   unlink(list.files(dir, "^plays_[0-9]+\\.parquet$", full.names = TRUE))
-  # One pass to find each game's rows; split() keeps them in input order.
-  rows <- split(seq_len(nrow(explorer_plays)), explorer_plays$game_id)
-  seasons <- explorer_plays$season
-  game_season <- vapply(rows, function(i) seasons[[i[[1L]]]], integer(1L))
-  for (season in unique(game_season)) {
-    dir.create(file.path(root, season), showWarnings = FALSE, recursive = TRUE)
-  }
+  # split() keeps each shard's rows in input (game, play) order.
+  key <- list(
+    season = explorer_plays$season,
+    shard = explorer_plays_shard(explorer_plays$game_id)
+  )
+  rows <- split(seq_len(nrow(explorer_plays)), key, drop = TRUE)
   plays <- dplyr::select(explorer_plays, -"season")
-  for (game in names(rows)) {
-    path <- file.path(root, game_season[[game]], paste0(game, ".parquet"))
-    arrow::write_parquet(plays[rows[[game]], , drop = FALSE], path)
+  for (i in rows) {
+    season <- explorer_plays$season[[i[[1L]]]]
+    shard <- explorer_plays_shard(explorer_plays$game_id[[i[[1L]]]])
+    dir.create(file.path(root, season), showWarnings = FALSE, recursive = TRUE)
+    arrow::write_parquet(
+      plays[i, , drop = FALSE],
+      file.path(root, season, paste0(shard, ".parquet"))
+    )
   }
   root
 }
