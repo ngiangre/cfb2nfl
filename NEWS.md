@@ -1,5 +1,13 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- The Explorer's **Combine** tab: every NFL Scouting Combine invitee since
+  2010 in a 3D scatter you can rotate, height by weight by 40-yard dash by
+  default, with any three of the eight measurements on the axes, filtered by
+  position (linemen included) and combine class, colored by draft round.
+  Tapping a point shows all of the player's measurements and opens their
+  college career in the Players tab. `combine_position_group()` maps combine
+  positions onto the same groups the rest of the project uses (#70, #64).
+
 - The Explorer's **Players** tab: a beeswarm of every player at a position
   for a season, one dot per player colored by NFL outcome, on a stat you
   pick (passing yards, sacks, yards per catch, ...), with conference filters

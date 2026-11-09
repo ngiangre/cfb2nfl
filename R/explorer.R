@@ -165,7 +165,7 @@ explorer_sources <- function() {
       "outcomes",
       "picks"
     ),
-    combine = c("combine", "outcomes", "picks"),
+    combine = c("combine", "player_stats"),
     careers = c("picks", "nfl_draft_picks", "nfl_rosters", "roster"),
     map = c("teams", "games")
   )
@@ -176,8 +176,9 @@ explorer_sources <- function() {
 #' @param games Cleaned games.
 #' @return A list: `default_season`, `seasons`, `default_team` (Texas, CFBD
 #'   team id 251), `sources`, `positions` (the Players tab's stats, from
-#'   [explorer_positions()], with a reader-facing `qualifier`) and `outcomes`
-#'   ([explorer_outcome_levels()]).
+#'   [explorer_positions()], with a reader-facing `qualifier`), `outcomes`
+#'   ([explorer_outcome_levels()]), and the Combine tab's `combine_groups`,
+#'   `combine_measures` and `combine_outcomes`.
 #' @export
 build_explorer_meta <- function(games) {
   done <- games$season[games$completed %in% TRUE]
@@ -215,7 +216,10 @@ build_explorer_meta <- function(games) {
     default_team = 251L,
     sources = explorer_sources(),
     positions = positions,
-    outcomes = explorer_outcome_levels()
+    outcomes = explorer_outcome_levels(),
+    combine_groups = explorer_combine_groups(),
+    combine_measures = explorer_combine_measures(),
+    combine_outcomes = explorer_combine_outcome_levels()
   )
 }
 

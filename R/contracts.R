@@ -2488,3 +2488,58 @@ contract_explorer_players <- function(
     pointblank::interrogate()
   enforce_contract(agent, "explorer_players", stop_on_fail)
 }
+
+#' Data contract for the explorer combine table
+#'
+#' Guards [build_explorer_combine()] and its file: one row per combine
+#' invitee (no loss), every row in a position group with a known outcome,
+#' every linked invitee carrying its athlete id, and `combine.json` under
+#' `max_gzip_bytes` (it loads whole when the Combine tab opens).
+#'
+#' @param explorer_combine Output of [build_explorer_combine()].
+#' @param combine Cleaned, linked combine table.
+#' @param path The written `combine.json`.
+#' @param max_gzip_bytes Largest allowed gzipped size, in bytes.
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_explorer_combine <- function(
+  explorer_combine,
+  combine,
+  path,
+  max_gzip_bytes = 200000L,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  check <- function(agent, ok) {
+    pointblank::col_vals_equal(
+      agent,
+      "ok",
+      TRUE,
+      preconditions = function(x) tibble::tibble(ok = ok)
+    )
+  }
+  linked <- combine$link_method != "unmatched"
+  gz <- length(memCompress(readBin(path, "raw", file.size(path)), "gzip"))
+  agent <- pointblank::create_agent(
+    explorer_combine,
+    label = "explorer_combine"
+  ) |>
+    pointblank::col_vals_not_null(pointblank::vars(
+      season,
+      name,
+      pos,
+      outcome,
+      outcome_label
+    )) |>
+    pointblank::col_vals_in_set("pos", explorer_combine_groups()$pos) |>
+    pointblank::col_vals_in_set(
+      "outcome",
+      explorer_combine_outcome_levels()$outcome
+    ) |>
+    check(nrow(explorer_combine) == nrow(combine)) |>
+    check(sum(!is.na(explorer_combine$athlete_id)) == sum(linked)) |>
+    check(gz <= max_gzip_bytes) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "explorer_combine", stop_on_fail)
+}

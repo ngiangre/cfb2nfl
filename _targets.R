@@ -728,7 +728,8 @@ list(
       explorer = ok_explorer,
       explorer_team_games = ok_explorer_team_games,
       explorer_plays = ok_explorer_plays,
-      explorer_players = ok_explorer_players
+      explorer_players = ok_explorer_players,
+      explorer_combine = ok_explorer_combine
     ))
   ),
   # ---- link-step contracts (audit-hygiene workstream C) ----------------------
@@ -947,6 +948,26 @@ list(
     explorer_player_files,
     write_explorer_players(explorer_player_seasons),
     format = "file"
+  ),
+  # Combine tab (plans/explorer.md step 5): every invitee's measurables and
+  # draft outcome as one columnar JSON file.
+  tar_target(
+    explorer_combine,
+    build_explorer_combine(combine, explorer_player_seasons)
+  ),
+  tar_target(
+    explorer_combine_file,
+    write_explorer_combine(explorer_combine),
+    format = "file"
+  ),
+  tar_target(
+    ok_explorer_combine,
+    pointblank::all_passed(contract_explorer_combine(
+      explorer_combine,
+      combine,
+      explorer_combine_file,
+      stop_on_fail = FALSE
+    ))
   ),
   tar_target(
     ok_explorer_players,
@@ -1330,6 +1351,14 @@ list(
         player_stats,
         keys = c("pos", "player_id", "season", "team"),
         contract_passed = ok_explorer_players
+      ),
+      audit_step(
+        explorer_combine,
+        "build_explorer_combine",
+        "features",
+        combine,
+        keys = c("season", "name", "school", "combine_pos"),
+        contract_passed = ok_explorer_combine
       )
     )
   ),
