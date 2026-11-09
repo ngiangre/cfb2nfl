@@ -175,15 +175,47 @@ explorer_sources <- function() {
 #'
 #' @param games Cleaned games.
 #' @return A list: `default_season`, `seasons`, `default_team` (Texas, CFBD
-#'   team id 251), `sources`.
+#'   team id 251), `sources`, `positions` (the Players tab's stats, from
+#'   [explorer_positions()], with a reader-facing `qualifier`) and `outcomes`
+#'   ([explorer_outcome_levels()]).
 #' @export
 build_explorer_meta <- function(games) {
   done <- games$season[games$completed %in% TRUE]
+  volume <- c(
+    ATT = "pass attempts",
+    CAR = "carries",
+    REC = "catches",
+    FGA = "field goal attempts",
+    NO = "punts"
+  )
+  positions <- explorer_positions() |>
+    dplyr::mutate(
+      qualifier = dplyr::if_else(
+        is.na(.data$min_stat_type),
+        NA_character_,
+        sprintf(
+          "At least %d %s",
+          as.integer(.data$min_value),
+          volume[.data$min_stat_type]
+        )
+      )
+    ) |>
+    dplyr::select(
+      "pos",
+      "group",
+      "key",
+      "label",
+      "format",
+      "reverse",
+      "qualifier"
+    )
   list(
     default_season = explorer_default_season(games),
     seasons = sort(unique(as.integer(done))),
     default_team = 251L,
-    sources = explorer_sources()
+    sources = explorer_sources(),
+    positions = positions,
+    outcomes = explorer_outcome_levels()
   )
 }
 

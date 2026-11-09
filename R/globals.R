@@ -132,5 +132,13 @@ utils::globalVariables(c(
   "home_cum_ppa",
   "home_margin",
   "home_score",
-  "away_score"
+  "away_score",
+  # data-masked columns in contract_explorer_players()
+  "pos",
+  "player_id",
+  "name",
+  "season",
+  "tier",
+  "outcome",
+  "outcome_label"
 ))

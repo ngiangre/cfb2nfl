@@ -163,9 +163,19 @@ explorer_elapsed <- function(
 #' @param games Cleaned games.
 #' @param teams Cleaned teams.
 #' @param play_stats Cleaned play stats.
+#' @param player_groups Optional position-group codes per player-season
+#'   (`player_id`, `season`, `pos`, as in [build_explorer_player_seasons()]),
+#'   so a player chip opens the Players tab at the right position. A player
+#'   without one gets no `pos`.
 #' @return A tibble keyed by `play_id`, one row per input play.
 #' @export
-build_explorer_plays <- function(plays, games, teams, play_stats) {
+build_explorer_plays <- function(
+  plays,
+  games,
+  teams,
+  play_stats,
+  player_groups = NULL
+) {
   homes <- dplyr::select(games, gameId = "id", home_team = "homeTeam")
   offense_ids <- dplyr::select(teams, offense = "team", offense_id = "team_id")
   # One entry per athlete per play: a punter carries several stat types.
@@ -173,12 +183,33 @@ build_explorer_plays <- function(plays, games, teams, play_stats) {
     dplyr::summarise(
       stat = paste(unique(.data$statType), collapse = ", "),
       .by = c("playId", "athleteId", "athleteName")
-    ) |>
+    )
+  if (!is.null(player_groups)) {
+    # A player-season with two teams has one group; keep the first.
+    groups <- player_groups |>
+      dplyr::distinct(.data$player_id, .data$season, .keep_all = TRUE) |>
+      dplyr::select(athleteId = "player_id", "season", "pos")
+    players <- players |>
+      dplyr::left_join(
+        dplyr::select(plays, playId = "id", "season"),
+        by = "playId",
+        relationship = "many-to-one"
+      ) |>
+      dplyr::left_join(
+        groups,
+        by = c("athleteId", "season"),
+        relationship = "many-to-one"
+      )
+  } else {
+    players$pos <- NA_character_
+  }
+  players <- players |>
     dplyr::summarise(
       players = as.character(jsonlite::toJSON(data.frame(
         id = .data$athleteId,
         name = .data$athleteName,
-        stat = .data$stat
+        stat = .data$stat,
+        pos = .data$pos
       ))),
       .by = "playId"
     )

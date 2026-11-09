@@ -20,6 +20,10 @@ import {
   defaultShowFcs, focusedConference, shouldLoadPlays, stepPlay, playWhen, playAnnouncement
 } from "./explorer/teams.js"
 import {readShard, gameRows, playsShardPath, hyparquetUrl} from "./explorer/plays.js"
+import {
+  TIERS, positionGroups, resolvePlayersPos, positionStats, formatStat, ordinal, swarmRows,
+  beeswarm, careerRows, seasonForPlayer, careerPercentiles, searchPlayers, groupPlural
+} from "./explorer/players.js"
 ```
 
 ```{ojs}
@@ -35,6 +39,12 @@ mutable scrubPlay = null
 mutable gameInView = false
 // Which Prev/Next button to refocus after the play card is redrawn.
 navFocus = ({key: null})
+mutable playersRetry = 0
+// The hyparquet module, imported once per page (a retry busts the failed import).
+function loadHyparquet(n) {
+  const url = hyparquetUrl("https://cdn.jsdelivr.net/npm/hyparquet@1/+esm", n);
+  return loadOnce(tabCache, url, () => import(url));
+}
 async function fetchJson(path) {
   const response = await fetch(new URL(path, document.baseURI));
   if (!response.ok) throw new Error(`${response.status} ${path}`);
@@ -106,6 +116,7 @@ hashState = Generators.observe(notify => {
 // The reader's game and player picks; set from taps, carried in the hash.
 viewof game = Inputs.input(hashState.game)
 viewof player = Inputs.input(hashState.player)
+viewof pos = Inputs.input(hashState.pos)
 ```
 
 ```{ojs}
@@ -137,7 +148,20 @@ pick = {
     team: id => { set(viewof team, id); scroll("teams-team"); },
     season: s => { set(viewof season, s); scroll("teams-season"); },
     game: id => { mutable gameInView = true; set(viewof game, id); scroll("teams-game"); },
-    player: id => { set(viewof player, id); set(viewof tab, "players"); }
+    // A player opens on the Players tab, at their position group when known.
+    player: (id, group) => {
+      if (group) set(viewof pos, group);
+      set(viewof player, id === null ? null : String(id));
+      if (viewof tab.value !== "players") {
+        set(viewof tab, "players");
+        // Wait for the tab to unhide (the hider cell runs after this input).
+        setTimeout(() => scroll("tab-players"), 150);
+      } else {
+        scroll("players-landscape");
+      }
+    },
+    pos: group => { set(viewof pos, group); set(viewof player, null); },
+    seasonOnly: s => set(viewof season, s)
   };
 }
 ```
@@ -187,7 +211,7 @@ viewof season = Inputs.select(ready.meta.seasons.slice().reverse(), {
   if (seasonGamesData.error) return;
   // Only the reader's own game pick goes into the hash; the default game is implied.
   const gameKey = teamSeasonGames.some(g => g.game_id === game) ? game : null;
-  const next = toHash({...hashState, tab, season, team, game: gameKey, player});
+  const next = toHash({...hashState, tab, season, team, game: gameKey, pos, player});
   if (next === location.hash) return;
   // Push only input-driven changes. A write that merely canonicalizes the
   // live URL replaces it, so Back never lands on a non-canonical entry.
@@ -479,8 +503,7 @@ gamePlaysData = {
   if (!gameRow || !shouldLoadPlays({tab, gameInView, hasPlays: gameRow.has_plays})) return {rows: [], pending: true};
   teamsRetry;
   try {
-    const url = hyparquetUrl("https://cdn.jsdelivr.net/npm/hyparquet@1/+esm", teamsRetry);
-    const hp = await loadOnce(tabCache, url, () => import(url));
+    const hp = await loadHyparquet(teamsRetry);
     // One small shard per season and game_id % 100, fetched whole (GitHub Pages
     // gzips it, so no range reads). The parsed shard is cached, so the other
     // games in it load for free.
@@ -585,7 +608,7 @@ playCard = {
     const chips = html`<div class="explorer-chips"></div>`;
     for (const a of players) {
       const chip = html`<button type="button" class="explorer-chip">${a.name} <span>${a.stat}</span></button>`;
-      chip.onclick = () => pick.player(a.id);
+      chip.onclick = () => pick.player(a.id, a.pos);
       chips.append(chip);
     }
     card.append(chips);
@@ -645,10 +668,226 @@ asNode(sourceLine(ready.meta.sources.game_timeline))
 ::: {#tab-players .explorer-tab hidden=""}
 ## Players
 
-::: {.explorer-card}
-The players landscape (every player at a position, season by season) is the
-next piece of the explorer.
+```{ojs}
+//| echo: false
+//| output: false
+playersPos = resolvePlayersPos(pos, ready.meta)
+playersStats = positionStats(ready.meta, playersPos)
+playersGroup = playersStats[0].group
+outcomeLevels = ready.meta.outcomes
+outcomeColor = new Map([
+  ["r1", "#1e3a8a"], ["r2_3", "#2563eb"], ["r4_7", "#93c5fd"],
+  ["udfa", "#d97706"], ["none", "#9ca3af"], ["active", "#059669"]
+])
+// One position group's player-seasons (every season), fetched whole the first
+// time the Players tab opens at that group.
+playersData = {
+  if (tab !== "players") return {rows: [], pending: true};
+  playersRetry;
+  try {
+    const hp = await loadHyparquet(playersRetry);
+    const url = new URL(`explorer-data/players/${playersPos}.parquet`, document.baseURI).href;
+    return {rows: await loadOnce(tabCache, url, () => readShard(hp, url))};
+  } catch (error) {
+    return {error, rows: []};
+  }
+}
+playerTeam = d => ready.teamById.get(d.team_id)?.team ?? d.team ?? ""
+career = player === null ? [] : careerRows(playersData.rows, player)
+```
+
+### Landscape {#players-landscape}
+
+```{ojs}
+//| echo: false
+// Not a viewof: the group lives in the hidden `pos` input, so the Combine tab
+// can share it. Changing it clears the player.
+positionPicker = {
+  const sel = Inputs.select(new Map(positionGroups(ready.meta).map(g => [g.group, g.pos])), {
+    label: "Position", value: playersPos
+  });
+  sel.addEventListener("input", () => pick.pos(sel.value));
+  return sel;
+}
+```
+
+```{ojs}
+//| echo: false
+viewof statKey = Inputs.select(new Map(playersStats.map(s => [s.label, s.key])), {label: "Stat"})
+```
+
+```{ojs}
+//| echo: false
+viewof tiers = Inputs.checkbox(new Map(TIERS.map(t => [t.label, t.tier])), {
+  label: "Conferences", value: [3, 2]
+})
+```
+
+```{ojs}
+//| echo: false
+playerSearch = {
+  const box = Inputs.text({label: "Find a player", placeholder: "Name or school", autocomplete: "off"});
+  const list = html`<div class="explorer-chips" role="list"></div>`;
+  box.addEventListener("input", () => {
+    list.replaceChildren();
+    for (const d of searchPlayers(playersData.rows, box.value, playerTeam)) {
+      const chip = html`<button type="button" class="explorer-chip" role="listitem">${d.name} <span>${playerTeam(d)} · ${d.season}</span></button>`;
+      chip.onclick = () => {
+        const c = careerRows(playersData.rows, d.player_id);
+        const s = seasonForPlayer(c, season);
+        if (s !== season) pick.seasonOnly(s);
+        pick.player(d.player_id);
+      };
+      list.append(chip);
+    }
+  });
+  return html`<div class="explorer-search">${box}${list}</div>`;
+}
+```
+
+```{ojs}
+//| echo: false
+swarm = {
+  if (playersData.error) {
+    const card = asNode(errorCard(`the ${playersGroup.toLowerCase()} stats`));
+    card.querySelector("button").onclick = () => { mutable playersRetry = playersRetry + 1; };
+    return card;
+  }
+  if (playersData.pending) return html`<div class="explorer-swarm"></div>`;
+  const stat = playersStats.find(s => s.key === statKey) ?? playersStats[0];
+  const dots = swarmRows(playersData.rows, {season, key: stat.key, tiers, player});
+  if (!dots.length) {
+    return asNode(`<div class="explorer-card">No ${escapeHtml(playersGroup.toLowerCase())} has a ranked ${escapeHtml(stat.label.toLowerCase())} line in ${season} in these conferences.</div>`);
+  }
+  // Wide swarms scroll sideways rather than shrink, so each dot stays tappable.
+  const r = 4;
+  const w = Math.max(width, Math.min(1600, Math.round(dots.length * 1.4)));
+  const ml = 20, mr = 20;
+  const values = dots.map(d => Number(d[stat.key]));
+  const lo = Math.min(...values), hi = Math.max(...values);
+  const span = hi > lo ? hi - lo : 1;
+  const px = values.map(v => ml + (v - lo) / span * (w - ml - mr));
+  const band = 150;
+  const ys = beeswarm(px, r, band);
+  const top = Math.max(r * 2, ...ys.map(y => Math.abs(y))) + r + 24;
+  const placed = dots.map((d, i) => ({...d, value: values[i], y: top + ys[i]}));
+  const chosen = placed.find(d => String(d.player_id) === String(player));
+  const chosenTeam = chosen ? ready.teamById.get(chosen.team_id) : null;
+  const fig = Plot.plot({
+    width: w, height: top * 2 + 30, marginLeft: ml, marginRight: mr, marginTop: 0, marginBottom: 30,
+    style: {fontSize: "14px"},
+    x: {domain: [lo, hi], label: stat.label, tickFormat: v => formatStat(v, stat.format)},
+    y: {type: "identity", axis: null},
+    marks: [
+      Plot.dot(placed, {
+        x: "value", y: "y", r, fill: d => outcomeColor.get(d.outcome) ?? "#9ca3af",
+        fillOpacity: 0.85
+      }),
+      chosen ? Plot.dot([chosen], {
+        x: "value", y: "y", r: 9, fill: outcomeColor.get(chosen.outcome),
+        stroke: chosenTeam?.color ?? "#111827", strokeWidth: 3
+      }) : null,
+      chosen ? Plot.text([chosen], {
+        x: "value", y: "y", text: "name", dy: -16, fontWeight: "bold", fontSize: 15, fill: "#111827",
+        stroke: "white", strokeWidth: 4, paintOrder: "stroke"
+      }) : null,
+      Plot.tip(placed, Plot.pointer({
+        x: "value", y: "y",
+        title: d => `${d.name} (${playerTeam(d)})\n${stat.label}: ${formatStat(d.value, stat.format)}, ${ordinal(d[`${stat.key}_pct`])} percentile\n${d.outcome_label}`
+      }))
+    ]
+  });
+  fig.addEventListener("click", () => { if (fig.value) pick.player(fig.value.player_id); });
+  const scroller = html`<div class="explorer-swarm" tabindex="0" aria-label="${`${groupPlural(playersGroup)}: ${stat.label.toLowerCase()} in ${season}, one dot per player`}">${fig}</div>`;
+  // Bring the selected player's dot into view in a swarm wider than the screen.
+  if (chosen) requestAnimationFrame(() => {
+    const x = ml + (chosen.value - lo) / span * (w - ml - mr);
+    scroller.scrollLeft = Math.max(0, x - scroller.clientWidth / 2);
+  });
+  const legend = html`<div class="explorer-legend">${outcomeLevels.map(o => html`<span><i style="background:${outcomeColor.get(o.outcome)}"></i>${o.label}</span>`)}</div>`;
+  return html`<div><h4>${groupPlural(playersGroup)} in ${season}: ${stat.label.toLowerCase()}</h4>${legend}${scroller}<p class="explorer-note">${placed.length.toLocaleString("en-US")} players. Tap a dot to open the player.</p></div>`;
+}
+```
+
+::: {.column-margin}
+Each dot is one player's season. The **percentile** of a value $v$ among the
+$n$ players at the position that season is
+
+$$p = 100 \times \frac{\#\{\text{players below } v\}}{n - 1}$$
+
+ranked across every conference, so 90 means the player was ahead of 90% of
+the position that season.
+Rate stats count only players with enough volume (at least 100 pass attempts,
+50 carries, 15 catches for receivers and 10 for tight ends, 10 field goal
+tries, 20 punts). Interceptions thrown are ranked in reverse, so a higher
+percentile is always better. Where many players share a value, the dots
+overlap.
 :::
+
+```{ojs}
+//| echo: false
+asNode(sourceLine(ready.meta.sources.players))
+```
+
+### Career {#players-career}
+
+```{ojs}
+//| echo: false
+careerView = {
+  if (player === null) return asNode(`<div class="explorer-card">Tap a dot, search above, or tap a player in a game's play card to see their career.</div>`);
+  if (playersData.pending || playersData.error) return html`<div></div>`;
+  if (!career.length) return asNode(`<div class="explorer-card">This player has no ${escapeHtml(playersGroup.toLowerCase())} stat line. Try another position.</div>`);
+  const last = career.at(-1);
+  const out = html`<div class="explorer-career">
+    <h4>${last.name}</h4>
+    <p><span class="explorer-outcome" style="--c:${outcomeColor.get(last.outcome)}">${last.outcome_label}</span></p>
+  </div>`;
+  if (!career.some(d => d.season === season)) {
+    const b = html`<button type="button" class="explorer-chip">Show ${last.season} in the landscape</button>`;
+    b.onclick = () => pick.seasonOnly(last.season);
+    out.append(html`<p class="explorer-note">${last.name} has no ${playersGroup.toLowerCase()} line in ${season}. ${b}</p>`);
+  }
+  const long = careerPercentiles(career, playersStats);
+  const seasons = career.map(d => d.season);
+  const logos = career.map(d => ({season: d.season, logo: ready.teamById.get(d.team_id)?.logo ?? null, team: playerTeam(d)}));
+  out.append(Plot.plot({
+    height: 300, marginLeft: 44, marginTop: 40, style: {fontSize: "15px"},
+    x: {type: "point", domain: seasons, label: null, tickFormat: String, inset: 20},
+    y: {domain: [0, 100], label: "Percentile", grid: true, ticks: [0, 25, 50, 75, 100]},
+    color: {legend: true, domain: playersStats.map(s => s.label)},
+    marks: [
+      Plot.line(long, {x: "season", y: "pct", z: "stat", stroke: "stat", strokeWidth: 2.5}),
+      Plot.dot(long.filter(d => d.pct !== null), {x: "season", y: "pct", fill: "stat", r: 4}),
+      Plot.image(logos.filter(d => d.logo), {x: "season", frameAnchor: "top", dy: -22, src: "logo", width: 28, title: "team"}),
+      Plot.text(logos.filter(d => !d.logo), {x: "season", frameAnchor: "top", dy: -22, text: "team", fontSize: 11}),
+      Plot.tip(long.filter(d => d.pct !== null), Plot.pointer({
+        x: "season", y: "pct", title: d => `${d.season} ${d.stat}: ${ordinal(d.pct)} percentile`
+      }))
+    ]
+  }));
+  const head = playersStats.map(s => `<th scope="col">${escapeHtml(s.label)}</th>`).join("");
+  const body = career.map(d => `<tr><th scope="row">${d.season}</th><td>${escapeHtml(playerTeam(d))}</td>` +
+    playersStats.map(s => {
+      const p = d[`${s.key}_pct`];
+      return `<td>${formatStat(d[s.key], s.format)}${p === null || p === undefined ? "" : ` <span>(${ordinal(p)})</span>`}</td>`;
+    }).join("") + "</tr>").join("");
+  out.append(asNode(`<div class="explorer-table"><table><thead><tr><th scope="col">Season</th><th scope="col">Team</th>${head}</tr></thead><tbody>${body}</tbody></table></div>`));
+  return out;
+}
+```
+
+::: {.column-margin}
+Each line is one stat's percentile, season by season, with the team's logo
+above each season, so a transfer shows as a logo change. A season without
+enough volume for a rate stat leaves a gap. The chip is the player's NFL
+outcome: drafted (round and pick), signed as an undrafted free agent, still
+playing in college, or no NFL.
+:::
+
+```{ojs}
+//| echo: false
+asNode(sourceLine(ready.meta.sources.players))
+```
 :::
 
 ::: {#tab-combine .explorer-tab hidden=""}

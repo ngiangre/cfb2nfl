@@ -124,3 +124,127 @@ explorer_play_stats_fixture <- function() {
     statType = c("Completion", "Reception")
   )
 }
+
+# Long player stats: two QBs (one below the rate-stat volume), a receiver,
+# a player with no recorded position in 2026, an offensive lineman, and a
+# D-II player (no team id).
+explorer_player_stats_fixture <- function() {
+  row <- function(id, name, season, team, conf, pos, category, stats) {
+    tibble::tibble(
+      season = season,
+      playerId = id,
+      player = name,
+      position = pos,
+      team = team,
+      conference = conf,
+      category = category,
+      statType = names(stats),
+      stat = as.character(unname(stats))
+    )
+  }
+  dplyr::bind_rows(
+    row(
+      "q1",
+      "Starter",
+      2025L,
+      "Texas",
+      "SEC",
+      "QB",
+      "passing",
+      c(YDS = 3000, TD = 25, INT = 5, ATT = 400, YPA = 7.5, PCT = 0.65)
+    ),
+    row(
+      "q2",
+      "Backup",
+      2025L,
+      "Alabama",
+      "SEC",
+      "QB",
+      "passing",
+      c(YDS = 300, TD = 2, INT = 0, ATT = 40, YPA = 7.5, PCT = 0.6)
+    ),
+    row(
+      "q3",
+      "Other",
+      2025L,
+      "Alabama",
+      "SEC",
+      "QB",
+      "passing",
+      c(YDS = 2000, TD = 15, INT = 10, ATT = 300, YPA = 6.7, PCT = 0.6)
+    ),
+    row(
+      "q1",
+      "Starter",
+      2026L,
+      "Texas",
+      "SEC",
+      "QB",
+      "passing",
+      c(YDS = 1000, TD = 8, INT = 2, ATT = 150, YPA = 6.7, PCT = 0.6)
+    ),
+    row(
+      "w1",
+      "Wideout",
+      2025L,
+      "Texas",
+      "SEC",
+      "WR",
+      "receiving",
+      c(YDS = 900, REC = 60, TD = 7, YPR = 15)
+    ),
+    row(
+      "w1",
+      "Wideout",
+      2026L,
+      "Texas",
+      "SEC",
+      "?",
+      "receiving",
+      c(YDS = 400, REC = 30, TD = 3, YPR = 13.3)
+    ),
+    row("o1", "Lineman", 2025L, "Texas", "SEC", "OT", "fumbles", c(REC = 1)),
+    row(
+      "d2",
+      "Small School",
+      2025L,
+      "Ferris State",
+      "GLIAC",
+      "WR",
+      "receiving",
+      c(YDS = 1200, REC = 70, TD = 12, YPR = 17.1)
+    )
+  )
+}
+
+explorer_player_outcomes_fixture <- function() {
+  tibble::tibble(
+    playerId = c("q1", "q2", "q3", "w1"),
+    outcome = c("active", "udfa", "r1", "active"),
+    outcome_label = c(
+      "Still playing",
+      "Signed UDFA",
+      "Drafted R1 #3 (Chicago)",
+      "Still playing"
+    )
+  )
+}
+
+explorer_player_seasons_fixture <- function() {
+  ts <- build_explorer_team_season(
+    explorer_games_fixture(),
+    explorer_tiers_fixture()
+  )
+  build_explorer_player_seasons(
+    explorer_player_stats_fixture(),
+    tibble::tibble(
+      season = c(2025L, 2026L, 2025L),
+      conference = c("SEC", "SEC", "GLIAC"),
+      tier = c(3L, 3L, 1L),
+      tier_label = c("Power", "Power", "FCS and below")
+    ),
+    build_explorer_teams(explorer_teams_fixture(), ts),
+    explorer_player_outcomes_fixture(),
+    current_season = 2026L
+  )
+}

@@ -130,7 +130,7 @@ volume, so low-volume players don't sit at the 100th percentile:
 
 | Position group | Stats (first = default) | Qualifier for rate stats |
 |---|---|---|
-| Quarterback | passing YDS, TD, INT, YPA, PCT; rushing YDS | YPA/PCT: ATT ≥ 100 |
+| Quarterback | passing YDS, TD, INT, YPA, PCT; rushing YDS | INT/YPA/PCT: ATT ≥ 100 |
 | Running back | rushing YDS, TD, YPC; receiving YDS | YPC: CAR ≥ 50 |
 | Receiver | receiving YDS, REC, TD, YPR | YPR: REC ≥ 15 |
 | Tight end | receiving YDS, REC, TD, YPR | YPR: REC ≥ 10 |
@@ -140,11 +140,19 @@ volume, so low-volume players don't sit at the 100th percentile:
 | Special teams | kicking FGM, PCT; punting YPP | PCT: FGA ≥ 10; YPP: NO ≥ 20 |
 
 Percentile = `percent_rank()` within position group × season among
-qualifying players (INT for QBs is reversed so a higher percentile is better).
-The position comes from that season's roster row, falling back to the
-player's nearest roster season. Outcome categories come from
-`career_end_status()` / `outcomes` (drafted by round group, signed UDFA,
-no NFL, still playing), with reader-facing labels.
+qualifying players across every tier, stored as 0–100 (INT for QBs is
+reversed so a higher percentile is better, and needs ATT ≥ 100 like the rate
+stats, or a backup with no interceptions would top it). The position comes
+from that season's stat line (`player_stats.position`, the season's roster
+position), falling back to the player's nearest season with one. Outcome
+categories come from `career_end_status()` / `outcomes` (drafted by round
+group, signed UDFA, no NFL, still playing), with reader-facing labels.
+
+As built (step 4): the swarm is laid out in the browser (greedy beeswarm);
+where a pile of tied values (753 linemen with 0 sacks) would outgrow the
+band, the rest of the pile overlaps inside it. The selected player is always
+drawn, even when their tier is filtered out. A play-card chip carries the
+player's position group, so it opens the right group.
 
 ### Tab 3: Combine
 
@@ -185,8 +193,7 @@ each asset, tested on fixtures. These assets are not added to the DuckDB
 | `team_season.json` | team × season: `team_id`, end Elo, W, L, conference, tier (names/colors only in `teams.json`) | ~4.2k FBS + FCS rows, ~39 KB gz | first view |
 | `team_games_<season>.json` | team × game, from each FBS/FCS team's side: site, home flag, score, result, Elo pre/post/change, neutral-field Elo win chance, postgame WP, `has_plays` | ~3k rows, ≤ ~100 KB gz per season | with the first view (it validates the hash's `game`) |
 | `plays/<season>/<shard>.parquet` | play: elapsed (non-decreasing within each game), home score/margin, home cumulative PPA, scoring/turnover flags, players JSON; `shard = game_id % 100`, one file per season and shard holding its games in play order | 3.1M rows, ~1.7k files, ~250 MB total; ~100 to 250 KB per shard (contract cap 400 KB) | loaded when the Game section comes into view (Teams tab only); one whole-file fetch per shard, cached, so games in the same shard are free |
-| `player_season_<pos>.parquet` | player × season: stats, percentiles, team, tier | ~160k rows total, split by group | on Players open |
-| `player_outcome.json` | player: outcome chip fields | ~70k rows | on Players open |
+| `players/<pos>.parquet` | player × season × team in one stat group: headline stats, percentiles (0–100), team id (name only for teams without one), tier, outcome code and chip label | 141k rows in 8 files, uncompressed parquet (Pages gzips it), 180–725 KB raw, ≤ ~410 KB gz; contract cap 1 MB | on Players open, one group at a time |
 | `combine.json` | combine invitee: measurables, outcome, `athlete_id` | ~5.7k rows | on Combine open |
 
 Budget (decision 0046): first view ≤ 250 KB of gzipped data assets, and a
@@ -276,7 +283,10 @@ session. GitHub Pages limits: 1 GB site, 100 MB per file.
    defaults to the team's latest game with play-by-play, and only a reader's
    own pick goes into the hash. The header is sticky on desktop and static
    under 600px.
-4. **Players tab** (`player_season_*`, `player_outcome` exports).
+4. [x] **Players tab** (done 2026-11-08): `players/<pos>.parquet`
+   exports, the beeswarm, search, the career percentile chart and table,
+   and the outcome chip. Outcomes ride on each player-season row, so there is
+   no separate `player_outcome.json`.
 5. **Combine tab** (shared builder with #64).
 6. **Draft & careers tab.** Move the old charts over, drop redshirts, then
    retire `visualizations.qmd`, point the `explore.qmd` tile at the explorer,

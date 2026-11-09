@@ -204,6 +204,23 @@ test_that("build_explorer_plays gives one players entry per athlete per play", {
   expect_equal(pl$stat, c("Completion, Attempt", "Reception"))
 })
 
+test_that("build_explorer_plays tags each player chip with its position group", {
+  p <- build_explorer_plays(
+    explorer_plays_fixture(),
+    explorer_games_fixture(),
+    explorer_teams_fixture(),
+    explorer_play_stats_fixture(),
+    player_groups = tibble::tibble(
+      player_id = c("p1", "p1"),
+      season = c(2025L, 2026L),
+      pos = c("QB", "RB")
+    )
+  )
+  pl <- jsonlite::fromJSON(p$players[p$play_id == "12"])
+  # p1 was a QB in 2025 (the play's season); p2 has no group, so no pos.
+  expect_equal(pl$pos, c("QB", NA))
+})
+
 test_that("write_explorer_team_games writes one JSON file per season", {
   dir <- withr::local_tempdir()
   g <- explorer_games_fixture()
