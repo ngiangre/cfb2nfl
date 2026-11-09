@@ -2,14 +2,21 @@
 % Please edit documentation in R/contracts.R
 \name{contract_explorer_plays_files}
 \alias{contract_explorer_plays_files}
-\title{Data contract for the explorer per-game plays files}
+\title{Data contract for the explorer plays shard files}
 \usage{
-contract_explorer_plays_files(plays_dir, explorer_plays, stop_on_fail = TRUE)
+contract_explorer_plays_files(
+  plays_dir,
+  explorer_plays,
+  max_bytes = 4e+05,
+  stop_on_fail = TRUE
+)
 }
 \arguments{
 \item{plays_dir}{The \verb{plays/} directory.}
 
 \item{explorer_plays}{Output of \code{\link[=build_explorer_plays]{build_explorer_plays()}}.}
+
+\item{max_bytes}{Largest allowed shard file, in bytes.}
 
 \item{stop_on_fail}{Abort on failure (default \code{TRUE})?}
 }
@@ -18,7 +25,8 @@ The interrogated pointblank agent, invisibly.
 }
 \description{
 Guards the directory \code{\link[=write_explorer_plays]{write_explorer_plays()}} writes: exactly one
-\verb{plays/<season>/<game_id>.parquet} per game in \code{explorer_plays}, and no
-other files. A missing game would blank the timeline; a stray file would
-be served as if it were a game.
+\verb{plays/<season>/<shard>.parquet} per (season, shard) in \code{explorer_plays},
+no other files, and no shard above \code{max_bytes} (each is fetched whole by
+the page). A missing shard would blank the timeline; a stray file would be
+served as if it were a shard.
 }

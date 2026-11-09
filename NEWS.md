@@ -1,8 +1,9 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
 - Fixed: the Explorer's game timeline failed to load on the live site (GitHub
-  Pages compresses the play files, which breaks partial reads); each game's
-  plays now ship as their own small file.
+  Pages compresses the play files, which breaks partial reads); plays now
+  ship in small per-season shards (100 per season, fetched whole), which also
+  keeps the Pages deploy from timing out on thousands of files.
 
 - The Explorer's **Teams** tab: conference landscapes of every team's
   end-of-season Elo (FCS by win share), each team's rating and record by

@@ -218,7 +218,7 @@ test_that("write_explorer_team_games writes one JSON file per season", {
   expect_equal(nrow(back), sum(tg$season == 2025L))
 })
 
-test_that("write_explorer_plays writes one parquet file per game, in game order", {
+test_that("write_explorer_plays writes one parquet shard per season and game_id %% 100, in game order", {
   dir <- withr::local_tempdir()
   p <- build_explorer_plays(
     explorer_plays_fixture(),
@@ -238,6 +238,35 @@ test_that("write_explorer_plays writes one parquet file per game, in game order"
     nrow(arrow::read_parquet(file.path(root, "2026", "4.parquet"))),
     1L
   )
+})
+
+test_that("explorer_plays_shard is game_id mod 100", {
+  expect_equal(
+    explorer_plays_shard(c(1, 4, 101, 100, 250)),
+    c(1L, 4L, 1L, 0L, 50L)
+  )
+})
+
+test_that("write_explorer_plays puts games that share a shard in one file, in order", {
+  dir <- withr::local_tempdir()
+  p <- build_explorer_plays(
+    explorer_plays_fixture(),
+    explorer_games_fixture(),
+    explorer_teams_fixture(),
+    explorer_play_stats_fixture()
+  )
+  extra <- p[p$game_id == 1L, ]
+  extra$game_id <- 101L
+  extra$play_id <- paste0(extra$play_id, "b")
+  root <- write_explorer_plays(rbind(p, extra), dir)
+  expect_equal(
+    sort(list.files(root, recursive = TRUE)),
+    c("2025/1.parquet", "2026/4.parquet")
+  )
+  back <- arrow::read_parquet(file.path(root, "2025", "1.parquet"))
+  expect_equal(unique(back$game_id), c(1L, 101L))
+  expect_equal(nrow(back), 2L * sum(p$game_id == 1L))
+  expect_equal(back$play_id[seq_len(5)], c("11", "12", "13", "14", "15"))
 })
 
 test_that("write_explorer_plays removes stale per-season files and old game files", {
@@ -315,7 +344,7 @@ test_that("contract_explorer_team_games caps each season file at the gzip budget
   expect_false(ok(10L))
 })
 
-test_that("contract_explorer_plays_files passes on one file per game", {
+test_that("contract_explorer_plays_files passes on one file per season and shard", {
   f <- explorer_games_assets_fixture()
   dir <- withr::local_tempdir()
   root <- write_explorer_plays(f$explorer_plays, dir)
@@ -326,7 +355,7 @@ test_that("contract_explorer_plays_files passes on one file per game", {
   )))
 })
 
-test_that("contract_explorer_plays_files catches missing and extra game files", {
+test_that("contract_explorer_plays_files catches missing, extra and oversized shard files", {
   f <- explorer_games_assets_fixture()
   dir <- withr::local_tempdir()
   root <- write_explorer_plays(f$explorer_plays, dir)
@@ -346,4 +375,11 @@ test_that("contract_explorer_plays_files catches missing and extra game files", 
   write_explorer_plays(f$explorer_plays, dir)
   writeLines("x", file.path(root, "2025", "77.parquet"))
   expect_false(ok())
+  write_explorer_plays(f$explorer_plays, dir)
+  expect_false(pointblank::all_passed(contract_explorer_plays_files(
+    root,
+    f$explorer_plays,
+    max_bytes = 10,
+    stop_on_fail = FALSE
+  )))
 })

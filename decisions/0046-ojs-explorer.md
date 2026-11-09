@@ -104,3 +104,13 @@ carries its own footer, and a game still costs one request. Checked at a
 390×844 viewport against a server that gzips every response (as Pages does):
 the Game section draws its two charts and a play card with no errors, and
 switching games loads each game's file whole, about 15 KB on the wire.
+
+**Per-game files were too many.** The 17,433 per-game files made
+`actions/deploy-pages` time out (10 minutes) while Pages processed the
+artifact, so the deploy failed. The plays now ship as shards:
+`plays/<season>/<game_id % 100>.parquet`, at most 100 per season (about
+1,700 in all, 100 to 250 KB each), each holding that season's games in the
+shard in play order. The page still fetches a file whole (no range reads),
+filters to the open game, and caches the parsed shard, so other games in it
+load for free. The deploy step also sets `timeout: 1800000` as a margin, and
+the plays-files contract caps a shard at 400 KB.

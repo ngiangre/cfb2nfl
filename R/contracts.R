@@ -2354,42 +2354,50 @@ contract_explorer_plays <- function(
   enforce_contract(agent, "explorer_plays", stop_on_fail)
 }
 
-#' Data contract for the explorer per-game plays files
+#' Data contract for the explorer plays shard files
 #'
 #' Guards the directory [write_explorer_plays()] writes: exactly one
-#' `plays/<season>/<game_id>.parquet` per game in `explorer_plays`, and no
-#' other files. A missing game would blank the timeline; a stray file would
-#' be served as if it were a game.
+#' `plays/<season>/<shard>.parquet` per (season, shard) in `explorer_plays`,
+#' no other files, and no shard above `max_bytes` (each is fetched whole by
+#' the page). A missing shard would blank the timeline; a stray file would be
+#' served as if it were a shard.
 #'
 #' @param plays_dir The `plays/` directory.
 #' @param explorer_plays Output of [build_explorer_plays()].
+#' @param max_bytes Largest allowed shard file, in bytes.
 #' @param stop_on_fail Abort on failure (default `TRUE`)?
 #' @return The interrogated pointblank agent, invisibly.
 #' @export
 contract_explorer_plays_files <- function(
   plays_dir,
   explorer_plays,
+  max_bytes = 400000,
   stop_on_fail = TRUE
 ) {
   rlang::check_installed("pointblank")
-  games <- dplyr::distinct(explorer_plays, .data$season, .data$game_id)
+  shards <- dplyr::distinct(
+    tibble::tibble(
+      season = explorer_plays$season,
+      shard = explorer_plays_shard(explorer_plays$game_id)
+    )
+  )
   expected <- file.path(
     "plays",
-    games$season,
-    paste0(games$game_id, ".parquet")
+    shards$season,
+    paste0(shards$shard, ".parquet")
   )
-  found <- if (dir.exists(plays_dir)) {
-    file.path(
-      "plays",
-      list.files(plays_dir, recursive = TRUE)
-    )
+  found_rel <- if (dir.exists(plays_dir)) {
+    list.files(plays_dir, recursive = TRUE)
   } else {
     character()
   }
+  found <- file.path("plays", found_rel)
+  sizes <- file.size(file.path(plays_dir, found_rel))
   counts <- tibble::tibble(
-    count_diff = length(found) - nrow(games),
+    count_diff = length(found) - nrow(shards),
     missing = sum(!expected %in% found),
     extra = sum(!found %in% expected),
+    max_size = if (length(sizes)) max(sizes) else 0,
     dir_exists = dir.exists(plays_dir)
   )
   agent <- pointblank::create_agent(counts, label = "explorer_plays_files") |>
@@ -2397,6 +2405,7 @@ contract_explorer_plays_files <- function(
     pointblank::col_vals_equal("count_diff", 0L) |>
     pointblank::col_vals_equal("missing", 0L) |>
     pointblank::col_vals_equal("extra", 0L) |>
+    pointblank::col_vals_lte("max_size", max_bytes) |>
     pointblank::interrogate()
   enforce_contract(agent, "explorer_plays_files", stop_on_fail)
 }
