@@ -11,7 +11,9 @@ build_explorer_meta(games)
 }
 \value{
 A list: \code{default_season}, \code{seasons}, \code{default_team} (Texas, CFBD
-team id 251), \code{sources}.
+team id 251), \code{sources}, \code{positions} (the Players tab's stats, from
+\code{\link[=explorer_positions]{explorer_positions()}}, with a reader-facing \code{qualifier}) and \code{outcomes}
+(\code{\link[=explorer_outcome_levels]{explorer_outcome_levels()}}).
 }
 \description{
 Explorer page metadata

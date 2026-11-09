@@ -727,7 +727,8 @@ list(
       team_draft = ok_team_draft,
       explorer = ok_explorer,
       explorer_team_games = ok_explorer_team_games,
-      explorer_plays = ok_explorer_plays
+      explorer_plays = ok_explorer_plays,
+      explorer_players = ok_explorer_players
     ))
   ),
   # ---- link-step contracts (audit-hygiene workstream C) ----------------------
@@ -879,7 +880,13 @@ list(
   ),
   tar_target(
     explorer_plays,
-    build_explorer_plays(plays, games, teams, play_stats),
+    build_explorer_plays(
+      plays,
+      games,
+      teams,
+      play_stats,
+      explorer_player_seasons
+    ),
     format = "parquet"
   ),
   tar_target(
@@ -914,6 +921,41 @@ list(
       write_explorer_plays(explorer_plays)
     ),
     format = "file"
+  ),
+  # Players tab (plans/explorer.md step 4): each player's NFL outcome, then
+  # every player-season's headline stats and percentiles, one parquet file
+  # per position group.
+  tar_target(
+    explorer_player_outcomes,
+    build_explorer_player_outcomes(
+      career_end_status(career, outcomes, picks_nfl),
+      picks_nfl,
+      explorer_meta$default_season
+    )
+  ),
+  tar_target(
+    explorer_player_seasons,
+    build_explorer_player_seasons(
+      player_stats,
+      tiers,
+      explorer_teams,
+      explorer_player_outcomes,
+      explorer_meta$default_season
+    )
+  ),
+  tar_target(
+    explorer_player_files,
+    write_explorer_players(explorer_player_seasons),
+    format = "file"
+  ),
+  tar_target(
+    ok_explorer_players,
+    pointblank::all_passed(contract_explorer_players(
+      explorer_player_seasons,
+      player_stats,
+      explorer_player_files,
+      stop_on_fail = FALSE
+    ))
   ),
   # Person-period outcome table (decision 0032): the modeling dependent
   # variables. Derived from cleaned tables (no new API calls), but PUBLISHED
@@ -1280,6 +1322,14 @@ list(
         plays,
         keys = "play_id",
         contract_passed = ok_explorer_plays
+      ),
+      audit_step(
+        explorer_player_seasons,
+        "build_explorer_player_seasons",
+        "features",
+        player_stats,
+        keys = c("pos", "player_id", "season", "team"),
+        contract_passed = ok_explorer_players
       )
     )
   ),

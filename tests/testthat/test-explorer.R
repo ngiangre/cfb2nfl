@@ -108,6 +108,13 @@ test_that("build_explorer_meta carries the default season and sources", {
   expect_equal(m$seasons, c(2025L, 2026L))
   expect_equal(m$default_team, 251L)
   expect_equal(m$sources, explorer_sources())
+  expect_equal(m$positions$key, explorer_positions()$key)
+  expect_equal(
+    m$positions$qualifier[m$positions$key == "passing_ypa"][[1]],
+    "At least 100 pass attempts"
+  )
+  expect_true(is.na(m$positions$qualifier[[1]]))
+  expect_equal(m$outcomes$outcome[[1]], "r1")
 })
 
 test_that("explorer_json writes rows, nulls and scalars the page expects", {

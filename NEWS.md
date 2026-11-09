@@ -1,5 +1,14 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- The Explorer's **Players** tab: a beeswarm of every player at a position
+  for a season, one dot per player colored by NFL outcome, on a stat you
+  pick (passing yards, sacks, yards per catch, ...), with conference filters
+  and a name or school search. Picking a player shows their percentile on
+  each of the position's headline stats season by season, the team logo for
+  each season, and how their career ended (drafted with round and pick,
+  signed as an undrafted free agent, still playing, or no NFL). Player chips
+  in a game's play card open the player here (#70).
+
 - Fixed: the Explorer's game timeline failed to load on the live site (GitHub
   Pages compresses the play files, which breaks partial reads); plays now
   ship in small per-season shards (100 per season, fetched whole), which also

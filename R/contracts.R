@@ -2409,3 +2409,82 @@ contract_explorer_plays_files <- function(
     pointblank::interrogate()
   enforce_contract(agent, "explorer_plays_files", stop_on_fail)
 }
+
+#' Data contract for the explorer player-season table
+#'
+#' Guards [build_explorer_player_seasons()] and its files: one row per
+#' player-season-team with a headline stat line in a stat position group (no
+#' silent loss against `player_stats`, no duplicates), no offensive linemen,
+#' every percentile in 0-100, every outcome a known code with a label, and
+#' one file per group under `max_bytes` (each is fetched whole).
+#'
+#' @param player_seasons Output of [build_explorer_player_seasons()].
+#' @param player_stats Cleaned long player stats.
+#' @param paths Files written by [write_explorer_players()].
+#' @param max_bytes Largest allowed group file, in bytes.
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_explorer_players <- function(
+  player_seasons,
+  player_stats,
+  paths,
+  max_bytes = 1000000,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  defs <- explorer_positions()
+  check <- function(agent, ok) {
+    pointblank::col_vals_equal(
+      agent,
+      "ok",
+      TRUE,
+      preconditions = function(x) tibble::tibble(ok = ok)
+    )
+  }
+  expected <- player_stats |>
+    dplyr::mutate(value = suppressWarnings(as.numeric(.data$stat))) |>
+    dplyr::filter(!is.na(.data$value)) |>
+    dplyr::inner_join(
+      explorer_player_groups(player_stats),
+      by = c("playerId", "season"),
+      relationship = "many-to-one"
+    ) |>
+    dplyr::inner_join(
+      dplyr::distinct(defs, .data$group, .data$category, .data$stat_type),
+      by = c("group", "category", statType = "stat_type"),
+      relationship = "many-to-many"
+    ) |>
+    dplyr::distinct(.data$playerId, .data$season, .data$team)
+  pct <- unlist(
+    player_seasons[grepl("_pct$", names(player_seasons))],
+    use.names = FALSE
+  )
+  pct <- pct[!is.na(pct)]
+  agent <- pointblank::create_agent(
+    player_seasons,
+    label = "explorer_players"
+  ) |>
+    pointblank::col_vals_not_null(pointblank::vars(
+      pos,
+      player_id,
+      name,
+      season,
+      tier,
+      outcome,
+      outcome_label
+    )) |>
+    pointblank::rows_distinct(pointblank::vars(pos, player_id, season, team)) |>
+    pointblank::col_vals_in_set("pos", unique(defs$pos)) |>
+    pointblank::col_vals_in_set("outcome", explorer_outcome_levels()$outcome) |>
+    pointblank::col_vals_in_set("tier", 1:3) |>
+    check(nrow(player_seasons) == nrow(expected)) |>
+    check(all(pct >= 0L & pct <= 100L)) |>
+    check(setequal(
+      basename(paths),
+      paste0(unique(defs$pos), ".parquet")
+    )) |>
+    check(all(file.size(paths) <= max_bytes)) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "explorer_players", stop_on_fail)
+}
