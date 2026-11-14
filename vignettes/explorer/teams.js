@@ -108,3 +108,15 @@ export function parsePlayers(json) {
     return [];
   }
 }
+
+// A team's record as shares of each season's games, for the 100% W-L bars;
+// `n` keeps the count for the tooltip.
+export function recordShares(rows) {
+  return rows.flatMap(d => {
+    const games = d.wins + d.losses + d.ties;
+    if (!games) return [];
+    return [["Wins", d.wins], ["Losses", d.losses], ["Ties", d.ties]]
+      .filter(([, n]) => n > 0)
+      .map(([outcome, n]) => ({season: d.season, outcome, n, share: n / games}));
+  });
+}

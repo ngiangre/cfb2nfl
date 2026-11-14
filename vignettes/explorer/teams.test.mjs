@@ -2,7 +2,7 @@ import {test} from "node:test";
 import assert from "node:assert/strict";
 import {
   formatRecord, teamGames, effectiveGame, landscapePanels, timelineFor, parsePlayers,
-  defaultShowFcs, focusedConference, shouldLoadPlays, stepPlay, playWhen, playAnnouncement
+  defaultShowFcs, focusedConference, shouldLoadPlays, stepPlay, playWhen, playAnnouncement, recordShares
 } from "./teams.js";
 
 const games = [
@@ -117,4 +117,11 @@ test("playAnnouncement reads the play for the live region", () => {
     "Q1 14:02: Kickoff for 60 yards"
   );
   assert.equal(playAnnouncement({period: 3, clock: "0:44", play_type: "Punt"}), "Q3 0:44: Punt");
+});
+
+test("recordShares splits each season into shares of its games, dropping empty outcomes", () => {
+  const out = recordShares([{season: 2024, wins: 9, losses: 3, ties: 0}, {season: 2025, wins: 5, losses: 4, ties: 1}]);
+  assert.deepEqual(out.filter(d => d.season === 2024).map(d => [d.outcome, d.n, d.share]), [["Wins", 9, 0.75], ["Losses", 3, 0.25]]);
+  assert.equal(out.filter(d => d.season === 2025).reduce((a, d) => a + d.share, 0), 1);
+  assert.deepEqual(recordShares([{season: 2026, wins: 0, losses: 0, ties: 0}]), []);
 });

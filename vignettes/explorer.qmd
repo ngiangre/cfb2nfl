@@ -14,10 +14,10 @@ toc: false
 ```{ojs}
 //| echo: false
 import {TABS, parseHash, toHash, resolveTeam} from "./explorer/state.js"
-import {sourceLine, errorCard, loadOnce, escapeHtml} from "./explorer/ui.js"
+import {sourceLine, errorCard, loadOnce, escapeHtml, axisRoom} from "./explorer/ui.js"
 import {
   formatRecord, teamGames, effectiveGame, landscapePanels, timelineFor, parsePlayers,
-  defaultShowFcs, focusedConference, shouldLoadPlays, stepPlay, playWhen, playAnnouncement
+  defaultShowFcs, focusedConference, shouldLoadPlays, stepPlay, playWhen, playAnnouncement, recordShares
 } from "./explorer/teams.js"
 import {readShard, gameRows, playsShardPath, hyparquetUrl} from "./explorer/plays.js"
 import {
@@ -291,7 +291,7 @@ landscape = {
     return grid;
   }
   // One conference, large: tap near a line (or a chip) to open that team.
-  const fig = Plot.plot({
+  const fig = Plot.plot(axisRoom({
     height: 360, marginLeft: 56, style: {fontSize: "16px"},
     x: {label: "Season", tickFormat: String},
     y: {label: yLabel, grid: true},
@@ -309,7 +309,7 @@ landscape = {
         tip: true
       }))
     ]
-  });
+  }));
   fig.addEventListener("click", () => { if (fig.value) pick.team(fig.value.team_id); });
   const back = html`<button type="button" class="explorer-chip">← All conferences</button>`;
   back.onclick = () => { mutable focusConf = null; };
@@ -357,7 +357,7 @@ teamView = {
   const elo = rows.filter(d => d.elo_end !== null);
   const out = html`<div></div>`;
   if (elo.length) {
-    const fig = Plot.plot({
+    const fig = Plot.plot(axisRoom({
       height: 300, marginLeft: 56, style: {fontSize: "16px"},
       x: {label: "Season", tickFormat: String},
       y: {label: "End-of-season Elo", grid: true},
@@ -370,28 +370,30 @@ teamView = {
           tip: true
         }))
       ]
-    });
+    }));
     fig.addEventListener("click", () => { if (fig.value) pick.season(fig.value.season); });
     out.append(fig);
   } else {
     out.append(asNode(`<div class="explorer-card">${escapeHtml(info.team)} has no Elo rating: CFBD rates FBS teams only.</div>`));
   }
-  // Wins and losses by season; tap a season to open its games.
-  const bars = rows.flatMap(d => [
-    {season: d.season, outcome: "Wins", n: d.wins},
-    {season: d.season, outcome: "Losses", n: d.losses},
-    {season: d.season, outcome: "Ties", n: d.ties}
-  ]).filter(d => d.n > 0);
-  const wl = Plot.plot({
-    height: 200, marginLeft: 40, style: {fontSize: "16px"},
+  // Each season's record as a share of its games, so win rates compare
+  // across seasons of different lengths; the tooltip carries the counts.
+  // Tap a season to open its games.
+  const bars = recordShares(rows);
+  const wl = Plot.plot(axisRoom({
+    height: 200, marginLeft: 48, style: {fontSize: "16px"},
     x: {label: "Season", type: "band", tickFormat: d => d % 4 === 2 ? String(d) : ""},
-    y: {label: "Games", grid: true},
+    y: {label: "Share of games", percent: true, domain: [0, 100], ticks: [0, 50, 100], tickFormat: d => `${d}%`},
     color: {domain: ["Wins", "Losses", "Ties"], range: [info.color, "#9ca3af", "#d1d5db"], legend: true},
     marks: [
-      Plot.barY(bars, {x: "season", y: "n", fill: "outcome", fillOpacity: d => d.season === season ? 1 : 0.55}),
-      Plot.tip(rows, Plot.pointerX({x: "season", y: "games", title: d => `${d.season}: ${formatRecord(d)}`}))
+      Plot.barY(bars, {x: "season", y: "share", fill: "outcome", fillOpacity: d => d.season === season ? 1 : 0.55}),
+      Plot.ruleY([0.5], {stroke: "white", strokeDasharray: "4,4"}),
+      Plot.tip(rows.filter(d => d.wins + d.losses + d.ties > 0), Plot.pointerX({
+        x: "season", y: () => 1,
+        title: d => `${d.season}: ${formatRecord(d)} (${Math.round(100 * (d.wins + d.ties / 2) / (d.wins + d.losses + d.ties))}% wins)`
+      }))
     ]
-  });
+  }));
   wl.addEventListener("click", () => { if (wl.value) pick.season(wl.value.season); });
   out.append(wl);
   return out;
@@ -432,7 +434,7 @@ seasonStrip = {
   const rated = teamSeasonGames.map((g, i) => ({...g, i: i + 1})).filter(g => g.elo_post !== null);
   const out = html`<div><h4>${info.team} in ${season}</h4></div>`;
   if (rated.length) {
-    out.append(Plot.plot({
+    out.append(Plot.plot(axisRoom({
       height: 130, marginLeft: 52, style: {fontSize: "14px"},
       x: {label: "Game", ticks: Math.min(rated.length, 8)},
       y: {label: "Elo", grid: true},
@@ -444,7 +446,7 @@ seasonStrip = {
           r: d => d.game_id === shownGame ? 7 : 4
         })
       ]
-    }));
+    })));
   }
   const tiles = html`<div class="explorer-tiles"></div>`;
   for (const g of teamSeasonGames) {
@@ -552,7 +554,7 @@ gameView = {
   const oppColor = opp?.color ?? "#6b7280";
   const x = {label: null, ticks: [0, 900, 1800, 2700, 3600], tickFormat: s => ["Q1", "Q2", "Q3", "Q4", "OT"][s / 900] ?? ""};
   const label = info.abbreviation ?? info.team;
-  const margin = Plot.plot({
+  const margin = Plot.plot(axisRoom({
     height: 240, marginLeft: 52, style: {fontSize: "16px"}, x,
     y: {label: `${label} lead`, grid: true},
     marks: [
@@ -567,8 +569,8 @@ gameView = {
       }),
       Plot.ruleX(timeline, Plot.pointerX({x: "elapsed", stroke: "#111827"}))
     ]
-  });
-  const ppa = Plot.plot({
+  }));
+  const ppa = Plot.plot(axisRoom({
     height: 200, marginLeft: 52, style: {fontSize: "16px"}, x,
     y: {label: "Cumulative PPA edge", grid: true},
     marks: [
@@ -576,7 +578,7 @@ gameView = {
       Plot.line(timeline, {x: "elapsed", y: "cum_ppa", stroke: info.color, strokeWidth: 2}),
       Plot.ruleX(timeline, Plot.pointerX({x: "elapsed", stroke: "#111827"}))
     ]
-  });
+  }));
   for (const fig of [margin, ppa]) {
     fig.addEventListener("input", () => { if (fig.value) mutable scrubPlay = fig.value; });
   }
@@ -781,7 +783,7 @@ swarm = {
   const placed = dots.map((d, i) => ({...d, value: values[i], y: top + ys[i]}));
   const chosen = placed.find(d => String(d.player_id) === String(player));
   const chosenTeam = chosen ? ready.teamById.get(chosen.team_id) : null;
-  const fig = Plot.plot({
+  const fig = Plot.plot(axisRoom({
     width: w, height: top * 2 + 30, marginLeft: ml, marginRight: mr, marginTop: 0, marginBottom: 30,
     style: {fontSize: "14px"},
     x: {domain: [lo, hi], label: stat.label, tickFormat: v => formatStat(v, stat.format)},
@@ -804,7 +806,7 @@ swarm = {
         title: d => `${d.name} (${playerTeam(d)})\n${stat.label}: ${formatStat(d.value, stat.format)}, ${ordinal(d[`${stat.key}_pct`])} percentile\n${d.outcome_label}`
       }))
     ]
-  });
+  }));
   fig.addEventListener("click", () => { if (fig.value) pick.player(fig.value.player_id); });
   const scroller = html`<div class="explorer-swarm" tabindex="0" aria-label="${`${groupPlural(playersGroup)}: ${stat.label.toLowerCase()} in ${season}, one dot per player`}">${fig}</div>`;
   // Bring the selected player's dot into view in a swarm wider than the screen.
@@ -858,10 +860,11 @@ careerView = {
   const long = careerPercentiles(career, playersStats);
   const seasons = career.map(d => d.season);
   const logos = career.map(d => ({season: d.season, logo: ready.teamById.get(d.team_id)?.logo ?? null, team: playerTeam(d)}));
-  out.append(Plot.plot({
-    height: 300, marginLeft: 44, marginTop: 40, style: {fontSize: "15px"},
+  out.append(Plot.plot(axisRoom({
+    height: 300, marginLeft: 64, marginTop: 40, style: {fontSize: "15px"},
     x: {type: "point", domain: seasons, label: null, tickFormat: String, inset: 20},
-    y: {domain: [0, 100], label: "Percentile", grid: true, ticks: [0, 25, 50, 75, 100]},
+    // The logos sit above the plot, so the y title runs up the side instead.
+    y: {domain: [0, 100], label: "Percentile", labelAnchor: "center", labelOffset: 50, grid: true, ticks: [0, 25, 50, 75, 100]},
     color: {legend: true, domain: playersStats.map(s => s.label)},
     marks: [
       Plot.line(long, {x: "season", y: "pct", z: "stat", stroke: "stat", strokeWidth: 2.5}),
@@ -872,7 +875,7 @@ careerView = {
         x: "season", y: "pct", title: d => `${d.season} ${d.stat}: ${ordinal(d.pct)} percentile`
       }))
     ]
-  }));
+  })));
   const head = playersStats.map(s => `<th scope="col">${escapeHtml(s.label)}</th>`).join("");
   const body = career.map(d => `<tr><th scope="row">${d.season}</th><td>${escapeHtml(playerTeam(d))}</td>` +
     playersStats.map(s => {

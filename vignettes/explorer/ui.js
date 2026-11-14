@@ -29,3 +29,28 @@ export function loadOnce(cache, key, load) {
   }
   return cache.get(key);
 }
+
+// Room for axis titles so they never sit on the tick labels (#78): a labelled
+// y axis puts its title above the top tick, a labelled x axis centres its
+// title under the ticks. The height grows by the added margin, so the plot
+// area keeps its size. Plot's defaults are marginTop 20, marginBottom 30.
+export function axisRoom(opts) {
+  const out = {...opts};
+  let grow = 0;
+  if (opts.y?.label) {
+    out.y = {labelAnchor: "top", ...opts.y};
+    if ((opts.marginTop ?? 20) < 34) {
+      grow += 34 - (opts.marginTop ?? 20);
+      out.marginTop = 34;
+    }
+  }
+  if (opts.x?.label) {
+    out.x = {labelAnchor: "center", labelOffset: 44, ...opts.x};
+    if ((opts.marginBottom ?? 30) < 50) {
+      grow += 50 - (opts.marginBottom ?? 30);
+      out.marginBottom = 50;
+    }
+  }
+  if (out.height !== undefined) out.height += grow;
+  return out;
+}

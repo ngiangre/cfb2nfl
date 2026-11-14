@@ -72,9 +72,20 @@
 .explorer-summary { font-size: 1rem; color: #374151; }
 .explorer-play-nav { display: flex; gap: 0.5rem; margin: 0.5rem 0 1rem; }
 .explorer-nav {
-  min-height: 44px; min-width: 44px; padding: 0.4rem 0.9rem; font-size: 1rem;
-  border: 1px solid #d1d5db; border-radius: 0.4rem; background: #fff; cursor: pointer;
+  min-height: 44px; min-width: 44px; padding: 0.4rem 0.9rem; font-size: 1rem; font-weight: 600;
+  border: 1px solid #6b7280; border-radius: 0.4rem; background: #fff; color: #111827; cursor: pointer;
 }
+.explorer-nav:hover { background: #f3f4f6; }
+/* Quarto adds .btn.btn-quarto to every button in a cell output, whose
+   light-grey text made the explorer's buttons look disabled (#78). Reset its
+   variables to the explorer's dark-on-white style. */
+.explorer-tab .btn.btn-quarto, .explorer-header .btn.btn-quarto {
+  --bs-btn-color: #111827; --bs-btn-bg: #fff; --bs-btn-border-color: #6b7280;
+  --bs-btn-hover-color: #111827; --bs-btn-hover-bg: #f3f4f6; --bs-btn-hover-border-color: #374151;
+  --bs-btn-active-color: #111827; --bs-btn-active-bg: #e5e7eb; --bs-btn-active-border-color: #111827;
+  --bs-btn-font-weight: inherit;
+}
+.explorer-tab .btn.btn-quarto.explorer-tile { --bs-btn-border-color: #d1d5db; }
 /* Screen-reader-only: keeps the live region in the DOM without showing it. */
 .visually-hidden {
   position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;

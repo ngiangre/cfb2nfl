@@ -1,6 +1,6 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {sourceLine, errorCard, escapeHtml, loadOnce} from "./ui.js";
+import {sourceLine, errorCard, escapeHtml, loadOnce, axisRoom} from "./ui.js";
 
 test("sourceLine links each table to its Data page anchor", () => {
   assert.equal(
@@ -33,4 +33,22 @@ test("loadOnce loads a tab's data once and retries after a failure", async () =>
   await assert.rejects(loadOnce(cache, "combine", flaky), /offline/);
   fail = false;
   assert.equal(await loadOnce(cache, "combine", flaky), "ok");
+});
+
+test("axisRoom gives labelled axes room clear of the tick labels", () => {
+  const o = axisRoom({height: 200, x: {label: "Season"}, y: {label: "Elo", grid: true}});
+  assert.equal(o.marginTop, 34);
+  assert.equal(o.marginBottom, 50);
+  assert.equal(o.x.labelAnchor, "center");
+  assert.equal(o.y.labelAnchor, "top");
+  assert.equal(o.y.grid, true);
+  assert.equal(o.height, 200 + 34 - 20 + 50 - 30);
+});
+
+test("axisRoom leaves unlabelled axes and larger margins alone", () => {
+  const o = axisRoom({height: 300, marginTop: 40, x: {label: null}, y: {label: "Percentile"}});
+  assert.equal(o.marginTop, 40);
+  assert.equal(o.marginBottom, undefined);
+  assert.equal(o.x.labelAnchor, undefined);
+  assert.equal(o.height, 300);
 });
