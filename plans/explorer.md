@@ -173,6 +173,12 @@ player's position group, so it opens the right group.
   by position group (default Quarterback) and combine season range. Tapping a
   point opens the player when `athlete_id` is linked. `link_method ==
   "unmatched"` points show their name with no link.
+- **Region filters** (#84, 2026-11-14), so a phone reader can reach one part
+  of the cloud without rotating: each axis has Any / Low / Mid / High
+  buttons, the thirds of the invitees shown. The region's invitees stay in
+  full color with an outline, everyone else fades back on the full axes, and
+  the region's invitees are listed as chips that open their card. An HTML
+  legend under the chart counts each color (N=...).
 - Touch rotate/zoom plus a "reset view" button. Combine data is pre-draft and
   shown as a description only; it is not a model input.
 - Shares its `build_*()` function with the #64 combine post.
