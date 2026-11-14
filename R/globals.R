@@ -141,7 +141,7 @@ utils::globalVariables(c(
   "tier",
   "outcome",
   "outcome_label",
-  # pointblank::vars() targets in contract_teams() / contract_explorer_map()
+  # pointblank::vars() targets in contract_teams()
   "latitude",
   "longitude"
 ))

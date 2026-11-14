@@ -63,7 +63,7 @@ browser from the data (decision 0046).
 
 | Visual | Tables |
 |---|---|
-| Teams landscape, team view | `games`, `teams`, `conference_tiers` |
+| Conference lines, team view | `games`, `teams`, `conference_tiers` |
 | Team-season strip | `games`, `teams` |
 | Game timeline | `plays`, `games`, `play_stats` (player chips) |
 | Players beeswarm, career | `player_stats`, `roster`, `teams`, `conference_tiers`, `outcomes`, `picks` |
@@ -71,7 +71,7 @@ browser from the data (decision 0046).
 | Draft classes | `picks`, `teams`, `conference_tiers` |
 | NFL careers | `picks`, `nfl_draft_picks`, `nfl_rosters` |
 | Transfers | `player_stats`, `roster`, `conference_tiers` |
-| Map, conference spread | `teams` (home-stadium location, #48), `games` |
+| Teams map | `teams` (home-stadium location, #48), `games` |
 
 ## Page layout
 
@@ -80,15 +80,23 @@ Each tab's data loads the first time the tab opens.
 
 ### Tab 1: Teams
 
-1. **Landscape.** Small multiples, one per conference (membership as of the
-   selected season; FBS by default, FCS behind a toggle). Each panel shows
-   end-of-season Elo lines for its teams across 2010 to now, with the selected
-   season marked by a vertical rule (FCS panels plot win share, since FCS has
-   no Elo). The selected team's line is drawn in its color. Tapping a panel
-   opens that conference large, with a chip per team; tapping near a line or a
-   chip opens the team.
-2. **Team view.** End-of-season Elo across seasons (line, team color) above
-   a W-L bar per season. Tapping a season opens the team-season.
+The team menu sits in the header beside the season: one group per
+conference that season (Power conferences first, FCS after), teams ordered
+by record within each, then the teams that did not play that season.
+(Revised 2026-11-14, #48: the small-multiples landscape and the separate
+Map tab were replaced by this flow.)
+
+1. **Conference.** A US map (AK/HI insets) of every home stadium at the
+   team's level (FBS or FCS) that season, dots sized by wins, the team's
+   conference in blue, the team in its color with a black ring (decision
+   0047). Tapping a dot selects that team. Below it, the conference's
+   end-of-season Elo lines across 2010 to now (FCS plots win share, since FCS
+   has no Elo), the selected season marked by a vertical rule, with a chip
+   per team; tapping near a line or a chip opens the team.
+2. **Team view.** End-of-season Elo across seasons beside a W-L share bar per
+   season (stacked on phones). A dotted line on each is the team's
+   conference average that season (Elo; win share), so the team reads
+   against its conference. Tapping a season opens the team-season.
 3. **Team-season view.** A wrapping grid of game tiles by week: one tile per
    game showing W/L color, score, opponent logo, home/away/neutral, and the Elo
    change (`postgameElo - pregameElo`). A mini Elo line for the season sits
@@ -174,16 +182,6 @@ player's position group, so it opens the right group.
 This tab holds the old page's draft time series, NFL longevity, and transfers.
 Each chart moves as is or is cut where a dated post already covers it.
 
-### Tab 5: Map (ships last)
-
-Teams on a US map (AK/HI insets) for the selected season: dot size = wins,
-one conference highlighted (the selected team's by default, picked from a
-menu), everyone else grey, the selected team ringed in its color (decision
-0047: a color per conference is too many hues for a scatter). Tapping a team
-or its chip opens Teams → team view. Below it, the highlighted conference's
-spread (mean distance between two members' home stadiums) by season against
-the other conferences' lines.
-
 ## Data assets
 
 New `explorer_*` targets in `_targets.R` (track mode, downstream of the cleaned
@@ -195,7 +193,7 @@ each asset, tested on fixtures. These assets are not added to the DuckDB
 | Asset | Grain | Est. size | Loaded |
 |---|---|---|---|
 | `meta.json` | page metadata: `default_season`, `seasons`, `default_team`, `sources` (visual → tables) | <1 KB | first view |
-| `teams.json` | team: name, mascot, abbreviation, color, alt color, logo (conference by season lives in `team_season.json`) | ~8 KB gz | first view |
+| `teams.json` | team: name, mascot, abbreviation, color, alt color, logo, home-stadium latitude/longitude/city/state/venue (conference by season lives in `team_season.json`) | ~15 KB gz | first view |
 | `team_season.json` | team × season: `team_id`, end Elo, W, L, conference, tier (names/colors only in `teams.json`) | ~4.2k FBS + FCS rows, ~39 KB gz | first view |
 | `team_games_<season>.json` | team × game, from each FBS/FCS team's side: site, home flag, score, result, Elo pre/post/change, neutral-field Elo win chance, postgame WP, `has_plays` | ~3k rows, ≤ ~100 KB gz per season | with the first view (it validates the hash's `game`) |
 | `plays/<season>/<shard>.parquet` | play: elapsed (non-decreasing within each game), home score/margin, home cumulative PPA, scoring/turnover flags, players JSON; `shard = game_id % 100`, one file per season and shard holding its games in play order | 3.1M rows, ~1.7k files, ~250 MB total; ~100 to 250 KB per shard (contract cap 400 KB) | loaded when the Game section comes into view (Teams tab only); one whole-file fetch per shard, cached, so games in the same shard are free |
@@ -315,12 +313,12 @@ session. GitHub Pages limits: 1 GB site, 100 MB per file.
    player dossiers (the Players career view), the career-length histogram,
    and the team logo table and drafts-by-team bars (covered by the Teams tab
    and the draft posts).
-7. [x] **Map tab** (done 2026-11-14, #48, decision 0047): `teams` gains
-   home-stadium coordinates; `map.json` (located teams and conference
-   spread by season, ~8 KB gzipped, contract cap 60 KB) loads on Map open
-   with the us-atlas states outline. The map highlights one conference at a
-   time, with an FCS toggle, member chips that open the team, and the
-   spread chart below.
+7. [x] **Map** (done 2026-11-14, #48, decision 0047), on the Teams tab
+   rather than a tab of its own: `teams` gains home-stadium coordinates,
+   carried in `teams.json`; the us-atlas states outline loads when the
+   Teams tab opens. The team menu moved to the header, grouped by
+   conference; the conference's Elo lines follow the map; the team's Elo
+   and record charts sit side by side with conference-average lines.
 
 Each step is its own PR, and `main` stays deployable after each one.
 

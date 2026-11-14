@@ -58,17 +58,80 @@ export function timelineFor(plays, isHome) {
     }));
 }
 
-// The Show FCS toggle's starting value: on when the team is FCS that season.
-export function defaultShowFcs(teamSeason, team, season) {
-  return teamSeason.some(d => d.team_id === team && d.season === season && d.classification === "fcs");
+// The selected team's row for a season (conference, record), or null when
+// it did not play that season.
+export function teamSeasonRow(teamSeason, team, season) {
+  return teamSeason.find(d => d.team_id === team && d.season === season) ?? null;
 }
 
-// The conference panel the reader opened, kept only while the selected team
-// is in it; otherwise the landscape shows every conference again.
-export function focusedConference(focusConf, panels, team) {
-  if (focusConf === null || focusConf === undefined) return null;
-  const panel = panels.find(p => p.conference === focusConf);
-  return panel && panel.teamIds.includes(team) ? focusConf : null;
+// The team menu for a season, one group per conference (FBS before FCS,
+// Power conferences first), teams ordered by win share then wins. Teams that
+// did not play that season close the menu, so any team stays selectable.
+export function teamGroups(teamSeason, teams, season) {
+  const name = new Map(teams.map(t => [t.team_id, t.team]));
+  const groups = new Map();
+  for (const d of teamSeason) {
+    if (d.season !== season || !name.has(d.team_id)) continue;
+    const conference = d.conference ?? "Independent";
+    if (!groups.has(conference)) {
+      groups.set(conference, {label: conference, fbs: d.classification === "fbs", tier: d.tier ?? 0, rows: []});
+    }
+    groups.get(conference).rows.push(d);
+  }
+  const out = [...groups.values()]
+    .sort((a, b) => Number(b.fbs) - Number(a.fbs) || b.tier - a.tier || a.label.localeCompare(b.label))
+    .map(g => ({
+      label: g.label,
+      options: g.rows
+        .sort((a, b) => b.win_pct - a.win_pct || b.wins - a.wins || name.get(a.team_id).localeCompare(name.get(b.team_id)))
+        .map(d => ({team_id: d.team_id, label: `${name.get(d.team_id)} (${formatRecord(d)})`}))
+    }));
+  const played = new Set(out.flatMap(g => g.options.map(o => o.team_id)));
+  const rest = teams.filter(t => !played.has(t.team_id)).sort((a, b) => a.team.localeCompare(b.team));
+  if (rest.length) out.push({label: `Did not play in ${season}`, options: rest.map(t => ({team_id: t.team_id, label: t.team}))});
+  return out;
+}
+
+const isConference = c => Boolean(c) && !/Independent/.test(c);
+
+// For each season the team played in a conference, that conference's average
+// end-of-season Elo and win share over its members (the team included).
+// Independents are not a conference, so their seasons have no average.
+export function conferenceAverages(teamSeason, team) {
+  const mean = xs => (xs.length ? xs.reduce((a, x) => a + x, 0) / xs.length : null);
+  return teamSeason
+    .filter(d => d.team_id === team && isConference(d.conference))
+    .map(d => {
+      const members = teamSeason.filter(m => m.season === d.season && m.conference === d.conference);
+      const elo = mean(members.filter(m => m.elo_end !== null).map(m => m.elo_end));
+      return {
+        season: d.season, conference: d.conference, members: members.length,
+        elo_mean: elo === null ? null : Math.round(elo),
+        win_pct_mean: Math.round(1000 * mean(members.map(m => m.win_pct))) / 1000
+      };
+    })
+    .sort((a, b) => a.season - b.season);
+}
+
+// The season's teams with a home stadium, in one classification, for the
+// map. Membership and record are that season's own.
+export function mapPoints(teams, teamSeason, season, classification) {
+  const byId = new Map(teams.map(t => [t.team_id, t]));
+  return teamSeason
+    .filter(d => d.season === season && d.classification === classification)
+    .map(d => ({d, t: byId.get(d.team_id)}))
+    .filter(({t}) => t && t.latitude !== null && t.latitude !== undefined && t.longitude !== null && t.longitude !== undefined)
+    .map(({d, t}) => ({
+      team_id: d.team_id, team: t.team, color: t.color, conference: d.conference ?? "Independent",
+      wins: d.wins, losses: d.losses, ties: d.ties,
+      latitude: t.latitude, longitude: t.longitude, city: t.city, state: t.state, venue: t.venue
+    }))
+    .sort((a, b) => a.team.localeCompare(b.team));
+}
+
+export function mapTitle(p) {
+  const place = [p.venue, [p.city, p.state].filter(Boolean).join(", ")].filter(Boolean).join(", ");
+  return `${p.team} (${formatRecord(p)})\n${p.conference}${place ? `\n${place}` : ""}`;
 }
 
 // The game timeline loads only on the Teams tab, once its Game section has

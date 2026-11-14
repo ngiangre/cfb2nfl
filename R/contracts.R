@@ -2212,6 +2212,8 @@ contract_explorer_shell <- function(
     team_season$team_id[team_season$season == meta$default_season]
   )
   has_logo <- teams$team_id[!is.na(teams$logo)]
+  fbs_ids <- unique(team_season$team_id[team_season$classification == "fbs"])
+  located <- teams$team_id[!is.na(teams$latitude) & !is.na(teams$longitude)]
   dicts <- sub("\\.yml$", "", list.files(app_sys("dict"), "\\.yml$"))
   gzip_bytes <- sum(vapply(
     list(meta, teams, team_season),
@@ -2258,6 +2260,13 @@ contract_explorer_shell <- function(
     check(sum(team_season$games) == expected_games) |>
     check(all(team_season$team_id %in% has_color)) |>
     check(all(current_ids %in% has_logo)) |>
+    # The Teams map places every FBS program at its home stadium (#48).
+    check(all(fbs_ids %in% located)) |>
+    check(all(
+      dplyr::between(teams$latitude, 18, 72) &
+        dplyr::between(teams$longitude, -170, -60),
+      na.rm = TRUE
+    )) |>
     check(identical(meta$default_season, explorer_default_season(games))) |>
     # The page falls back to the default team and season when the hash names
     # an unknown one, so both must exist; the season menu is contiguous.
@@ -2645,59 +2654,4 @@ contract_explorer_careers <- function(
     check(gz <= max_gzip_bytes) |>
     pointblank::interrogate()
   enforce_contract(agent, "explorer_careers", stop_on_fail)
-}
-
-#' Data contract for the explorer Map asset
-#'
-#' Every FBS team-season must place its team on the map (FCS programs without
-#' a home venue are allowed to drop off), coordinates sit inside the United
-#' States bounding box, every conference-season's members add back to the
-#' team-season rows, spreads are non-negative, and the written file stays under
-#' its gzipped size cap.
-#'
-#' @param map Output of [build_explorer_map()].
-#' @param team_season Output of [build_explorer_team_season()].
-#' @param path The written `map.json`.
-#' @param max_gzip_bytes Gzipped size cap for `map.json`.
-#' @param stop_on_fail If `TRUE` (default), raise an error when any check fails.
-#' @return The interrogated `pointblank` agent.
-#' @export
-contract_explorer_map <- function(
-  map,
-  team_season,
-  path,
-  max_gzip_bytes = 60000L,
-  stop_on_fail = TRUE
-) {
-  rlang::check_installed("pointblank")
-  check <- function(agent, ok) {
-    pointblank::col_vals_equal(
-      agent,
-      "ok",
-      TRUE,
-      preconditions = function(x) tibble::tibble(ok = ok)
-    )
-  }
-  fbs_ids <- unique(team_season$team_id[team_season$classification == "fbs"])
-  in_conference <- team_season[
-    !is.na(team_season$conference) &
-      !grepl("Independent", team_season$conference),
-  ]
-  gz <- length(memCompress(readBin(path, "raw", file.size(path)), "gzip"))
-  agent <- pointblank::create_agent(map$teams, label = "explorer_map") |>
-    pointblank::col_vals_not_null(pointblank::vars(
-      team_id,
-      latitude,
-      longitude
-    )) |>
-    pointblank::rows_distinct(pointblank::vars(team_id)) |>
-    pointblank::col_vals_between("latitude", 18, 72) |>
-    pointblank::col_vals_between("longitude", -170, -60) |>
-    check(all(fbs_ids %in% map$teams$team_id)) |>
-    check(sum(map$spread$members) == nrow(in_conference)) |>
-    check(all(map$spread$mapped <= map$spread$members)) |>
-    check(all(map$spread$spread_miles >= 0, na.rm = TRUE)) |>
-    check(gz <= max_gzip_bytes) |>
-    pointblank::interrogate()
-  enforce_contract(agent, "explorer_map", stop_on_fail)
 }

@@ -7,8 +7,7 @@ export const TABS = [
   {key: "teams", label: "Teams"},
   {key: "players", label: "Players"},
   {key: "combine", label: "Combine"},
-  {key: "careers", label: "Draft & careers"},
-  {key: "map", label: "Map"}
+  {key: "careers", label: "Draft & careers"}
 ];
 
 const KEYS = ["tab", "season", "team", "game", "pos", "player"];

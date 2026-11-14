@@ -118,7 +118,8 @@ build_explorer_team_season <- function(games, tiers) {
 #'
 #' Display fields for every team in the team-season export, stored once so
 #' `team_season.json` carries ids only (decision 0046). Colors go through the
-#' shared valid-hex filter, falling back to the shared grey.
+#' shared valid-hex filter, falling back to the shared grey. The home-stadium
+#' location places each team on the Teams map (decision 0047).
 #'
 #' @param teams Cleaned teams.
 #' @param team_season Output of [build_explorer_team_season()].
@@ -139,7 +140,13 @@ build_explorer_teams <- function(teams, team_season) {
         .data$alt_color,
         NA_character_
       ),
-      logo = .data$logo_light
+      logo = .data$logo_light,
+      # Home stadium, for the Teams map (#48); a few FCS programs have none.
+      latitude = round(.data$latitude, 3),
+      longitude = round(.data$longitude, 3),
+      city = .data$city,
+      state = .data$state,
+      venue = .data$venue
     ) |>
     dplyr::arrange(.data$team)
 }
@@ -169,7 +176,7 @@ explorer_sources <- function() {
     careers_draft = c("picks", "teams", "conference_tiers"),
     careers_nfl = c("picks", "nfl_draft_picks", "nfl_rosters"),
     careers_transfers = c("player_stats", "roster", "conference_tiers"),
-    map = c("teams", "games")
+    teams_map = c("teams", "games")
   )
 }
 

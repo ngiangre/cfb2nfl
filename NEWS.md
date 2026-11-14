@@ -6,13 +6,16 @@
   contract checks they sit inside the United States (#48,
   [decision 0047](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0047-team-geography.md)).
 
-- The Explorer's **Map** tab: every FBS home stadium (FCS behind a toggle)
-  for the selected season, sized by wins, with one conference highlighted
-  (the selected team's by default) and its members listed below; tapping a
-  team opens it in the Teams tab. Under the map, each conference's spread,
-  the average distance between two members' home stadiums, season by
-  season, so realignment shows up as the Big Ten more than doubling in 2024
-  (#48, #70).
+- The Explorer's **Teams** tab is reorganized around the selected team
+  (#48, #70). The team menu now sits in the header beside the season,
+  grouped by that season's conferences with teams ordered by record. The tab
+  opens on a map of every home stadium at the team's level that season,
+  sized by wins, with the team's conference in blue (tap a dot to switch
+  team), followed by that conference's Elo lines over time. The team's
+  end-of-season Elo and season records now sit side by side, each with a
+  dotted line for its conference's average that season, replacing the fixed
+  50% line. The all-conference small multiples are gone; the team menu
+  covers that navigation.
 
 - The Explorer's game timeline now draws one shared crosshair: dragging
   across either the lead chart or the PPA chart (or stepping with

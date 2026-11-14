@@ -43,5 +43,5 @@ test("resolveSeason and resolveTeam", () => {
 });
 
 test("tabs are the shell's four, Teams first", () => {
-  assert.deepEqual(TABS.map(t => t.key), ["teams", "players", "combine", "careers", "map"]);
+  assert.deepEqual(TABS.map(t => t.key), ["teams", "players", "combine", "careers"]);
 });
