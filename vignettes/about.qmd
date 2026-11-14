@@ -6,62 +6,78 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-`cfb2nfl` studies what shapes a college football player's path to the NFL
-draft, and how well we could have seen it coming from what we knew during their
-career. This page is the short version; the full working plan lives in the
-project's [VISION.md](https://github.com/ngiangre/cfb2nfl/blob/main/VISION.md).
+`cfb2nfl` looks at what shapes a college football player's path to the NFL
+draft: when it happens, when it doesn't, and what it takes to get there. This
+page is the short version; the full working plan lives in the project's
+[VISION.md](https://github.com/ngiangre/cfb2nfl/blob/main/VISION.md).
 
-## The questions
+## Why it matters
+
+A lot of people are invested in this game. Nobody is more invested than the
+players. For the few who are drafted, it is a chance to play on the world
+stage against the best athletes there are, and to build a career that can
+change things for their family and their community. We want a look at what
+the data says about how that may happen.
+
+## Where we are: exploring
+
+Right now the project is about **getting to know the data** and organizing it
+so it can support careful analysis later. The site is a place for fans to look
+around and come up with their own hypotheses:
+
+- **[Explore](explore.html)** the data with interactive charts.
+- **[Investigations](investigations.html)** are quick looks at one question
+  each. They describe what the data shows; they are starting points, not
+  verdicts.
+
+We'd rather follow the data than the vibes, and we try to say plainly when the
+data can't answer something yet.
+
+## How we work: AI inside guardrails
+
+AI agents do much of the legwork, which lets us go from a question to a chart
+quickly. They work inside guardrails we've built so that speed doesn't cost
+accuracy:
+
+- **Checks on the data.** Every rebuild verifies that the numbers look right
+  (no players silently dropped, values in sensible ranges, every season
+  present) and stops if they don't.
+- **Tested code.** The logic behind each number has tests that must pass.
+- **A written record.** Every significant choice about the data is written
+  down with its reasoning, so it can be questioned later.
+- **Every number traces to the data.** Figures in a write-up are computed
+  from the database, so they update when the data does.
+
+## Where we're headed: testing claims
+
+When the groundwork is ready, we'll move to in-depth, curated analyses that
+puts football wisdom to the test. We'll ask whether the data **supports** a claim,
+**refutes** it, or can't tell. The questions driving that work:
 
 - What is it about a player's college career that actually predicts turning pro?
 - Does the **head coach** matter (and later, coordinators, position coaches, and
-  strength & conditioning staff)?
+  strength and conditioning staff)? Does a coaching change or a transfer help
+  or hurt? If the data doesn't exist, is there a proxy or can we quantify variance
+  that could be due to this?
 - After each season, what is a player's **percent chance of being drafted**,
   broken down by position?
-- For the players who get drafted, what do they go on to do in the NFL — the
+- For the players who get drafted, what do they go on to do in the NFL: the
   statistics they put up, and **how long they last**?
 
-There's so many more questions to ask and interrogate. Additionally we use data over vibes to probe our questions. 
-The **Explore** page lets you poke at the data with interactive charts, and **Analysis** collects the write-ups as
-they take shape.
+We go after each question in two ways:
 
-## What we're looking at first
-
-- **Coaching:** who the head coach is and how the program is doing (wins and a
-  couple of standard team-strength ratings), plus whether the **head coach
-  changed** from one season to the next.
-- **Transfers:** whether a player switched schools, and whether that move was a
-  step **up, sideways, or down** in level of competition (Power conference,
-  Group of Five, or FCS-and-below) — measured season by season, since
-  conferences shuffle over the years.
-- **Size:** the player's height and weight from the team roster. (We hoped to
-  track weight *changes* between seasons, but our source lists just one weight
-  per player, so that isn't possible yet — see the Data page.)
-- **Who we count and what counts as "made it":** every player with a college
-  stat line, in the seasons they were eligible for the draft; the outcome we
-  track is whether they were drafted.
-- **What happens next:** for the players who get drafted, we now follow them into
-  the NFL — **how long they last** (seasons on an NFL roster) and the statistics
-  they put up, from [nflverse](https://nflverse.nflreadr.com/). This is an
-  *outcome* we describe and forecast, kept separate from anything used to predict
-  the draft itself.
-
-## How we try to answer them
-
-We go after every question two ways at once:
-
-- **Why** — which things actually carry information about turning pro, and how
+- **Why:** which things actually carry information about turning pro, and how
   sure we can be about each one.
-- **How well we can call it** — whether we could genuinely have *predicted*
-  future draft classes, not just explained the past after the fact.
-
-When we say a model can predict a draft class, it's only allowed to use what we'd have known *before* that class was picked — no peeking at the future. That's a much harder bar than fitting numbers we already have, and it's the one we hold ourselves to.
+- **How well we can call it:** whether we could genuinely have *predicted*
+  future draft classes, not just explained the past after the fact. A
+  forecast for a draft class may only use what we'd have known *before* that
+  class was picked. No peeking at the future.
 
 ::: {.callout-note collapse="true"}
 ## For the stats-minded
 
 This follows Breiman's *Two Cultures*, used side by side: **data models** for
-explanation and inference, **algorithmic models** for prediction — with
+explanation and inference, **algorithmic models** for prediction, with
 **out-of-time validation** as the headline metric (a model predicting a draft
 class only sees data through the prior season). Decisions are recorded in an
 ADR-style **decision log**; logic is tested with `testthat` and data with

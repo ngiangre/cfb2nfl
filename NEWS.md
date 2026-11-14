@@ -1,5 +1,12 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- The README and About page are rewritten around where the project is now:
+  exploring the data so fans can form their own hypotheses, AI agents working
+  inside tested guardrails, and later, curated analyses that ask whether the
+  data supports or refutes common football wisdom. The README is a short
+  landing page; About carries the full story, starting with why the players
+  are the ones most invested.
+
 - The Explorer's game timeline now draws one shared crosshair: dragging
   across either the lead chart or the PPA chart (or stepping with
   Previous/Next) puts the vertical line on the same play in both charts,
