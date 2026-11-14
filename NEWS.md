@@ -1,5 +1,11 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Explorer polish (#78): axis titles no longer sit on the tick labels, each
+  team's season records are drawn as shares of its games (100% bars with a
+  50% line, counts in the tooltip) so win rates compare across seasons, and
+  the Previous/Next play buttons, game tiles and chips no longer look
+  disabled (Quarto's default button style had greyed their text).
+
 - The Explorer's **Combine** tab: every NFL Scouting Combine invitee since
   2010 in a 3D scatter you can rotate, height by weight by 40-yard dash by
   default, with any three of the eight measurements on the axes, filtered by
