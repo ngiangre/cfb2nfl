@@ -49,6 +49,9 @@ mutable scrubPlay = null
 mutable gameInView = false
 // Which Prev/Next button to refocus after the play card is redrawn.
 navFocus = ({key: null})
+// The game charts' shared crosshair: `sync(play)` moves the line in both
+// charts to one play; `play` is the play the card shows.
+crosshair = ({sync: () => {}, play: null})
 mutable playersRetry = 0
 mutable combineRetry = 0
 // The invitee the reader tapped in the 3D scatter.
@@ -577,7 +580,9 @@ gameView = {
       Plot.dot(timeline.filter(d => d.turnover), {
         x: "elapsed", y: "margin", symbol: "times", r: 7, stroke: "#b91c1c", strokeWidth: 2
       }),
-      Plot.ruleX(timeline, Plot.pointerX({x: "elapsed", stroke: "#111827"}))
+      // Invisible: it only picks the play under the pointer. The visible line
+      // is the shared crosshair below, drawn in both charts.
+      Plot.ruleX(timeline, Plot.pointerX({x: "elapsed", strokeOpacity: 0}))
     ]
   }));
   const ppa = Plot.plot(axisRoom({
@@ -586,9 +591,31 @@ gameView = {
     marks: [
       Plot.ruleY([0], {stroke: "#9ca3af"}),
       Plot.line(timeline, {x: "elapsed", y: "cum_ppa", stroke: info.color, strokeWidth: 2}),
-      Plot.ruleX(timeline, Plot.pointerX({x: "elapsed", stroke: "#111827"}))
+      Plot.ruleX(timeline, Plot.pointerX({x: "elapsed", strokeOpacity: 0}))
     ]
   }));
+  // One vertical line per chart, both placed at the same play, so the lead
+  // and the PPA edge always read at the same moment. Each pointer only picks
+  // the play; the line follows the play card (pointer, Prev/Next or default).
+  const lines = [margin, ppa].map(fig => {
+    const [y0, y1] = fig.scale("y").range;
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("y1", y0);
+    line.setAttribute("y2", y1);
+    line.setAttribute("stroke", "#111827");
+    line.setAttribute("stroke-width", 1.5);
+    line.setAttribute("pointer-events", "none");
+    fig.append(line);
+    return {line, xs: fig.scale("x")};
+  });
+  crosshair.sync = play => {
+    for (const {line, xs} of lines) {
+      const px = xs.apply(play.elapsed);
+      line.setAttribute("x1", px);
+      line.setAttribute("x2", px);
+    }
+  };
+  crosshair.sync(crosshair.play && timeline.includes(crosshair.play) ? crosshair.play : timeline[0]);
   for (const fig of [margin, ppa]) {
     fig.addEventListener("input", () => { if (fig.value) mutable scrubPlay = fig.value; });
   }
@@ -613,6 +640,8 @@ playCard = {
   // stay hidden.
   if (!timeline.length) return html`<div class="explorer-play-wrap"></div>`;
   const p = scrubPlay && timeline.includes(scrubPlay) ? scrubPlay : timeline[0];
+  crosshair.play = p;
+  crosshair.sync(p);
   const info = ready.teamById.get(team);
   const opp = ready.teamById.get(gameRow.opp_id);
   const ord = ["", "1st", "2nd", "3rd", "4th"];
@@ -676,7 +705,8 @@ and subtracts the opponent's, play by play, so it rises while the team is
 outplaying its opponent even when the score doesn't move.
 
 Drag across either chart to read any play, or use the Previous and Next
-buttons under the play card.
+buttons under the play card. The vertical line marks the same play in both
+charts.
 :::
 
 ```{ojs}

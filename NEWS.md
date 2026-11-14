@@ -1,5 +1,10 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- The Explorer's game timeline now draws one shared crosshair: dragging
+  across either the lead chart or the PPA chart (or stepping with
+  Previous/Next) puts the vertical line on the same play in both charts,
+  matching the play card. Before, each chart tracked the pointer on its own.
+
 - The Explorer's **Draft & careers** tab, which replaces the Visualizations
   page (old links redirect to the Explorer, and the Explore hub's tile now
   opens it): every NFL draft since 2010 split by conference tier, with the
