@@ -166,7 +166,9 @@ explorer_sources <- function() {
       "picks"
     ),
     combine = c("combine", "player_stats"),
-    careers = c("picks", "nfl_draft_picks", "nfl_rosters", "roster"),
+    careers_draft = c("picks", "teams", "conference_tiers"),
+    careers_nfl = c("picks", "nfl_draft_picks", "nfl_rosters"),
+    careers_transfers = c("player_stats", "roster", "conference_tiers"),
     map = c("teams", "games")
   )
 }

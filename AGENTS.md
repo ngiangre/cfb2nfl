@@ -277,8 +277,9 @@ all of it. Years 2010–2026.
   navbar, but `$ALTDOC_VIGNETTE_BLOCK`/`$ALTDOC_MAN_BLOCK` only expand in the
   sidebar in altdoc 0.7.3, so the pages are hand-wired instead). Content pages
   are vignettes: `explore.qmd` is a hub of bslib value-card tiles linking to
-  `about`, `analysis`, `data`, `visualizations` (the interactive charts,
-  renamed from the old explore page), and `pipeline`; `investigations.qmd` builds a
+  `about`, `analysis`, `data`, `explorer` (the Quarto OJS explorer,
+  decision 0046, which replaced the old `visualizations` page; that URL
+  redirects via `aliases:`), and `pipeline`; `investigations.qmd` builds a
   reactable table of all dated posts (`YYYY-MM-DD-*.qmd`) from their YAML at
   render time; `reference.qmd` builds a searchable reactable of every
   non-internal function linking to `../man/<fn>.html` (75 rendered man pages).

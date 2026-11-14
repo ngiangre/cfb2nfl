@@ -62,9 +62,10 @@ Sources, grains, and how each table is built.
 :::
 
 ::: {.explore-tile}
-### [Visualizations](visualizations.html){.stretched-link}
+### [Explorer](explorer.html){.stretched-link}
 
-Interactive exemplars of the project's chart families.
+Tap from conferences to teams, games and players, plus the combine, the
+draft and NFL careers.
 :::
 
 ::: {.explore-tile}

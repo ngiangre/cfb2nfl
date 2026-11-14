@@ -2543,3 +2543,65 @@ contract_explorer_combine <- function(
     pointblank::interrogate()
   enforce_contract(agent, "explorer_combine", stop_on_fail)
 }
+
+#' Data contract for the explorer Draft & careers asset
+#'
+#' Guards [build_explorer_careers()] and its file: one row per draft pick in
+#' the data window (no loss), every pick in a position group and tier, NFL
+#' seasons known exactly for the picks linked to nflverse, transfer arrivals
+#' summing to [transfer_counts()], and `careers.json` under `max_gzip_bytes`
+#' (it loads whole when the tab opens).
+#'
+#' @param careers Output of [build_explorer_careers()].
+#' @param picks_nfl CFBD picks linked to nflverse.
+#' @param ps_change Player-season change features.
+#' @param first_season First season of the data window (the first season in
+#'   the conference tiers); picks from earlier drafts are not shipped.
+#' @param path The written `careers.json`.
+#' @param max_gzip_bytes Largest allowed gzipped size, in bytes.
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_explorer_careers <- function(
+  careers,
+  picks_nfl,
+  ps_change,
+  first_season,
+  path,
+  max_gzip_bytes = 150000L,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  check <- function(agent, ok) {
+    pointblank::col_vals_equal(
+      agent,
+      "ok",
+      TRUE,
+      preconditions = function(x) tibble::tibble(ok = ok)
+    )
+  }
+  draft <- careers$draft
+  kept <- picks_nfl[picks_nfl$year >= first_season, ]
+  gz <- length(memCompress(readBin(path, "raw", file.size(path)), "gzip"))
+  agent <- pointblank::create_agent(draft, label = "explorer_careers") |>
+    pointblank::col_vals_not_null(pointblank::vars(
+      year,
+      round,
+      overall,
+      name,
+      pos,
+      team,
+      tier
+    )) |>
+    pointblank::col_vals_in_set("pos", explorer_combine_groups()$pos) |>
+    pointblank::col_vals_in_set("tier", 1:3) |>
+    pointblank::col_vals_gte("nfl_seasons", 0L, na_pass = TRUE) |>
+    check(nrow(draft) == nrow(kept)) |>
+    check(sum(!is.na(draft$nfl_seasons)) == sum(kept$nfl_matched)) |>
+    check(
+      sum(careers$transfers$n) == sum(transfer_counts(ps_change)$n_transfers)
+    ) |>
+    check(gz <= max_gzip_bytes) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "explorer_careers", stop_on_fail)
+}

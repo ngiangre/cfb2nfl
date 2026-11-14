@@ -5,6 +5,9 @@ vignette: >
   %\VignetteIndexEntry{Explorer}
   %\VignetteEngine{quarto::html}
   %\VignetteEncoding{UTF-8}
+# The Explorer replaced the Visualizations page; old links redirect here.
+aliases:
+  - visualizations.html
 resources:
   - explorer-data/**
 css: explorer/explorer.css
@@ -27,6 +30,10 @@ import {
 import {
   columnsToRows, resolveCombinePos, combinePoints, missingCount, formatMeasure, canOpenPlayer, combineTraces
 } from "./explorer/combine.js"
+import {
+  TIER_LABELS, DIRECTIONS, draftByTier, picksPerYear, teamPicks, longevityPoints, roundMedians,
+  transferTotals, teamTransfers, nflSeasonsLabel
+} from "./explorer/careers.js"
 ```
 
 ```{ojs}
@@ -46,6 +53,9 @@ mutable playersRetry = 0
 mutable combineRetry = 0
 // The invitee the reader tapped in the 3D scatter.
 mutable combinePick = null
+mutable careersRetry = 0
+// A position code's reader-facing group, for the draft chips.
+groupOf = pos => ready.meta.combine_groups.find(g => g.pos === pos)?.group ?? "Position not recorded"
 // The hyparquet module, imported once per page (a retry busts the failed import).
 function loadHyparquet(n) {
   const url = hyparquetUrl("https://cdn.jsdelivr.net/npm/hyparquet@1/+esm", n);
@@ -1091,8 +1101,261 @@ asNode(sourceLine(ready.meta.sources.combine))
 ::: {#tab-careers .explorer-tab hidden=""}
 ## Draft & careers
 
-::: {.explorer-card}
-Draft classes, NFL careers and transfers move here from the Visualizations
-page.
+Where do NFL draft picks come from, how long do they last in the league, and
+how often do college players change schools along the way? Every chart
+follows the season and team picked above.
+
+```{ojs}
+//| echo: false
+//| output: false
+tierColor = new Map([[TIER_LABELS[3], "#1e3a8a"], [TIER_LABELS[2], "#60a5fa"], [TIER_LABELS[1], "#d97706"]])
+directionColor = new Map([["Up a tier", "#2a9d8f"], ["Same tier", "#b0b7c0"], ["Down a tier", "#d1495b"]])
+// Every pick since 2010 and the transfer arrivals (~85 KB gzipped), fetched
+// the first time the tab opens.
+careersData = {
+  if (tab !== "careers") return {pending: true, draft: [], transfers: []};
+  careersRetry;
+  try {
+    const raw = await loadOnce(tabCache, "careers", () => fetchJson("explorer-data/careers.json"));
+    return {
+      draft: columnsToRows(raw.draft), transfers: columnsToRows(raw.transfers),
+      rate: raw.transfer_rate, latest: raw.nfl_latest_season
+    };
+  } catch (error) {
+    return {error, draft: [], transfers: []};
+  }
+}
+draftYears = [...new Set(careersData.draft.map(d => d.year))].sort((a, b) => a - b)
+careersBlank = careersData.error || careersData.pending
+```
+
+```{ojs}
+//| echo: false
+// The error card, shown once at the top of the tab.
+careersStatus = {
+  // An empty element, not a comment: OJS prints a comment that replaces an
+  // earlier output as "Comment {}".
+  if (!careersData.error) return html`<div></div>`;
+  const card = asNode(errorCard("the draft and transfer data"));
+  card.querySelector("button").onclick = () => { mutable careersRetry = careersRetry + 1; };
+  return card;
+}
+```
+
+### Draft classes {#careers-draft}
+
+```{ojs}
+//| echo: false
+draftView = {
+  if (careersBlank) return html`<div></div>`;
+  const info = ready.teamById.get(team);
+  const draft = careersData.draft;
+  const byTier = draftByTier(draft);
+  const years = draftYears.map(year => {
+    const rows = byTier.filter(d => d.year === year);
+    return {year, total: rows.reduce((a, d) => a + d.n, 0), rows};
+  });
+  const tierOrder = [3, 2, 1].map(t => TIER_LABELS[t]);
+  const national = Plot.plot(axisRoom({
+    width, height: 240, marginLeft: 48, style: {fontSize: "16px"},
+    x: {label: "Draft", type: "band", tickFormat: d => d % 4 === 2 ? String(d) : ""},
+    y: {label: "Players drafted", grid: true},
+    color: {domain: tierOrder, range: tierOrder.map(t => tierColor.get(t)), legend: true},
+    marks: [
+      Plot.barY(byTier, {
+        x: "year", y: "n", fill: "label", order: tierOrder,
+        fillOpacity: d => d.year === season ? 1 : 0.6
+      }),
+      Plot.tip(years, Plot.pointerX({
+        x: "year", y: "total",
+        title: d => `${d.year} draft: ${d.total} picks\n` + d.rows.map(r => `${r.label}: ${r.n}`).join("\n")
+      }))
+    ]
+  }));
+  national.addEventListener("click", () => { if (national.value) pick.seasonOnly(national.value.year); });
+  const mine = picksPerYear(draft, team, draftYears);
+  const own = Plot.plot(axisRoom({
+    width, height: 170, marginLeft: 48, style: {fontSize: "16px"},
+    x: {label: "Draft", type: "band", tickFormat: d => d % 4 === 2 ? String(d) : ""},
+    y: {label: `Picks from ${info.team}`, grid: true, tickFormat: d => Number.isInteger(d) ? d : ""},
+    marks: [
+      Plot.barY(mine, {x: "year", y: "n", fill: info.color, fillOpacity: d => d.year === season ? 1 : 0.55}),
+      Plot.ruleY([0]),
+      Plot.tip(mine, Plot.pointerX({x: "year", y: "n", title: d => `${d.year} draft: ${d.n} from ${info.team}`}))
+    ]
+  }));
+  own.addEventListener("click", () => { if (own.value) pick.seasonOnly(own.value.year); });
+  const list = teamPicks(draft, team, season);
+  const chips = html`<div class="explorer-chips"></div>`;
+  for (const d of list) {
+    const text = html`${d.name} <span>R${d.round} #${d.overall} · ${groupOf(d.pos)}</span>`;
+    if (d.players_pos) {
+      const chip = html`<button type="button" class="explorer-chip">${text}</button>`;
+      // Open the player's last college season.
+      chip.onclick = () => pick.player(d.player_id, d.players_pos, d.year - 1);
+      chips.append(chip);
+    } else {
+      chips.append(html`<span class="explorer-chip explorer-chip-static">${text}</span>`);
+    }
+  }
+  const caption = !draftYears.includes(season)
+    ? `There is no ${season} draft in the data yet.`
+    : list.length ? `${info.team} in the ${season} draft. Tap a player to open their college career.`
+    : `${info.team} had no player picked in the ${season} draft.`;
+  return html`<div>
+    <h4>Players drafted each year, by conference tier</h4>${national}
+    <h4>${info.team}</h4>${own}
+    <p class="explorer-note">${caption}</p>${chips}
+  </div>`;
+}
+```
+
+::: {.column-margin}
+Each bar is one NFL draft, split by the conference tier of the player's
+last college season: the **Power** conferences, the **Group of Five**, and
+**FCS and below**. The darker bar is the selected season's draft. Tap a
+draft in either chart to list the selected team's picks that year.
 :::
+
+```{ojs}
+//| echo: false
+asNode(sourceLine(ready.meta.sources.careers_draft))
+```
+
+### NFL careers {#careers-nfl}
+
+```{ojs}
+//| echo: false
+viewof nflFilter = {
+  const groups = new Map([["Every position", "all"], ...ready.meta.combine_groups.map(g => [g.group, g.pos])]);
+  const posSel = Inputs.select(groups, {label: "Position", value: "all"});
+  const years = draftYears.length ? draftYears : [ready.meta.default_season];
+  const from = Inputs.select(years, {label: "From draft", value: years[0], format: String});
+  const to = Inputs.select(years, {label: "To draft", value: years.at(-1), format: String});
+  const form = html`<div class="explorer-axes">${posSel}${from}${to}</div>`;
+  const read = () => ({pos: posSel.value, from: Math.min(from.value, to.value), to: Math.max(from.value, to.value)});
+  form.value = read();
+  for (const el of [posSel, from, to]) {
+    el.addEventListener("input", event => {
+      event.stopPropagation();
+      form.value = read();
+      form.dispatchEvent(new Event("input", {bubbles: true}));
+    });
+  }
+  return form;
+}
+```
+
+```{ojs}
+//| echo: false
+nflView = {
+  if (careersBlank) return html`<div></div>`;
+  const info = ready.teamById.get(team);
+  const pts = longevityPoints(careersData.draft, nflFilter);
+  if (!pts.length) return asNode(`<div class="explorer-card">No picks with NFL roster records for this position and these drafts.</div>`);
+  const meds = roundMedians(pts);
+  const others = pts.filter(d => d.team_id !== team), mine = pts.filter(d => d.team_id === team);
+  const label = d => `${d.name} (${d.team}), ${d.year} R${d.round} #${d.overall}\n${nflSeasonsLabel(d)}`;
+  const fig = Plot.plot(axisRoom({
+    width, height: 380, marginLeft: 48, style: {fontSize: "16px"},
+    x: {label: "Draft round", domain: [0.5, 7.5], ticks: [1, 2, 3, 4, 5, 6, 7], tickFormat: d => `R${d}`},
+    y: {label: "NFL seasons on a roster", grid: true, domain: [-0.5, Math.max(...pts.map(d => d.nfl_seasons)) + 0.5]},
+    marks: [
+      Plot.dot(others, {x: "x", y: "y", r: 2.5, stroke: "#9ca3af", fill: d => d.active ? "white" : "#9ca3af", fillOpacity: 0.8}),
+      Plot.dot(mine, {x: "x", y: "y", r: 5, stroke: info.color, strokeWidth: 2, fill: d => d.active ? "white" : info.color}),
+      Plot.link(meds, {x1: d => d.round - 0.4, x2: d => d.round + 0.4, y1: "median", y2: "median", stroke: "#111827", strokeWidth: 3}),
+      Plot.tip(pts, Plot.pointer({x: "x", y: "y", title: label}))
+    ]
+  }));
+  fig.addEventListener("click", () => {
+    const d = fig.value;
+    if (d && d.players_pos) pick.player(d.player_id, d.players_pos, d.year - 1);
+  });
+  const medianText = meds.map(m => `R${m.round} ${m.median}`).join(" · ");
+  const teamText = mine.length
+    ? `${mine.length.toLocaleString("en-US")} of them from ${info.team}, in its color.`
+    : `None from ${info.team}.`;
+  return html`<div>
+    <h4>How long drafted players last, ${nflFilter.from}–${nflFilter.to} drafts</h4>
+    ${fig}
+    <p class="explorer-note">${pts.length.toLocaleString("en-US")} picks with an NFL record. ${teamText} Median seasons by round: ${medianText}. Tap a dot to open the player's college career.</p>
+  </div>`;
+}
+```
+
+::: {.column-margin}
+Each dot is one draft pick, placed by round and by how many **seasons the player
+spent on an NFL roster** (any team, any time in the season). Within each
+round, earlier picks sit to the left. The black bar is the round's
+**median**: half the round's picks lasted longer, half shorter.
+**Hollow dots** are still on a roster in the latest NFL season, so their
+careers are not over and their counts will grow; recent drafts are mostly
+hollow. Picks the NFL records could not be matched to are left out.
+:::
+
+```{ojs}
+//| echo: false
+asNode(sourceLine(ready.meta.sources.careers_nfl))
+```
+
+### Transfers {#careers-transfers}
+
+```{ojs}
+//| echo: false
+transfersView = {
+  if (careersBlank) return html`<div></div>`;
+  const info = ready.teamById.get(team);
+  const labels = DIRECTIONS.map(d => d.label);
+  const color = {domain: labels, range: labels.map(l => directionColor.get(l)), legend: true};
+  const chart = (rows, height, yLabel) => {
+    const totals = [...new Set(rows.map(d => d.season))].map(s => {
+      const r = rows.filter(d => d.season === s);
+      return {season: s, total: r.reduce((a, d) => a + d.n, 0), rows: r};
+    });
+    const fig = Plot.plot(axisRoom({
+      width, height, marginLeft: 52, style: {fontSize: "16px"},
+      x: {label: "Season", type: "band", domain: ready.meta.seasons, tickFormat: d => d % 4 === 2 ? String(d) : ""},
+      y: {label: yLabel, grid: true},
+      color,
+      marks: [
+        Plot.barY(rows, {x: "season", y: "n", fill: "label", order: labels, fillOpacity: d => d.season === season ? 1 : 0.6}),
+        Plot.ruleY([0]),
+        Plot.tip(totals, Plot.pointerX({
+          x: "season", y: "total",
+          title: d => `${d.season}: ${d.total.toLocaleString("en-US")} transfers in\n` + d.rows.map(r => `${r.label}: ${r.n}`).join("\n")
+        }))
+      ]
+    }));
+    fig.addEventListener("click", () => { if (fig.value) pick.seasonOnly(fig.value.season); });
+    return fig;
+  };
+  const all = transferTotals(careersData.transfers);
+  const mine = teamTransfers(careersData.transfers, team);
+  const rate = careersData.rate;
+  const pct = Math.round(rate.share * 1000) / 10;
+  return html`<div>
+    <h4>Transfers by the season a player first played for the new school</h4>
+    ${chart(all, 260, "Transfers")}
+    <h4>Transfers into ${info.team}</h4>
+    ${mine.length ? chart(mine, 200, "Transfers in") : asNode(`<div class="explorer-card">No transfers into ${escapeHtml(info.team)} with a stat line.</div>`)}
+    <p class="explorer-note">${pct}% of the ${rate.players.toLocaleString("en-US")} players on a college roster since 2010 (${rate.transferred.toLocaleString("en-US")}) changed schools at least once.</p>
+  </div>`;
+}
+```
+
+::: {.column-margin}
+A **transfer** is a player whose stat line moves to a new school from one
+season to the next. Its **direction** compares the two schools' conference
+tiers (Power above Group of Five above FCS and below) in the season of the
+move, so realignment is read as it stood then. The bars count players with
+a stat line, which the early seasons record for far fewer players, so those
+counts run low; the jump since 2021 also follows the NCAA's transfer portal
+(2018) and its one-time transfer rule (2021). The share below the charts
+counts every player on a roster.
+:::
+
+```{ojs}
+//| echo: false
+asNode(sourceLine(ready.meta.sources.careers_transfers))
+```
 :::
