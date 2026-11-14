@@ -1,5 +1,19 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Explorer: every player name now carries the player's position, as in
+  "Arch Manning (QB)": play-card chips, Players search results, swarm
+  tooltips and the career heading, Combine tooltips and cards, and the draft
+  chips and NFL-career tooltips. Combine tooltips also name the position a
+  player was drafted at ("Drafted as OG, R5 #150"), which can differ from
+  the position they worked out at (#84).
+
+- Explorer Combine tab: **region filters**. Each axis has Any / Low / Mid /
+  High buttons (thirds of the invitees shown, with their ranges), so a
+  region such as tall and fast receivers can be picked out by tapping instead
+  of rotating the 3D chart. Its invitees stay in full color while everyone
+  else fades back, they are listed below the chart, and the legend counts
+  each color (#84).
+
 - Teams now carry their home stadium's name, city, state, latitude and
   longitude, read from the CFBD `/teams` response the refresh already pulls
   (no extra API calls). Every FBS program has coordinates, and the teams

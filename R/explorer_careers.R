@@ -41,6 +41,41 @@ draft_position_group <- function(position) {
   out
 }
 
+#' Abbreviate NFL draft position names
+#'
+#' CFBD's spelled-out draft positions as the codes fans read beside a name
+#' ("Offensive Tackle" is `"OT"`). Unknown names become `NA`.
+#'
+#' @param position Character vector of `picks$position` values.
+#' @return Character vector of position codes.
+#' @export
+draft_position_code <- function(position) {
+  map <- c(
+    "Quarterback" = "QB",
+    "Running Back" = "RB",
+    "Fullback" = "FB",
+    "Wide Receiver" = "WR",
+    "Tight End" = "TE",
+    "Offensive Tackle" = "OT",
+    "Offensive Guard" = "OG",
+    "Center" = "C",
+    "Defensive End" = "DE",
+    "Defensive Tackle" = "DT",
+    "Defensive Edge" = "EDGE",
+    "Linebacker" = "LB",
+    "Inside Linebacker" = "ILB",
+    "Outside Linebacker" = "OLB",
+    "Cornerback" = "CB",
+    "Safety" = "S",
+    "Defensive Back" = "DB",
+    "Place Kicker" = "K",
+    "Punter" = "P",
+    "Long Snapper" = "LS",
+    "Kick Returner" = "KR"
+  )
+  unname(map[position])
+}
+
 #' Conference tier at the nearest season with one
 #'
 #' Looks up each conference's tier in `season`, else in the closest season
@@ -132,6 +167,7 @@ build_explorer_draft <- function(
       overall = as.integer(.data$overall),
       name = .data$name,
       pos = .data$pos,
+      position = draft_position_code(.data$position),
       team_id = .data$team_id,
       team = .data$collegeTeam,
       tier = .data$tier,

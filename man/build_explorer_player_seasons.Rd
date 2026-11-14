@@ -26,7 +26,8 @@ to \code{team_id}. Lower-division teams keep their name and have no id.}
 outcome row (no roster career).}
 }
 \value{
-A tibble: \code{pos}, \code{player_id}, \code{name}, \code{season}, \code{team}, \code{team_id},
+A tibble: \code{pos}, \code{player_id}, \code{name}, \code{position} (roster code),
+\code{season}, \code{team}, \code{team_id},
 \code{conference}, \code{tier}, \code{outcome}, \code{outcome_label}, then the stat columns.
 }
 \description{

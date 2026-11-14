@@ -119,3 +119,19 @@ h3[tabindex="-1"]:focus { outline-offset: 4px; }
 .explorer-3d-plot { touch-action: none; } /* drags rotate the scene */
 .explorer-combine-card h4 { margin-top: 0; }
 .explorer-chip-static { cursor: default; }
+/* Combine region filters (#84): one row of four buttons per axis. */
+.explorer-region { margin: 0.5rem 0; }
+.explorer-region-axis { margin: 0.4rem 0; }
+.explorer-region-buttons { display: grid; grid-template-columns: 0.7fr 1fr 1fr 1fr; gap: 0.3rem; margin-top: 0.2rem; }
+.explorer-region-button {
+  min-height: 44px; padding: 0.3rem; border: 1px solid #9ca3af; border-radius: 0.5rem;
+  background: #fff; color: #111827; font-size: 1rem; line-height: 1.15; cursor: pointer;
+}
+.explorer-region-button small { display: block; font-size: 0.78rem; opacity: 0.75; }
+.explorer-region-button[aria-pressed="true"] { background: #111827; color: #fff; border-color: #111827; }
+/* Quarto's .btn-quarto colors win over plain background rules; set its variables. */
+.explorer-tab .btn.btn-quarto.explorer-region-button { --bs-btn-border-color: #9ca3af; }
+.explorer-tab .btn.btn-quarto.explorer-region-button[aria-pressed="true"] {
+  --bs-btn-bg: #111827; --bs-btn-color: #fff; --bs-btn-border-color: #111827;
+  --bs-btn-hover-bg: #111827; --bs-btn-hover-color: #fff; --bs-btn-active-bg: #111827; --bs-btn-active-color: #fff;
+}

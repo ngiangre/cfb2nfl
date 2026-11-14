@@ -68,6 +68,44 @@ test_that("draft_position_group maps the draft's position names", {
   )
 })
 
+test_that("draft_position_code abbreviates CFBD draft positions", {
+  expect_equal(
+    draft_position_code(c(
+      "Offensive Tackle",
+      "Defensive Edge",
+      "Place Kicker",
+      "Cornerback",
+      "Nope"
+    )),
+    c("OT", "EDGE", "K", "CB", NA)
+  )
+  # Every position the group map knows has a code.
+  known <- c(
+    "Quarterback",
+    "Running Back",
+    "Fullback",
+    "Wide Receiver",
+    "Tight End",
+    "Offensive Tackle",
+    "Offensive Guard",
+    "Center",
+    "Defensive End",
+    "Defensive Tackle",
+    "Defensive Edge",
+    "Linebacker",
+    "Inside Linebacker",
+    "Outside Linebacker",
+    "Cornerback",
+    "Safety",
+    "Defensive Back",
+    "Place Kicker",
+    "Punter",
+    "Long Snapper",
+    "Kick Returner"
+  )
+  expect_false(anyNA(draft_position_code(known)))
+})
+
 test_that("build_explorer_draft keeps the data window and counts NFL seasons", {
   x <- build_explorer_draft(
     explorer_picks_nfl_fixture(),
@@ -86,6 +124,8 @@ test_that("build_explorer_draft keeps the data window and counts NFL seasons", {
   expect_true(by_name$Starter$active)
   expect_equal(by_name$Starter$players_pos, "QB")
   expect_equal(by_name$Starter$pos, "QB")
+  expect_equal(by_name$Starter$position, "QB")
+  expect_equal(by_name$`Late Lineman`$position, "OT")
   # Linked to nflverse but never on a roster: zero seasons, not NA.
   expect_equal(by_name$`Late Lineman`$nfl_seasons, 0L)
   expect_false(by_name$`Late Lineman`$active)

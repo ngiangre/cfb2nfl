@@ -213,12 +213,15 @@ test_that("build_explorer_plays tags each player chip with its position group", 
     player_groups = tibble::tibble(
       player_id = c("p1", "p1"),
       season = c(2025L, 2026L),
-      pos = c("QB", "RB")
+      pos = c("QB", "RB"),
+      position = c("QB", "RB")
     )
   )
   pl <- jsonlite::fromJSON(p$players[p$play_id == "12"])
   # p1 was a QB in 2025 (the play's season); p2 has no group, so no pos.
   expect_equal(pl$pos, c("QB", NA))
+  # The chip also carries the season's position code, shown beside the name.
+  expect_equal(pl$position, c("QB", NA))
 })
 
 test_that("write_explorer_team_games writes one JSON file per season", {

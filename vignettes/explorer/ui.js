@@ -13,6 +13,13 @@ export function sourceLine(tables, href = "data.html") {
   return `<p class="explorer-source">Data: ${links}</p>`;
 }
 
+// A player's name with their position first among the details in
+// parentheses, e.g. "Arch Manning (QB, Texas)"; missing details are skipped.
+export function playerLabel(name, position, ...details) {
+  const extra = [position, ...details].filter(x => x !== null && x !== undefined && x !== "");
+  return extra.length ? `${name} (${extra.join(", ")})` : String(name);
+}
+
 export function errorCard(what) {
   return `<div class="explorer-card explorer-error" role="alert"><p>Couldn't load ${escapeHtml(what)}.</p>` +
     `<button type="button" class="explorer-retry">Retry</button></div>`;

@@ -17,7 +17,7 @@ toc: false
 ```{ojs}
 //| echo: false
 import {TABS, parseHash, toHash, resolveTeam} from "./explorer/state.js"
-import {sourceLine, errorCard, loadOnce, escapeHtml, axisRoom} from "./explorer/ui.js"
+import {sourceLine, errorCard, loadOnce, escapeHtml, axisRoom, playerLabel} from "./explorer/ui.js"
 import {
   formatRecord, teamGames, effectiveGame, landscapePanels, timelineFor, parsePlayers,
   teamSeasonRow, teamGroups, conferenceAverages, mapPoints, mapTitle, shouldLoadPlays, stepPlay, playWhen, playAnnouncement, recordShares
@@ -28,7 +28,8 @@ import {
   beeswarm, careerRows, seasonForPlayer, careerPercentiles, searchPlayers, groupPlural
 } from "./explorer/players.js"
 import {
-  columnsToRows, resolveCombinePos, combinePoints, missingCount, formatMeasure, canOpenPlayer, combineTraces
+  columnsToRows, resolveCombinePos, combinePoints, missingCount, formatMeasure, canOpenPlayer, combineTraces,
+  regionCuts, regionActive, inRegion
 } from "./explorer/combine.js"
 import {
   TIER_LABELS, DIRECTIONS, draftByTier, picksPerYear, teamPicks, longevityPoints, roundMedians,
@@ -56,9 +57,9 @@ mutable playersRetry = 0
 mutable combineRetry = 0
 // The invitee the reader tapped in the 3D scatter.
 mutable combinePick = null
+// The reader's last 3D camera, kept when a region pick redraws the chart.
+combineCamera = ({eye: {x: 1.6, y: 1.6, z: 1.1}})
 mutable careersRetry = 0
-// A position code's reader-facing group, for the draft chips.
-groupOf = pos => ready.meta.combine_groups.find(g => g.pos === pos)?.group ?? "Position not recorded"
 // The hyparquet module, imported once per page (a retry busts the failed import).
 function loadHyparquet(n) {
   const url = hyparquetUrl("https://cdn.jsdelivr.net/npm/hyparquet@1/+esm", n);
@@ -754,7 +755,7 @@ playCard = {
   if (players.length) {
     const chips = html`<div class="explorer-chips"></div>`;
     for (const a of players) {
-      const chip = html`<button type="button" class="explorer-chip">${a.name} <span>${a.stat}</span></button>`;
+      const chip = html`<button type="button" class="explorer-chip">${playerLabel(a.name, a.position)} <span>${a.stat}</span></button>`;
       chip.onclick = () => pick.player(a.id, a.pos);
       chips.append(chip);
     }
@@ -879,7 +880,7 @@ playerSearch = {
   box.addEventListener("input", () => {
     list.replaceChildren();
     for (const d of searchPlayers(playersData.rows, box.value, playerTeam)) {
-      const chip = html`<button type="button" class="explorer-chip" role="listitem">${d.name} <span>${playerTeam(d)} · ${d.season}</span></button>`;
+      const chip = html`<button type="button" class="explorer-chip" role="listitem">${playerLabel(d.name, d.position)} <span>${playerTeam(d)} · ${d.season}</span></button>`;
       chip.onclick = () => {
         const c = careerRows(playersData.rows, d.player_id);
         const s = seasonForPlayer(c, season);
@@ -936,12 +937,12 @@ swarm = {
         stroke: chosenTeam?.color ?? "#111827", strokeWidth: 3
       }) : null,
       chosen ? Plot.text([chosen], {
-        x: "value", y: "y", text: "name", dy: -16, fontWeight: "bold", fontSize: 15, fill: "#111827",
+        x: "value", y: "y", text: d => playerLabel(d.name, d.position), dy: -16, fontWeight: "bold", fontSize: 15, fill: "#111827",
         stroke: "white", strokeWidth: 4, paintOrder: "stroke"
       }) : null,
       Plot.tip(placed, Plot.pointer({
         x: "value", y: "y",
-        title: d => `${d.name} (${playerTeam(d)})\n${stat.label}: ${formatStat(d.value, stat.format)}, ${ordinal(d[`${stat.key}_pct`])} percentile\n${d.outcome_label}`
+        title: d => `${playerLabel(d.name, d.position, playerTeam(d))}\n${stat.label}: ${formatStat(d.value, stat.format)}, ${ordinal(d[`${stat.key}_pct`])} percentile\n${d.outcome_label}`
       }))
     ]
   }));
@@ -987,13 +988,13 @@ careerView = {
   if (!career.length) return asNode(`<div class="explorer-card">This player has no ${escapeHtml(playersGroup.toLowerCase())} stat line. Try another position.</div>`);
   const last = career.at(-1);
   const out = html`<div class="explorer-career">
-    <h4>${last.name}</h4>
+    <h4>${playerLabel(last.name, last.position)}</h4>
     <p><span class="explorer-outcome" style="--c:${outcomeColor.get(last.outcome)}">${last.outcome_label}</span></p>
   </div>`;
   if (!career.some(d => d.season === season)) {
     const b = html`<button type="button" class="explorer-chip">Show ${last.season} in the landscape</button>`;
     b.onclick = () => pick.seasonOnly(last.season);
-    out.append(html`<p class="explorer-note">${last.name} has no ${playersGroup.toLowerCase()} line in ${season}. ${b}</p>`);
+    out.append(html`<p class="explorer-note">${playerLabel(last.name, last.position)} has no ${playersGroup.toLowerCase()} line in ${season}. ${b}</p>`);
   }
   const long = careerPercentiles(career, playersStats);
   const seasons = career.map(d => d.season);
@@ -1128,6 +1129,37 @@ viewof combineRange = {
 //| output: false
 combineFilter = ({pos: combinePos, from: combineRange[0], to: combineRange[1], axes: combineAxes})
 combineShown = combinePoints(combineData.rows, combineFilter)
+combineCuts = regionCuts(combineShown, combineAxes)
+```
+
+```{ojs}
+//| echo: false
+// Low / Mid / High thirds per axis. Any change to the position, classes or
+// axes rebuilds the buttons, which resets the region to Any.
+viewof combineRegion = {
+  const byKey = new Map(combineMeasures.map(m => [m.key, m]));
+  const form = html`<div class="explorer-region" role="group" aria-label="Region filters"></div>`;
+  form.value = [null, null, null];
+  const fmt = (v, m) => formatMeasure(m.unit === "s" ? Math.round(v * 100) / 100 : Math.round(v * 10) / 10, m);
+  combineAxes.forEach((k, a) => {
+    const m = byKey.get(k), c = combineCuts[a];
+    const row = html`<div class="explorer-region-axis"><strong>${m.label}</strong><div class="explorer-region-buttons"></div></div>`;
+    const box = row.querySelector(".explorer-region-buttons");
+    const choices = [["Any", null], ["Low", 0], ["Mid", 1], ["High", 2]];
+    const buttons = choices.map(([text, b]) => {
+      const btn = html`<button type="button" class="explorer-region-button" aria-pressed=${String(b === null)}>${text}${b === null ? "" : html`<small>${fmt(c[b], m)}–${fmt(c[b + 1], m)}</small>`}</button>`;
+      btn.onclick = () => {
+        for (const x of buttons) x.setAttribute("aria-pressed", String(x === btn));
+        form.value = form.value.map((v, i) => (i === a ? b : v));
+        form.dispatchEvent(new Event("input", {bubbles: true}));
+      };
+      box.append(btn);
+      return btn;
+    });
+    form.append(row);
+  });
+  return form;
+}
 ```
 
 ```{ojs}
@@ -1148,16 +1180,23 @@ combinePlot = {
   const title = k => `${byKey.get(k).label} (${byKey.get(k).unit})`;
   const camera = {eye: {x: 1.6, y: 1.6, z: 1.1}};
   const el = html`<div class="explorer-3d-plot"></div>`;
-  Plotly.newPlot(el, combineTraces(combineShown, {
+  const traces = combineTraces(combineShown, {
     axes: combineAxes, measures: combineMeasures, outcomes: ready.meta.combine_outcomes,
-    colors: combineOutcomeColor, selected: player
-  }), {
+    colors: combineOutcomeColor, selected: player, region: combineRegion, cuts: combineCuts
+  });
+  // An HTML legend with each color's count: it wraps on any screen, where
+  // plotly's horizontal legend runs off the edge.
+  const legend = html`<div class="explorer-legend"></div>`;
+  for (const t of traces.filter(t => t.showlegend !== false)) {
+    legend.append(html`<span><i style=${`background:${t.marker.color};opacity:${Math.max(t.marker.opacity, 0.6)}`}></i>${t.name}</span>`);
+  }
+  Plotly.newPlot(el, traces, {
     width, height: Math.min(560, Math.max(420, width)),
     margin: {l: 0, r: 0, t: 0, b: 0},
     font: {size: 14},
-    legend: {orientation: "h", y: -0.02, font: {size: 13}},
+    showlegend: false,
     scene: {
-      camera,
+      camera: combineCamera,
       xaxis: {title: title(combineAxes[0])},
       yaxis: {title: title(combineAxes[1])},
       zaxis: {title: title(combineAxes[2])}
@@ -1167,14 +1206,47 @@ combinePlot = {
     const p = e.points?.[0];
     if (p && p.customdata !== undefined) mutable combinePick = combineShown[p.customdata];
   });
+  el.on("plotly_relayout", e => {
+    const cam = e["scene.camera"];
+    if (cam) Object.assign(combineCamera, cam);
+  });
   const reset = html`<button type="button" class="explorer-chip">Reset view</button>`;
-  reset.onclick = () => Plotly.relayout(el, {"scene.camera": camera});
+  reset.onclick = () => {
+    for (const k of Object.keys(combineCamera)) delete combineCamera[k];
+    Object.assign(combineCamera, camera);
+    Plotly.relayout(el, {"scene.camera": camera});
+  };
   const skipped = missingCount(combineData.rows, combineFilter);
   return html`<div class="explorer-3d">
     <h4>${group} invitees, ${Math.min(...combineRange)}–${Math.max(...combineRange)} classes</h4>
     ${el}
+    ${legend}
     <div class="explorer-chips">${reset}</div>
-    <p class="explorer-note">${combineShown.length.toLocaleString("en-US")} invitees with all three measurements${skipped ? `; ${skipped.toLocaleString("en-US")} skipped at least one of these drills and aren't shown` : ""}. Drag to rotate, pinch or scroll to zoom, tap a point for the player.</p>
+    <p class="explorer-note">${combineShown.length.toLocaleString("en-US")} invitees with all three measurements${skipped ? `; ${skipped.toLocaleString("en-US")} skipped at least one of these drills and aren't shown` : ""}. Pick a third on any axis above to pick out a region; drag to rotate, pinch or scroll to zoom, tap a point for the player.</p>
+  </div>`;
+}
+```
+
+```{ojs}
+//| echo: false
+// The region's players, listed so a reader never has to hunt for a point.
+combineRegionList = {
+  if (combineData.pending || combineData.error || !regionActive(combineRegion)) return html`<div></div>`;
+  const inside = combineShown.filter(d => inRegion(d, combineAxes, combineCuts, combineRegion));
+  const order = new Map(ready.meta.combine_outcomes.map((o, i) => [o.outcome, i]));
+  inside.sort((a, b) => order.get(a.outcome) - order.get(b.outcome) || a.season - b.season || a.name.localeCompare(b.name));
+  const cap = 40;
+  const chips = html`<div class="explorer-chips"></div>`;
+  for (const d of inside.slice(0, cap)) {
+    const chip = html`<button type="button" class="explorer-chip">${playerLabel(d.name, d.combine_pos)} <span>${d.season} · ${d.outcome_label}</span></button>`;
+    chip.onclick = () => { mutable combinePick = d; };
+    chips.append(chip);
+  }
+  const more = inside.length > cap ? ` The first ${cap} are listed, by draft outcome.` : "";
+  return html`<div>
+    <h4>${inside.length.toLocaleString("en-US")} ${inside.length === 1 ? "invitee" : "invitees"} in this region</h4>
+    <p class="explorer-note">Tap a name for the player's card.${more}</p>
+    ${chips}
   </div>`;
 }
 ```
@@ -1192,14 +1264,14 @@ combineCard = {
   const off = !combineShown.includes(d);
   const rows = combineMeasures.map(m => `<tr><th scope="row">${escapeHtml(m.label)}</th><td>${escapeHtml(formatMeasure(d[m.key], m))}</td></tr>`).join("");
   const card = asNode(`<div class="explorer-card explorer-combine-card">
-    <h4>${escapeHtml(d.name)}</h4>
-    <p>${escapeHtml(d.school)} · ${escapeHtml(d.combine_pos)} · ${d.season} combine</p>
+    <h4>${escapeHtml(playerLabel(d.name, d.combine_pos))}</h4>
+    <p>${escapeHtml(d.school)} · ${d.season} combine</p>
     ${off ? `<p class="explorer-note">Not in the chart: no measurement on one of these axes, or outside the classes shown.</p>` : ""}
     <p><span class="explorer-outcome" style="--c:${combineOutcomeColor.get(d.outcome)}">${escapeHtml(d.outcome_label)}</span></p>
     <div class="explorer-table"><table><tbody>${rows}</tbody></table></div>
   </div>`);
   if (canOpenPlayer(d)) {
-    const b = html`<button type="button" class="explorer-chip">Open ${d.name} in Players →</button>`;
+    const b = html`<button type="button" class="explorer-chip">Open ${playerLabel(d.name, d.combine_pos)} in Players →</button>`;
     // The combine follows the last college season, so open that season.
     b.onclick = () => pick.player(d.athlete_id, d.players_pos, d.season - 1);
     card.append(b);
@@ -1218,6 +1290,13 @@ vertical and broad jumps in inches, and the bench press in repetitions of
 225 pounds. Players skip drills, so each view only shows invitees with all
 three measurements. Combine numbers are taken after the college career and
 describe draft prospects; they are not used to forecast careers.
+
+The **region buttons** cut each axis into thirds of the invitees shown
+(the position and classes picked): Low is the bottom third of values, High
+the top. For the 40, shuttle and 3-cone, Low is the fastest third. Picking
+thirds on more than one axis keeps only the invitees in all of them; the
+rest fade back so the region reads against the whole field. The legend
+counts the invitees in each color.
 :::
 
 ```{ojs}
@@ -1316,7 +1395,7 @@ draftView = {
   const list = teamPicks(draft, team, season);
   const chips = html`<div class="explorer-chips"></div>`;
   for (const d of list) {
-    const text = html`${d.name} <span>R${d.round} #${d.overall} · ${groupOf(d.pos)}</span>`;
+    const text = html`${playerLabel(d.name, d.position)} <span>R${d.round} #${d.overall}</span>`;
     if (d.players_pos) {
       const chip = html`<button type="button" class="explorer-chip">${text}</button>`;
       // Open the player's last college season.
@@ -1383,7 +1462,7 @@ nflView = {
   if (!pts.length) return asNode(`<div class="explorer-card">No picks with NFL roster records for this position and these drafts.</div>`);
   const meds = roundMedians(pts);
   const others = pts.filter(d => d.team_id !== team), mine = pts.filter(d => d.team_id === team);
-  const label = d => `${d.name} (${d.team}), ${d.year} R${d.round} #${d.overall}\n${nflSeasonsLabel(d)}`;
+  const label = d => `${playerLabel(d.name, d.position, d.team)}, ${d.year} R${d.round} #${d.overall}\n${nflSeasonsLabel(d)}`;
   const fig = Plot.plot(axisRoom({
     width, height: 380, marginLeft: 48, style: {fontSize: "16px"},
     x: {label: "Draft round", domain: [0.5, 7.5], ticks: [1, 2, 3, 4, 5, 6, 7], tickFormat: d => `R${d}`},

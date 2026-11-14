@@ -78,6 +78,31 @@ test_that("build_explorer_combine labels outcomes and links players", {
   expect_true(all(x$outcome %in% explorer_combine_outcome_levels()$outcome))
 })
 
+test_that("build_explorer_combine names the position a player was drafted at", {
+  picks <- tibble::tibble(
+    year = c(2025L, 2025L),
+    overall = c(3L, 150L),
+    position = c("Quarterback", "Offensive Guard")
+  )
+  x <- build_explorer_combine(
+    explorer_combine_fixture(),
+    explorer_player_seasons_fixture(),
+    picks
+  )
+  by_name <- split(x, x$name)
+  expect_equal(
+    by_name$Starter$outcome_label,
+    "Drafted as QB, R1 #3 (Chicago)"
+  )
+  # Worked out as a tackle, drafted as a guard.
+  expect_equal(by_name$`Big Man`$combine_pos, "OT")
+  expect_equal(
+    by_name$`Big Man`$outcome_label,
+    "Drafted as OG, R5 #150 (Denver)"
+  )
+  expect_equal(by_name$Nobody$outcome_label, "Not drafted")
+})
+
 test_that("write_explorer_combine writes columns and the contract passes", {
   dir <- withr::local_tempdir()
   cb <- explorer_combine_fixture()

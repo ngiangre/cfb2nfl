@@ -17,6 +17,9 @@ test_that("explorer_player_groups fills an unrecorded position from the nearest 
   g <- explorer_player_groups(explorer_player_stats_fixture())
   expect_equal(g$group[g$playerId == "w1" & g$season == 2026L], "Receiver")
   expect_equal(g$group[g$playerId == "o1"], "Offensive line")
+  # The position code is filled the same way ("?" is not a position).
+  expect_equal(g$position[g$playerId == "w1" & g$season == 2026L], "WR")
+  expect_equal(g$position[g$playerId == "o1"], "OT")
 })
 
 test_that("build_explorer_player_seasons ranks within group and season", {
@@ -44,6 +47,7 @@ test_that("build_explorer_player_seasons drops OL and keeps every stat line", {
   w <- dplyr::filter(ps, .data$player_id == "w1")
   expect_equal(w$season, c(2025L, 2026L))
   expect_true(all(is.na(w$passing_yds)))
+  expect_equal(w$position, c("WR", "WR"))
 })
 
 test_that("build_explorer_player_seasons joins team id, tier and outcome", {
@@ -96,6 +100,7 @@ test_that("write_explorer_players writes one file per group with its stats", {
   expect_true(all(c("passing_yds", "passing_yds_pct") %in% names(qb)))
   expect_false("receiving_yds" %in% names(qb))
   expect_type(qb$season, "integer")
+  expect_equal(unique(qb$position), "QB")
   # Names are kept only for teams without an id.
   wr <- arrow::read_parquet(file.path(dir, "players", "WR.parquet"))
   expect_equal(wr$team[wr$player_id == "d2"], "Ferris State")

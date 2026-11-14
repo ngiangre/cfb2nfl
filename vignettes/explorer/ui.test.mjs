@@ -1,6 +1,14 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {sourceLine, errorCard, escapeHtml, loadOnce, axisRoom} from "./ui.js";
+import {sourceLine, errorCard, escapeHtml, loadOnce, axisRoom, playerLabel} from "./ui.js";
+
+test("playerLabel puts the position first in the parentheses", () => {
+  assert.equal(playerLabel("Arch Manning", "QB", "Texas"), "Arch Manning (QB, Texas)");
+  assert.equal(playerLabel("Arch Manning", "QB"), "Arch Manning (QB)");
+  // A missing position or detail is skipped, never printed as "null".
+  assert.equal(playerLabel("Walk On", null, "Texas", 2025), "Walk On (Texas, 2025)");
+  assert.equal(playerLabel("Walk On", undefined), "Walk On");
+});
 
 test("sourceLine links each table to its Data page anchor", () => {
   assert.equal(
