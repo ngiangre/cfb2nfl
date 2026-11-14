@@ -145,17 +145,23 @@ build_explorer_player_outcomes <- function(
 #' Position group per player-season
 #'
 #' The position comes from the season's stat line (the season's roster
-#' position). A season with no recorded position takes the group from the
-#' player's nearest season that has one (the earlier season on a tie).
+#' position). A season with no recorded position takes the group, and the
+#' position code shown beside the player's name, from the player's nearest
+#' season that has one (the earlier season on a tie).
 #'
 #' @param player_stats Cleaned long player stats.
-#' @return A tibble keyed by `(playerId, season)`: `group`.
+#' @return A tibble keyed by `(playerId, season)`: `group`, `position` (the
+#'   roster code, e.g. `"CB"`; `NA` when no season records one).
 #' @export
 explorer_player_groups <- function(player_stats) {
   seasons <- player_stats |>
     dplyr::distinct(.data$playerId, .data$season, .data$position) |>
     dplyr::mutate(group = position_group(.data$position)) |>
     dplyr::summarise(
+      position = dplyr::first(
+        .data$position[.data$group != "Position not recorded"],
+        default = NA_character_
+      ),
       group = dplyr::first(
         .data$group[.data$group != "Position not recorded"],
         default = "Position not recorded"
@@ -167,13 +173,23 @@ explorer_player_groups <- function(player_stats) {
     dplyr::filter(.data$group == "Position not recorded") |>
     dplyr::select("playerId", "season") |>
     dplyr::inner_join(
-      dplyr::rename(known, near = "season", near_group = "group"),
+      dplyr::rename(
+        known,
+        near = "season",
+        near_group = "group",
+        near_position = "position"
+      ),
       by = "playerId",
       relationship = "many-to-many"
     ) |>
     dplyr::arrange(abs(.data$near - .data$season), .data$near) |>
     dplyr::distinct(.data$playerId, .data$season, .keep_all = TRUE) |>
-    dplyr::select("playerId", "season", fill = "near_group")
+    dplyr::select(
+      "playerId",
+      "season",
+      fill = "near_group",
+      fill_position = "near_position"
+    )
   seasons |>
     dplyr::left_join(
       filled,
@@ -181,13 +197,15 @@ explorer_player_groups <- function(player_stats) {
       relationship = "one-to-one"
     ) |>
     dplyr::mutate(
-      group = dplyr::if_else(
-        .data$group == "Position not recorded" & !is.na(.data$fill),
-        .data$fill,
-        .data$group
+      filled = .data$group == "Position not recorded" & !is.na(.data$fill),
+      group = dplyr::if_else(.data$filled, .data$fill, .data$group),
+      position = dplyr::if_else(
+        .data$filled,
+        .data$fill_position,
+        .data$position
       )
     ) |>
-    dplyr::select("playerId", "season", "group")
+    dplyr::select("playerId", "season", "group", "position")
 }
 
 # Percentile 0-100 among non-missing values; a lone player sits at 100.
@@ -219,7 +237,8 @@ explorer_percentile <- function(x, reverse = FALSE) {
 #' @param player_outcomes Output of [build_explorer_player_outcomes()].
 #' @param current_season The in-progress season, for players with no
 #'   outcome row (no roster career).
-#' @return A tibble: `pos`, `player_id`, `name`, `season`, `team`, `team_id`,
+#' @return A tibble: `pos`, `player_id`, `name`, `position` (roster code),
+#'   `season`, `team`, `team_id`,
 #'   `conference`, `tier`, `outcome`, `outcome_label`, then the stat columns.
 #' @export
 build_explorer_player_seasons <- function(
@@ -337,6 +356,7 @@ build_explorer_player_seasons <- function(
       "pos",
       player_id = "playerId",
       "name",
+      "position",
       "season",
       "team",
       "team_id",
@@ -373,6 +393,7 @@ write_explorer_players <- function(
   common <- c(
     "player_id",
     "name",
+    "position",
     "season",
     "team",
     "team_id",

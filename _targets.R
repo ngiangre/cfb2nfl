@@ -956,7 +956,7 @@ list(
   # draft outcome as one columnar JSON file.
   tar_target(
     explorer_combine,
-    build_explorer_combine(combine, explorer_player_seasons)
+    build_explorer_combine(combine, explorer_player_seasons, picks)
   ),
   tar_target(
     explorer_combine_file,

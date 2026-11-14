@@ -16,9 +16,10 @@ build_explorer_plays(plays, games, teams, play_stats, player_groups = NULL)
 \item{play_stats}{Cleaned play stats.}
 
 \item{player_groups}{Optional position-group codes per player-season
-(\code{player_id}, \code{season}, \code{pos}, as in \code{\link[=build_explorer_player_seasons]{build_explorer_player_seasons()}}),
-so a player chip opens the Players tab at the right position. A player
-without one gets no \code{pos}.}
+(\code{player_id}, \code{season}, \code{pos}, \code{position}, as in
+\code{\link[=build_explorer_player_seasons]{build_explorer_player_seasons()}}), so a player chip opens the Players
+tab at the right position and shows the player's position code. A player
+without one gets no \code{pos} or \code{position}.}
 }
 \value{
 A tibble keyed by \code{play_id}, one row per input play.

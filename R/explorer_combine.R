@@ -123,11 +123,17 @@ explorer_combine_outcome_levels <- function() {
 #' the right group (`NA` when the player has no stat line there, e.g. most
 #' linemen).
 #'
+#' The outcome label names the position a drafted player was picked at
+#' (from CFBD `picks`, matched on draft year and overall pick), which can
+#' differ from the position they worked out at (`combine_pos`).
+#'
 #' @param combine Cleaned, linked combine table.
 #' @param player_seasons Output of [build_explorer_player_seasons()].
+#' @param picks Optional CFBD draft picks (`year`, `overall`, `position`);
+#'   without them the label leaves out the drafted position.
 #' @return A tibble, one row per input row.
 #' @export
-build_explorer_combine <- function(combine, player_seasons) {
+build_explorer_combine <- function(combine, player_seasons, picks = NULL) {
   last_drafted <- suppressWarnings(max(
     combine$season[!is.na(combine$draft_round)]
   ))
@@ -136,7 +142,27 @@ build_explorer_combine <- function(combine, player_seasons) {
     dplyr::arrange(.data$player_id, dplyr::desc(.data$season)) |>
     dplyr::distinct(.data$player_id, .keep_all = TRUE) |>
     dplyr::select(athlete_id = "player_id", players_pos = "pos")
+  drafted_as <- if (is.null(picks)) {
+    tibble::tibble(
+      season = integer(),
+      draft_ovr = integer(),
+      drafted_pos = character()
+    )
+  } else {
+    picks |>
+      dplyr::transmute(
+        season = as.integer(.data$year),
+        draft_ovr = as.integer(.data$overall),
+        drafted_pos = draft_position_code(.data$position)
+      ) |>
+      dplyr::distinct(.data$season, .data$draft_ovr, .keep_all = TRUE)
+  }
   combine |>
+    dplyr::left_join(
+      drafted_as,
+      by = c("season", "draft_ovr"),
+      relationship = "many-to-one"
+    ) |>
     dplyr::mutate(
       group = combine_position_group(.data$pos),
       outcome = dplyr::case_when(
@@ -145,6 +171,13 @@ build_explorer_combine <- function(combine, player_seasons) {
         TRUE ~ "undrafted"
       ),
       outcome_label = dplyr::case_when(
+        !is.na(.data$draft_round) & !is.na(.data$drafted_pos) ~ sprintf(
+          "Drafted as %s, R%d #%d (%s)",
+          .data$drafted_pos,
+          .data$draft_round,
+          .data$draft_ovr,
+          .data$draft_team
+        ),
         !is.na(.data$draft_round) ~ sprintf(
           "Drafted R%d #%d (%s)",
           .data$draft_round,

@@ -4,12 +4,15 @@
 \alias{build_explorer_combine}
 \title{Explorer combine table}
 \usage{
-build_explorer_combine(combine, player_seasons)
+build_explorer_combine(combine, player_seasons, picks = NULL)
 }
 \arguments{
 \item{combine}{Cleaned, linked combine table.}
 
 \item{player_seasons}{Output of \code{\link[=build_explorer_player_seasons]{build_explorer_player_seasons()}}.}
+
+\item{picks}{Optional CFBD draft picks (\code{year}, \code{overall}, \code{position});
+without them the label leaves out the drafted position.}
 }
 \value{
 A tibble, one row per input row.
@@ -20,4 +23,9 @@ and the CFBD link. \code{players_pos} is the Players-tab group of the
 player's last stat season, so tapping a linked point opens the player in
 the right group (\code{NA} when the player has no stat line there, e.g. most
 linemen).
+}
+\details{
+The outcome label names the position a drafted player was picked at
+(from CFBD \code{picks}, matched on draft year and overall pick), which can
+differ from the position they worked out at (\code{combine_pos}).
 }

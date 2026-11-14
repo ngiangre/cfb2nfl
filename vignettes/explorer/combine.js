@@ -1,3 +1,5 @@
+import {playerLabel} from "./ui.js";
+
 // Combine-tab helpers (plans/explorer.md step 5). R computes every value;
 // these reshape, filter and format for the plotly 3D scatter, and are
 // unit-tested with node --test.
@@ -58,7 +60,7 @@ export function canOpenPlayer(d) {
 export function combineTraces(points, {axes, measures, outcomes, colors, selected}) {
   const [x, y, z] = axes;
   const byKey = new Map(measures.map(m => [m.key, m]));
-  const hover = d => `${d.name} (${d.school}, ${d.season})<br>${d.outcome_label}<br>` +
+  const hover = d => `${playerLabel(d.name, d.combine_pos, d.school, d.season)}<br>${d.outcome_label}<br>` +
     axes.map(k => `${byKey.get(k).label}: ${formatMeasure(d[k], byKey.get(k))}`).join("<br>");
   const traces = [];
   for (const o of outcomes) {
@@ -76,7 +78,7 @@ export function combineTraces(points, {axes, measures, outcomes, colors, selecte
     const d = points[s];
     traces.push({
       type: "scatter3d", mode: "markers+text", name: d.name, showlegend: false,
-      x: [d[x]], y: [d[y]], z: [d[z]], customdata: [s], text: [d.name],
+      x: [d[x]], y: [d[y]], z: [d[z]], customdata: [s], text: [playerLabel(d.name, d.combine_pos)],
       textposition: "top center", hoverinfo: "text", hovertext: [hover(d)],
       marker: {size: 9, color: colors.get(d.outcome) ?? "#9ca3af", line: {color: "#111827", width: 3}}
     });

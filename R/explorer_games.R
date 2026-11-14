@@ -164,9 +164,10 @@ explorer_elapsed <- function(
 #' @param teams Cleaned teams.
 #' @param play_stats Cleaned play stats.
 #' @param player_groups Optional position-group codes per player-season
-#'   (`player_id`, `season`, `pos`, as in [build_explorer_player_seasons()]),
-#'   so a player chip opens the Players tab at the right position. A player
-#'   without one gets no `pos`.
+#'   (`player_id`, `season`, `pos`, `position`, as in
+#'   [build_explorer_player_seasons()]), so a player chip opens the Players
+#'   tab at the right position and shows the player's position code. A player
+#'   without one gets no `pos` or `position`.
 #' @return A tibble keyed by `play_id`, one row per input play.
 #' @export
 build_explorer_plays <- function(
@@ -188,7 +189,7 @@ build_explorer_plays <- function(
     # A player-season with two teams has one group; keep the first.
     groups <- player_groups |>
       dplyr::distinct(.data$player_id, .data$season, .keep_all = TRUE) |>
-      dplyr::select(athleteId = "player_id", "season", "pos")
+      dplyr::select(athleteId = "player_id", "season", "pos", "position")
     players <- players |>
       dplyr::left_join(
         dplyr::select(plays, playId = "id", "season"),
@@ -202,6 +203,7 @@ build_explorer_plays <- function(
       )
   } else {
     players$pos <- NA_character_
+    players$position <- NA_character_
   }
   players <- players |>
     dplyr::summarise(
@@ -209,7 +211,8 @@ build_explorer_plays <- function(
         id = .data$athleteId,
         name = .data$athleteName,
         stat = .data$stat,
-        pos = .data$pos
+        pos = .data$pos,
+        position = .data$position
       ))),
       .by = "playId"
     )

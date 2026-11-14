@@ -10,10 +10,12 @@ explorer_player_groups(player_stats)
 \item{player_stats}{Cleaned long player stats.}
 }
 \value{
-A tibble keyed by \verb{(playerId, season)}: \code{group}.
+A tibble keyed by \verb{(playerId, season)}: \code{group}, \code{position} (the
+roster code, e.g. \code{"CB"}; \code{NA} when no season records one).
 }
 \description{
 The position comes from the season's stat line (the season's roster
-position). A season with no recorded position takes the group from the
-player's nearest season that has one (the earlier season on a tie).
+position). A season with no recorded position takes the group, and the
+position code shown beside the player's name, from the player's nearest
+season that has one (the earlier season on a tie).
 }
