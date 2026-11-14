@@ -16,6 +16,8 @@ display metadata (colors, mascot, abbreviation, conference). The raw \code{logos
 block is a list of the same image at several resolutions in light and \code{-dark}
 variants; like the other ingest functions (which unnest \code{hometownInfo} /
 \code{seasons}), this flattens it here into \code{logo_light} / \code{logo_dark} so the
-persisted parquet stays flat. Deduping duplicate school names is a cleaning
-concern, handled in \code{\link[=clean_teams]{clean_teams()}}.
+persisted parquet stays flat. The nested home-venue \code{location} object is
+flattened the same way to \code{venue}, \code{city}, \code{state}, \code{latitude} and
+\code{longitude} (no extra API call). Deduping duplicate school names is a
+cleaning concern, handled in \code{\link[=clean_teams]{clean_teams()}}.
 }

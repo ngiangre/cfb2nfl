@@ -14,7 +14,7 @@ dictionaries next to this file, one YAML per table:
 | `player_stats` | **long**: player-season-category-statType-stat | [`dict/player_stats.yml`](dict/player_stats.yml) |
 | `roster` | one player-season on a team roster | [`dict/roster.yml`](dict/roster.yml) |
 | `coaches` | one head-coach-season | [`dict/coaches.yml`](dict/coaches.yml) |
-| `teams` | one team (program) — DISPLAY only | [`dict/teams.yml`](dict/teams.yml) |
+| `teams` | one team (program), with home-stadium lat/long — DISPLAY only | [`dict/teams.yml`](dict/teams.yml) |
 | `conference_tiers` | season × conference | [`dict/conference_tiers.yml`](dict/conference_tiers.yml) |
 | `recruiting` | one HS recruit | [`dict/recruiting.yml`](dict/recruiting.yml) |
 | `games` | one game (metadata + result) | [`dict/games.yml`](dict/games.yml) |
@@ -156,7 +156,9 @@ wrong rows, so they are called out explicitly.
 
 2. **Team / school name (string).** `player_stats.team` = `roster.team` =
    `coaches.school` = `teams.team`. `teams` is DISPLAY metadata only
-   (logos/colors); keep it off the model path.
+   (logos/colors, home-stadium location for maps); keep it off the model path.
+   Its `conference` is the *current* one: color a map by season through
+   `(team, season)` in `player_season`/`conference_tiers` instead.
 
 3. **`(team, season)`** links a player-season to its head coach in `coaches`
    (a school can have >1 head coach in a season, so this is many-to-one and can

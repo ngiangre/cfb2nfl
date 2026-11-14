@@ -68,7 +68,7 @@ all of it. Years 2010–2026.
 | `data/player_stats.parquet` | **long**: player-season-stat | `playerId` (string); pivot `category`/`statType`/`stat` |
 | `data/coaches.parquet` | one head-coach-season | head coaches only |
 | `data/roster.parquet` | one player-season on a roster | `id`→`playerId` (string) + `season`; physicals/position/hometown. Weight is **static** per player (decision 0009) |
-| `data/teams.parquet` | one team (program) | join by school **name** (`team`); logos/colors, DISPLAY only (decision 0008) |
+| `data/teams.parquet` | one team (program) | join by school **name** (`team`); logos/colors and home-stadium `latitude`/`longitude` (every FBS program; decision 0047), DISPLAY only (decision 0008). `conference` is the *current* one |
 | `data/conference_tiers.parquet` | season × conference | tier 3 Power / 2 G5 / 1 FCS-and-below (decision 0003) |
 | `data/recruiting.parquet` | one HS recruit | CFBD `athleteId`; `stars`/`rating`/`ranking`. Id is an **untrusted** namespace — join only via the name guard (decision 0013) |
 | `data/nfl_draft_picks.parquet` | one NFL draft pick | nflverse; key `(season, round, pick)`. Bridge to `gsis_id`/`pfr_player_id` + PFR career summary (decision 0014) |

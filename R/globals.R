@@ -140,5 +140,8 @@ utils::globalVariables(c(
   "season",
   "tier",
   "outcome",
-  "outcome_label"
+  "outcome_label",
+  # pointblank::vars() targets in contract_teams()
+  "latitude",
+  "longitude"
 ))

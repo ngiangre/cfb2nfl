@@ -488,9 +488,11 @@ list(
   ),
   tar_target(
     ok_teams,
-    pointblank::all_passed(
-      contract_teams(teams, player_season, stop_on_fail = FALSE)$coverage
-    )
+    all(vapply(
+      contract_teams(teams, player_season, stop_on_fail = FALSE),
+      pointblank::all_passed,
+      logical(1)
+    ))
   ),
   tar_target(
     ok_games,

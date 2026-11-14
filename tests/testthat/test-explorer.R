@@ -87,8 +87,24 @@ test_that("build_explorer_teams keeps teams in the export with a valid color", {
   expect_setequal(tm$team_id, c(1L, 2L, 3L))
   expect_named(
     tm,
-    c("team_id", "team", "mascot", "abbreviation", "color", "alt_color", "logo")
+    c(
+      "team_id",
+      "team",
+      "mascot",
+      "abbreviation",
+      "color",
+      "alt_color",
+      "logo",
+      "latitude",
+      "longitude",
+      "city",
+      "state",
+      "venue"
+    )
   )
+  expect_equal(tm$latitude[tm$team_id == 1L], 30.284)
+  # An FCS program without a home stadium stays, unlocated.
+  expect_true(is.na(tm$latitude[tm$team_id == 3L]))
   # "#null" is not a color: the shared fallback grey stands in.
   expect_equal(tm$color[tm$team_id == 3L], "#6b7280")
   expect_equal(tm$color[tm$team_id == 1L], "#bf5700")
@@ -170,6 +186,16 @@ test_that("contract_explorer_shell catches row loss, stale meta and size", {
   # A team-season with no display row.
   expect_false(pointblank::all_passed(contract_explorer_shell(
     f$teams[f$teams$team_id != 1L, ],
+    f$team_season,
+    f$meta,
+    f$games,
+    stop_on_fail = FALSE
+  )))
+  # An FBS team the map cannot place.
+  lost <- f$teams
+  lost$latitude[lost$team_id == 2L] <- NA_real_
+  expect_false(pointblank::all_passed(contract_explorer_shell(
+    lost,
     f$team_season,
     f$meta,
     f$games,

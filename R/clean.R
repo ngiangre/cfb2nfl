@@ -79,10 +79,13 @@ clean_coaches <- function(coaches) {
 #' out. We keep the row with a real `classification`, then the one that has a
 #' logo, dropping the phantom. Logo URLs were flattened at ingest; a handful of
 #' small programs carry no logo and are left `NA` (placeholder at display time).
+#' The home-venue `latitude`/`longitude` place a program on a map; nearly every
+#' FBS and FCS program has one, most lower-division and phantom rows do not.
 #'
 #' @param teams Raw teams tibble from [ingest_teams()] (already flat).
 #'
-#' @return A cleaned tibble, one row per `team`, with colors and logo URLs.
+#' @return A cleaned tibble, one row per `team`, with colors, logo URLs and
+#'   home-venue location.
 #' @export
 clean_teams <- function(teams) {
   teams |>
@@ -103,7 +106,12 @@ clean_teams <- function(teams) {
       color = .data$color,
       alt_color = .data$alternateColor,
       logo_light = .data$logo_light,
-      logo_dark = .data$logo_dark
+      logo_dark = .data$logo_dark,
+      venue = .data$venue,
+      city = .data$city,
+      state = .data$state,
+      latitude = .data$latitude,
+      longitude = .data$longitude
     )
 }
 

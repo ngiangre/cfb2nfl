@@ -248,8 +248,10 @@ ingest_coaches <- function() {
 #' block is a list of the same image at several resolutions in light and `-dark`
 #' variants; like the other ingest functions (which unnest `hometownInfo` /
 #' `seasons`), this flattens it here into `logo_light` / `logo_dark` so the
-#' persisted parquet stays flat. Deduping duplicate school names is a cleaning
-#' concern, handled in [clean_teams()].
+#' persisted parquet stays flat. The nested home-venue `location` object is
+#' flattened the same way to `venue`, `city`, `state`, `latitude` and
+#' `longitude` (no extra API call). Deduping duplicate school names is a
+#' cleaning concern, handled in [clean_teams()].
 #'
 #' @return A flat tibble, one row per team row returned by `/teams` (school names
 #'   may still repeat until [clean_teams()] dedupes them).
@@ -259,7 +261,14 @@ ingest_teams <- function() {
   first_match <- function(x, pattern) {
     if (length(x)) x[grep(pattern, x)][1] else NA_character_
   }
-  cfbd_get("/teams") |>
+  # A location field absent from every team comes back as a missing column.
+  location_col <- function(location, name, empty) {
+    x <- location[[name]]
+    if (is.null(x)) rep(empty, NROW(location)) else x
+  }
+  raw <- cfbd_get("/teams")
+  location <- raw$location %||% data.frame(row.names = seq_len(nrow(raw)))
+  raw |>
     dplyr::transmute(
       id = .data$id,
       school = .data$school,
@@ -278,7 +287,12 @@ ingest_teams <- function() {
         .data$logos,
         first_match,
         pattern = "/logos-dark/"
-      )
+      ),
+      venue = location_col(location, "name", NA_character_),
+      city = location_col(location, "city", NA_character_),
+      state = location_col(location, "state", NA_character_),
+      latitude = as.double(location_col(location, "latitude", NA_real_)),
+      longitude = as.double(location_col(location, "longitude", NA_real_))
     )
 }
 

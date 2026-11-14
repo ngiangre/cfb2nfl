@@ -68,7 +68,12 @@ explorer_teams_fixture <- function() {
     color = c("#bf5700", "#9e1b32", "#null", "#cc0000", "#000000"),
     alt_color = c("#ffffff", "#null", "#000000", "#000000", "#000000"),
     logo_light = c("t.png", "a.png", "g.png", "f.png", NA),
-    logo_dark = c("td.png", "ad.png", "gd.png", "fd.png", NA)
+    logo_dark = c("td.png", "ad.png", "gd.png", "fd.png", NA),
+    venue = c("Royal-Memorial Stadium", "Bryant-Denny Stadium", NA, NA, NA),
+    city = c("Austin", "Tuscaloosa", NA, NA, NA),
+    state = c("TX", "AL", NA, NA, NA),
+    latitude = c(30.2837, 33.2083, NA, NA, NA),
+    longitude = c(-97.7325, -87.5504, NA, NA, NA)
   )
 }
 

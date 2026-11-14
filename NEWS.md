@@ -1,5 +1,22 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Teams now carry their home stadium's name, city, state, latitude and
+  longitude, read from the CFBD `/teams` response the refresh already pulls
+  (no extra API calls). Every FBS program has coordinates, and the teams
+  contract checks they sit inside the United States (#48,
+  [decision 0047](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0047-team-geography.md)).
+
+- The Explorer's **Teams** tab is reorganized around the selected team
+  (#48, #70). The team menu now sits in the header beside the season,
+  grouped by that season's conferences with teams ordered by record. The tab
+  opens on a map of every home stadium at the team's level that season,
+  sized by wins, with the team's conference in blue (tap a dot to switch
+  team), followed by that conference's Elo lines over time. The team's
+  end-of-season Elo and season records now sit side by side, each with a
+  dotted line for its conference's average that season, replacing the fixed
+  50% line. The all-conference small multiples are gone; the team menu
+  covers that navigation.
+
 - The README and About page are rewritten around where the project is now:
   exploring the data so fans can form their own hypotheses, AI agents working
   inside tested guardrails, and later, curated analyses that ask whether the

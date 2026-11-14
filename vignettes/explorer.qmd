@@ -20,7 +20,7 @@ import {TABS, parseHash, toHash, resolveTeam} from "./explorer/state.js"
 import {sourceLine, errorCard, loadOnce, escapeHtml, axisRoom} from "./explorer/ui.js"
 import {
   formatRecord, teamGames, effectiveGame, landscapePanels, timelineFor, parsePlayers,
-  defaultShowFcs, focusedConference, shouldLoadPlays, stepPlay, playWhen, playAnnouncement, recordShares
+  teamSeasonRow, teamGroups, conferenceAverages, mapPoints, mapTitle, shouldLoadPlays, stepPlay, playWhen, playAnnouncement, recordShares
 } from "./explorer/teams.js"
 import {readShard, gameRows, playsShardPath, hyparquetUrl} from "./explorer/plays.js"
 import {
@@ -42,7 +42,7 @@ import {
 mutable retry = 0
 tabCache = new Map()
 mutable teamsRetry = 0
-mutable focusConf = null
+mutable mapRetry = 0
 mutable scrubPlay = null
 // Latches true once the Game section has been in view (or a game was picked):
 // the play-by-play is not fetched until then (plans/explorer.md step 3).
@@ -165,6 +165,8 @@ pick = {
   };
   return {
     team: id => { set(viewof team, id); scroll("teams-team"); },
+    // A map tap re-centers the map on the new team's conference, so stay put.
+    teamOnly: id => set(viewof team, id),
     season: s => { set(viewof season, s); scroll("teams-season"); },
     game: id => { mutable gameInView = true; set(viewof game, id); scroll("teams-game"); },
     // A player opens on the Players tab, at their position group when known
@@ -219,7 +221,40 @@ viewof season = Inputs.select(ready.meta.seasons.slice().reverse(), {
   format: String
 })
 ```
+
+```{ojs}
+//| echo: false
+// The team menu, grouped by the season's conferences. Built once per hash
+// read: rebuilding it on each season change would reset it to the hash's team,
+// so the cell below refills its options in place instead.
+viewof team = {
+  const sel = html`<select id="explorer-team-select"></select>`;
+  const form = html`<form class="explorer-team"><label for="explorer-team-select">Team</label>${sel}</form>`;
+  Object.defineProperty(form, "value", {get: () => Number(sel.value), set: v => { sel.value = String(v); }});
+  form.addEventListener("submit", event => event.preventDefault());
+  fillTeamMenu(sel, teamGroups(ready.teamSeason, ready.teams, hashState.season), hashState.team);
+  return form;
+}
+```
 :::
+
+```{ojs}
+//| echo: false
+//| output: false
+function fillTeamMenu(sel, groups, selected) {
+  sel.replaceChildren(...groups.map(g => {
+    const group = document.createElement("optgroup");
+    group.label = g.label;
+    for (const o of g.options) group.append(new Option(o.label, String(o.team_id)));
+    return group;
+  }));
+  sel.value = String(selected);
+}
+// Each season lists its own conferences and records; the pick is kept.
+{
+  fillTeamMenu(viewof team.querySelector("select"), teamGroups(ready.teamSeason, ready.teams, season), team);
+}
+```
 
 ```{ojs}
 //| echo: false
@@ -259,64 +294,118 @@ viewof season = Inputs.select(ready.meta.seasons.slice().reverse(), {
 ::: {#tab-teams .explorer-tab hidden=""}
 ## Teams
 
-### Conferences {#teams-landscape}
+### Conference {#teams-conference}
 
 ```{ojs}
 //| echo: false
-// Starts on when the selected team is FCS in the selected season; picking an
-// FCS team (or changing season) sets it again.
-viewof showFcs = Inputs.toggle({label: "Show FCS", value: defaultShowFcs(ready.teamSeason, team, season)})
+//| output: false
+// The US states outline, fetched the first time the Teams tab opens.
+mapData = {
+  if (tab !== "teams") return {pending: true};
+  mapRetry;
+  try {
+    const topoUrl = "https://cdn.jsdelivr.net/npm/topojson-client@3/+esm";
+    const [us, topo] = await Promise.all([
+      loadOnce(tabCache, "us_states", () => fetch("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json").then(r => {
+        if (!r.ok) throw new Error(`${r.status} us-atlas`);
+        return r.json();
+      })),
+      loadOnce(tabCache, topoUrl, () => import(topoUrl))
+    ]);
+    return {states: topo.feature(us, us.objects.states)};
+  } catch (error) {
+    return {error};
+  }
+}
+teamRow = teamSeasonRow(ready.teamSeason, team, season)
 ```
 
 ```{ojs}
 //| echo: false
-landscape = {
-  const classification = showFcs ? "fcs" : "fbs";
-  const panels = landscapePanels(ready.teamSeason, season, classification);
-  const metric = classification === "fbs" ? "elo_end" : "win_pct";
+teamMap = {
+  const info = ready.teamById.get(team);
+  if (mapData.pending) return html`<div></div>`;
+  if (mapData.error) {
+    const card = asNode(errorCard("the map"));
+    card.querySelector("button").onclick = () => { mutable mapRetry = mapRetry + 1; };
+    return card;
+  }
+  const cls = teamRow?.classification ?? "fbs";
+  const pts = mapPoints(ready.teams, ready.teamSeason, season, cls);
+  const conf = teamRow ? (teamRow.conference ?? "Independent") : null;
+  const members = pts.filter(p => p.conference === conf);
+  const others = pts.filter(p => p.conference !== conf);
+  const mine = pts.filter(p => p.team_id === team);
+  const fig = Plot.plot({
+    width, height: Math.round(width * 0.62), style: {fontSize: "16px"},
+    projection: "albers-usa",
+    r: {domain: [0, 15], range: [2, width < 600 ? 7 : 10]},
+    marks: [
+      Plot.geo(mapData.states, {fill: "#f1f3f5", stroke: "white", strokeWidth: 1}),
+      Plot.dot(others, {x: "longitude", y: "latitude", r: "wins", fill: "#9ca3af", fillOpacity: 0.55}),
+      Plot.dot(members, {x: "longitude", y: "latitude", r: "wins", fill: "#2a78d6", stroke: "white", strokeWidth: 2}),
+      Plot.dot(mine, {x: "longitude", y: "latitude", r: "wins", fill: d => d.color, stroke: "white", strokeWidth: 2}),
+      // A dark ring sets the selected team apart from its conference's blue.
+      Plot.dot(mine, {x: "longitude", y: "latitude", r: d => d.wins + 4, fill: "none", stroke: "#111827", strokeWidth: 2.5}),
+      Plot.tip(pts, Plot.pointer({x: "longitude", y: "latitude", title: mapTitle}))
+    ]
+  });
+  fig.addEventListener("click", () => { if (fig.value) pick.teamOnly(fig.value.team_id); });
+  const level = cls === "fbs" ? "FBS" : "FCS";
+  const title = teamRow
+    ? `${conf} in ${season}: ${members.length} ${members.length === 1 ? "team" : "teams"}, in blue`
+    : `${info.team} did not play in ${season}`;
+  const where = mine.length ? `${info.team} is drawn in its own color, ringed in black.` : teamRow ? `${info.team} has no home stadium on record.` : "";
+  return html`<div>
+    <h4>${title}</h4>
+    ${fig}
+    <p class="explorer-note">Every ${level} home stadium in ${season}. ${where} Bigger dots won more games. Tap a team to open its conference.</p>
+  </div>`;
+}
+```
+
+::: {.column-margin}
+Each dot is a program's **home stadium**, placed by its latitude and
+longitude, and sized by the team's **wins** that season. The selected team's
+conference is in blue, the other teams at the same level (FBS or FCS) in
+grey, and the selected team in its own color inside a black ring. Membership is the season's own: pick a season before 2024 and the Big
+Ten stops at Nebraska. Alaska and Hawaii are drawn in insets, as on most US
+maps. A few FCS programs have no recorded home stadium and are left off.
+:::
+
+```{ojs}
+//| echo: false
+asNode(sourceLine(ready.meta.sources.teams_map))
+```
+
+```{ojs}
+//| echo: false
+conferenceView = {
+  const info = ready.teamById.get(team);
+  const classification = teamRow?.classification ?? "fbs";
+  const panel = teamRow
+    ? landscapePanels(ready.teamSeason, season, classification).find(p => p.teamIds.includes(team))
+    : null;
+  if (!panel) return asNode(`<div class="explorer-card">${escapeHtml(info.team)} has no ${season} season, so it has no conference to show. Pick another season or team.</div>`);
+  const metric = panel.metric;
   const yLabel = metric === "elo_end" ? "End-of-season Elo" : "Win share";
   const value = d => metric === "elo_end" ? `Elo ${d.elo_end}` : `${Math.round(d.win_pct * 100)}% wins`;
   const color = id => ready.teamById.get(id)?.color ?? "#6b7280";
   const name = id => ready.teamById.get(id)?.team ?? String(id);
-  const focused = panels.find(p => p.conference === focusedConference(focusConf, panels, team));
-  if (!focused) {
-    // Small multiples: the selected team's line in its color, the rest grey.
-    const grid = html`<div class="explorer-panels"></div>`;
-    for (const p of panels) {
-      const fig = Plot.plot({
-        height: 150, marginLeft: 44, style: {fontSize: "13px"},
-        x: {label: null, tickFormat: String, ticks: 4},
-        y: {label: null, ticks: 3},
-        marks: [
-          Plot.ruleX([season], {stroke: "#9ca3af", strokeDasharray: "3,3"}),
-          Plot.line(p.rows, {
-            x: "season", y: metric, z: "team_id",
-            stroke: d => d.team_id === team ? color(team) : "#9ca3af",
-            strokeWidth: d => d.team_id === team ? 3 : 1,
-            strokeOpacity: d => d.team_id === team ? 1 : 0.5
-          })
-        ]
-      });
-      const card = html`<button type="button" class="explorer-panel" aria-label="${`Open ${p.conference}`}"><h4>${p.conference}</h4>${fig}</button>`;
-      card.onclick = () => { mutable focusConf = p.conference; };
-      grid.append(card);
-    }
-    return grid;
-  }
-  // One conference, large: tap near a line (or a chip) to open that team.
+  // Tap near a line (or a chip) to open that team.
   const fig = Plot.plot(axisRoom({
-    height: 360, marginLeft: 56, style: {fontSize: "16px"},
+    width, height: 360, marginLeft: 56, style: {fontSize: "16px"},
     x: {label: "Season", tickFormat: String},
     y: {label: yLabel, grid: true},
     marks: [
       Plot.ruleX([season], {stroke: "#9ca3af", strokeDasharray: "4,4"}),
-      Plot.line(focused.rows, {
+      Plot.line(panel.rows, {
         x: "season", y: metric, z: "team_id",
         stroke: d => color(d.team_id),
         strokeWidth: d => d.team_id === team ? 4 : 1.5,
         strokeOpacity: d => d.team_id === team ? 1 : 0.6
       }),
-      Plot.dot(focused.rows, Plot.pointer({
+      Plot.dot(panel.rows, Plot.pointer({
         x: "season", y: metric, fill: d => color(d.team_id), r: 6,
         title: d => `${name(d.team_id)} ${d.season}: ${value(d)}, ${formatRecord(d)}`,
         tip: true
@@ -324,24 +413,22 @@ landscape = {
     ]
   }));
   fig.addEventListener("click", () => { if (fig.value) pick.team(fig.value.team_id); });
-  const back = html`<button type="button" class="explorer-chip">← All conferences</button>`;
-  back.onclick = () => { mutable focusConf = null; };
   const chips = html`<div class="explorer-chips"></div>`;
-  const now = focused.rows.filter(d => d.season === season).sort((a, b) => b[metric] - a[metric]);
+  const now = panel.rows.filter(d => d.season === season).sort((a, b) => b[metric] - a[metric]);
   for (const d of now) {
     const t = ready.teamById.get(d.team_id);
     const chip = html`<button type="button" class="explorer-chip" aria-pressed=${String(d.team_id === team)}>${t?.logo ? html`<img src=${t.logo} alt="" width="24" height="24" loading="lazy">` : ""}${name(d.team_id)} <span>${formatRecord(d)}</span></button>`;
     chip.onclick = () => pick.team(d.team_id);
     chips.append(chip);
   }
-  return html`<div>${back}<h4>${focused.conference} in ${season}</h4>${fig}${chips}</div>`;
+  return html`<div><h4>${panel.conference} teams over time</h4>${fig}${chips}</div>`;
 }
 ```
 
 ::: {.column-margin}
 Each line is one team's rating at the end of every season. Membership is as
 of the selected season, so a team that changed conference keeps its whole
-history on one line. FCS teams have no Elo rating; their panels show **win
+history on one line. FCS teams have no Elo rating; their chart shows **win
 share**, $(W + T/2) / G$ over the season's $G$ games.
 :::
 
@@ -354,62 +441,70 @@ asNode(sourceLine(ready.meta.sources.teams_landscape))
 
 ```{ojs}
 //| echo: false
-// Every FBS/FCS team, independent of the season: an input that depended on
-// `season` would be rebuilt (and reset to the hash's team) on each change.
-viewof team = Inputs.select(
-  new Map(ready.teams.map(t => [t.team, t.team_id])),
-  {label: "Team", value: hashState.team}
-)
-```
-
-```{ojs}
-//| echo: false
 teamView = {
   const info = ready.teamById.get(team);
   const rows = ready.teamSeason.filter(d => d.team_id === team);
   const elo = rows.filter(d => d.elo_end !== null);
-  const out = html`<div></div>`;
+  const avg = conferenceAverages(ready.teamSeason, team);
+  const avgBy = new Map(avg.map(a => [a.season, a]));
+  const avgText = (s, field, fmt) => {
+    const a = avgBy.get(s);
+    return a && a[field] !== null ? `\n${a.conference} average: ${fmt(a[field])}` : "";
+  };
+  const pct = x => `${Math.round(100 * x)}% wins`;
+  // Side by side on wider screens, stacked on phones.
+  const w = width >= 820 ? Math.floor((width - 24) / 2) : width;
+  const row = html`<div class="explorer-row"></div>`;
+  row.style.gridTemplateColumns = width >= 820 ? "1fr 1fr" : "1fr";
+  const legend = (mark, label) => html`<span><svg width="28" height="10" aria-hidden="true">${mark}</svg>${label}</span>`;
+  // Fresh nodes per legend: a DOM node can sit in only one place.
+  const solid = () => svg`<line x1="0" y1="5" x2="28" y2="5" stroke=${info.color} stroke-width="3"/>`;
+  const dotted = () => svg`<line x1="0" y1="5" x2="28" y2="5" stroke="#111827" stroke-width="2" stroke-dasharray="2,3"/>`;
   if (elo.length) {
     const fig = Plot.plot(axisRoom({
-      height: 300, marginLeft: 56, style: {fontSize: "16px"},
-      x: {label: "Season", tickFormat: String},
+      width: w, height: 300, marginLeft: 56, style: {fontSize: "16px"},
+      x: {label: "Season", tickFormat: String, ticks: 5},
       y: {label: "End-of-season Elo", grid: true},
       marks: [
         Plot.ruleX([season], {stroke: "#9ca3af", strokeDasharray: "4,4"}),
+        Plot.line(avg.filter(a => a.elo_mean !== null), {x: "season", y: "elo_mean", stroke: "#111827", strokeWidth: 2, strokeDasharray: "2,3"}),
         Plot.line(elo, {x: "season", y: "elo_end", stroke: info.color, strokeWidth: 3}),
         Plot.dot(elo, Plot.pointerX({
           x: "season", y: "elo_end", fill: info.color, r: 7,
-          title: d => `${d.season}: Elo ${d.elo_end}, record ${formatRecord(d)}`,
+          title: d => `${d.season}: Elo ${d.elo_end}, record ${formatRecord(d)}` + avgText(d.season, "elo_mean", String),
           tip: true
         }))
       ]
     }));
     fig.addEventListener("click", () => { if (fig.value) pick.season(fig.value.season); });
-    out.append(fig);
+    row.append(html`<div><h4>${info.team}: end-of-season Elo</h4>${fig}<div class="explorer-legend">${legend(solid(), info.team)}${legend(dotted(), "Conference average")}</div></div>`);
   } else {
-    out.append(asNode(`<div class="explorer-card">${escapeHtml(info.team)} has no Elo rating: CFBD rates FBS teams only.</div>`));
+    row.append(asNode(`<div class="explorer-card">${escapeHtml(info.team)} has no Elo rating: CFBD rates FBS teams only.</div>`));
   }
   // Each season's record as a share of its games, so win rates compare
   // across seasons of different lengths; the tooltip carries the counts.
   // Tap a season to open its games.
   const bars = recordShares(rows);
+  const tick = avg.filter(a => a.win_pct_mean !== null);
   const wl = Plot.plot(axisRoom({
-    height: 200, marginLeft: 48, style: {fontSize: "16px"},
+    width: w, height: 300, marginLeft: 48, style: {fontSize: "16px"},
     x: {label: "Season", type: "band", tickFormat: d => d % 4 === 2 ? String(d) : ""},
     y: {label: "Share of games", percent: true, domain: [0, 100], ticks: [0, 50, 100], tickFormat: d => `${d}%`},
     color: {domain: ["Wins", "Losses", "Ties"], range: [info.color, "#9ca3af", "#d1d5db"], legend: true},
     marks: [
       Plot.barY(bars, {x: "season", y: "share", fill: "outcome", fillOpacity: d => d.season === season ? 1 : 0.55}),
-      Plot.ruleY([0.5], {stroke: "white", strokeDasharray: "4,4"}),
+      // A white edge keeps the dotted average visible on a dark team color.
+      Plot.tickY(tick, {x: "season", y: "win_pct_mean", stroke: "white", strokeWidth: 4}),
+      Plot.tickY(tick, {x: "season", y: "win_pct_mean", stroke: "#111827", strokeWidth: 2, strokeDasharray: "2,3"}),
       Plot.tip(rows.filter(d => d.wins + d.losses + d.ties > 0), Plot.pointerX({
         x: "season", y: () => 1,
-        title: d => `${d.season}: ${formatRecord(d)} (${Math.round(100 * (d.wins + d.ties / 2) / (d.wins + d.losses + d.ties))}% wins)`
+        title: d => `${d.season}: ${formatRecord(d)} (${pct((d.wins + d.ties / 2) / (d.wins + d.losses + d.ties))})` + avgText(d.season, "win_pct_mean", pct)
       }))
     ]
   }));
   wl.addEventListener("click", () => { if (wl.value) pick.season(wl.value.season); });
-  out.append(wl);
-  return out;
+  row.append(html`<div><h4>${info.team}: season records</h4>${wl}<div class="explorer-legend">${legend(dotted(), "Conference average win share")}</div></div>`);
+  return row;
 }
 ```
 
@@ -420,7 +515,10 @@ expected win probability of
 
 $$E = \frac{1}{1 + 10^{-D/400}}$$
 
-so a 100-point edge is about a 64% favorite. Tap a season in either chart to
+so a 100-point edge is about a 64% favorite. The **dotted lines** are the
+average over the members of the team's conference that season (the team
+included): their end-of-season Elo, and their win share $(W + T/2) / G$.
+Seasons as an independent have no average. Tap a season in either chart to
 open its games.
 :::
 

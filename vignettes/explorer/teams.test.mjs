@@ -2,7 +2,7 @@ import {test} from "node:test";
 import assert from "node:assert/strict";
 import {
   formatRecord, teamGames, effectiveGame, landscapePanels, timelineFor, parsePlayers,
-  defaultShowFcs, focusedConference, shouldLoadPlays, stepPlay, playWhen, playAnnouncement, recordShares
+  teamSeasonRow, teamGroups, conferenceAverages, mapPoints, mapTitle, shouldLoadPlays, stepPlay, playWhen, playAnnouncement, recordShares
 } from "./teams.js";
 
 const games = [
@@ -67,27 +67,56 @@ test("parsePlayers reads the JSON array and tolerates nothing", () => {
   assert.deepEqual(parsePlayers("not json"), []);
 });
 
-test("defaultShowFcs is on only when the team is FCS in that season", () => {
-  const rows = [
-    {team_id: 149, season: 2026, classification: "fcs"},
-    {team_id: 251, season: 2026, classification: "fbs"},
-    {team_id: 251, season: 2025, classification: "fbs"}
-  ];
-  assert.equal(defaultShowFcs(rows, 149, 2026), true);
-  assert.equal(defaultShowFcs(rows, 251, 2026), false);
-  // A season the team has no row for falls back to FBS.
-  assert.equal(defaultShowFcs(rows, 149, 2025), false);
+const ts = [
+  {team_id: 333, season: 2024, conference: "SEC", classification: "fbs", tier: 3, wins: 9, losses: 4, ties: 0, win_pct: 0.692, elo_end: 1800},
+  {team_id: 251, season: 2024, conference: "SEC", classification: "fbs", tier: 3, wins: 13, losses: 3, ties: 0, win_pct: 0.813, elo_end: 1900},
+  {team_id: 2, season: 2024, conference: "SEC", classification: "fbs", tier: 3, wins: 5, losses: 7, ties: 0, win_pct: 0.417, elo_end: 1500},
+  {team_id: 251, season: 2023, conference: "Big 12", classification: "fbs", tier: 3, wins: 12, losses: 2, ties: 0, win_pct: 0.857, elo_end: 1850},
+  {team_id: 87, season: 2024, conference: "FBS Independents", classification: "fbs", tier: 2, wins: 14, losses: 2, ties: 0, win_pct: 0.875, elo_end: 1950},
+  {team_id: 149, season: 2024, conference: "Big Sky", classification: "fcs", tier: 1, wins: 10, losses: 3, ties: 0, win_pct: 0.769, elo_end: null}
+];
+const tms = [
+  {team_id: 333, team: "Alabama", color: "#9e1b32", latitude: 33.208, longitude: -87.55, city: "Tuscaloosa", state: "AL", venue: "Bryant-Denny Stadium"},
+  {team_id: 251, team: "Texas", color: "#bf5700", latitude: 30.284, longitude: -97.733, city: "Austin", state: "TX", venue: null},
+  {team_id: 2, team: "Auburn", color: "#0c2340", latitude: null, longitude: null, city: null, state: null, venue: null},
+  {team_id: 87, team: "Notre Dame", color: "#0c2340", latitude: 41.698, longitude: -86.234, city: "South Bend", state: "IN", venue: "Notre Dame Stadium"},
+  {team_id: 149, team: "Montana", color: "#70003c", latitude: 46.86, longitude: -113.99, city: "Missoula", state: "MT", venue: null},
+  {team_id: 5, team: "Defunct", color: "#6b7280", latitude: null, longitude: null}
+];
+
+test("teamSeasonRow finds the team's season, or null", () => {
+  assert.equal(teamSeasonRow(ts, 251, 2023).conference, "Big 12");
+  assert.equal(teamSeasonRow(ts, 251, 2010), null);
 });
 
-test("focusedConference keeps the focus only while the team is in that panel", () => {
-  const panels = [
-    {conference: "SEC", teamIds: [251, 333]},
-    {conference: "Big Sky", teamIds: [149]}
-  ];
-  assert.equal(focusedConference("SEC", panels, 251), "SEC");
-  assert.equal(focusedConference("SEC", panels, 149), null);
-  assert.equal(focusedConference(null, panels, 251), null);
-  assert.equal(focusedConference("Nope", panels, 251), null);
+test("teamGroups groups the season by conference, best record first", () => {
+  const groups = teamGroups(ts, tms, 2024);
+  assert.deepEqual(groups.map(g => g.label), ["SEC", "FBS Independents", "Big Sky", "Did not play in 2024"]);
+  assert.deepEqual(groups[0].options.map(o => o.label), ["Texas (13-3)", "Alabama (9-4)", "Auburn (5-7)"]);
+  // Every team stays selectable in any season.
+  assert.deepEqual(groups.at(-1).options, [{team_id: 5, label: "Defunct"}]);
+  assert.equal(groups.flatMap(g => g.options).length, tms.length);
+});
+
+test("conferenceAverages follows the team's conference each season", () => {
+  assert.deepEqual(conferenceAverages(ts, 251), [
+    {season: 2023, conference: "Big 12", members: 1, elo_mean: 1850, win_pct_mean: 0.857},
+    {season: 2024, conference: "SEC", members: 3, elo_mean: 1733, win_pct_mean: 0.641}
+  ]);
+  // Independents have no conference average; FCS has win share but no Elo.
+  assert.deepEqual(conferenceAverages(ts, 87), []);
+  assert.equal(conferenceAverages(ts, 149)[0].elo_mean, null);
+});
+
+test("mapPoints keeps one classification's located teams for the season", () => {
+  assert.deepEqual(mapPoints(tms, ts, 2024, "fbs").map(p => p.team), ["Alabama", "Notre Dame", "Texas"]);
+  assert.deepEqual(mapPoints(tms, ts, 2024, "fcs").map(p => p.team), ["Montana"]);
+});
+
+test("mapTitle carries the record, conference and stadium", () => {
+  const [bama, , texas] = mapPoints(tms, ts, 2024, "fbs");
+  assert.equal(mapTitle(bama), "Alabama (9-4)\nSEC\nBryant-Denny Stadium, Tuscaloosa, AL");
+  assert.equal(mapTitle(texas), "Texas (13-3)\nSEC\nAustin, TX");
 });
 
 test("shouldLoadPlays needs the Teams tab, a seen Game section and plays", () => {

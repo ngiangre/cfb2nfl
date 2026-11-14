@@ -18,29 +18,55 @@ test_that("contract_conference_tiers passes a well-formed lookup and its coverag
   expect_true(pointblank::all_passed(agents$coverage))
 })
 
+teams_fixture <- function() {
+  tibble::tibble(
+    team = c("Alabama", "Troy", "Wabash"),
+    logo_light = c("a.png", NA_character_, "w.png"),
+    logo_dark = c("a-dark.png", NA_character_, "w-dark.png"),
+    conference = c("SEC", "Sun Belt", "NCAC"),
+    classification = c("fbs", "fbs", "iii"),
+    venue = c("Bryant-Denny Stadium", "Veterans Memorial Stadium", NA),
+    city = c("Tuscaloosa", "Troy", NA),
+    state = c("AL", "AL", NA),
+    latitude = c(33.21, 31.8, NA),
+    longitude = c(-87.55, -85.95, NA)
+  )
+}
+
 test_that("contract_teams passes when every player_season team resolves", {
   skip_if_not_installed("pointblank")
-  teams <- tibble::tibble(
-    team = c("Alabama", "Troy"),
-    logo_light = c("a.png", NA_character_),
-    logo_dark = c("a-dark.png", NA_character_),
-    conference = c("SEC", "Sun Belt")
-  )
-  ps <- tibble::tibble(team = c("Alabama", "Troy"))
+  teams <- teams_fixture()
+  ps <- tibble::tibble(team = c("Alabama", "Troy", "Wabash"))
   agents <- contract_teams(teams, ps, stop_on_fail = FALSE)
   expect_true(pointblank::all_passed(agents$dim))
   # A missing logo (Troy) is allowed; only coverage (row presence) is enforced.
   expect_true(pointblank::all_passed(agents$coverage))
+  # A non-FBS program without a home venue (Wabash) is allowed.
+  expect_true(pointblank::all_passed(agents$location))
+})
+
+test_that("contract_teams flags an FBS program with no home coordinates", {
+  skip_if_not_installed("pointblank")
+  teams <- teams_fixture()
+  teams$latitude[teams$team == "Troy"] <- NA_real_
+  agents <- contract_teams(teams, teams["team"], stop_on_fail = FALSE)
+  expect_false(pointblank::all_passed(agents$location))
+  expect_error(contract_teams(teams, teams["team"]), "coordinates")
+})
+
+test_that("contract_teams flags coordinates outside the United States", {
+  skip_if_not_installed("pointblank")
+  teams <- teams_fixture()
+  # A swapped latitude/longitude pair is the likely data-entry error.
+  teams$latitude[teams$team == "Alabama"] <- -87.55
+  teams$longitude[teams$team == "Alabama"] <- 33.21
+  agents <- contract_teams(teams, teams["team"], stop_on_fail = FALSE)
+  expect_false(pointblank::all_passed(agents$dim))
 })
 
 test_that("contract_teams flags a team with no dimension row", {
   skip_if_not_installed("pointblank")
-  teams <- tibble::tibble(
-    team = "Alabama",
-    logo_light = "a.png",
-    logo_dark = "a-dark.png",
-    conference = "SEC"
-  )
+  teams <- teams_fixture()
   ps <- tibble::tibble(team = c("Alabama", "Nonexistent State"))
   agents <- contract_teams(teams, ps, stop_on_fail = FALSE)
   expect_false(pointblank::all_passed(agents$coverage))

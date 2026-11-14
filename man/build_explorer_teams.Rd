@@ -17,5 +17,6 @@ A tibble keyed by \code{team_id}.
 \description{
 Display fields for every team in the team-season export, stored once so
 \code{team_season.json} carries ids only (decision 0046). Colors go through the
-shared valid-hex filter, falling back to the shared grey.
+shared valid-hex filter, falling back to the shared grey. The home-stadium
+location places each team on the Teams map (decision 0047).
 }

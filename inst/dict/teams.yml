@@ -3,8 +3,8 @@ source: CFBD /teams (all divisions)
 grain: one row per team (program)
 key: team (string, from school)
 description: >
-  Team dimension for display: logos, colors, mascot, abbreviation and
-  conference. Joined by school NAME (`team`), the same namespace as
+  Team dimension for display: logos, colors, mascot, abbreviation,
+  conference and home-stadium location (city, state, latitude/longitude). Joined by school NAME (`team`), the same namespace as
   `player_stats.team` and the coach join. Display metadata only, kept off the
   model path. Cleaning dedupes duplicate school names to one row per school and
   extracts light/dark logo URLs from the `logos` array; a few small programs
@@ -50,3 +50,23 @@ columns:
     type: string
     description: Dark-background logo URL; NA when unavailable.
     provenance: derived (clean_teams)
+  - name: venue
+    type: string
+    description: Home stadium name; NA when CFBD has no home venue (most lower-division and phantom rows).
+    provenance: raw (location.name)
+  - name: city
+    type: string
+    description: Home stadium city.
+    provenance: raw (location.city)
+  - name: state
+    type: string
+    description: Home stadium state (two-letter code).
+    provenance: raw (location.state)
+  - name: latitude
+    type: double
+    description: Home stadium latitude (decimal degrees); places the program on a map. Present for every FBS program.
+    provenance: raw (location.latitude)
+  - name: longitude
+    type: double
+    description: Home stadium longitude (decimal degrees, negative west).
+    provenance: raw (location.longitude)

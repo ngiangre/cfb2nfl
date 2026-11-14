@@ -155,13 +155,18 @@ contract_coaches <- function(coaches, stop_on_fail = TRUE) {
 #' check — a few small programs legitimately carry no logo URL (a placeholder is
 #' used at display time), so that is left to a softer signal.
 #'
+#' Home-venue coordinates must fall inside the United States bounding box
+#' (Hawaii to Maine, so a swapped latitude/longitude pair fails), and every FBS
+#' program must carry them so a map never silently drops one. Lower divisions
+#' are often missing a venue and are not held to coverage.
+#'
 #' @param teams Cleaned team dimension (see [clean_teams()]).
 #' @param player_season Player-season backbone (see [build_player_season()]); the
 #'   coverage universe the dimension must fully cover.
 #' @param stop_on_fail If `TRUE` (default), raise an error when any check fails.
 #'
-#' @return Invisibly, a list of the two interrogated `pointblank` agents
-#'   (`dim`, `coverage`).
+#' @return Invisibly, a list of the three interrogated `pointblank` agents
+#'   (`dim`, `coverage`, `location`).
 #' @export
 contract_teams <- function(teams, player_season, stop_on_fail = TRUE) {
   rlang::check_installed("pointblank")
@@ -174,10 +179,31 @@ contract_teams <- function(teams, player_season, stop_on_fail = TRUE) {
       "team",
       "logo_light",
       "logo_dark",
-      "conference"
+      "conference",
+      "classification",
+      "latitude",
+      "longitude"
     )) |>
     pointblank::col_vals_not_null(pointblank::vars(team)) |>
     pointblank::rows_distinct(pointblank::vars(team)) |>
+    pointblank::col_vals_between(
+      pointblank::vars(latitude),
+      18,
+      72,
+      na_pass = TRUE
+    ) |>
+    pointblank::col_vals_between(
+      pointblank::vars(longitude),
+      -170,
+      -60,
+      na_pass = TRUE
+    ) |>
+    pointblank::interrogate()
+
+  fbs <- dplyr::filter(teams, .data$classification %in% "fbs")
+  agent_location <-
+    pointblank::create_agent(fbs, label = "teams: FBS home coordinates") |>
+    pointblank::col_vals_not_null(pointblank::vars(latitude, longitude)) |>
     pointblank::interrogate()
 
   # Referential coverage: every player_season team has a dimension row.
@@ -207,9 +233,24 @@ contract_teams <- function(teams, player_season, stop_on_fail = TRUE) {
         "i" = "e.g. {.val {utils::head(missing$team, 3)}}"
       ))
     }
+    if (!pointblank::all_passed(agent_location)) {
+      missing <- dplyr::filter(
+        fbs,
+        is.na(.data$latitude) | is.na(.data$longitude)
+      )
+      cli::cli_abort(c(
+        "FBS programs in {.file teams} are missing home-venue coordinates.",
+        "x" = "{nrow(missing)} program{?s} without coordinates.",
+        "i" = "e.g. {.val {utils::head(missing$team, 3)}}"
+      ))
+    }
   }
 
-  invisible(list(dim = agent_dim, coverage = agent_coverage))
+  invisible(list(
+    dim = agent_dim,
+    coverage = agent_coverage,
+    location = agent_location
+  ))
 }
 
 #' Data contract for the draft-outcome join
@@ -2171,6 +2212,8 @@ contract_explorer_shell <- function(
     team_season$team_id[team_season$season == meta$default_season]
   )
   has_logo <- teams$team_id[!is.na(teams$logo)]
+  fbs_ids <- unique(team_season$team_id[team_season$classification == "fbs"])
+  located <- teams$team_id[!is.na(teams$latitude) & !is.na(teams$longitude)]
   dicts <- sub("\\.yml$", "", list.files(app_sys("dict"), "\\.yml$"))
   gzip_bytes <- sum(vapply(
     list(meta, teams, team_season),
@@ -2217,6 +2260,13 @@ contract_explorer_shell <- function(
     check(sum(team_season$games) == expected_games) |>
     check(all(team_season$team_id %in% has_color)) |>
     check(all(current_ids %in% has_logo)) |>
+    # The Teams map places every FBS program at its home stadium (#48).
+    check(all(fbs_ids %in% located)) |>
+    check(all(
+      dplyr::between(teams$latitude, 18, 72) &
+        dplyr::between(teams$longitude, -170, -60),
+      na.rm = TRUE
+    )) |>
     check(identical(meta$default_season, explorer_default_season(games))) |>
     # The page falls back to the default team and season when the hash names
     # an unknown one, so both must exist; the season menu is contiguous.
