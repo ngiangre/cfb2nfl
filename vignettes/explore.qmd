@@ -65,7 +65,7 @@ Sources, grains, and how each table is built.
 ### [Explorer](explorer.html){.stretched-link}
 
 Tap from conferences to teams, games and players, plus the combine, the
-draft and NFL careers.
+draft and NFL careers, and a map of every home stadium.
 :::
 
 ::: {.explore-tile}

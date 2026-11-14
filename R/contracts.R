@@ -155,13 +155,18 @@ contract_coaches <- function(coaches, stop_on_fail = TRUE) {
 #' check — a few small programs legitimately carry no logo URL (a placeholder is
 #' used at display time), so that is left to a softer signal.
 #'
+#' Home-venue coordinates must fall inside the United States bounding box
+#' (Hawaii to Maine, so a swapped latitude/longitude pair fails), and every FBS
+#' program must carry them so a map never silently drops one. Lower divisions
+#' are often missing a venue and are not held to coverage.
+#'
 #' @param teams Cleaned team dimension (see [clean_teams()]).
 #' @param player_season Player-season backbone (see [build_player_season()]); the
 #'   coverage universe the dimension must fully cover.
 #' @param stop_on_fail If `TRUE` (default), raise an error when any check fails.
 #'
-#' @return Invisibly, a list of the two interrogated `pointblank` agents
-#'   (`dim`, `coverage`).
+#' @return Invisibly, a list of the three interrogated `pointblank` agents
+#'   (`dim`, `coverage`, `location`).
 #' @export
 contract_teams <- function(teams, player_season, stop_on_fail = TRUE) {
   rlang::check_installed("pointblank")
@@ -174,10 +179,31 @@ contract_teams <- function(teams, player_season, stop_on_fail = TRUE) {
       "team",
       "logo_light",
       "logo_dark",
-      "conference"
+      "conference",
+      "classification",
+      "latitude",
+      "longitude"
     )) |>
     pointblank::col_vals_not_null(pointblank::vars(team)) |>
     pointblank::rows_distinct(pointblank::vars(team)) |>
+    pointblank::col_vals_between(
+      pointblank::vars(latitude),
+      18,
+      72,
+      na_pass = TRUE
+    ) |>
+    pointblank::col_vals_between(
+      pointblank::vars(longitude),
+      -170,
+      -60,
+      na_pass = TRUE
+    ) |>
+    pointblank::interrogate()
+
+  fbs <- dplyr::filter(teams, .data$classification %in% "fbs")
+  agent_location <-
+    pointblank::create_agent(fbs, label = "teams: FBS home coordinates") |>
+    pointblank::col_vals_not_null(pointblank::vars(latitude, longitude)) |>
     pointblank::interrogate()
 
   # Referential coverage: every player_season team has a dimension row.
@@ -207,9 +233,24 @@ contract_teams <- function(teams, player_season, stop_on_fail = TRUE) {
         "i" = "e.g. {.val {utils::head(missing$team, 3)}}"
       ))
     }
+    if (!pointblank::all_passed(agent_location)) {
+      missing <- dplyr::filter(
+        fbs,
+        is.na(.data$latitude) | is.na(.data$longitude)
+      )
+      cli::cli_abort(c(
+        "FBS programs in {.file teams} are missing home-venue coordinates.",
+        "x" = "{nrow(missing)} program{?s} without coordinates.",
+        "i" = "e.g. {.val {utils::head(missing$team, 3)}}"
+      ))
+    }
   }
 
-  invisible(list(dim = agent_dim, coverage = agent_coverage))
+  invisible(list(
+    dim = agent_dim,
+    coverage = agent_coverage,
+    location = agent_location
+  ))
 }
 
 #' Data contract for the draft-outcome join
@@ -2604,4 +2645,59 @@ contract_explorer_careers <- function(
     check(gz <= max_gzip_bytes) |>
     pointblank::interrogate()
   enforce_contract(agent, "explorer_careers", stop_on_fail)
+}
+
+#' Data contract for the explorer Map asset
+#'
+#' Every FBS team-season must place its team on the map (FCS programs without
+#' a home venue are allowed to drop off), coordinates sit inside the United
+#' States bounding box, every conference-season's members add back to the
+#' team-season rows, spreads are non-negative, and the written file stays under
+#' its gzipped size cap.
+#'
+#' @param map Output of [build_explorer_map()].
+#' @param team_season Output of [build_explorer_team_season()].
+#' @param path The written `map.json`.
+#' @param max_gzip_bytes Gzipped size cap for `map.json`.
+#' @param stop_on_fail If `TRUE` (default), raise an error when any check fails.
+#' @return The interrogated `pointblank` agent.
+#' @export
+contract_explorer_map <- function(
+  map,
+  team_season,
+  path,
+  max_gzip_bytes = 60000L,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  check <- function(agent, ok) {
+    pointblank::col_vals_equal(
+      agent,
+      "ok",
+      TRUE,
+      preconditions = function(x) tibble::tibble(ok = ok)
+    )
+  }
+  fbs_ids <- unique(team_season$team_id[team_season$classification == "fbs"])
+  in_conference <- team_season[
+    !is.na(team_season$conference) &
+      !grepl("Independent", team_season$conference),
+  ]
+  gz <- length(memCompress(readBin(path, "raw", file.size(path)), "gzip"))
+  agent <- pointblank::create_agent(map$teams, label = "explorer_map") |>
+    pointblank::col_vals_not_null(pointblank::vars(
+      team_id,
+      latitude,
+      longitude
+    )) |>
+    pointblank::rows_distinct(pointblank::vars(team_id)) |>
+    pointblank::col_vals_between("latitude", 18, 72) |>
+    pointblank::col_vals_between("longitude", -170, -60) |>
+    check(all(fbs_ids %in% map$teams$team_id)) |>
+    check(sum(map$spread$members) == nrow(in_conference)) |>
+    check(all(map$spread$mapped <= map$spread$members)) |>
+    check(all(map$spread$spread_miles >= 0, na.rm = TRUE)) |>
+    check(gz <= max_gzip_bytes) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "explorer_map", stop_on_fail)
 }

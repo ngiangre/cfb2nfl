@@ -34,6 +34,9 @@ import {
   TIER_LABELS, DIRECTIONS, draftByTier, picksPerYear, teamPicks, longevityPoints, roundMedians,
   transferTotals, teamTransfers, nflSeasonsLabel
 } from "./explorer/careers.js"
+import {
+  mapPoints, mapConferences, resolveMapConference, spreadRows, spreadSummary, mapTitle
+} from "./explorer/map.js"
 ```
 
 ```{ojs}
@@ -57,6 +60,8 @@ mutable combineRetry = 0
 // The invitee the reader tapped in the 3D scatter.
 mutable combinePick = null
 mutable careersRetry = 0
+mutable mapRetry = 0
+mapPick = ({conf: null})
 // A position code's reader-facing group, for the draft chips.
 groupOf = pos => ready.meta.combine_groups.find(g => g.pos === pos)?.group ?? "Position not recorded"
 // The hyparquet module, imported once per page (a retry busts the failed import).
@@ -165,6 +170,12 @@ pick = {
   };
   return {
     team: id => { set(viewof team, id); scroll("teams-team"); },
+    // From another tab (the Map): open the Teams tab at the team view.
+    teamView: id => {
+      set(viewof team, id);
+      set(viewof tab, "teams");
+      setTimeout(() => scroll("teams-team"), 150);
+    },
     season: s => { set(viewof season, s); scroll("teams-season"); },
     game: id => { mutable gameInView = true; set(viewof game, id); scroll("teams-game"); },
     // A player opens on the Players tab, at their position group when known
@@ -1387,5 +1398,194 @@ counts every player on a roster.
 ```{ojs}
 //| echo: false
 asNode(sourceLine(ready.meta.sources.careers_transfers))
+```
+:::
+
+::: {#tab-map .explorer-tab hidden=""}
+## Map
+
+Where does each program play its home games, and how far apart do a
+conference's schools sit? The map follows the season picked above, so
+conference realignment shows up as schools joining or leaving the blue and
+the conference spreading out or pulling in.
+
+```{ojs}
+//| echo: false
+//| output: false
+// Home stadiums and conference spreads (~8 KB gzipped) plus the US states
+// outline, fetched the first time the tab opens.
+mapData = {
+  if (tab !== "map") return {pending: true};
+  mapRetry;
+  try {
+    const topoUrl = "https://cdn.jsdelivr.net/npm/topojson-client@3/+esm";
+    const [raw, us, topo] = await Promise.all([
+      loadOnce(tabCache, "map", () => fetchJson("explorer-data/map.json")),
+      loadOnce(tabCache, "us_states", () => fetch("https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json").then(r => {
+        if (!r.ok) throw new Error(`${r.status} us-atlas`);
+        return r.json();
+      })),
+      loadOnce(tabCache, topoUrl, () => import(topoUrl))
+    ]);
+    return {
+      located: columnsToRows(raw.teams), spread: columnsToRows(raw.spread),
+      states: topo.feature(us, us.objects.states)
+    };
+  } catch (error) {
+    return {error};
+  }
+}
+mapBlank = mapData.error || mapData.pending
+```
+
+```{ojs}
+//| echo: false
+mapStatus = {
+  if (!mapData.error) return html`<div></div>`;
+  const card = asNode(errorCard("the map data"));
+  card.querySelector("button").onclick = () => { mutable mapRetry = mapRetry + 1; };
+  return card;
+}
+```
+
+### Home stadiums {#map-stadiums}
+
+```{ojs}
+//| echo: false
+viewof mapFcs = Inputs.toggle({label: "Show FCS", value: defaultShowFcs(ready.teamSeason, team, season)})
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+mapShown = mapBlank ? [] : mapPoints(mapData.located, ready.teamSeason, ready.teamById, season, mapFcs)
+mapConfs = mapConferences(mapShown)
+teamConference = ready.teamSeason.find(d => d.team_id === team && d.season === season)?.conference ?? null
+```
+
+```{ojs}
+//| echo: false
+// A reader's conference pick holds across seasons while it is on the map.
+viewof mapConf = {
+  const sel = Inputs.select(mapConfs, {
+    label: "Conference",
+    value: resolveMapConference(mapPick.conf, mapConfs, teamConference)
+  });
+  sel.addEventListener("input", () => { mapPick.conf = sel.value; });
+  return sel;
+}
+```
+
+```{ojs}
+//| echo: false
+mapView = {
+  if (mapBlank) return html`<div></div>`;
+  if (!mapShown.length) return asNode(`<div class="explorer-card">No teams to map in ${season}.</div>`);
+  const conf = resolveMapConference(mapConf, mapConfs, teamConference);
+  const members = mapShown.filter(p => p.conference === conf);
+  const others = mapShown.filter(p => p.conference !== conf);
+  const mine = mapShown.filter(p => p.team_id === team);
+  const highlight = "#2a78d6";
+  const fig = Plot.plot({
+    width, height: Math.round(width * 0.62), style: {fontSize: "16px"},
+    projection: "albers-usa",
+    r: {domain: [0, 15], range: [2, width < 600 ? 7 : 10]},
+    marks: [
+      Plot.geo(mapData.states, {fill: "#f1f3f5", stroke: "white", strokeWidth: 1}),
+      Plot.dot(others, {x: "longitude", y: "latitude", r: "wins", fill: "#9ca3af", fillOpacity: 0.55}),
+      Plot.dot(members, {x: "longitude", y: "latitude", r: "wins", fill: highlight, stroke: "white", strokeWidth: 2}),
+      Plot.dot(mine, {x: "longitude", y: "latitude", r: d => d.wins + 4, stroke: d => d.color, strokeWidth: 3, fill: "none"}),
+      Plot.tip(mapShown, Plot.pointer({x: "longitude", y: "latitude", title: mapTitle}))
+    ]
+  });
+  fig.addEventListener("click", () => { if (fig.value) pick.teamView(fig.value.team_id); });
+  const chips = html`<div class="explorer-chips"></div>`;
+  for (const p of members) {
+    const chip = html`<button type="button" class="explorer-chip">${p.team} <span>${p.wins}-${p.losses}${p.ties ? `-${p.ties}` : ""}</span></button>`;
+    chip.onclick = () => pick.teamView(p.team_id);
+    chips.append(chip);
+  }
+  const info = ready.teamById.get(team);
+  const teamNote = mine.length
+    ? `${info.team} is ringed in its color.`
+    : `${info.team} has no home stadium on the map for ${season}.`;
+  return html`<div>
+    <h4>${conf} in ${season}: ${members.length} ${members.length === 1 ? "team" : "teams"}, in blue</h4>
+    ${fig}
+    <p class="explorer-note">${teamNote} Bigger dots won more games. Tap a team to open it.</p>
+    ${chips}
+  </div>`;
+}
+```
+
+::: {.column-margin}
+Each dot is a program's **home stadium**, placed by its latitude and
+longitude, and sized by the team's **wins** that season. The picked
+conference is in blue, every other team in grey, and the selected team
+wears a ring in its own color. Membership is the season's own: pick a
+season before 2024 and the Big Ten stops at Nebraska. Alaska and Hawaii are
+drawn in insets, as on most US maps. Programs without a recorded home
+stadium (a few FCS schools) are left off.
+:::
+
+```{ojs}
+//| echo: false
+asNode(sourceLine(ready.meta.sources.map))
+```
+
+### Conference spread {#map-spread}
+
+```{ojs}
+//| echo: false
+spreadView = {
+  if (mapBlank || !mapShown.length) return html`<div></div>`;
+  const conf = resolveMapConference(mapConf, mapConfs, teamConference);
+  const cls = mapShown.find(p => p.conference === conf)?.classification ?? "fbs";
+  const rows = spreadRows(mapData.spread, cls);
+  const mine = rows.filter(d => d.conference === conf).sort((a, b) => a.season - b.season);
+  if (!mine.length) return asNode(`<div class="explorer-card">No spread for ${escapeHtml(conf)}: it is not a conference, or too few of its schools are on the map.</div>`);
+  const fig = Plot.plot(axisRoom({
+    width, height: 300, marginLeft: 56, style: {fontSize: "16px"},
+    x: {label: "Season", domain: [ready.meta.seasons[0], ready.meta.seasons.at(-1)], tickFormat: d => String(d), ticks: 5},
+    y: {label: "Miles between two members", grid: true, zero: true},
+    marks: [
+      Plot.line(rows.filter(d => d.conference !== conf), {x: "season", y: "spread_miles", z: "conference", stroke: "#c4c9d0", strokeWidth: 1.5}),
+      Plot.ruleX([season], {stroke: "#6b7280", strokeDasharray: "4,3"}),
+      Plot.line(mine, {x: "season", y: "spread_miles", stroke: "#2a78d6", strokeWidth: 3}),
+      Plot.dot(mine, {x: "season", y: "spread_miles", fill: "#2a78d6", r: 4}),
+      Plot.tip(rows, Plot.pointer({
+        x: "season", y: "spread_miles",
+        title: d => `${d.conference}, ${d.season}\n${d.spread_miles.toLocaleString("en-US")} miles between two members\n${d.members} members`
+      }))
+    ]
+  }));
+  fig.addEventListener("click", () => { if (fig.value) pick.seasonOnly(fig.value.season); });
+  const summary = spreadSummary(mapData.spread, conf, season);
+  return html`<div>
+    <h4>How far apart ${conf} schools sit, each season</h4>
+    ${fig}
+    <p class="explorer-note">${summary ?? `${conf} did not play in ${season}.`} Grey lines are the other ${cls === "fbs" ? "FBS" : "FCS"} conferences. Tap a season to open it.</p>
+  </div>`;
+}
+```
+
+::: {.column-margin}
+A conference's **spread** is the average distance between two of its
+members' home stadiums, over every pair of members, measured along the
+Earth's surface by the haversine formula:
+
+$$a = \sin^2\tfrac{\Delta\varphi}{2} + \cos\varphi_1 \cos\varphi_2 \sin^2\tfrac{\Delta\lambda}{2}$$
+
+$$d = 2R \arcsin\sqrt{a}$$
+
+where $\varphi$ is latitude, $\lambda$ longitude and $R = 3{,}958.8$ miles
+the Earth's radius. It is roughly the
+length of a typical conference road trip. Independents are not a
+conference, so they have no line.
+:::
+
+```{ojs}
+//| echo: false
+asNode(sourceLine(ready.meta.sources.map))
 ```
 :::

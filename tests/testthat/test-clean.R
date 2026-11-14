@@ -45,13 +45,22 @@ test_that("clean_teams dedupes duplicate school names, keeping the real program"
     color = c(NA, "#8A2432"),
     alternateColor = c(NA, "#FFFFFF"),
     logo_light = c(NA, "https://cdn/logos/500/2653.png"),
-    logo_dark = c(NA, "https://cdn/logos-dark/500/2653.png")
+    logo_dark = c(NA, "https://cdn/logos-dark/500/2653.png"),
+    venue = c(NA, "Veterans Memorial Stadium"),
+    city = c(NA, "Troy"),
+    state = c(NA, "AL"),
+    latitude = c(NA, 31.8),
+    longitude = c(NA, -85.95)
   )
   out <- clean_teams(raw)
   expect_equal(nrow(out), 1L)
   expect_equal(out$team, "Troy")
   expect_equal(out$classification, "fbs")
   expect_false(is.na(out$logo_light))
+  # The home venue location rides along with the kept row.
+  expect_equal(out$venue, "Veterans Memorial Stadium")
+  expect_equal(c(out$city, out$state), c("Troy", "AL"))
+  expect_equal(c(out$latitude, out$longitude), c(31.8, -85.95))
 })
 
 test_that("clean_roster keys on a string playerId", {

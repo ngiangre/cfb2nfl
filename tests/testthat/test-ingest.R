@@ -71,3 +71,42 @@ test_that("cfbd_log_call appends one line per call only when configured", {
   expect_null(cfbd_log_call("/teams"))
   expect_length(readLines(log), 2L)
 })
+
+test_that("ingest_teams flattens the home venue location", {
+  skip_if_not_installed("httr2")
+  Sys.setenv(CFBD_API_KEY = "test-key")
+  withr::defer(Sys.unsetenv("CFBD_API_KEY"))
+
+  # CFBD sends a location object with null fields for programs with no venue.
+  body <- '[
+    {"id": 333, "school": "Alabama", "mascot": "Crimson Tide",
+     "abbreviation": "ALA", "conference": "SEC", "classification": "fbs",
+     "color": "#9E1B32", "alternateColor": "#FFFFFF",
+     "logos": ["https://cdn/logos/500/333.png",
+               "https://cdn/logos-dark/500/333.png"],
+     "location": {"name": "Bryant-Denny Stadium", "city": "Tuscaloosa",
+                  "state": "AL", "latitude": 33.208, "longitude": -87.55}},
+    {"id": 9, "school": "Phantom", "mascot": null, "abbreviation": null,
+     "conference": null, "classification": null, "color": null,
+     "alternateColor": null, "logos": [],
+     "location": {"name": null, "city": null, "state": null,
+                  "latitude": null, "longitude": null}}
+  ]'
+  out <- httr2::with_mocked_responses(
+    \(req) {
+      httr2::response(
+        status_code = 200L,
+        headers = list(`Content-Type` = "application/json"),
+        body = charToRaw(body)
+      )
+    },
+    ingest_teams()
+  )
+  expect_equal(nrow(out), 2L)
+  expect_equal(out$venue, c("Bryant-Denny Stadium", NA))
+  expect_equal(out$city, c("Tuscaloosa", NA))
+  expect_equal(out$state, c("AL", NA))
+  expect_equal(out$latitude, c(33.208, NA))
+  expect_equal(out$longitude, c(-87.55, NA))
+  expect_equal(out$logo_dark, c("https://cdn/logos-dark/500/333.png", NA))
+})

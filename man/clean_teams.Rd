@@ -10,7 +10,8 @@ clean_teams(teams)
 \item{teams}{Raw teams tibble from \code{\link[=ingest_teams]{ingest_teams()}} (already flat).}
 }
 \value{
-A cleaned tibble, one row per \code{team}, with colors and logo URLs.
+A cleaned tibble, one row per \code{team}, with colors, logo URLs and
+home-venue location.
 }
 \description{
 Standardizes the \verb{/teams} dimension for a \strong{name join} on \code{team} (= CFBD
@@ -21,4 +22,6 @@ phantom row with \code{NA} classification and no logos); a naive join would fan
 out. We keep the row with a real \code{classification}, then the one that has a
 logo, dropping the phantom. Logo URLs were flattened at ingest; a handful of
 small programs carry no logo and are left \code{NA} (placeholder at display time).
+The home-venue \code{latitude}/\code{longitude} place a program on a map; nearly every
+FBS and FCS program has one, most lower-division and phantom rows do not.
 }

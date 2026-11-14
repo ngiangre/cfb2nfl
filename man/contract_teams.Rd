@@ -15,8 +15,8 @@ coverage universe the dimension must fully cover.}
 \item{stop_on_fail}{If \code{TRUE} (default), raise an error when any check fails.}
 }
 \value{
-Invisibly, a list of the two interrogated \code{pointblank} agents
-(\code{dim}, \code{coverage}).
+Invisibly, a list of the three interrogated \code{pointblank} agents
+(\code{dim}, \code{coverage}, \code{location}).
 }
 \description{
 Validates the cleaned team dimension and, crucially, its \emph{coverage}: every
@@ -24,4 +24,10 @@ Validates the cleaned team dimension and, crucially, its \emph{coverage}: every
 logo/color join never silently drops a program. Logo \emph{presence} is not a hard
 check — a few small programs legitimately carry no logo URL (a placeholder is
 used at display time), so that is left to a softer signal.
+}
+\details{
+Home-venue coordinates must fall inside the United States bounding box
+(Hawaii to Maine, so a swapped latitude/longitude pair fails), and every FBS
+program must carry them so a map never silently drops one. Lower divisions
+are often missing a venue and are not held to coverage.
 }

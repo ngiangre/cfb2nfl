@@ -1,5 +1,19 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Teams now carry their home stadium's name, city, state, latitude and
+  longitude, read from the CFBD `/teams` response the refresh already pulls
+  (no extra API calls). Every FBS program has coordinates, and the teams
+  contract checks they sit inside the United States (#48,
+  [decision 0047](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0047-team-geography.md)).
+
+- The Explorer's **Map** tab: every FBS home stadium (FCS behind a toggle)
+  for the selected season, sized by wins, with one conference highlighted
+  (the selected team's by default) and its members listed below; tapping a
+  team opens it in the Teams tab. Under the map, each conference's spread,
+  the average distance between two members' home stadiums, season by
+  season, so realignment shows up as the Big Ten more than doubling in 2024
+  (#48, #70).
+
 - The Explorer's game timeline now draws one shared crosshair: dragging
   across either the lead chart or the PPA chart (or stepping with
   Previous/Next) puts the vertical line on the same play in both charts,

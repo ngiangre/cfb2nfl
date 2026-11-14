@@ -1,6 +1,6 @@
 # Spec: interactive explorer (issue #70)
 
-Status: design approved 2026-11-08; steps 1–6 done (2026-11-14), the Map waits on #48. Replaces
+Status: design approved 2026-11-08; steps 1–7 done (2026-11-14). Replaces
 `vignettes/visualizations.qmd` with one Quarto OJS page a fan can drill
 through on a phone: conference → team → season → game → play, and
 position → player → NFL outcome, plus combine measurables.
@@ -71,7 +71,7 @@ browser from the data (decision 0046).
 | Draft classes | `picks`, `teams`, `conference_tiers` |
 | NFL careers | `picks`, `nfl_draft_picks`, `nfl_rosters` |
 | Transfers | `player_stats`, `roster`, `conference_tiers` |
-| Map | `teams` (location, #48), `games` |
+| Map, conference spread | `teams` (home-stadium location, #48), `games` |
 
 ## Page layout
 
@@ -177,8 +177,12 @@ Each chart moves as is or is cut where a dated post already covers it.
 ### Tab 5: Map (ships last)
 
 Teams on a US map (AK/HI insets) for the selected season: dot size = wins,
-color/shape = conference. Tapping a team opens Teams → team view. Blocked on
-#48 publishing team locations.
+one conference highlighted (the selected team's by default, picked from a
+menu), everyone else grey, the selected team ringed in its color (decision
+0047: a color per conference is too many hues for a scatter). Tapping a team
+or its chip opens Teams → team view. Below it, the highlighted conference's
+spread (mean distance between two members' home stadiums) by season against
+the other conferences' lines.
 
 ## Data assets
 
@@ -311,7 +315,12 @@ session. GitHub Pages limits: 1 GB site, 100 MB per file.
    player dossiers (the Players career view), the career-length histogram,
    and the team logo table and drafts-by-team bars (covered by the Teams tab
    and the draft posts).
-7. **Map tab** after #48 publishes.
+7. [x] **Map tab** (done 2026-11-14, #48, decision 0047): `teams` gains
+   home-stadium coordinates; `map.json` (located teams and conference
+   spread by season, ~8 KB gzipped, contract cap 60 KB) loads on Map open
+   with the us-atlas states outline. The map highlights one conference at a
+   time, with an FCS toggle, member chips that open the team, and the
+   spread chart below.
 
 Each step is its own PR, and `main` stays deployable after each one.
 

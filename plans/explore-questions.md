@@ -21,7 +21,7 @@ question.
 | 4 | College career length | Yes | Distinct seasons per `playerId` in `roster` (full backbone — includes no-stat seasons). |
 | 5 | Transfers: how many, when | Yes | `add_change_features()` already derives team changes + tier direction. Viz: counts by season, direction (up/down/lateral) over time, share of careers with ≥1 transfer. |
 | 6 | Performance arc + opponent quality | Partially | Arcs: per-player stat trajectory by season index (pivot long stats). Opponent adjustment: only season-level team strength exists (SRS / SP+ in `coaches.parquet`) — contextualize the player's team strength per season, not per-game opponents. Per-game opponent quality needs a `/games` ingest (new target). |
-| 7 | Teams/conferences spatially | Needs new ingest | `teams.parquet` has no coordinates. Add ingest for venue lat/lon (CFBD venues), then a `leaflet`/`plotly` map colored by conference. |
+| 7 | Teams/conferences spatially | Done (#48) | `teams` keeps the `/teams` home-stadium lat/long (no new ingest); the Explorer Map tab maps it by season with conference spread (decision 0047). |
 | 8 | Position stability HS→college→NFL | Yes | Chain `recruiting.recruit_position` → `roster.position` → NFL `position` (slot-bridged picks), restricted to name-guarded linked players. Transition matrix / alluvial. |
 | 9 | Drafts by college × position | Yes | `picks` alone: count by `collegeTeam` × `position`. Extends `viz_drafts_by_team`. |
 | 10 | Playing time per game / season | Partially | Season stats include games-played-style stats (check `stat_taxonomy` coverage); usage proxies = touches/attempts per game from season totals. True per-game/snap data needs a `/games` or player-game stats ingest. |
@@ -49,10 +49,8 @@ question.
 - [x] **Shared ggplot theme + team-color scale in `R/viz.R`** —
   `theme_cfbstats()`, `team_color_values()`, `scale_fill_team()`,
   `scale_color_team()`.
-- [ ] New ingest: venue lat/lon table (dict + DuckDB bundle entry +
-  `inst/data-model.md`, per decisions 0017/0018). NOTE: this is an *ingested*
-  table, so unlike the derived tables of decision 0021 it must be published to
-  the `data-latest` release before merge (constraint below).
+- [x] Venue lat/lon: kept from the `/teams` response in `teams` rather than a
+  new table (#48, decision 0047), republished to `data-latest` before merge.
 
 ## New contracts
 
@@ -94,7 +92,6 @@ mode.
   position; transition matrix / alluvial.
 - [ ] Drafts by school × position — `picks` alone; extends
   `viz_drafts_by_team`.
-- [ ] Venues ingest + spatial map — needs the ingested venues table published
-  to `data-latest` BEFORE merge (release/CI constraint above).
+- [x] Spatial map: the Explorer Map tab (#48, decision 0047).
 - [x] Limitations section (injuries, entered-not-selected, injured-vs-benched): the 2026-11-07 absence-by-position post (issue #51).
 - [ ] Restructure explore.qmd into the question sections above.

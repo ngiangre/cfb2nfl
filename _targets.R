@@ -488,9 +488,11 @@ list(
   ),
   tar_target(
     ok_teams,
-    pointblank::all_passed(
-      contract_teams(teams, player_season, stop_on_fail = FALSE)$coverage
-    )
+    all(vapply(
+      contract_teams(teams, player_season, stop_on_fail = FALSE),
+      pointblank::all_passed,
+      logical(1)
+    ))
   ),
   tar_target(
     ok_games,
@@ -730,7 +732,8 @@ list(
       explorer_plays = ok_explorer_plays,
       explorer_players = ok_explorer_players,
       explorer_combine = ok_explorer_combine,
-      explorer_careers = ok_explorer_careers
+      explorer_careers = ok_explorer_careers,
+      explorer_map = ok_explorer_map
     ))
   ),
   # ---- link-step contracts (audit-hygiene workstream C) ----------------------
@@ -1000,6 +1003,26 @@ list(
       ps_change,
       min(tiers$season),
       explorer_careers_file,
+      stop_on_fail = FALSE
+    ))
+  ),
+  # Map tab (plans/explorer.md step 7, #48): home-stadium coordinates and
+  # each conference's spread by season.
+  tar_target(
+    explorer_map,
+    build_explorer_map(teams, explorer_team_season)
+  ),
+  tar_target(
+    explorer_map_file,
+    write_explorer_map(explorer_map),
+    format = "file"
+  ),
+  tar_target(
+    ok_explorer_map,
+    pointblank::all_passed(contract_explorer_map(
+      explorer_map,
+      explorer_team_season,
+      explorer_map_file,
       stop_on_fail = FALSE
     ))
   ),
