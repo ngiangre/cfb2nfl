@@ -114,3 +114,4 @@ h3[tabindex="-1"]:focus { outline-offset: 4px; }
 .explorer-axes { display: flex; flex-wrap: wrap; gap: 0 1rem; }
 .explorer-3d-plot { touch-action: none; } /* drags rotate the scene */
 .explorer-combine-card h4 { margin-top: 0; }
+.explorer-chip-static { cursor: default; }

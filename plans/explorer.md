@@ -1,6 +1,6 @@
 # Spec: interactive explorer (issue #70)
 
-Status: design approved 2026-11-08; implementation not started. Replaces
+Status: design approved 2026-11-08; steps 1–6 done (2026-11-14), the Map waits on #48. Replaces
 `vignettes/visualizations.qmd` with one Quarto OJS page a fan can drill
 through on a phone: conference → team → season → game → play, and
 position → player → NFL outcome, plus combine measurables.
@@ -68,7 +68,9 @@ browser from the data (decision 0046).
 | Game timeline | `plays`, `games`, `play_stats` (player chips) |
 | Players beeswarm, career | `player_stats`, `roster`, `teams`, `conference_tiers`, `outcomes`, `picks` |
 | Combine 3D | `combine`, `player_stats` (the Players group a point opens) |
-| Draft & careers | as in the current charts (`picks`, `nfl_draft_picks`, `nfl_rosters`, `roster`) |
+| Draft classes | `picks`, `teams`, `conference_tiers` |
+| NFL careers | `picks`, `nfl_draft_picks`, `nfl_rosters` |
+| Transfers | `player_stats`, `roster`, `conference_tiers` |
 | Map | `teams` (location, #48), `games` |
 
 ## Page layout
@@ -195,6 +197,7 @@ each asset, tested on fixtures. These assets are not added to the DuckDB
 | `plays/<season>/<shard>.parquet` | play: elapsed (non-decreasing within each game), home score/margin, home cumulative PPA, scoring/turnover flags, players JSON; `shard = game_id % 100`, one file per season and shard holding its games in play order | 3.1M rows, ~1.7k files, ~250 MB total; ~100 to 250 KB per shard (contract cap 400 KB) | loaded when the Game section comes into view (Teams tab only); one whole-file fetch per shard, cached, so games in the same shard are free |
 | `players/<pos>.parquet` | player × season × team in one stat group: headline stats, percentiles (0–100), team id (name only for teams without one), tier, outcome code and chip label | 141k rows in 8 files, uncompressed parquet (Pages gzips it), 180–725 KB raw, ≤ ~410 KB gz; contract cap 1 MB | on Players open, one group at a time |
 | `combine.json` | combine invitee: measurables, outcome (draft round group, not drafted, or draft pending for a class with no slots yet), `athlete_id`, the Players group to open; columnar (one array per field) | 5.7k rows, ~145 KB gz (contract cap 200 KB) | on Combine open, with the plotly gl3d bundle |
+| `careers.json` | `draft` (one draft pick since 2010: year, round, overall, name, position group, `team_id`/school, tier, athlete id, Players group, NFL roster seasons, still active), `transfers` (team × season × direction arrivals), `transfer_rate`, `nfl_latest_season`; columnar | 4.4k picks + 4.2k transfer rows, ~85 KB gz (contract cap 150 KB) | on Draft & careers open |
 
 Budget (decision 0046): first view ≤ 250 KB of gzipped data assets, and a
 game open is one request for one shard file (~100 to 250 KB; many per-game files made the Pages deploy time out). **No range requests:**
@@ -293,9 +296,21 @@ session. GitHub Pages limits: 1 GB site, 100 MB per file.
    when the invitee has a stat line. `combine_position_group()` is the
    position crosswalk #64 reuses. Outcomes come from the combine's own draft
    slot (the draft that spring), so the 2026 class is "Draft pending".
-6. **Draft & careers tab.** Move the old charts over, drop redshirts, then
-   retire `visualizations.qmd`, point the `explore.qmd` tile at the explorer,
-   and update NEWS.
+6. [x] **Draft & careers tab** (done 2026-11-14): `careers.json` (every
+   pick since the 2010 draft with its tier, school and NFL roster seasons;
+   transfer arrivals by team, season and direction; the career transfer
+   share), ~85 KB gzipped, contract cap 150 KB. Three sections: picks per
+   draft by conference tier with the selected team's picks below it (tap a
+   draft to list them, tap a player to open Players); NFL roster seasons by
+   round, each round spread by pick order, the team's picks in its color and
+   still-active careers hollow; transfers by season and direction,
+   nationally and into the selected team. `visualizations.qmd` is retired
+   (its URL redirects to the explorer), the `explore.qmd` tile points here,
+   and its now-unused `viz_*()` chart functions are removed. Cut, not moved:
+   redshirts (dropped), the 2D/3D physicals scatters (the Combine tab), the
+   player dossiers (the Players career view), the career-length histogram,
+   and the team logo table and drafts-by-team bars (covered by the Teams tab
+   and the draft posts).
 7. **Map tab** after #48 publishes.
 
 Each step is its own PR, and `main` stays deployable after each one.

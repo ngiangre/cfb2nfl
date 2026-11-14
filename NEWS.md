@@ -1,5 +1,14 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- The Explorer's **Draft & careers** tab, which replaces the Visualizations
+  page (old links redirect to the Explorer, and the Explore hub's tile now
+  opens it): every NFL draft since 2010 split by conference tier, with the
+  selected team's picks each year and a tap-through to each player's college
+  career; how many NFL seasons drafted players last, by round and pick, with
+  the team's picks highlighted and still-active careers marked; and
+  transfers by season and tier direction, nationally and into the selected
+  team. The old page's `viz_*()` chart functions are removed (#70).
+
 - Explorer polish (#78): axis titles no longer sit on the tick labels, each
   team's season records are drawn as shares of its games (100% bars with a
   50% line, counts in the tooltip) so win rates compare across seasons, and

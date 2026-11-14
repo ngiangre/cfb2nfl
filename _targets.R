@@ -729,7 +729,8 @@ list(
       explorer_team_games = ok_explorer_team_games,
       explorer_plays = ok_explorer_plays,
       explorer_players = ok_explorer_players,
-      explorer_combine = ok_explorer_combine
+      explorer_combine = ok_explorer_combine,
+      explorer_careers = ok_explorer_careers
     ))
   ),
   # ---- link-step contracts (audit-hygiene workstream C) ----------------------
@@ -966,6 +967,39 @@ list(
       explorer_combine,
       combine,
       explorer_combine_file,
+      stop_on_fail = FALSE
+    ))
+  ),
+  # Draft & careers tab (plans/explorer.md step 6): every pick since 2010
+  # with its NFL roster seasons, and transfer arrivals by team and season.
+  tar_target(
+    explorer_careers,
+    build_explorer_careers(
+      build_explorer_draft(
+        picks_nfl,
+        nfl_rosters,
+        tiers,
+        explorer_teams,
+        explorer_player_seasons
+      ),
+      build_explorer_transfers(ps_change, explorer_teams),
+      transfer_rate(career),
+      nfl_rosters
+    )
+  ),
+  tar_target(
+    explorer_careers_file,
+    write_explorer_careers(explorer_careers),
+    format = "file"
+  ),
+  tar_target(
+    ok_explorer_careers,
+    pointblank::all_passed(contract_explorer_careers(
+      explorer_careers,
+      picks_nfl,
+      ps_change,
+      min(tiers$season),
+      explorer_careers_file,
       stop_on_fail = FALSE
     ))
   ),
@@ -1359,6 +1393,14 @@ list(
         combine,
         keys = c("season", "name", "school", "combine_pos"),
         contract_passed = ok_explorer_combine
+      ),
+      audit_step(
+        explorer_careers$draft,
+        "build_explorer_draft",
+        "features",
+        picks_nfl,
+        keys = c("year", "overall"),
+        contract_passed = ok_explorer_careers
       )
     )
   ),
