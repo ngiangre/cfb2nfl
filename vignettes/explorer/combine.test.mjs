@@ -6,17 +6,23 @@ import {
 } from "./combine.js";
 
 const rows = columnsToRows({
-  season: [2020, 2020, 2021, 2020],
-  name: ["Joe Burrow", "Tall", "Later", "Lineman"],
-  school: ["LSU", "Texas", "Texas", "Texas"],
-  pos: ["QB", "QB", "QB", "OL"],
-  height: [75, 78, 74, 78],
-  weight: [221, 230, 210, 315],
-  forty: [null, 4.8, 4.6, 5.2],
-  outcome: ["r1", "undrafted", "pending", "r4_7"],
-  outcome_label: ["Drafted R1 #1 (Cincinnati)", "Not drafted", "Draft pending", "Drafted R5 #150 (Denver)"],
-  athlete_id: ["3915511", null, "9", "8"],
-  players_pos: ["QB", null, "QB", null]
+  season: [2020, 2020, 2021, 2020, 2019],
+  name: ["Joe Burrow", "Tall", "Later", "Lineman", "Made It"],
+  school: ["LSU", "Texas", "Texas", "Texas", "Texas"],
+  pos: ["QB", "QB", "QB", "OL", "WR"],
+  height: [75, 78, 74, 78, 71],
+  weight: [221, 230, 210, 315, 195],
+  forty: [null, 4.8, 4.6, 5.2, 4.5],
+  outcome: ["r1", "undrafted", "pending", "r4_7", "udfa"],
+  outcome_label: [
+    "Drafted R1 #1 (Cincinnati)",
+    "Not drafted",
+    "Draft pending (draft not yet in the data)",
+    "Drafted R5 #150 (Denver)",
+    "UDFA, NFL roster (2021-2025)"
+  ],
+  athlete_id: ["3915511", null, "9", "8", null],
+  players_pos: ["QB", null, "QB", null, null]
 });
 
 const measures = [
@@ -26,12 +32,13 @@ const measures = [
 ];
 const outcomes = [
   {outcome: "r1", label: "Drafted, round 1"},
+  {outcome: "udfa", label: "UDFA, made NFL roster"},
   {outcome: "undrafted", label: "Not drafted"},
-  {outcome: "pending", label: "Draft pending"}
+  {outcome: "pending", label: "Draft pending (draft not yet in data)"}
 ];
 
 test("columnsToRows turns columns into row objects", () => {
-  assert.equal(rows.length, 4);
+  assert.equal(rows.length, 5);
   assert.deepEqual(rows[0].name, "Joe Burrow");
   assert.equal(columnsToRows({}).length, 0);
 });
@@ -61,13 +68,14 @@ test("canOpenPlayer needs a CFBD id and a Players group", () => {
   assert.equal(canOpenPlayer(rows[0]), true);
   assert.equal(canOpenPlayer(rows[1]), false);
   assert.equal(canOpenPlayer(rows[3]), false);
+  assert.equal(canOpenPlayer(rows[4]), false);
 });
 
 test("combineTraces makes one trace per outcome present, plus the selected player", () => {
   const points = combinePoints(rows, {pos: "QB", from: 2020, to: 2021, axes: ["height", "weight", "forty"]});
   const colors = new Map([["r1", "#000"], ["undrafted", "#999"], ["pending", "#0f0"]]);
   const t = combineTraces(points, {axes: ["height", "weight", "forty"], measures, outcomes, colors, selected: "9"});
-  assert.deepEqual(t.map(d => d.name), ["Not drafted (N=1)", "Draft pending (N=1)", "Later"]);
+  assert.deepEqual(t.map(d => d.name), ["Not drafted (N=1)", "Draft pending (draft not yet in data) (N=1)", "Later"]);
   assert.deepEqual(t[0].customdata, [0]);
   assert.deepEqual(t[1].x, [74]);
   assert.equal(t[2].marker.size, 9);

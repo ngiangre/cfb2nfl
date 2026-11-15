@@ -12,5 +12,8 @@ A tibble: \code{outcome} (code), \code{label}.
 \description{
 Draft outcome for a combine invitee in the draft right after the combine,
 in legend order. "Draft pending" marks a combine class whose draft has no
-slots in the source yet.
+slots in the source yet (the draft has not happened in the published data,
+not an in-flight draft). "UDFA, made NFL roster" marks an invitee without a
+draft slot who still shows up in nflverse's player table: an undrafted free
+agent who made an NFL roster, spanned by \code{rookie_season}/\code{last_season}.
 }

@@ -4,7 +4,12 @@
 \alias{build_explorer_combine}
 \title{Explorer combine table}
 \usage{
-build_explorer_combine(combine, player_seasons, picks = NULL)
+build_explorer_combine(
+  combine,
+  player_seasons,
+  picks = NULL,
+  nfl_players = NULL
+)
 }
 \arguments{
 \item{combine}{Cleaned, linked combine table.}
@@ -13,6 +18,12 @@ build_explorer_combine(combine, player_seasons, picks = NULL)
 
 \item{picks}{Optional CFBD draft picks (\code{year}, \code{overall}, \code{position});
 without them the label leaves out the drafted position.}
+
+\item{nfl_players}{Optional nflverse player crosswalk (\code{pfr_id},
+\code{rookie_season}, \code{last_season}; see \code{\link[=ingest_nfl_players]{ingest_nfl_players()}}). An invitee
+without a draft slot who appears in it is relabelled an undrafted free
+agent who made an NFL roster; without the crosswalk they stay "Not
+drafted".}
 }
 \value{
 A tibble, one row per input row. \code{players_jersey} is the last
