@@ -20,6 +20,14 @@ export function playerLabel(name, position, ...details) {
   return extra.length ? `${name} (${extra.join(", ")})` : String(name);
 }
 
+// A jersey number and position rendered as "#7 QB"; a missing number or
+// position is dropped, so the label degrades to the position alone.
+export function jerseyPos(jersey, position) {
+  const n = (jersey !== null && jersey !== undefined && jersey !== "") ? `#${jersey}` : null;
+  const p = (position !== null && position !== undefined && position !== "") ? position : null;
+  return [n, p].filter(x => x !== null).join(" ");
+}
+
 export function errorCard(what) {
   return `<div class="explorer-card explorer-error" role="alert"><p>Couldn't load ${escapeHtml(what)}.</p>` +
     `<button type="button" class="explorer-retry">Retry</button></div>`;

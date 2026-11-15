@@ -235,10 +235,13 @@ explorer_percentile <- function(x, reverse = FALSE) {
 #' @param teams Explorer teams ([build_explorer_teams()]): FBS and FCS names
 #'   to `team_id`. Lower-division teams keep their name and have no id.
 #' @param player_outcomes Output of [build_explorer_player_outcomes()].
+#' @param roster Cleaned roster, for the season's jersey number (display
+#'   only). A player-team-season row is matched first, then any jersey the
+#'   player wore that season (transfers).
 #' @param current_season The in-progress season, for players with no
 #'   outcome row (no roster career).
 #' @return A tibble: `pos`, `player_id`, `name`, `position` (roster code),
-#'   `season`, `team`, `team_id`,
+#'   `jersey`, `season`, `team`, `team_id`,
 #'   `conference`, `tier`, `outcome`, `outcome_label`, then the stat columns.
 #' @export
 build_explorer_player_seasons <- function(
@@ -246,6 +249,7 @@ build_explorer_player_seasons <- function(
   tiers,
   teams,
   player_outcomes,
+  roster,
   current_season
 ) {
   defs <- explorer_positions()
@@ -313,6 +317,31 @@ build_explorer_player_seasons <- function(
     all[[col]] <- if (endsWith(col, "_pct")) NA_integer_ else NA_real_
   }
   all |>
+    # Jersey number for the season (display only): the roster row for the
+    # same player-team-season wins, then any jersey the player wore that
+    # season (a transfer's two teams can disagree).
+    dplyr::left_join(
+      roster |>
+        dplyr::filter(!is.na(.data$jersey)) |>
+        dplyr::summarise(
+          jersey = dplyr::first(.data$jersey),
+          .by = c("playerId", "season", "team")
+        ),
+      by = c("playerId", "season", "team"),
+      relationship = "many-to-one"
+    ) |>
+    dplyr::left_join(
+      roster |>
+        dplyr::filter(!is.na(.data$jersey)) |>
+        dplyr::summarise(
+          jersey_any = dplyr::first(.data$jersey),
+          .by = c("playerId", "season")
+        ),
+      by = c("playerId", "season"),
+      relationship = "many-to-one"
+    ) |>
+    dplyr::mutate(jersey = dplyr::coalesce(.data$jersey, .data$jersey_any)) |>
+    dplyr::select(-"jersey_any") |>
     dplyr::left_join(
       names_by_id,
       by = c("playerId", "season"),
@@ -357,6 +386,7 @@ build_explorer_player_seasons <- function(
       player_id = "playerId",
       "name",
       "position",
+      "jersey",
       "season",
       "team",
       "team_id",
@@ -394,6 +424,7 @@ write_explorer_players <- function(
     "player_id",
     "name",
     "position",
+    "jersey",
     "season",
     "team",
     "team_id",
@@ -409,6 +440,7 @@ write_explorer_players <- function(
       dplyr::select(dplyr::all_of(c(common, keys, paste0(keys, "_pct")))) |>
       dplyr::mutate(
         season = as.integer(.data$season),
+        jersey = as.integer(.data$jersey),
         team_id = as.integer(.data$team_id),
         team = dplyr::if_else(is.na(.data$team_id), .data$team, NA_character_)
       ) |>

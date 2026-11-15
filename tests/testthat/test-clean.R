@@ -111,3 +111,15 @@ test_that("clean_roster coerces out-of-range placeholder weights to NA", {
   expect_equal(out$weight[out$playerId == "2"], 240L)
   expect_true(is.na(out$weight[out$playerId == "3"]))
 })
+
+test_that("clean_roster coerces out-of-range jerseys to NA", {
+  raw <- tibble::tibble(
+    id = c(1L, 2L, 3L),
+    season = c(2019L, 2019L, 2019L),
+    jersey = c(7, 99, 137)
+  )
+  out <- clean_roster(raw)
+  expect_equal(out$jersey[out$playerId == "1"], 7L)
+  expect_equal(out$jersey[out$playerId == "2"], 99L)
+  expect_true(is.na(out$jersey[out$playerId == "3"]))
+})

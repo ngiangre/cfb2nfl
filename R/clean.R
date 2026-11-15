@@ -163,6 +163,12 @@ clean_roster <- function(roster) {
       # field (~124k rows with class_year == season). Anything outside the
       # plausible 1-5 class range is unmeasurable, so coerce to NA (same
       # precedent as the weight coercion, decision 0009).
+      # Jersey (0-99): outside that range is a data-entry error, coerced to
+      # NA (same precedent as the weight coercion, decision 0009).
+      dplyr::across(
+        dplyr::any_of("jersey"),
+        \(j) dplyr::if_else(j >= 0 & j <= 99, as.integer(j), NA_integer_)
+      ),
       dplyr::across(
         dplyr::any_of("class_year"),
         \(cy) dplyr::if_else(cy >= 1 & cy <= 5, as.integer(cy), NA_integer_)
@@ -377,8 +383,31 @@ clean_combine <- function(combine) {
 #' @return A cleaned tibble keyed by `gsis_id` and `season`.
 #' @export
 clean_nfl_rosters <- function(nfl_rosters) {
+  # nflverse rosters are weekly; a traded player's jersey can change
+  # mid-season. The season-level value is the most common non-NA week value,
+  # ties resolved to the smaller number.
+  jerseys <- nfl_rosters |>
+    dplyr::filter(!is.na(.data$gsis_id), !is.na(.data$jersey_number)) |>
+    dplyr::count(
+      .data$gsis_id,
+      .data$season,
+      jersey = as.integer(.data$jersey_number)
+    ) |>
+    dplyr::arrange(
+      .data$gsis_id,
+      .data$season,
+      dplyr::desc(.data$n),
+      .data$jersey
+    ) |>
+    dplyr::summarise(
+      jersey = dplyr::first(.data$jersey),
+      .by = c("gsis_id", "season")
+    )
   nfl_rosters |>
     dplyr::filter(!is.na(.data$gsis_id)) |>
+    # The raw weekly jersey_number column is replaced by the season modal.
+    dplyr::select(-"jersey_number") |>
+    dplyr::left_join(jerseys, by = c("gsis_id", "season")) |>
     dplyr::transmute(
       gsis_id = as.character(.data$gsis_id),
       season = as.integer(.data$season),
@@ -400,6 +429,13 @@ clean_nfl_rosters <- function(nfl_rosters) {
         as.integer(.data$weight)
       ),
       college = as.character(.data$college),
+      # Jersey (0-99): outside that range is a data-entry error, coerced to
+      # NA (same precedent as the weight coercion, decision 0009).
+      jersey_number = dplyr::if_else(
+        .data$jersey >= 0 & .data$jersey <= 99,
+        as.integer(.data$jersey),
+        NA_integer_
+      ),
       rookie_year = as.integer(.data$rookie_year)
     ) |>
     dplyr::arrange(.data$gsis_id, .data$season) |>

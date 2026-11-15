@@ -22,6 +22,20 @@ test_that("explorer_player_groups fills an unrecorded position from the nearest 
   expect_equal(g$position[g$playerId == "o1"], "OT")
 })
 
+test_that("build_explorer_player_seasons attaches the roster jersey", {
+  ps <- explorer_player_seasons_fixture()
+  # The player-team-season roster row wins; a season without a roster row
+  # falls back to any jersey the player wore that season.
+  q <- ps[ps$player_id == "q1" & ps$season == 2025L, ]
+  expect_equal(q$jersey, 7L)
+  # A player absent from the roster has NA, and the column survives the
+  # per-group write.
+  paths <- write_explorer_players(ps, file.path(tempdir(), "explorer-test"))
+  d <- arrow::read_parquet(paths[[1]])
+  expect_true("jersey" %in% names(d))
+  expect_type(d$jersey, "integer")
+})
+
 test_that("build_explorer_player_seasons ranks within group and season", {
   ps <- explorer_player_seasons_fixture()
   qb25 <- dplyr::filter(ps, .data$pos == "QB", .data$season == 2025L)

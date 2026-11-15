@@ -235,6 +235,15 @@ explorer_player_outcomes_fixture <- function() {
   )
 }
 
+explorer_roster_fixture <- function() {
+  tibble::tibble(
+    playerId = c("q1", "q2", "q3", "w1", "d2"),
+    season = c(2025L, 2025L, 2025L, 2026L, 2025L),
+    team = c("Texas", "Texas", "Texas", "Texas", "Ferris State"),
+    jersey = c(7L, 10L, 3L, 1L, NA_integer_)
+  )
+}
+
 explorer_player_seasons_fixture <- function() {
   ts <- build_explorer_team_season(
     explorer_games_fixture(),
@@ -250,6 +259,7 @@ explorer_player_seasons_fixture <- function() {
     ),
     build_explorer_teams(explorer_teams_fixture(), ts),
     explorer_player_outcomes_fixture(),
+    explorer_roster_fixture(),
     current_season = 2026L
   )
 }

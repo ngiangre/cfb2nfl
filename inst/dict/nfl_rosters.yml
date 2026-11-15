@@ -49,6 +49,10 @@ columns:
     type: string
     description: College attended.
     provenance: raw
+  - name: jersey_number
+    type: int32
+    description: Jersey number for the season, the most common non-NA week value (nflverse rosters are weekly and a traded player's number can change mid-season; ties take the smaller number). NA where unknown.
+    provenance: raw (jersey_number, modal across weeks)
   - name: rookie_year
     type: int32
     description: The player's rookie NFL season; NA where unknown.

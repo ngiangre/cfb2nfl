@@ -1,5 +1,15 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Explorer: player listings now show the jersey number with the position,
+  as in "Arch Manning (#7 QB)". The college jersey comes from
+  `data/roster.parquet` (94% coverage; the roster and NFL-rosters contracts
+  now guard it to the plausible 0-99 range, with out-of-range values
+  coerced to NA) and the NFL jersey from nflverse rosters in
+  `data/nfl_rosters.parquet`, taken as the most common non-NA week value in
+  a season because a traded player's number can change mid-season (ties
+  take the smaller number). Jersey numbers are display only and stay off
+  the model input path (#87).
+
 - New post: **combine measurables and the invite-to-draft funnel** (#64).
   What the NFL Scouting Combine records at each position, how size and
   speed separate positions and drift from 2010 to 2026, how drill records

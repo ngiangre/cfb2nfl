@@ -15,7 +15,8 @@ build_explorer_combine(combine, player_seasons, picks = NULL)
 without them the label leaves out the drafted position.}
 }
 \value{
-A tibble, one row per input row.
+A tibble, one row per input row. \code{players_jersey} is the last
+stat season's college jersey number (display only).
 }
 \description{
 One row per combine invitee: measurables, the draft outcome that year,

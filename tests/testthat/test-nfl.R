@@ -54,7 +54,8 @@ test_that("clean_nfl_rosters drops idless rows and keys one row per player-seaso
     height = c(73, 73, 71),
     weight = c(215L, 218L, 190L),
     college = c("Wyoming", "Wyoming", "State"),
-    rookie_year = c(2019L, 2019L, NA_integer_)
+    rookie_year = c(2019L, 2019L, NA_integer_),
+    jersey_number = c(17, 17, 6)
   )
 
   out <- clean_nfl_rosters(raw)
@@ -62,6 +63,63 @@ test_that("clean_nfl_rosters drops idless rows and keys one row per player-seaso
   expect_equal(nrow(out), 2L)
   expect_setequal(out$season, c(2019L, 2020L))
   expect_true(all(!is.na(out$gsis_id)))
+})
+
+test_that("clean_nfl_rosters takes the modal week jersey, ties to the smaller", {
+  # A traded player wears 11 for four weeks, 8 for two; a tie (4 vs 7)
+  # resolves to the smaller; a jersey-less player stays NA.
+  raw <- tibble::tibble(
+    gsis_id = c(
+      "00-1",
+      "00-1",
+      "00-1",
+      "00-1",
+      "00-1",
+      "00-1",
+      "00-2",
+      "00-2",
+      "00-2",
+      "00-2",
+      "00-3"
+    ),
+    season = 2023L,
+    full_name = c(rep("Traded", 6), rep("Tie", 4), "No Jersey"),
+    team = c(rep("BUF", 4), rep("LAC", 2), rep("DAL", 5)),
+    position = c(rep("WR", 6), rep("QB", 5)),
+    status = "ACT",
+    years_exp = 1L,
+    height = 73,
+    weight = 210L,
+    college = "X",
+    rookie_year = 2023L,
+    jersey_number = c(11, 11, 11, 11, 8, 8, 4, 4, 7, 7, NA),
+    week = 1:11,
+    game_type = "REG"
+  )
+
+  out <- clean_nfl_rosters(raw)
+
+  expect_equal(out$jersey_number[out$gsis_id == "00-1"], 11L)
+  expect_equal(out$jersey_number[out$gsis_id == "00-2"], 4L)
+  expect_true(is.na(out$jersey_number[out$gsis_id == "00-3"]))
+})
+
+test_that("clean_nfl_rosters coerces out-of-range jerseys to NA", {
+  raw <- tibble::tibble(
+    gsis_id = "00-1",
+    season = 2023L,
+    full_name = "X",
+    team = "DAL",
+    position = "QB",
+    status = "ACT",
+    years_exp = 0L,
+    height = 73,
+    weight = 210L,
+    college = "Y",
+    rookie_year = 2023L,
+    jersey_number = 137
+  )
+  expect_true(is.na(clean_nfl_rosters(raw)$jersey_number))
 })
 
 test_that("link_nfl_draft bridges by slot and name-guards wrong matches", {

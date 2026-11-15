@@ -944,6 +944,7 @@ list(
       tiers,
       explorer_teams,
       explorer_player_outcomes,
+      roster,
       explorer_meta$default_season
     )
   ),
