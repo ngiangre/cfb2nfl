@@ -1,0 +1,1063 @@
+---
+title: "Combine invitees are drafted far more often than uninvited eligible players, while fewer of them run each drill"
+date: "2026-11-14"
+description: "Fewer than one in ten draft-eligible players is invited to the NFL Scouting Combine and invitees are drafted at many times the rate of everyone else, positions sort by size and speed, drill records have thinned since 2021, and quarterbacks who skip the 40-yard dash are drafted more often than those who run it."
+followups:
+  - "Add pro-day results for invitees who skip combine drills, to separate a skipped drill from an unmeasured player."
+  - "Ask whether combine measurables add to in-career production in a draft-time model, kept apart from the in-career forecasts."
+  - "Link more unmatched invitees, mostly offensive linemen without a stat line, through roster names and schools."
+  - "Check whether the faster 40-yard dash medians since 2022 come from faster players or from slower players choosing not to run."
+author:
+  - "AI directed by Nick Giangreco"
+freeze: auto
+vignette: >
+  %\VignetteIndexEntry{Combine invitees are drafted far more often than uninvited eligible players, while fewer of them run each drill}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# ---- Packages, data connection and figure defaults -------------------------
+# Load the project's functions straight from the checkout with pkgload; the
+# repo is never installed (decision 0042). The site build sets CFB2NFL_ROOT,
+# a local render finds the checkout from the working directory.
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+library(DBI)
+library(dplyr)
+library(duckdb)
+library(ggiraph)
+library(ggplot2)
+library(knitr)
+
+# One interaction style for every girafe figure: a clear hover pop, dimming
+# of non-hovered marks, a dark tooltip, and toolbar zoom + PNG download.
+set_girafe_defaults(
+  opts_hover = opts_hover(
+    css = "stroke:#111827;stroke-width:2.5px;filter:brightness(1.12);"
+  ),
+  opts_hover_inv = opts_hover_inv(css = "opacity:0.45;"),
+  opts_tooltip = opts_tooltip(
+    css = "background:#111827;color:#fff;padding:6px 9px;border-radius:5px;font-weight:bold;font-size:15px;"
+  ),
+  opts_zoom = opts_zoom(min = 1, max = 5),
+  opts_toolbar = opts_toolbar(saveaspng = TRUE, position = "topright"),
+  opts_sizing = opts_sizing(rescale = TRUE)
+)
+
+# thousands-separated and percent formatters for inline numbers
+fmt <- function(x, digits = 0) {
+  formatC(as.numeric(x), big.mark = ",", format = "f", digits = digits)
+}
+pct <- function(x, digits = 1) sprintf("%.*f%%", digits, 100 * x)
+# "a, b and c"
+and_list <- function(x) sub(", ([^,]*)$", " and \\1", paste(x, collapse = ", "))
+
+claim_fill <- "#B45309"
+context_fill <- "#9CA3AF"
+
+# ---- Named players (keyed on athlete id) -----------------------------------
+# Key on athlete id, never name (recruiting ids collide, decision 0013).
+subjects <- tibble::tribble(
+  ~who             , ~cfb_athlete_id , ~team           ,
+  "Joe Burrow"     , "3915511"       , "LSU"           ,
+  "Jordan Travis"  , "4360799"       , "Florida State" ,
+  "Cam Ward"       , "4688380"       , "Miami"         ,
+  "Shane Buechele" , "4039034"       , "SMU"           ,
+  "Kyle Allen"     , "559681"        , "Houston"
+)
+
+# ---- Load the tables -------------------------------------------------------
+meta <- dbReadTable(con, "_meta")
+last_draft <- meta$last_complete_nfl_draft
+pos_levels <- position_group_levels()
+combine <- dbReadTable(con, "combine") |>
+  mutate(
+    position_group = factor(combine_position_group(pos), pos_levels),
+    # "Drafted that year": the combine is held the spring of its draft.
+    drafted = !is.na(draft_round)
+  )
+outcomes <- dbReadTable(con, "outcomes")
+# One position per player-season (a handful of ids repeat within a season).
+roster_pos <- dbGetQuery(
+  con,
+  "SELECT playerId, season, any_value(position) AS position
+   FROM roster GROUP BY playerId, season"
+)
+teams <- dbReadTable(con, "teams")
+team_colors <- team_color_values(teams)
+
+# The eight measurables, with reader-facing labels and units.
+measures <- explorer_combine_measures() |>
+  mutate(label_unit = sprintf("%s (%s)", label, unit))
+drills <- setdiff(measures$key, c("height", "weight"))
+combine_years <- range(combine$season)
+
+# ---- 2.2 Where each invitee can be placed -----------------------------------
+status_labels <- c(
+  eligible = "In the eligible population",
+  outside_population = "Linked, outside the population",
+  unmatched = "No college id"
+)
+placed <- combine_funnel_status(combine, outcomes) |>
+  mutate(funnel_status = factor(status_labels[funnel_status], status_labels))
+n_invitees <- nrow(combine)
+n_unmatched <- sum(is.na(combine$athlete_id))
+ol_unmatched_share <- mean(
+  combine$position_group[is.na(combine$athlete_id)] == "Offensive line"
+)
+
+# ---- 3.1 What is recorded, by position and season ---------------------------
+long <- combine |>
+  select(season, player_name, school, position_group, all_of(measures$key)) |>
+  tidyr::pivot_longer(
+    all_of(measures$key),
+    names_to = "key",
+    values_to = "value"
+  ) |>
+  left_join(select(measures, key, label), by = "key") |>
+  mutate(label = factor(label, measures$label))
+recorded_pos <- long |>
+  group_by(position_group, key, label) |>
+  summarise(n = n(), recorded = mean(!is.na(value)), .groups = "drop")
+qb_bench <- recorded_pos$recorded[
+  recorded_pos$position_group == "Quarterback" & recorded_pos$key == "bench"
+]
+recorded_season <- long |>
+  group_by(season, key, label) |>
+  summarise(n = n(), recorded = mean(!is.na(value)), .groups = "drop")
+# The first five combines against the last five (2022 on, after the
+# cancelled 2021 combine); sections 3.1 and 3.4 share them.
+early_window <- combine_years[1]:(combine_years[1] + 4L)
+late_window <- (combine_years[2] - 4L):combine_years[2]
+# "Steady": a recorded share that moves by less than this between windows.
+steady_pts <- 0.10
+recorded_change <- recorded_season |>
+  mutate(
+    window = case_when(
+      season %in% early_window ~ "early",
+      season %in% late_window ~ "late"
+    )
+  ) |>
+  filter(!is.na(window)) |>
+  group_by(key, label, window) |>
+  summarise(recorded = mean(recorded), .groups = "drop") |>
+  tidyr::pivot_wider(names_from = window, values_from = recorded) |>
+  mutate(change = late - early)
+hw_share <- mean(!is.na(c(combine$height, combine$weight)))
+biggest_drop <- recorded_change |>
+  filter(key %in% drills) |>
+  slice_min(change, n = 1)
+e1_holds <- all(abs(recorded_change$change) < steady_pts)
+
+# ---- 3.2 Skipping the 40-yard dash ------------------------------------------
+drafted_window <- combine |>
+  filter(season <= last_draft) |>
+  mutate(ran = !is.na(forty))
+skip_pos <- drafted_window |>
+  group_by(position_group) |>
+  summarise(
+    invitees = n(),
+    skipped = mean(!ran),
+    drafted_ran = mean(drafted[ran]),
+    drafted_skip = mean(drafted[!ran]),
+    .groups = "drop"
+  )
+e2_holds <- all(skip_pos$drafted_skip < skip_pos$drafted_ran)
+qb_skip <- skip_pos |> filter(position_group == "Quarterback")
+cast_combine <- combine |>
+  inner_join(subjects, by = c("athlete_id" = "cfb_athlete_id")) |>
+  mutate(n_recorded = rowSums(!is.na(pick(all_of(measures$key)))))
+cast_max_recorded <- max(cast_combine$n_recorded)
+cast_invited <- and_list(cast_combine$who)
+
+# ---- 3.3 How positions separate ---------------------------------------------
+# Special teams invitees rarely run, so separation compares the other eight.
+sep_levels <- setdiff(pos_levels, "Special teams")
+q <- function(x, p) unname(stats::quantile(x, p, na.rm = TRUE))
+spread <- long |>
+  filter(!is.na(value)) |>
+  group_by(position_group, key, label) |>
+  summarise(
+    lo = q(value, 0.25),
+    med = stats::median(value),
+    hi = q(value, 0.75),
+    .groups = "drop"
+  )
+boxes <- spread |>
+  filter(key %in% c("weight", "forty"), position_group %in% sep_levels) |>
+  select(position_group, key, lo, med, hi) |>
+  tidyr::pivot_wider(names_from = key, values_from = c(lo, med, hi))
+overlaps <- function(a_lo, a_hi, b_lo, b_hi) a_lo <= b_hi & b_lo <= a_hi
+pairs <- tidyr::expand_grid(a = seq_len(nrow(boxes)), b = seq_len(nrow(boxes))) |>
+  filter(a < b) |>
+  mutate(
+    pair = paste(boxes$position_group[a], "and", tolower(boxes$position_group[b])),
+    overlap = overlaps(boxes$lo_weight[a], boxes$hi_weight[a], boxes$lo_weight[b], boxes$hi_weight[b]) &
+      overlaps(boxes$lo_forty[a], boxes$hi_forty[a], boxes$lo_forty[b], boxes$hi_forty[b])
+  )
+n_pairs <- nrow(pairs)
+n_overlap <- sum(pairs$overlap)
+overlap_pairs <- paste(tolower(pairs$pair[pairs$overlap]), collapse = "; ")
+e3_holds <- n_overlap == 0
+
+# ---- 3.4 Drift between the first and last five combines --------------------
+drift <- combine |>
+  filter(season %in% c(early_window, late_window), position_group %in% sep_levels) |>
+  mutate(window = if_else(season %in% early_window, "first", "last")) |>
+  group_by(position_group, window) |>
+  summarise(
+    ran = mean(!is.na(forty)),
+    forty = stats::median(forty, na.rm = TRUE),
+    weight = stats::median(weight, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  tidyr::pivot_wider(names_from = window, values_from = c(forty, weight, ran)) |>
+  mutate(forty_change = forty_last - forty_first, weight_change = weight_last - weight_first)
+n_faster <- sum(drift$forty_change < 0)
+e4_holds <- n_faster == nrow(drift)
+# The position whose share running the 40 fell the most.
+fewest_ran <- drift |> slice_min(ran_last - ran_first, n = 1)
+ran_first <- mean(!is.na(combine$forty[combine$season %in% early_window]))
+ran_last <- mean(!is.na(combine$forty[combine$season %in% late_window]))
+medians_season <- long |>
+  filter(!is.na(value), position_group %in% sep_levels) |>
+  group_by(position_group, season, key, label) |>
+  summarise(med = stats::median(value), n = n(), .groups = "drop")
+
+# ---- 3.5 and 3.6 The invite-to-draft funnel ---------------------------------
+# Draft-eligible player-seasons whose draft has happened, with the position
+# the player was rostered at that season (the same map as the combine's).
+funnel <- build_combine_funnel(combine, outcomes) |>
+  left_join(roster_pos, by = c("playerId", "season"), relationship = "many-to-one") |>
+  mutate(position_group = factor(position_group(position), c(pos_levels, "Position not recorded")))
+funnel_years <- range(funnel$draft_year)
+out_band <- placed |>
+  filter(season %in% funnel_years[1]:funnel_years[2]) |>
+  count(season, funnel_status) |>
+  tidyr::pivot_wider(names_from = funnel_status, values_from = n, values_fill = 0)
+by_year <- funnel |>
+  group_by(draft_year) |>
+  summarise(
+    eligible = n(),
+    invited_n = sum(invited),
+    invite_rate = mean(invited),
+    drafted_inv = mean(drafted[invited]),
+    drafted_uninv = mean(drafted[!invited]),
+    drafted_were_invited = mean(invited[drafted]),
+    .groups = "drop"
+  ) |>
+  left_join(out_band, by = c("draft_year" = "season"))
+invite_lo <- min(by_year$invite_rate)
+invite_hi <- max(by_year$invite_rate)
+invite_hi_year <- by_year$draft_year[which.max(by_year$invite_rate)]
+eligible_first <- by_year$eligible[1]
+eligible_last <- by_year$eligible[nrow(by_year)]
+invited_first <- by_year$invited_n[1]
+invited_last <- by_year$invited_n[nrow(by_year)]
+e5_holds <- all(by_year$invite_rate < 0.10)
+pooled <- funnel |>
+  summarise(
+    drafted_inv = mean(drafted[invited]),
+    drafted_uninv = mean(drafted[!invited]),
+    drafted_were_invited = mean(invited[drafted])
+  )
+ratio <- pooled$drafted_inv / pooled$drafted_uninv
+e6_holds <- all(by_year$drafted_inv >= 10 * by_year$drafted_uninv)
+by_pos <- funnel |>
+  group_by(position_group) |>
+  summarise(
+    eligible = n(),
+    invited_n = sum(invited),
+    invite_rate = mean(invited),
+    drafted_inv = mean(drafted[invited]),
+    drafted_uninv = mean(drafted[!invited]),
+    drafted_were_invited = mean(invited[drafted]),
+    .groups = "drop"
+  )
+by_pos_year <- funnel |>
+  filter(position_group %in% pos_levels) |>
+  group_by(position_group, draft_year) |>
+  summarise(
+    eligible = n(),
+    invited_n = sum(invited),
+    invite_rate = mean(invited),
+    drafted_inv = mean(drafted[invited]),
+    drafted_uninv = mean(drafted[!invited]),
+    .groups = "drop"
+  )
+cast_funnel <- funnel |>
+  inner_join(subjects, by = c("playerId" = "cfb_athlete_id")) |>
+  group_by(who) |>
+  summarise(seasons = n(), invited = sum(invited), drafted = sum(drafted))
+cf <- function(name, col) cast_funnel[[col]][cast_funnel$who == name]
+not_invited <- and_list(setdiff(subjects$who, cast_combine$who))
+n_no_pos <- sum(funnel$position_group == "Position not recorded")
+# Players with a stat line per season: the coverage that drives the
+# eligible count.
+statline_season <- count(outcomes, season, name = "players")
+sl <- function(s) statline_season$players[statline_season$season == s]
+```
+
+::: {.callout-note appearance="minimal"}
+*Data as of the `data-latest` release, retrieved 2026-11-14. The
+`r combine_years[2]` combine class has not been drafted yet, so it appears in
+the measurables but not in the draft rates.*
+:::
+
+## 1. Introduction
+
+Every February the NFL invites a few hundred college players to its Scouting Combine to be measured and timed; `r cast_invited` went, `r not_invited` did not. This post asks what the combine records at each position, how those records spread and drift across `r combine_years[1]` to `r combine_years[2]`, and how the invitation itself lines up with being drafted.
+
++ *Expectation one: each measurable's recorded share moves by less than `r round(100 * steady_pts)` points between the first five and the last five combines.*
++ *Expectation two: invitees who skip the 40-yard dash are drafted less often than those who run it, at every position.*
++ *Expectation three: on weight and the 40-yard dash together, the middle halves of no two position groups overlap.*
++ *Expectation four: the median 40-yard dash got faster at every position between the first five and the last five combines.*
++ *Expectation five: fewer than one in ten draft-eligible players is invited in every draft year.*
++ *Expectation six: an invited eligible player is drafted at least ten times as often as an uninvited one, in every draft year.*
+
+## 2. Data
+
+### 2.1 The combine measures size, speed, strength and agility, and the draft follows it that spring
+
+The table defines the combine, its `r nrow(measures)` measurables with their units, and the draft-eligible population the invitees are compared with.
+
+```{r}
+#| label: terms
+tibble::tribble(
+  ~Term, ~Meaning,
+  "Combine", "The NFL Scouting Combine, a week of measurements and drills each February before the spring draft. The 2021 combine was cancelled, so that year's records come from campus workouts.",
+  "Invitee", "A player on the combine's list for a year, whether or not they took part in every drill.",
+  "Height, weight", "Measured in inches and pounds.",
+  "40-yard dash", "A timed sprint, in seconds; lower is faster.",
+  "Bench press", "Repetitions of 225 pounds.",
+  "Vertical jump, broad jump", "Standing jumps straight up and straight forward, in inches.",
+  "3-cone drill, shuttle", "Timed change-of-direction runs, in seconds; lower is quicker.",
+  "Recorded", "The measurable has a value for the invitee. A missing value usually means the player chose not to do the drill.",
+  "Middle half", "The range from the 25th to the 75th percentile: half of a position's invitees fall inside it.",
+  "Drafted that year", "Selected in the draft held the spring of the combine.",
+  "Draft-eligible season", "A college season with a stat line, after which the player is old enough for the next draft (three years past high school). Each such season is one chance to be drafted.",
+  "Invitation rate", "Invitees among a draft year's draft-eligible players.",
+  "Player-season", "One player in one college season.",
+  "Position group", sprintf("%s groups (quarterback through special teams) shared by every post; combine and college position codes map onto the same groups.", length(pos_levels))
+) |>
+  kable(caption = "The terms used throughout.")
+```
+
+### 2.2 Of `r fmt(n_invitees)` invitees, `r fmt(n_unmatched)` have no college id, `r pct(ol_unmatched_share, 0)` of them offensive linemen
+
+Every invitee counts toward the measurables in sections 3.1 to 3.4; only invitees placed in the draft-eligible population, joined on their college athlete id, enter the draft comparisons in 3.5 and 3.6.
+
+```{r}
+#| label: placement
+placed |>
+  count(position_group, funnel_status) |>
+  tidyr::pivot_wider(names_from = funnel_status, values_from = n, values_fill = 0) |>
+  mutate(Invitees = rowSums(pick(all_of(unname(status_labels))))) |>
+  arrange(position_group) |>
+  mutate(across(c(Invitees, all_of(unname(status_labels))), fmt)) |>
+  select(`Position group` = position_group, Invitees, all_of(unname(status_labels))) |>
+  kable(
+    align = "lrrrr",
+    caption = sprintf(
+      "Combine invitees %s to %s by position group and where they can be placed. Linked invitees fall outside the population when they have no stat line in their final season, their eligibility clock says not yet, or their draft (%s) has not happened.",
+      combine_years[1],
+      combine_years[2],
+      combine_years[2]
+    )
+  )
+```
+
+### 2.3 Every position has height and weight recorded, but only `r pct(qb_bench, 0)` of quarterback invitees have a bench press
+
+The table gives the share of each position's invitees with each measurable recorded, pooled over every combine.
+
+```{r}
+#| label: recorded-by-position
+recorded_pos |>
+  select(position_group, label, recorded) |>
+  mutate(recorded = pct(recorded, 0)) |>
+  tidyr::pivot_wider(names_from = label, values_from = recorded) |>
+  left_join(count(combine, position_group, name = "Invitees"), by = "position_group") |>
+  arrange(position_group) |>
+  transmute(
+    `Position group` = as.character(position_group),
+    Invitees = fmt(Invitees),
+    !!!rlang::syms(measures$label)
+  ) |>
+  kable(
+    align = paste0("l", strrep("r", 9)),
+    caption = sprintf(
+      "Share of invitees with each measurable recorded, by position group, combines %s to %s.",
+      combine_years[1],
+      combine_years[2]
+    )
+  )
+```
+
+## 3. Results
+
+### 3.1 Height and weight are recorded for `r pct(hw_share)` of invitees, while the bench press fell from `r pct(biggest_drop$early, 0)` of invitees at the `r early_window[1]` to `r max(early_window)` combines to `r pct(biggest_drop$late, 0)` at `r late_window[1]` to `r max(late_window)`
+
+*Expectation: each measurable's recorded share moves by less than `r round(100 * steady_pts)` points between the first five and the last five combines.* `r if (e1_holds) "✅" else "❌"`
+
+The table compares each measurable's recorded share between the two windows, and the figures show the drills thinning after 2021 at every position.
+
+```{r}
+#| label: s31-table
+recorded_change |>
+  mutate(label = factor(label, measures$label)) |>
+  arrange(label) |>
+  transmute(
+    Measurable = as.character(label),
+    !!sprintf("Recorded, %s to %s", early_window[1], max(early_window)) := pct(early, 0),
+    !!sprintf("Recorded, %s to %s", late_window[1], max(late_window)) := pct(late, 0),
+    `Change (points)` = sprintf("%+.0f", 100 * change)
+  ) |>
+  kable(
+    align = "lrrr",
+    caption = "Share of invitees with each measurable recorded, first five combines against the last five."
+  )
+```
+
+```{r}
+#| label: s31-explain
+#| fig-height: 6
+p <- recorded_season |>
+  mutate(
+    is_claim = key == biggest_drop$key,
+    tip = sprintf("%s, %s: %s of %s invitees recorded", label, season, pct(recorded), fmt(n))
+  ) |>
+  ggplot(aes(season, recorded, group = label, colour = is_claim)) +
+  annotate("rect", xmin = 2020.5, xmax = 2021.5, ymin = -Inf, ymax = Inf, fill = "grey90") +
+  annotate("text", x = 2021, y = 0.05, label = "2021: no combine", fontface = "bold", size = 4.5) +
+  geom_line(aes(linewidth = is_claim)) +
+  geom_point_interactive(aes(tooltip = tip, data_id = paste(key, season)), size = 2.6) +
+  annotate(
+    "text",
+    x = combine_years[2],
+    y = biggest_drop$late - 0.06,
+    label = biggest_drop$label,
+    colour = claim_fill,
+    hjust = 1,
+    fontface = "bold",
+    size = 5
+  ) +
+  scale_colour_manual(values = c(`FALSE` = context_fill, `TRUE` = claim_fill), guide = "none") +
+  scale_linewidth_manual(values = c(`FALSE` = 0.6, `TRUE` = 1.6), guide = "none") +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(combine_years[1], combine_years[2], 2)) +
+  labs(
+    x = "Combine",
+    y = "Invitees with the measurable recorded",
+    subtitle = "One line per measurable; hover a point for the measurable and year"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s31-explore
+#| fig-height: 9
+grid <- long |>
+  filter(key %in% drills) |>
+  group_by(position_group, season, label) |>
+  summarise(n = n(), recorded = mean(!is.na(value)), .groups = "drop") |>
+  mutate(
+    tip = sprintf(
+      "%s, %s, %s: %s of %s invitees recorded",
+      position_group,
+      label,
+      season,
+      pct(recorded, 0),
+      fmt(n)
+    )
+  )
+p2 <- ggplot(grid, aes(season, forcats::fct_rev(position_group), fill = recorded)) +
+  geom_tile_interactive(
+    aes(tooltip = tip, data_id = paste(position_group, label, season)),
+    colour = "white"
+  ) +
+  facet_wrap(~label, ncol = 2) +
+  scale_fill_viridis_c(option = "D", labels = scales::percent, limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(combine_years[1], combine_years[2], 4)) +
+  labs(x = "Combine", y = NULL, fill = "Recorded") +
+  theme_cfb2nfl() +
+  theme(legend.key.width = grid::unit(2.5, "cm"))
+girafe(ggobj = p2, width_svg = 13, height_svg = 10)
+```
+
+### 3.2 Quarterbacks who skip the 40-yard dash are drafted `r pct(qb_skip$drafted_skip, 0)` of the time, against `r pct(qb_skip$drafted_ran, 0)` for those who run it
+
+*Expectation: invitees who skip the 40-yard dash are drafted less often than those who run it, at every position.* `r if (e2_holds) "✅" else "❌"`
+
+Skipping the 40 comes with a lower draft rate at `r sum(skip_pos$drafted_skip < skip_pos$drafted_ran)` of `r nrow(skip_pos)` positions, but quarterbacks who skip it are drafted more often: `r cast_invited` have at most `r cast_max_recorded` of the `r nrow(measures)` measurables recorded, and all `r sum(cast_combine$drafted)` were drafted.
+
+```{r}
+#| label: s32-table
+skip_pos |>
+  transmute(
+    `Position group` = as.character(position_group),
+    Invitees = fmt(invitees),
+    `Skipped the 40` = pct(skipped, 0),
+    `Drafted, ran it` = pct(drafted_ran, 0),
+    `Drafted, skipped it` = pct(drafted_skip, 0)
+  ) |>
+  kable(
+    align = "lrrrr",
+    caption = sprintf(
+      "Invitees at the %s to %s combines by whether they ran the 40-yard dash, and the share drafted that year.",
+      combine_years[1],
+      last_draft
+    )
+  )
+```
+
+```{r}
+#| label: s32-explain
+#| fig-height: 6
+p3 <- skip_pos |>
+  mutate(
+    is_claim = position_group == "Quarterback",
+    tip = sprintf(
+      "%s: drafted %s when they ran the 40, %s when they skipped it",
+      position_group,
+      pct(drafted_ran),
+      pct(drafted_skip)
+    )
+  ) |>
+  ggplot(aes(y = forcats::fct_rev(position_group))) +
+  geom_segment(aes(x = drafted_ran, xend = drafted_skip, colour = is_claim), linewidth = 1.4) +
+  geom_point_interactive(
+    aes(x = drafted_ran, tooltip = tip, data_id = position_group),
+    shape = 21,
+    size = 5,
+    fill = "white",
+    stroke = 1.6
+  ) +
+  geom_point_interactive(
+    aes(x = drafted_skip, fill = is_claim, tooltip = tip, data_id = position_group),
+    shape = 21,
+    size = 5,
+    stroke = 1.2
+  ) +
+  scale_colour_manual(values = c(`FALSE` = context_fill, `TRUE` = claim_fill), guide = "none") +
+  scale_fill_manual(values = c(`FALSE` = context_fill, `TRUE` = claim_fill), guide = "none") +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    x = "Drafted that year",
+    y = NULL,
+    subtitle = "Open circle: ran the 40-yard dash. Filled circle: skipped it"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p3, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s32-explore
+#| fig-height: 7
+undrafted_y <- 290
+qbs <- drafted_window |>
+  filter(position_group == "Quarterback") |>
+  left_join(subjects, by = c("athlete_id" = "cfb_athlete_id")) |>
+  mutate(
+    status = if_else(ran, "Ran the 40", "Skipped the 40"),
+    pick = coalesce(draft_ovr, undrafted_y),
+    tip = sprintf(
+      "%s (%s), %s: %s; %s",
+      player_name,
+      school,
+      season,
+      if_else(ran, sprintf("40 in %.2f s", forty), "no 40 recorded"),
+      if_else(drafted, sprintf("pick %s", draft_ovr), "not drafted")
+    )
+  )
+cast_qbs <- filter(qbs, !is.na(who))
+p4 <- ggplot(qbs, aes(season, pick, colour = status)) +
+  geom_point_interactive(
+    aes(tooltip = tip, data_id = paste(player_name, season)),
+    position = position_jitter(width = 0.25, height = 0, seed = 64),
+    size = 2.8,
+    alpha = 0.8
+  ) +
+  geom_point(
+    data = cast_qbs,
+    aes(fill = team),
+    shape = 21,
+    size = 6,
+    colour = "#111827",
+    stroke = 1.4
+  ) +
+  geom_text(
+    data = cast_qbs,
+    aes(label = who),
+    colour = "#111827",
+    nudge_y = -18,
+    fontface = "bold",
+    size = 4.5
+  ) +
+  scale_fill_manual(values = team_colors, guide = "none") +
+  scale_colour_manual(values = c(`Ran the 40` = "#6B7280", `Skipped the 40` = claim_fill)) +
+  scale_y_reverse(
+    breaks = c(1, 50, 100, 150, 200, 250, undrafted_y),
+    labels = c(1, 50, 100, 150, 200, 250, "Not drafted")
+  ) +
+  scale_x_continuous(breaks = seq(combine_years[1], last_draft, 2)) +
+  labs(
+    x = "Combine",
+    y = "Overall pick",
+    colour = NULL,
+    subtitle = "Every quarterback invitee; the named players are filled in their school's color"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p4, width_svg = 13, height_svg = 7)
+```
+
+### 3.3 Positions sort into size and speed bands, but `r n_overlap` of `r n_pairs` position pairs share a middle half on weight and the 40-yard dash
+
+*Expectation: on weight and the 40-yard dash together, the middle halves of no two position groups overlap.* `r if (e3_holds) "✅" else "❌"`
+
+The table gives each position's typical height, weight and 40-yard dash, and the figures place each position's middle half on weight and the 40, leaving out special teams, who rarely run it.
+
+```{r}
+#| label: s33-table
+size_speed <- c("height", "weight", "forty")
+spread |>
+  filter(key %in% size_speed) |>
+  left_join(select(measures, key, unit), by = "key") |>
+  mutate(
+    digits = if_else(unit == "s", 2L, 0L),
+    cell = sprintf("%.*f (%.*f to %.*f)", digits, med, digits, lo, digits, hi),
+    label = factor(sprintf("%s (%s)", label, unit), measures$label_unit)
+  ) |>
+  select(position_group, label, cell) |>
+  tidyr::pivot_wider(names_from = label, values_from = cell) |>
+  arrange(position_group) |>
+  select(
+    `Position group` = position_group,
+    all_of(measures$label_unit[measures$key %in% size_speed])
+  ) |>
+  kable(
+    align = "lrrr",
+    caption = "Median height, weight and 40-yard dash by position group, with the middle half in parentheses, all combines. The exploratory figure in 3.4 follows every measurable."
+  )
+```
+
+```{r}
+#| label: s33-explain
+#| fig-height: 8
+#| fig-cap: !expr "sprintf('Overlapping pairs: %s.', overlap_pairs)"
+overlap_groups <- unique(c(
+  as.character(boxes$position_group[pairs$a[pairs$overlap]]),
+  as.character(boxes$position_group[pairs$b[pairs$overlap]])
+))
+p5 <- boxes |>
+  mutate(
+    in_overlap = position_group %in% overlap_groups,
+    tip = sprintf(
+      "%s: weight %s to %s lb, 40-yard dash %.2f to %.2f s",
+      position_group,
+      fmt(lo_weight),
+      fmt(hi_weight),
+      lo_forty,
+      hi_forty
+    )
+  ) |>
+  ggplot() +
+  geom_rect_interactive(
+    aes(
+      xmin = lo_weight,
+      xmax = hi_weight,
+      ymin = lo_forty,
+      ymax = hi_forty,
+      fill = position_group,
+      colour = in_overlap,
+      tooltip = tip,
+      data_id = position_group
+    ),
+    alpha = 0.35,
+    linewidth = 1.3
+  ) +
+  scale_fill_viridis_d(option = "D", end = 0.9) +
+  scale_colour_manual(
+    values = c(`FALSE` = "#6B7280", `TRUE` = claim_fill),
+    labels = c(`FALSE` = "Separate from every other group", `TRUE` = "Overlaps another group on both")
+  ) +
+  labs(
+    x = "Weight (lb)",
+    y = "40-yard dash (s)",
+    fill = NULL,
+    colour = NULL,
+    subtitle = "Each box spans a position's middle half on weight and the 40-yard dash; hover a box for its ranges"
+  ) +
+  theme_cfb2nfl() +
+  theme(legend.box = "vertical")
+girafe(ggobj = p5, width_svg = 13, height_svg = 8)
+```
+
+```{r}
+#| label: s33-explore
+#| fig-height: 8
+points <- combine |>
+  filter(!is.na(forty), !is.na(weight), position_group %in% sep_levels) |>
+  mutate(
+    tip = sprintf(
+      "%s (%s, %s), %s: %s lb, 40 in %.2f s",
+      player_name,
+      pos,
+      school,
+      season,
+      weight,
+      forty
+    )
+  )
+p6 <- ggplot(points, aes(weight, forty, colour = position_group)) +
+  geom_point_interactive(
+    aes(tooltip = tip, data_id = paste(player_name, season)),
+    size = 1.8,
+    alpha = 0.6
+  ) +
+  scale_colour_viridis_d(option = "D", end = 0.9) +
+  labs(
+    x = "Weight (lb)",
+    y = "40-yard dash (s)",
+    colour = NULL,
+    subtitle = "Every invitee with both a weight and a 40-yard dash"
+  ) +
+  theme_cfb2nfl() +
+  guides(colour = guide_legend(override.aes = list(size = 4, alpha = 1)))
+girafe(ggobj = p6, width_svg = 13, height_svg = 8)
+```
+
+### 3.4 The median 40-yard dash fell at `r n_faster` of `r nrow(drift)` positions between the first and last five combines, while far fewer invitees ran it
+
+*Expectation: the median 40-yard dash got faster at every position between the first five and the last five combines.* `r if (e4_holds) "✅" else "❌"`
+
+The table compares the `r early_window[1]` to `r max(early_window)` combines with `r late_window[1]` to `r max(late_window)`, when `r pct(ran_last, 0)` of invitees ran the 40 against `r pct(ran_first, 0)` before, so part of the faster medians may be who chose to run.
+
+```{r}
+#| label: s34-table
+drift |>
+  arrange(position_group) |>
+  transmute(
+    `Position group` = as.character(position_group),
+    `Ran the 40, first five` = pct(ran_first, 0),
+    `Ran the 40, last five` = pct(ran_last, 0),
+    `40-yard dash, first five (s)` = sprintf("%.2f", forty_first),
+    `40-yard dash, last five (s)` = sprintf("%.2f", forty_last),
+    `Change (s)` = sprintf("%+.2f", forty_change)
+  ) |>
+  kable(
+    align = "lrrrrr",
+    caption = sprintf(
+      "Share of invitees who ran the 40-yard dash and their median time by position group, combines %s to %s against %s to %s.",
+      early_window[1],
+      max(early_window),
+      late_window[1],
+      max(late_window)
+    )
+  )
+```
+
+```{r}
+#| label: s34-explain
+#| fig-height: 6
+p7 <- drift |>
+  mutate(
+    is_claim = position_group == fewest_ran$position_group,
+    tip = sprintf(
+      "%s: median %.2f s to %.2f s; ran the 40, %s to %s",
+      position_group,
+      forty_first,
+      forty_last,
+      pct(ran_first, 0),
+      pct(ran_last, 0)
+    )
+  ) |>
+  ggplot(aes(y = forcats::fct_rev(position_group))) +
+  geom_segment(
+    aes(x = forty_first, xend = forty_last, colour = is_claim),
+    linewidth = 1.4,
+    arrow = grid::arrow(length = grid::unit(0.3, "cm"), type = "closed")
+  ) +
+  geom_point_interactive(
+    aes(x = forty_first, tooltip = tip, data_id = position_group),
+    size = 4,
+    colour = "#6B7280"
+  ) +
+  scale_colour_manual(values = c(`FALSE` = context_fill, `TRUE` = claim_fill), guide = "none") +
+  labs(
+    x = "Median 40-yard dash (s)",
+    y = NULL,
+    subtitle = sprintf(
+      "Arrows run from the %s to %s median to the %s to %s median. %s: the share running the 40 fell from %s to %s",
+      early_window[1],
+      max(early_window),
+      late_window[1],
+      max(late_window),
+      fewest_ran$position_group,
+      pct(fewest_ran$ran_first, 0),
+      pct(fewest_ran$ran_last, 0)
+    )
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p7, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s34-explore
+#| fig-height: 10
+p8 <- medians_season |>
+  left_join(select(measures, key, label_unit), by = "key") |>
+  mutate(
+    label_unit = factor(label_unit, measures$label_unit),
+    tip = sprintf("%s, %s, %s: median %s (%s invitees)", position_group, label, season, signif(med, 4), fmt(n))
+  ) |>
+  ggplot(aes(season, med, colour = position_group, group = position_group)) +
+  geom_line(linewidth = 0.6) +
+  geom_point_interactive(aes(tooltip = tip, data_id = paste(position_group, key, season)), size = 1.8) +
+  facet_wrap(~label_unit, ncol = 2, scales = "free_y") +
+  scale_colour_viridis_d(option = "D", end = 0.9) +
+  scale_x_continuous(breaks = seq(combine_years[1], combine_years[2], 4)) +
+  labs(x = "Combine", y = "Median", colour = NULL) +
+  theme_cfb2nfl()
+girafe(ggobj = p8, width_svg = 13, height_svg = 12)
+```
+
+### 3.5 The combine invites `r pct(invite_lo)` to `r pct(invite_hi)` of a draft year's eligible players, and `r pct(pooled$drafted_were_invited, 0)` of the drafted are among them
+
+*Expectation: fewer than one in ten draft-eligible players is invited in every draft year.* `r if (e5_holds) "✅" else "❌"`
+
+The table follows each draft year from eligible seasons to invitees; the falling rate comes mostly from data coverage, as players with a stat line grow from `r fmt(sl(funnel_years[1] - 1L))` in the `r funnel_years[1] - 1L` season to `r fmt(sl(funnel_years[2] - 1L))` in `r funnel_years[2] - 1L` (with a dip in the shortened 2020 season), so eligible seasons grow from `r fmt(eligible_first)` to `r fmt(eligible_last)` while invitees placed among them go from `r fmt(invited_first)` to `r fmt(invited_last)`.
+
+```{r}
+#| label: s35-table
+by_year |>
+  transmute(
+    `Draft year` = as.character(draft_year),
+    `Eligible seasons` = fmt(eligible),
+    `Invited` = fmt(invited_n),
+    `Invitation rate` = pct(invite_rate),
+    `Drafted, invited` = pct(drafted_inv, 0),
+    `Drafted, not invited` = pct(drafted_uninv),
+    `Drafted players who were invited` = pct(drafted_were_invited, 0),
+    `Invitees outside the population` = fmt(`Linked, outside the population`),
+    `Invitees with no college id` = fmt(`No college id`)
+  ) |>
+  kable(
+    align = "lrrrrrrrr",
+    caption = sprintf(
+      "Draft-eligible seasons and combine invitees by draft year. Draft years before %s have no eligible seasons, since the data starts with the %s season. The last two columns count invitees who cannot be placed among the eligible seasons and are left out of every rate.",
+      funnel_years[1],
+      min(outcomes$season)
+    )
+  )
+```
+
+```{r}
+#| label: s35-explain
+#| fig-height: 6
+p9 <- by_year |>
+  mutate(
+    tip = sprintf(
+      "%s: %s of %s eligible seasons invited (%s)",
+      draft_year,
+      fmt(invited_n),
+      fmt(eligible),
+      pct(invite_rate)
+    )
+  ) |>
+  ggplot(aes(draft_year, invite_rate)) +
+  geom_col_interactive(aes(tooltip = tip, data_id = draft_year), fill = claim_fill, width = 0.75) +
+  geom_hline(yintercept = 0.10, linetype = "dashed", colour = "#111827") +
+  annotate(
+    "text",
+    x = funnel_years[2] + 0.4,
+    y = 0.104,
+    label = "One in ten",
+    hjust = 1,
+    vjust = 0,
+    fontface = "bold",
+    size = 4.5
+  ) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 0.12)) +
+  scale_x_continuous(breaks = seq(funnel_years[1], funnel_years[2], 2)) +
+  labs(
+    x = "Draft year",
+    y = "Eligible seasons invited",
+    subtitle = "The fall tracks the eligible count, which grows with the data's stat-line coverage"
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p9, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s35-explore
+#| fig-height: 7
+p10 <- by_pos_year |>
+  mutate(
+    tip = sprintf(
+      "%s, %s: %s of %s eligible seasons invited (%s)",
+      position_group,
+      draft_year,
+      fmt(invited_n),
+      fmt(eligible),
+      pct(invite_rate)
+    )
+  ) |>
+  ggplot(aes(draft_year, invite_rate, colour = position_group, group = position_group)) +
+  geom_line(linewidth = 0.6) +
+  geom_point_interactive(aes(tooltip = tip, data_id = paste(position_group, draft_year)), size = 3) +
+  scale_colour_viridis_d(option = "D", end = 0.9) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_continuous(breaks = seq(funnel_years[1], funnel_years[2], 2)) +
+  labs(
+    x = "Draft year",
+    y = "Eligible seasons invited",
+    colour = NULL,
+    subtitle = sprintf(
+      "Position is the roster position in the eligible season; %s seasons without one are left out",
+      fmt(n_no_pos)
+    )
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p10, width_svg = 13, height_svg = 7)
+```
+
+### 3.6 `r pct(pooled$drafted_inv, 0)` of invited eligible seasons end in a draft selection that year, against `r pct(pooled$drafted_uninv)` of uninvited ones
+
+*Expectation: an invited eligible player is drafted at least ten times as often as an uninvited one, in every draft year.* `r if (e6_holds) "✅" else "❌"`
+
+Out of every 100 invited eligible seasons about `r round(100 * pooled$drafted_inv)` end in a draft selection, against about `r round(1000 * pooled$drafted_uninv)` of every 1,000 uninvited ones; Kyle Allen and Shane Buechele, eligible in `r cf("Kyle Allen", "seasons")` and `r cf("Shane Buechele", "seasons")` seasons and never invited, were not drafted.
+
+```{r}
+#| label: s36-table
+by_pos |>
+  transmute(
+    `Position group` = as.character(position_group),
+    `Eligible seasons` = fmt(eligible),
+    `Invited` = fmt(invited_n),
+    `Drafted, invited` = pct(drafted_inv, 0),
+    `Drafted, not invited` = pct(drafted_uninv),
+    `Times as often` = fmt(drafted_inv / drafted_uninv)
+  ) |>
+  kable(
+    align = "lrrrrr",
+    caption = sprintf(
+      "Draft-eligible seasons, draft years %s to %s, by roster position and invitation. Offensive linemen rarely log a stat line, so few of their seasons are in the eligible population.",
+      funnel_years[1],
+      funnel_years[2]
+    )
+  )
+```
+
+```{r}
+#| label: s36-explain
+#| fig-height: 6
+rates_long <- by_year |>
+  select(draft_year, drafted_inv, drafted_uninv) |>
+  tidyr::pivot_longer(-draft_year, names_to = "group", values_to = "rate") |>
+  mutate(
+    group = if_else(group == "drafted_inv", "Invited", "Not invited"),
+    tip = sprintf("%s, %s: %s drafted", group, draft_year, pct(rate))
+  )
+p11 <- ggplot(rates_long, aes(draft_year, rate, colour = group)) +
+  geom_line(linewidth = 1.4) +
+  geom_point_interactive(aes(tooltip = tip, data_id = paste(group, draft_year)), size = 3.5) +
+  annotate(
+    "text",
+    x = mean(funnel_years),
+    y = pooled$drafted_inv / 2,
+    label = sprintf("Invited players are drafted %s times as often", fmt(ratio)),
+    fontface = "bold",
+    colour = claim_fill,
+    size = 5
+  ) +
+  scale_colour_manual(values = c(Invited = claim_fill, `Not invited` = "#6B7280")) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(funnel_years[1], funnel_years[2], 2)) +
+  labs(x = "Draft year", y = "Drafted that year", colour = NULL) +
+  theme_cfb2nfl()
+girafe(ggobj = p11, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: s36-explore
+#| fig-height: 10
+p12 <- by_pos_year |>
+  tidyr::pivot_longer(c(drafted_inv, drafted_uninv), names_to = "group", values_to = "rate") |>
+  mutate(
+    group = if_else(group == "drafted_inv", "Invited", "Not invited"),
+    n = if_else(group == "Invited", invited_n, eligible - invited_n),
+    tip = sprintf("%s, %s, %s: %s of %s drafted", position_group, group, draft_year, pct(rate), fmt(n))
+  ) |>
+  # A position-year with no invitees has no invited rate.
+  filter(is.finite(rate)) |>
+  ggplot(aes(draft_year, rate, colour = group)) +
+  geom_line(linewidth = 0.6) +
+  geom_point_interactive(aes(tooltip = tip, data_id = paste(position_group, group, draft_year)), size = 2.2) +
+  facet_wrap(~position_group, ncol = 3) +
+  scale_colour_manual(values = c(Invited = claim_fill, `Not invited` = "#6B7280")) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(funnel_years[1], funnel_years[2], 4)) +
+  labs(
+    x = "Draft year",
+    y = "Drafted that year",
+    colour = NULL,
+    subtitle = sprintf("%s seasons without a roster position are left out", fmt(n_no_pos))
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p12, width_svg = 13, height_svg = 11)
+```
+
+## 4. Summary
+
+The combine is a small list that holds most of each draft class, and what it records thins as more invitees choose which drills to run.
+
+```{r}
+#| label: summary
+verdict <- function(x) if (x) "✅" else "❌"
+tibble::tribble(
+  ~Expectation, ~Verdict, ~Evidence,
+  sprintf("Each recorded share moves by less than %s points", round(100 * steady_pts)), verdict(e1_holds), sprintf("%s recorded at %s of the %s to %s combines, %s at %s to %s", biggest_drop$label, pct(biggest_drop$early, 0), early_window[1], max(early_window), pct(biggest_drop$late, 0), late_window[1], max(late_window)),
+  "Skipping the 40 lowers the draft rate at every position", verdict(e2_holds), sprintf("Quarterbacks who skip it: %s drafted, against %s who run", pct(qb_skip$drafted_skip, 0), pct(qb_skip$drafted_ran, 0)),
+  "No two positions share a middle half on weight and the 40", verdict(e3_holds), sprintf("%s of %s pairs overlap", n_overlap, n_pairs),
+  "The median 40 got faster at every position", verdict(e4_holds), sprintf("Faster at %s of %s positions", n_faster, nrow(drift)),
+  "Fewer than one in ten eligible players is invited", verdict(e5_holds), sprintf("%s to %s per draft year", pct(invite_lo), pct(invite_hi)),
+  "Invitees are drafted at least ten times as often", verdict(e6_holds), sprintf("%s against %s pooled", pct(pooled$drafted_inv, 0), pct(pooled$drafted_uninv))
+) |>
+  kable(caption = "Each expectation and what the data showed.")
+```
+
+## 5. Discussion
+
+::: {.callout-important}
+The invitation does much of the sorting before anyone runs. Invitees are the players scouts already rate, so the gap between invited and uninvited draft rates mostly reflects that selection.
+
+- `r pct(pooled$drafted_were_invited, 0)` of drafted eligible players were invited; the rest were drafted without an invitation.
+:::
+
+::: {.callout-important}
+A missing drill more often reflects the player's choice than a gap in the records. Quarterbacks who skip the 40 are drafted more often than those who run it, which fits prospects with settled draft stock sitting out.
+
+- The thinning since 2021 means a later combine's medians describe the invitees who chose to run, so comparisons across years carry that selection.
+:::
+
+Caveats: combine measurables are taken after the final college season, so they describe draft-time players and are kept apart from the in-career forecasts. The 2021 records come from campus workouts and include more players than a normal combine. The draft rates compare draft-eligible seasons with a stat line; invitees without a college id or outside that population (`r fmt(sum(by_year[["Linked, outside the population"]]) + sum(by_year[["No college id"]]))` in the draft years shown) are counted in the measurables only. The eligible count grows with the data's stat-line coverage, so invitation rates are comparable within a draft year but not as a trend across years.
+
+```{r}
+#| label: teardown
+#| output: false
+dbDisconnect(con, shutdown = TRUE)
+```
