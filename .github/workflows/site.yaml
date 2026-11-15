@@ -30,7 +30,7 @@ jobs:
       # Vignettes read the pipeline from the project root under altdoc's build.
       CFB2NFL_ROOT: ${{ github.workspace }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: quarto-dev/quarto-actions/setup@v2
 
@@ -73,12 +73,12 @@ jobs:
       - name: Render site (altdoc -> docs/)
         run: Rscript -e 'altdoc::render_docs(freeze = TRUE)'
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: docs
 
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
         with:
           # Safety margin: Pages processes the artifact slowly (default 10 min).
           timeout: 1800000
