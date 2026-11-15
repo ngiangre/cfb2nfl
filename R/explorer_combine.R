@@ -98,19 +98,23 @@ explorer_combine_measures <- function() {
 #'
 #' Draft outcome for a combine invitee in the draft right after the combine,
 #' in legend order. "Draft pending" marks a combine class whose draft has no
-#' slots in the source yet.
+#' slots in the source yet (the draft has not happened in the published data,
+#' not an in-flight draft). "UDFA, made NFL roster" marks an invitee without a
+#' draft slot who still shows up in nflverse's player table: an undrafted free
+#' agent who made an NFL roster, spanned by `rookie_season`/`last_season`.
 #'
 #' @return A tibble: `outcome` (code), `label`.
 #' @export
 explorer_combine_outcome_levels <- function() {
   tibble::tibble(
-    outcome = c("r1", "r2_3", "r4_7", "undrafted", "pending"),
+    outcome = c("r1", "r2_3", "r4_7", "udfa", "undrafted", "pending"),
     label = c(
       "Drafted, round 1",
       "Drafted, rounds 2-3",
       "Drafted, rounds 4-7",
+      "UDFA, made NFL roster",
       "Not drafted",
-      "Draft pending"
+      "Draft pending (draft not yet in data)"
     )
   )
 }
@@ -131,10 +135,20 @@ explorer_combine_outcome_levels <- function() {
 #' @param player_seasons Output of [build_explorer_player_seasons()].
 #' @param picks Optional CFBD draft picks (`year`, `overall`, `position`);
 #'   without them the label leaves out the drafted position.
+#' @param nfl_players Optional nflverse player crosswalk (`pfr_id`,
+#'   `rookie_season`, `last_season`; see [ingest_nfl_players()]). An invitee
+#'   without a draft slot who appears in it is relabelled an undrafted free
+#'   agent who made an NFL roster; without the crosswalk they stay "Not
+#'   drafted".
 #' @return A tibble, one row per input row. `players_jersey` is the last
 #'   stat season's college jersey number (display only).
 #' @export
-build_explorer_combine <- function(combine, player_seasons, picks = NULL) {
+build_explorer_combine <- function(
+  combine,
+  player_seasons,
+  picks = NULL,
+  nfl_players = NULL
+) {
   last_drafted <- suppressWarnings(max(
     combine$season[!is.na(combine$draft_round)]
   ))
@@ -177,10 +191,33 @@ build_explorer_combine <- function(combine, player_seasons, picks = NULL) {
       ) |>
       dplyr::distinct(.data$season, .data$draft_ovr, .keep_all = TRUE)
   }
+  if (!"pfr_id" %in% names(combine)) {
+    combine <- dplyr::mutate(combine, pfr_id = NA_character_)
+  }
   combine |>
     dplyr::left_join(
       drafted_as,
       by = c("season", "draft_ovr"),
+      relationship = "many-to-one"
+    ) |>
+    # UDFA relabel: the crosswalk sees undrafted invitees the draft-slot link
+    # cannot (no NFL draft pick to match on).
+    dplyr::left_join(
+      if (is.null(nfl_players) || !"pfr_id" %in% names(combine)) {
+        tibble::tibble(
+          pfr_id = NA_character_,
+          nfl_rookie = NA_integer_,
+          nfl_last = NA_integer_
+        )
+      } else {
+        nfl_players |>
+          dplyr::select(
+            "pfr_id",
+            nfl_rookie = "rookie_season",
+            nfl_last = "last_season"
+          )
+      },
+      by = "pfr_id",
       relationship = "many-to-one"
     ) |>
     dplyr::mutate(
@@ -188,6 +225,7 @@ build_explorer_combine <- function(combine, player_seasons, picks = NULL) {
       outcome = dplyr::case_when(
         !is.na(.data$draft_round) ~ explorer_round_outcome(.data$draft_round),
         .data$season > last_drafted ~ "pending",
+        !is.na(.data$nfl_rookie) ~ "udfa",
         TRUE ~ "undrafted"
       ),
       outcome_label = dplyr::case_when(
@@ -204,7 +242,17 @@ build_explorer_combine <- function(combine, player_seasons, picks = NULL) {
           .data$draft_ovr,
           .data$draft_team
         ),
-        .data$outcome == "pending" ~ "Draft pending",
+        .data$outcome == "udfa" ~ dplyr::if_else(
+          .data$nfl_rookie == .data$nfl_last,
+          sprintf("UDFA, NFL roster (%d)", .data$nfl_rookie),
+          sprintf(
+            "UDFA, NFL roster (%d-%d)",
+            .data$nfl_rookie,
+            .data$nfl_last
+          )
+        ),
+        .data$outcome == "pending" ~
+          "Draft pending (draft not yet in the data)",
         TRUE ~ "Not drafted"
       )
     ) |>

@@ -1,5 +1,16 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Explorer Combine tab: combine invitees without a draft slot who still show
+  up in nflverse's player table are now labelled **"UDFA, made NFL roster"**
+  with their NFL span (e.g. "UDFA, NFL roster (2021-2025)") instead of "Not
+  drafted". The label comes from a new nflverse player crosswalk
+  (`ingest_nfl_players()`, `pfr_id` to `gsis_id` plus rookie and last
+  season, no API key), the only bridge that sees undrafted free agents,
+  since the draft-slot link cannot. About a quarter of the former "Not
+  drafted" combine rows are really UDFAs who made an NFL roster. The
+  "Draft pending" label is also clarified: it marks a combine class whose
+  draft is not yet in the published data, not an in-flight draft (#89).
+
 - Explorer: player listings now show the jersey number with the position,
   as in "Arch Manning (#7 QB)". The college jersey comes from
   `data/roster.parquet` (94% coverage; the roster and NFL-rosters contracts

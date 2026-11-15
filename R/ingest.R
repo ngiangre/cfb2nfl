@@ -412,6 +412,31 @@ ingest_combine <- function(seasons = 2010:2026) {
     dplyr::filter(.data$season %in% as.integer(seasons))
 }
 
+#' Ingest NFL player crosswalk (nflverse)
+#'
+#' Pulls nflverse's player table (`nflreadr::load_players()`), one row per NFL
+#' player, and keeps the **pfr_id -> gsis_id crosswalk** plus the rookie and
+#' last season. This is the only bridge that sees **undrafted free agents**:
+#' `nfl_draft_picks` links by draft slot, so by construction it cannot attach
+#' an NFL record to a combine invitee who went undrafted but still made a
+#' roster. The join key is `pfr_id`, which the cleaned combine table carries
+#' from nflverse on both sides (the same Pro-Football-Reference namespace, no
+#' name guard needed).
+#'
+#' @return A tibble, one row per NFL player with a `pfr_id`.
+#' @export
+ingest_nfl_players <- function() {
+  rlang::check_installed(
+    "nflreadr",
+    reason = "to pull the nflverse player crosswalk."
+  )
+  nflreadr::load_players() |>
+    tibble::as_tibble() |>
+    dplyr::select("pfr_id", "gsis_id", "rookie_season", "last_season") |>
+    dplyr::filter(!is.na(.data$pfr_id)) |>
+    dplyr::distinct(.data$pfr_id, .keep_all = TRUE)
+}
+
 # ---- game statistics (CFBD /games family) ----------------------------------
 #
 # Three endpoints, three grains (see inst/dict/games*.yml):

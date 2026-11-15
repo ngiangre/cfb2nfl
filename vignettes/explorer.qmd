@@ -1050,7 +1050,7 @@ combinePos = resolveCombinePos(pos, ready.meta)
 combineMeasures = ready.meta.combine_measures
 combineOutcomeColor = new Map([
   ["r1", "#1e3a8a"], ["r2_3", "#2563eb"], ["r4_7", "#93c5fd"],
-  ["undrafted", "#9ca3af"], ["pending", "#059669"]
+  ["undrafted", "#9ca3af"], ["udfa", "#0ea5e9"], ["pending", "#059669"]
 ])
 // The invitees and the plotly 3D bundle (~530 KB gzipped), both fetched the
 // first time the Combine tab opens.

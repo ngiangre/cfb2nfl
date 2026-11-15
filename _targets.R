@@ -954,10 +954,18 @@ list(
     format = "file"
   ),
   # Combine tab (plans/explorer.md step 5): every invitee's measurables and
-  # draft outcome as one columnar JSON file.
+  # draft outcome as one columnar JSON file. The nflverse player crosswalk
+  # (target-only, decision 0041) relabels undrafted invitees who made an NFL
+  # roster; it is a static nflreadr download (no API key) needed in both modes.
+  tar_target(explorer_nfl_players, ingest_nfl_players()),
   tar_target(
     explorer_combine,
-    build_explorer_combine(combine, explorer_player_seasons, picks)
+    build_explorer_combine(
+      combine,
+      explorer_player_seasons,
+      picks,
+      explorer_nfl_players
+    )
   ),
   tar_target(
     explorer_combine_file,
