@@ -1,5 +1,15 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- New post: **combine measurables and the invite-to-draft funnel** (#64).
+  What the NFL Scouting Combine records at each position, how size and
+  speed separate positions and drift from 2010 to 2026, how drill records
+  thinned after the cancelled 2021 combine, and how invitees are drafted at
+  many times the rate of uninvited draft-eligible players. New helpers
+  `combine_funnel_status()` and `build_combine_funnel()` place invitees
+  against the draft-eligible population of `outcomes`, joined on athlete id
+  (on the fly per
+  [decision 0041](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0041-lean-data-model.md)).
+
 - Explorer: every player name now carries the player's position, as in
   "Arch Manning (QB)": play-card chips, Players search results, swarm
   tooltips and the career heading, Combine tooltips and cards, and the draft
