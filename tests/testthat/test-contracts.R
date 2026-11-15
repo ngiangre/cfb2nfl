@@ -361,7 +361,8 @@ test_that("contract_roster guards key uniqueness and class_year range", {
     team = c("Florida State", "Louisville", "USC"),
     height = c(74L, 74L, NA_integer_),
     weight = c(210L, 210L, NA_integer_),
-    class_year = c(4L, 4L, NA_integer_)
+    class_year = c(4L, 4L, NA_integer_),
+    jersey = c(7L, 7L, NA_integer_)
   )
   expect_true(pointblank::all_passed(
     contract_roster(good, stop_on_fail = FALSE)
@@ -377,6 +378,11 @@ test_that("contract_roster guards key uniqueness and class_year range", {
   bad_class <- good |> dplyr::mutate(class_year = c(2018L, 4L, NA_integer_))
   expect_false(pointblank::all_passed(
     contract_roster(bad_class, stop_on_fail = FALSE)
+  ))
+  # Jersey outside 0-99 fails; NA passes.
+  bad_jersey <- good |> dplyr::mutate(jersey = c(7L, 137L, NA_integer_))
+  expect_false(pointblank::all_passed(
+    contract_roster(bad_jersey, stop_on_fail = FALSE)
   ))
 })
 

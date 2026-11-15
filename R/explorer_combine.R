@@ -131,7 +131,8 @@ explorer_combine_outcome_levels <- function() {
 #' @param player_seasons Output of [build_explorer_player_seasons()].
 #' @param picks Optional CFBD draft picks (`year`, `overall`, `position`);
 #'   without them the label leaves out the drafted position.
-#' @return A tibble, one row per input row.
+#' @return A tibble, one row per input row. `players_jersey` is the last
+#'   stat season's college jersey number (display only).
 #' @export
 build_explorer_combine <- function(combine, player_seasons, picks = NULL) {
   last_drafted <- suppressWarnings(max(
@@ -141,7 +142,26 @@ build_explorer_combine <- function(combine, player_seasons, picks = NULL) {
   players_pos <- player_seasons |>
     dplyr::arrange(.data$player_id, dplyr::desc(.data$season)) |>
     dplyr::distinct(.data$player_id, .keep_all = TRUE) |>
-    dplyr::select(athlete_id = "player_id", players_pos = "pos")
+    dplyr::select(
+      athlete_id = "player_id",
+      players_pos = "pos",
+      players_jersey = "jersey"
+    ) |>
+    # The last stat season can lack a jersey while another season has one.
+    dplyr::left_join(
+      player_seasons |>
+        dplyr::filter(!is.na(.data$jersey)) |>
+        dplyr::summarise(
+          jersey_any = dplyr::first(.data$jersey),
+          .by = "player_id"
+        ),
+      by = c("athlete_id" = "player_id"),
+      relationship = "many-to-one"
+    ) |>
+    dplyr::mutate(
+      players_jersey = dplyr::coalesce(.data$players_jersey, .data$jersey_any)
+    ) |>
+    dplyr::select(-"jersey_any")
   drafted_as <- if (is.null(picks)) {
     tibble::tibble(
       season = integer(),
@@ -215,7 +235,8 @@ build_explorer_combine <- function(combine, player_seasons, picks = NULL) {
       outcome = .data$outcome,
       outcome_label = .data$outcome_label,
       athlete_id = .data$athlete_id,
-      players_pos = .data$players_pos
+      players_pos = .data$players_pos,
+      players_jersey = .data$players_jersey
     ) |>
     dplyr::arrange(.data$season, .data$name)
 }

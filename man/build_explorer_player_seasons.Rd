@@ -9,6 +9,7 @@ build_explorer_player_seasons(
   tiers,
   teams,
   player_outcomes,
+  roster,
   current_season
 )
 }
@@ -22,12 +23,16 @@ to \code{team_id}. Lower-division teams keep their name and have no id.}
 
 \item{player_outcomes}{Output of \code{\link[=build_explorer_player_outcomes]{build_explorer_player_outcomes()}}.}
 
+\item{roster}{Cleaned roster, for the season's jersey number (display
+only). A player-team-season row is matched first, then any jersey the
+player wore that season (transfers).}
+
 \item{current_season}{The in-progress season, for players with no
 outcome row (no roster career).}
 }
 \value{
 A tibble: \code{pos}, \code{player_id}, \code{name}, \code{position} (roster code),
-\code{season}, \code{team}, \code{team_id},
+\code{jersey}, \code{season}, \code{team}, \code{team_id},
 \code{conference}, \code{tier}, \code{outcome}, \code{outcome_label}, then the stat columns.
 }
 \description{

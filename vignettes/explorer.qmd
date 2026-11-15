@@ -17,7 +17,7 @@ toc: false
 ```{ojs}
 //| echo: false
 import {TABS, parseHash, toHash, resolveTeam} from "./explorer/state.js"
-import {sourceLine, errorCard, loadOnce, escapeHtml, axisRoom, playerLabel} from "./explorer/ui.js"
+import {sourceLine, errorCard, loadOnce, escapeHtml, axisRoom, playerLabel, jerseyPos} from "./explorer/ui.js"
 import {
   formatRecord, teamGames, effectiveGame, landscapePanels, timelineFor, parsePlayers,
   teamSeasonRow, teamGroups, conferenceAverages, mapPoints, mapTitle, shouldLoadPlays, stepPlay, playWhen, playAnnouncement, recordShares
@@ -880,7 +880,7 @@ playerSearch = {
   box.addEventListener("input", () => {
     list.replaceChildren();
     for (const d of searchPlayers(playersData.rows, box.value, playerTeam)) {
-      const chip = html`<button type="button" class="explorer-chip" role="listitem">${playerLabel(d.name, d.position)} <span>${playerTeam(d)} · ${d.season}</span></button>`;
+      const chip = html`<button type="button" class="explorer-chip" role="listitem">${playerLabel(d.name, jerseyPos(d.jersey, d.position))} <span>${playerTeam(d)} · ${d.season}</span></button>`;
       chip.onclick = () => {
         const c = careerRows(playersData.rows, d.player_id);
         const s = seasonForPlayer(c, season);
@@ -937,12 +937,12 @@ swarm = {
         stroke: chosenTeam?.color ?? "#111827", strokeWidth: 3
       }) : null,
       chosen ? Plot.text([chosen], {
-        x: "value", y: "y", text: d => playerLabel(d.name, d.position), dy: -16, fontWeight: "bold", fontSize: 15, fill: "#111827",
+        x: "value", y: "y", text: d => playerLabel(d.name, jerseyPos(d.jersey, d.position)), dy: -16, fontWeight: "bold", fontSize: 15, fill: "#111827",
         stroke: "white", strokeWidth: 4, paintOrder: "stroke"
       }) : null,
       Plot.tip(placed, Plot.pointer({
         x: "value", y: "y",
-        title: d => `${playerLabel(d.name, d.position, playerTeam(d))}\n${stat.label}: ${formatStat(d.value, stat.format)}, ${ordinal(d[`${stat.key}_pct`])} percentile\n${d.outcome_label}`
+        title: d => `${playerLabel(d.name, jerseyPos(d.jersey, d.position), playerTeam(d))}\n${stat.label}: ${formatStat(d.value, stat.format)}, ${ordinal(d[`${stat.key}_pct`])} percentile\n${d.outcome_label}`
       }))
     ]
   }));
@@ -988,13 +988,13 @@ careerView = {
   if (!career.length) return asNode(`<div class="explorer-card">This player has no ${escapeHtml(playersGroup.toLowerCase())} stat line. Try another position.</div>`);
   const last = career.at(-1);
   const out = html`<div class="explorer-career">
-    <h4>${playerLabel(last.name, last.position)}</h4>
+    <h4>${playerLabel(last.name, jerseyPos(last.jersey, last.position))}</h4>
     <p><span class="explorer-outcome" style="--c:${outcomeColor.get(last.outcome)}">${last.outcome_label}</span></p>
   </div>`;
   if (!career.some(d => d.season === season)) {
     const b = html`<button type="button" class="explorer-chip">Show ${last.season} in the landscape</button>`;
     b.onclick = () => pick.seasonOnly(last.season);
-    out.append(html`<p class="explorer-note">${playerLabel(last.name, last.position)} has no ${playersGroup.toLowerCase()} line in ${season}. ${b}</p>`);
+    out.append(html`<p class="explorer-note">${playerLabel(last.name, jerseyPos(last.jersey, last.position))} has no ${playersGroup.toLowerCase()} line in ${season}. ${b}</p>`);
   }
   const long = careerPercentiles(career, playersStats);
   const seasons = career.map(d => d.season);
@@ -1238,7 +1238,7 @@ combineRegionList = {
   const cap = 40;
   const chips = html`<div class="explorer-chips"></div>`;
   for (const d of inside.slice(0, cap)) {
-    const chip = html`<button type="button" class="explorer-chip">${playerLabel(d.name, d.combine_pos)} <span>${d.season} · ${d.outcome_label}</span></button>`;
+    const chip = html`<button type="button" class="explorer-chip">${playerLabel(d.name, jerseyPos(d.players_jersey, d.combine_pos))} <span>${d.season} · ${d.outcome_label}</span></button>`;
     chip.onclick = () => { mutable combinePick = d; };
     chips.append(chip);
   }
@@ -1264,14 +1264,14 @@ combineCard = {
   const off = !combineShown.includes(d);
   const rows = combineMeasures.map(m => `<tr><th scope="row">${escapeHtml(m.label)}</th><td>${escapeHtml(formatMeasure(d[m.key], m))}</td></tr>`).join("");
   const card = asNode(`<div class="explorer-card explorer-combine-card">
-    <h4>${escapeHtml(playerLabel(d.name, d.combine_pos))}</h4>
+    <h4>${escapeHtml(playerLabel(d.name, jerseyPos(d.players_jersey, d.combine_pos)))}</h4>
     <p>${escapeHtml(d.school)} · ${d.season} combine</p>
     ${off ? `<p class="explorer-note">Not in the chart: no measurement on one of these axes, or outside the classes shown.</p>` : ""}
     <p><span class="explorer-outcome" style="--c:${combineOutcomeColor.get(d.outcome)}">${escapeHtml(d.outcome_label)}</span></p>
     <div class="explorer-table"><table><tbody>${rows}</tbody></table></div>
   </div>`);
   if (canOpenPlayer(d)) {
-    const b = html`<button type="button" class="explorer-chip">Open ${playerLabel(d.name, d.combine_pos)} in Players →</button>`;
+    const b = html`<button type="button" class="explorer-chip">Open ${playerLabel(d.name, jerseyPos(d.players_jersey, d.combine_pos))} in Players →</button>`;
     // The combine follows the last college season, so open that season.
     b.onclick = () => pick.player(d.athlete_id, d.players_pos, d.season - 1);
     card.append(b);

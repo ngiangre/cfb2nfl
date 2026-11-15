@@ -591,6 +591,7 @@ contract_roster <- function(roster, stop_on_fail = TRUE) {
     pointblank::col_vals_between("height", 60, 85, na_pass = TRUE) |>
     pointblank::rows_distinct(pointblank::vars(playerId, season, team)) |>
     pointblank::col_vals_between("class_year", 1L, 5L, na_pass = TRUE) |>
+    pointblank::col_vals_between("jersey", 0, 99, na_pass = TRUE) |>
     pointblank::interrogate()
   enforce_contract(agent, "roster", stop_on_fail)
 }
@@ -949,12 +950,14 @@ contract_nfl_rosters <- function(nfl_rosters, stop_on_fail = TRUE) {
       "season",
       "player_name",
       "nfl_team",
-      "years_exp"
+      "years_exp",
+      "jersey_number"
     )) |>
     pointblank::col_vals_not_null(pointblank::vars(gsis_id, season)) |>
     pointblank::rows_distinct(pointblank::vars(gsis_id, season)) |>
     pointblank::col_vals_between("season", 2010, 2026) |>
     pointblank::col_vals_between("weight", 100, 500, na_pass = TRUE) |>
+    pointblank::col_vals_between("jersey_number", 0, 99, na_pass = TRUE) |>
     pointblank::interrogate()
   enforce_contract(agent, "nfl_rosters", stop_on_fail)
 }
