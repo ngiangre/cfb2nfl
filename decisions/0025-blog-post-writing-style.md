@@ -77,7 +77,14 @@ order:
    finer grain, with hover tooltips carrying the full detail).
 
 A single-fact section may drop to a table plus one figure. Summary is one
-sentence plus a ledger table. The skeleton lives in
+sentence plus a ledger table.
+
+*Revised 2026-11-20:* the Results table is no longer required. It appears
+only when it carries a different summary than the section's figures
+(definitions, counts the figures cannot show, a reconciliation); a table
+that restates a figure's data is dropped, since readers skip it. Data
+sections still lead with a table, and a single-fact section may drop to one
+figure. The skeleton lives in
 `vignettes/_post-template.qmd`, and all existing posts were converted.
 
 ## Outcome / what we learned

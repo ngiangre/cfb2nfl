@@ -181,8 +181,12 @@ all of it. Years 2010–2026.
     what the exhibits below show and why they are there, and nothing more:
     any further detail moves into a table, a figure annotation, or a caption.
     The prose is then followed by its supporting exhibits, in this order:
-    1. **Table** (`knitr::kable`, captioned): expository, it defines and
-       counts the data the claim rests on.
+    1. **Table, only when it adds a different summary** (`knitr::kable`,
+       captioned): a table earns its place only by showing something the
+       section's figures do not, such as definitions, counts the figures
+       cannot carry, or a reconciliation. Never lead with a table that
+       restates the data a figure below already shows; readers skip it
+       (revised 2026-11-20).
     2. **Explanatory figure**: makes the section's claim at a glance; the
        claim's element is highlighted (color, annotation, arrow) and the
        rest is context.
@@ -190,8 +194,9 @@ all of it. Years 2010–2026.
        snapshot at finer grain (every category, season, or player behind the
        claim) with hover tooltips carrying the full detail, so the reader can
        probe beyond the claim without leaving the question.
-    Data sections need at least the table; every Results section carries all
-    three unless the claim is a single fact (then table plus one figure). A
+    Data sections need at least the table (they define the data). Every
+    Results section carries both figures unless the claim is a single fact
+    (then one figure), plus a table only under the rule above. A
     Results section that tests an expectation states it first, italicized,
     with its verdict emoji (`*Expectation: ...* ✅`), and the one or two
     sentences follow. The skeleton lives in `vignettes/_post-template.qmd`.

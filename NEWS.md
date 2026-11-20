@@ -1,5 +1,26 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Post revision: **Georgia vs Missouri game flow by EPA**. Every EPA is now
+  CFBD's published PPA, with the spline expected-points model shown only in
+  3.1 to explain what PPA measures. The drive chart is a football field with
+  one arrow per drive, and drive points now reconcile to the 48-21 final.
+  Player attribution replaces the old disruption ledger: players come from
+  the play-stats log first, and the play-by-play text adds the tacklers the
+  log leaves out (CFBD's log carries no tackle stat type for this game).
+  Each play's EPA is split evenly among the players named on each side.
+  Position groups are measured against each group's typical play, with the
+  offensive line left out because blocking is never recorded. Players are
+  ranked by average EPA per involvement, among those named at least four
+  times. New helpers `play_text_mentions()`, `match_play_mentions()` and
+  `build_play_involvement()` (`R/play_involvement.R`, tested) do the
+  attribution on the fly
+  ([decision 0041](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0041-lean-data-model.md)).
+- Post style: a Results section's table is now optional. It appears only
+  when it shows a different summary than the section's figures, never
+  restating what a figure already shows
+  ([decision 0025](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0025-blog-post-writing-style.md),
+  revised 2026-11-20).
+
 - Explorer Combine tab: combine invitees without a draft slot who still show
   up in nflverse's player table are now labelled **"UDFA, made NFL roster"**
   with their NFL span (e.g. "UDFA, NFL roster (2021-2025)") instead of "Not
