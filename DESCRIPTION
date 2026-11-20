@@ -34,7 +34,8 @@ Imports:
     tidyr,
     utils,
     visNetwork,
-    yaml
+    yaml,
+    patchwork
 Suggests: 
     altdoc,
     arrow,
