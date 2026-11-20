@@ -84,10 +84,16 @@ ratio <- formals(usage_decline)$ratio
 read_floor <- 0.05
 
 # ---- Load the tables -------------------------------------------------------
-# Career endings, the player x game table and playing time are
-# contract-checked pipeline steps, read from the targets store (decision 0041).
+# The player x game table and playing time are contract-checked pipeline
+# steps, read from the targets store (decision 0041). Career endings are
+# derived here from the contract-checked career and outcome tables, matching
+# how the pipeline builds them for the explorer.
 store <- file.path(root, "_targets")
-career_end <- targets::tar_read(career_end, store = store)
+career_end <- career_end_status(
+  targets::tar_read(career, store = store),
+  targets::tar_read(outcomes, store = store),
+  targets::tar_read(picks_nfl, store = store)
+)
 player_game <- targets::tar_read(player_game, store = store)
 usage <- targets::tar_read(player_usage, store = store)
 roster <- dbReadTable(con, "roster")
