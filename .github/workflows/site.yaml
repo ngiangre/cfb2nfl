@@ -71,7 +71,7 @@ jobs:
       # freeze = TRUE reuses the committed _quarto/_freeze/ cache so CI does not
       # re-execute vignette code; renders are faster and deterministic (dec 0007).
       - name: Render site (altdoc -> docs/)
-        run: Rscript -e 'altdoc::render_docs(freeze = TRUE)'
+        run: Rscript -e 'altdoc::render_docs(verbose = TRUE, freeze = TRUE)'
 
       - uses: actions/upload-pages-artifact@v5
         with:
