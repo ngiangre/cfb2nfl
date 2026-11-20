@@ -54,11 +54,14 @@ stalls. Check:
    completeness rather than the argument.
 3. **Wordiness.** Each section body is one or two sentences. Flag any prose
    doing a table's job, and any section carrying more than one idea.
-4. **Exhibit order and roles.** In Results the order is the captioned table,
-   then the explanatory figure (claim highlighted, the rest context), then
-   the exploratory `ggiraph` figure (finer grain, hover tooltips). A
-   single-fact claim may drop to a table plus one figure. Data sections need
-   at least the table.
+4. **Exhibit order and roles.** In Results the order is an optional
+   captioned table, then the explanatory figure (claim highlighted, the rest
+   context), then the exploratory `ggiraph` figure (finer grain, hover
+   tooltips). A Results table belongs only when it shows a different summary
+   than the section's figures: flag a table that restates what a figure
+   already shows, and do not flag a section for having no table. A
+   single-fact claim may drop to one figure. Data sections need at least the
+   table.
 5. **Defined terms.** Every term (person-season, eligible season, status
    categories, round groups, hazard) is defined in plain language before use.
    Flag raw column names or codes (`outcome_drafted_d`, `r2_3`) in prose,

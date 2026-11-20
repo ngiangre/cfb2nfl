@@ -143,13 +143,15 @@ tibble::tribble(
 ONE OR TWO sentences: what the exhibits show and why they are here. Any
 further detail belongs in the table, a figure annotation, or a caption.
 Exhibits follow in this order:
-  1. table: expository, defines and counts what the claim rests on;
+  1. table, ONLY if it shows a different summary than the figures below
+     (definitions, counts the figures cannot carry, a reconciliation); never
+     a table that restates what a figure already shows, delete the chunk;
   2. explanatory figure: makes the claim at a glance, the claim's element
      highlighted (color, annotation, arrow), the rest context;
   3. exploratory figure: interactive view of the same snapshot at finer grain
      (every category, season, or player behind the claim), hover tooltips with
      the full detail.
-A single-fact claim may drop to table plus one figure. Every number the prose,
+A single-fact claim may drop to one figure. Every number the prose,
 captions, or annotations state is an inline variable (`r x`) computed from the
 database, never a hardcoded literal.
 -->
