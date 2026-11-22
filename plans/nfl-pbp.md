@@ -1,11 +1,9 @@
 # NFL play, snap and roster-status data (2022 on)
 
-Feature: F22 (all criteria). Builds toward F19 (thrive or fizzle).
+Feature: F23 (all criteria). Builds toward F19 (thrive or fizzle).
 
-**Status (2026-11-22): on hold.** Waiting for the `sdlc-alignment` work (the
-`product/` registry and the reviewer agents) to land on `main`. Then: move
-the F22 card into `product/features.md`, re-run `feature-reviewer` on it,
-run `task-reviewer` on section 5, and only then start building.
+**Status (2026-11-22):** card F23 is in `product/features.md` under G4;
+reviews below.
 
 Goal: give every drafted and UDFA player an NFL record of **what they did on
 a play** (play-by-play, EPA), **whether they were on the field** (snap
@@ -28,7 +26,7 @@ same day.
 | Standing | Weekly roster status | Active, practice squad, inactive, IR, cut, traded, plus depth-chart position, one row per player-week |
 | Not pulled | Injury reports, trades table | Weekly status already separates "hurt" (IR) from "not playing" and records `TRD`; add either later if a post needs it |
 | Backfill run | **Dedicated `data-raw/refresh-nfl.R`** | Touches only the NFL targets, 0 CFBD calls |
-| Tracking | New data feature **F22**; F19 stays an idea built on it | F22 can ship once the data is published and contract-gated |
+| Tracking | New data feature **F23** under G4; F19 stays an idea built on it | F23 can ship once the data is published and contract-gated |
 
 ## 2. Sources (nflverse, no API key)
 
@@ -112,17 +110,24 @@ runner. A site build downloads ~690 MB instead of ~560 MB.
 5. Contracts (`contract_gate`): unique keys; `season_coverage` 2022 through
    the last completed season (participation: through the last season
    nflverse published); gsis ids match `^00-00\\d{5}$`; `epa` in a plausible
-   range; snap pct in [0, 1]; status in the known set; join coverage: share
-   of `outcomes` players with an NFL entry season >= 2022 who appear in
-   weekly rosters, and share of snap rows mapping to a gsis id, each with a
-   failing threshold set from the first backfill (catches a broken bridge).
-   A leakage test fails if any NFL table is upstream of a model-input
-   target (walk `tar_network()`).
-6. `inst/dict/*.yml` for the four tables, the `duckdb_file` table list,
-   `inst/data-model.md`, audit rows, AGENTS.md data table.
-7. Decision record: "NFL play, snap and roster-status data from 2022,
-   season-spliced, full pbp columns".
-8. Publish before merging (track-mode CI needs the new parquet).
+   range; snap pct in [0, 1]; status in the known set. Bridge coverage
+   (`contract_nfl_bridge()`): share of `outcomes` players with an NFL entry
+   (`draft_year >= 2022`) found in weekly rosters, and share of snap rows
+   mapping to a gsis id through a pipeline-stage target `nfl_players`
+   (the `ingest_nfl_players()` pfr -> gsis crosswalk, which the explorer's
+   `explorer_nfl_players` then reuses instead of pulling its own), each with
+   a failing threshold recorded in the contract and the decision record.
+6. Leakage test (testthat): walk `tar_network()` and fail if any of the four
+   NFL tables is upstream of `model_table` or `model_fit`.
+7. `inst/dict/*.yml` for the four tables, the
+   `duckdb_file` table list, `inst/data-model.md` (grain, key, join path;
+   coverage starts 2022 so earlier careers are truncated, use season-grain
+   `nfl_rosters` for whole careers and longevity; current season partial;
+   a worked query from `outcomes` to one named player's weekly status and
+   snaps), audit rows, the AGENTS.md data table.
+8. Decision record: "NFL play, snap and roster-status data from 2022,
+   season-spliced, full pbp columns", with the bridge thresholds.
+9. Publish before merging (track-mode CI needs the new parquet).
 
 ### Weekly current season, past seasons once
 
@@ -132,84 +137,76 @@ runner. A site build downloads ~690 MB instead of ~560 MB.
   replaced, which also picks up nflverse's nightly corrections. The Mar 10
   run still counts 2026 as current, so it captures the playoffs and Super
   Bowl. No schedule change needed.
-- **Once:** `Rscript data-raw/refresh-nfl.R 2022:2025 --yes --publish`.
-  The script sets `CFB2NFL_REFRESH=true` and the selector, invalidates and
-  builds **only** the NFL `raw_*`/`*_file` targets
-  (`tar_make(names = ...)`), then rebuilds `duckdb_file` in track mode so
-  every other table is read from its published parquet rather than
-  re-ingested (`*_file` targets are `cue = "always"`, so building the
-  DuckDB in refresh mode would re-run every source). With `--publish` it
-  uploads the changed parquet and the DuckDB. After that, past seasons
-  change only on a deliberate re-pull (for example, after an nflfastR EPA
-  model update).
+- **Once:** `Rscript data-raw/refresh-nfl.R --yes --publish`, which pulls
+  the full NFL window (2022 to current; `splice_seasons()` has no published
+  file to splice into yet, so the first pull must be the full window). The
+  script sets `CFB2NFL_REFRESH=true`, invalidates only the NFL `raw_*` and
+  `*_file` targets and builds just those (`tar_make(names = ...)`), then
+  runs a second `tar_make()` in **track mode** so the contracts, the DuckDB
+  and everything downstream rebuild from the published parquet without
+  touching CFBD (a refresh-mode build on a store with outdated `raw_*`
+  targets would re-ingest every source). It reports the CFBD call count
+  from `CFB2NFL_CALL_LOG` and stops if it is not 0. With `--publish` it
+  uploads the NFL parquet and the DuckDB. Later seasons can be re-pulled
+  with a selector (`refresh-nfl.R 2024`), for example after an nflfastR EPA
+  model update.
 - Participation for 2026 enters through the weekly run automatically once
   nflverse publishes it.
 
 ## 6. Feature card
 
-To move into `product/features.md` once the registry is on `main`: add the
-row
-`| F22 | NFL play, snap and roster-status data, 2022 on | G4, G1, G5 | P2, P1 | accepted | plans/nfl-pbp.md; enables F19 |`,
-move the `Next free ID` comment to F23, and relink F19's row to "builds on
-F22" (it currently links this plan).
+The card is **F23** in `product/features.md` (under G4 · Follow players
+into the NFL), the source of truth for its acceptance criteria.
 
-### F22 · NFL play, snap and roster-status data, 2022 on
+## 7. Build checklist
 
-- **Goals:** G4 (primary), G1 (via F19: VISION §1 "what drafted players do
-  in the NFL"), G5
-- **Personas:** P2. Can query, for any drafted or UDFA player who reached
-  the NFL in 2022 or later, every play they were credited on, every snap
-  they played, and their roster status each week. P1 benefits through the
-  F19 posts this enables.
-- **Why now:** current NFL outcomes are roster seasons and box-score totals,
-  which say nothing about linemen, playing time, or whether a pick started
-  right away, had to earn it, or was hurt. Each table serves an F19
-  question:
-  - `nfl_rosters_weekly`: where a player stood each week (active, practice
-    squad, inactive, injured reserve, cut, moved teams).
-  - `nfl_snap_counts`: how much a player was on the field each game, every
-    position and the current season included.
-  - `nfl_pbp`: what a player's credited plays were worth (EPA, success),
-    the basis for attributing contributions to game outcomes. All columns
-    are kept because that attribution method is still open (user decision,
-    2026-11-22).
-  - `nfl_participation`: on-field presence per play for players with no
-    credited plays (linemen), plus formation and personnel context.
-- **Acceptance criteria:**
-  - [ ] `nfl_pbp`, `nfl_participation`, `nfl_snap_counts` and
-    `nfl_rosters_weekly` are published on `data-latest` and in the DuckDB,
-    covering 2022 through the last completed NFL season (participation:
-    through the last season nflverse published).
-  - [ ] Of `outcomes` players with an NFL entry season of 2022 or later, at
-    least X% appear in `nfl_rosters_weekly`, and at least Y% of
-    `nfl_snap_counts` rows map to a `gsis_id`; the contract fails below
-    these thresholds (X and Y set from the first backfill).
-  - [ ] A contract or test fails the build if any of the four NFL tables is
-    an upstream dependency of a model-input target (leakage, decision
-    0014, G2 signals).
-  - [ ] A `data-current.yaml` run replaces only the current NFL season's
-    rows in the four tables, logs 0 CFBD calls for the NFL sources in
-    `CFB2NFL_CALL_LOG`, and leaves the 2022 to 2025 row counts unchanged.
-  - [ ] `cfb2nfl.duckdb` stays under the 2 GiB asset limit and `site.yaml`
-    succeeds with the larger download.
-  - [ ] `inst/dict` and `inst/data-model.md` give each table's grain, key
-    and join path, say that season-grain `nfl_rosters` remains the
-    longevity source, and include a worked query from `outcomes` to one
-    named player's weekly status and snaps.
-- **Out of scope:** any performance metric or thrive/fizzle classification
-  (F19); injury reports and the trades table; NFL seasons before 2022; CFB
-  `play_stats` backfill.
-- **Cost:** 0 CFBD calls; ~190 MB added to `cfb2nfl.duckdb` (~560 MB total,
-  ~21 years of headroom to the 2 GiB asset limit); four new tables; one
-  decision record; new `data-raw/refresh-nfl.R`.
-- **Tasks:** plans/nfl-pbp.md
-- **Review:** feature-reviewer 2026-11-22: aligned after changes (findings
-  2 to 7 applied; finding 1 resolved by option (b), per-table Why-now lines,
-  since the user chose full pbp and participation)
+Tracked in the F23 issue; task-reviewer 2026-11-22 (pre-build): gaps (5),
+folded in below.
 
-## 7. Order of work
+- [ ] Ingest (`R/ingest.R`, roxygen): `ingest_nfl_pbp()`,
+  `ingest_nfl_participation()`, `ingest_nfl_snap_counts()`,
+  `ingest_nfl_rosters_weekly()`, clamped to seasons nflverse has published.
+- [ ] Seasons (`R/seasons.R`): the four sources in `refresh_source_groups`
+  (`nfl`) with a 2022 floor. A selector that picks **no** season in the NFL
+  window (e.g. `refresh-historical.R 2015`) skips the NFL sources (raw is
+  `NULL`, the published parquet is kept) instead of aborting; testthat case
+  for a pre-2022 selector. A CFB selector overlapping 2022 on (e.g.
+  `2021:2023`) also re-pulls those NFL seasons, at 0 CFBD calls.
+- [ ] Clean (`R/clean.R`, roxygen): each table conformed to its dict
+  columns and types (missing columns added as `NA`, new nflverse columns
+  dropped with a message), so a schema change upstream cannot break the
+  weekly splice. Participation gets `season` from the game id.
+- [ ] Targets: `raw_*`, `*_file` (spliced by season), table targets,
+  `nfl_players` crosswalk target reused by `explorer_nfl_players` (a live
+  nflreadr download in both modes; noted in the decision record).
+- [ ] Contracts: per table (keys, ranges, id pattern, status set),
+  `season_coverage` from 2022, and `contract_nfl_bridge()`: denominator =
+  distinct players with `outcome_nfl_entry_d` TRUE on a row with
+  `draft_year >= 2022` (one row per player, joined on non-NA `gsis_id`;
+  entrants with no `gsis_id` reported); thresholds X (weekly rosters) and Y
+  (snap rows -> gsis) set from the first backfill.
+- [ ] Leakage test: no NFL table upstream of `model_table` / `model_fit`.
+- [ ] `build_duckdb()` (or the publish step) aborts if the file is 2 GiB or
+  more.
+- [ ] `data-raw/refresh-nfl.R`: targeted refresh-mode build, then a
+  track-mode build; stops before publishing if the CFBD call log is not 0 or
+  if any non-NFL `data/*.parquet` md5 changed; prints per-season row counts
+  for the four tables.
+- [ ] `data-current.yaml`: write per-season row counts of the four NFL
+  tables to the step summary (evidence that only the current season moved).
+- [ ] Docs: `inst/dict/*.yml` (from nflreadr's dictionaries), DuckDB table
+  list, `inst/data-model.md` (join paths, 2022 truncation, partial current
+  season, longevity stays in `nfl_rosters`, worked query), AGENTS.md table,
+  decision record with X and Y, NEWS.
+- [ ] Release order: backfill and publish, then merge **before the next
+  Sunday 13:17 UTC `data-current.yaml` run** (main's run would otherwise
+  rebuild the DuckDB without the new tables), then dispatch `site.yaml` and
+  confirm it passes with the larger download.
 
-1. F22 card reviewed (`feature-reviewer`), tasks reviewed (`task-reviewer`).
+## 8. Order of work
+
+
+1. F23 card reviewed (`feature-reviewer`), tasks reviewed (`task-reviewer`).
 2. Branch `data/nfl-pbp` from `main`; TDD the ingest/clean functions on
    fixtures, then the contracts.
 3. `data-raw/refresh-nfl.R`; run the backfill locally, publish.
