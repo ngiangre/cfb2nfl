@@ -26,6 +26,7 @@
 ^_quarto$
 ^\.githooks$
 ^plans$
+^product$
 ^app\.R$
 ^shiny_bookmarks$
 ^the-beast-2026\.txt$

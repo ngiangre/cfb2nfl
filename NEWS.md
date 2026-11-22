@@ -1,5 +1,16 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Process: work now traces **issue → feature → goal → persona**. `product/`
+  holds who the site serves (`personas.md`: the invested fan first, then
+  coders and researchers), what it is for (`goals.md`: answer the questions,
+  fan self-serve, NFL careers, then the forecast, under trust and API-budget
+  constraints) and the features grouped by goal (`features.md`), backfilled
+  from the shipped work. GitHub issues carry `goal:*`/`constraint:*` labels
+  and a `Feature:` line, and `sync_feature_tasks()` writes each feature's
+  task checklist from them. New `feature-reviewer` and `task-reviewer`
+  agents check each link, and the `sdlc-alignment` and `site-personas`
+  skills hold the workflow
+  ([decision 0048](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0048-goal-feature-task-traceability.md)).
 - Post revision: **Georgia vs Missouri game flow by EPA**. Every EPA is now
   CFBD's published PPA, with the spline expected-points model shown only in
   3.1 to explain what PPA measures. The drive chart is a football field with
