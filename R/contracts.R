@@ -1156,7 +1156,8 @@ contract_nfl_rosters_weekly <- function(
 #' @param nfl_players The crosswalk, with `pfr_id` and `gsis_id`
 #'   ([ingest_nfl_players()]).
 #' @return A one-row tibble: `n_entrants`, `n_no_gsis`, `roster_share` (share
-#'   of entrants with a `gsis_id` found in the weekly rosters) and
+#'   of all entrants found in the weekly rosters; one with no `gsis_id` counts
+#'   as not found) and
 #'   `snap_share` (share of snap rows whose `pfr_player_id` maps to a
 #'   `gsis_id`).
 #' @keywords internal
@@ -1177,7 +1178,10 @@ nfl_bridge_coverage <- function(
   tibble::tibble(
     n_entrants = nrow(entrants),
     n_no_gsis = sum(is.na(entrants$gsis_id)),
-    roster_share = mean(linked %in% nfl_rosters_weekly$gsis_id),
+    # Entrants with no gsis_id count as unlinked, so a broken upstream link
+    # fails the contract instead of shrinking the denominator.
+    roster_share = sum(linked %in% nfl_rosters_weekly$gsis_id) /
+      max(nrow(entrants), 1L),
     snap_share = mean(nfl_snap_counts$pfr_player_id %in% mapped)
   )
 }
@@ -1188,7 +1192,8 @@ nfl_bridge_coverage <- function(
 #' ([nfl_bridge_coverage()]): fewer than `min_roster_share` of NFL entrants
 #' from 2022 on found in the weekly rosters, or fewer than `min_snap_share`
 #' of snap rows mapping to a `gsis_id`. The thresholds were set from the
-#' first backfill (2026-11-22: 100% and 99.88%).
+#' first backfill (2026-11-22: 99.7% (2,288 of 2,295 entrants; 7 have no
+#' `gsis_id`) and 99.88%).
 #'
 #' @inheritParams nfl_bridge_coverage
 #' @param min_roster_share,min_snap_share Smallest allowed shares.

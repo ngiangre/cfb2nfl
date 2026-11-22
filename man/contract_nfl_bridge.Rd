@@ -36,5 +36,6 @@ Fails when the model population stops reaching the play-level NFL tables
 (\code{\link[=nfl_bridge_coverage]{nfl_bridge_coverage()}}): fewer than \code{min_roster_share} of NFL entrants
 from 2022 on found in the weekly rosters, or fewer than \code{min_snap_share}
 of snap rows mapping to a \code{gsis_id}. The thresholds were set from the
-first backfill (2026-11-22: 100\% and 99.88\%).
+first backfill (2026-11-22: 99.7\% (2,288 of 2,295 entrants; 7 have no
+\code{gsis_id}) and 99.88\%).
 }

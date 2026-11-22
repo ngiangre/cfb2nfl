@@ -15,8 +15,9 @@
 # refresh mode; everything downstream (contracts, the DuckDB, the explorer)
 # is then built in track mode, which reads the published parquet and calls no
 # API. It stops before publishing if the CFBD call log is not empty or any
-# non-NFL parquet changed. Pull the current release first
-# (data-raw/pull-data.R) so the DuckDB is built from current tables.
+# non-NFL parquet changed, or if local data/ no longer matches data-latest.
+# Pull the current release first (data-raw/pull-data.R) so the DuckDB is
+# built from current tables.
 
 args <- commandArgs(trailingOnly = TRUE)
 spec <- args[!startsWith(args, "--")][1]
@@ -108,6 +109,20 @@ if (length(changed) > 0L) {
 cat("Non-NFL parquet unchanged.\n")
 
 if (publish) {
+  # The DuckDB bundles every table, so the local non-NFL parquet must match
+  # the release, or the upload would replace newer published tables with a
+  # stale local copy. GitHub reports sizes, not checksums: compare those.
+  release <- piggyback::pb_list(repo = "ngiangre/cfb2nfl", tag = "data-latest")
+  local <- file.size(others)
+  published <- release$size[match(basename(others), release$file_name)]
+  stale <- basename(others)[is.na(published) | published != local]
+  if (length(stale) > 0L) {
+    stop(
+      "Local data/ differs from data-latest (",
+      paste(stale, collapse = ", "),
+      "); run data-raw/pull-data.R, then this script again."
+    )
+  }
   piggyback::pb_upload(
     file = c(nfl_paths[file.exists(nfl_paths)], "data/cfb2nfl.duckdb"),
     repo = "ngiangre/cfb2nfl",

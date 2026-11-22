@@ -200,13 +200,16 @@ test_that("contract_nfl_participation checks the key and season", {
 })
 
 test_that("contract_nfl_bridge fails when entrants or snaps stop linking", {
+  # 100 entrants from 2022 on, one with no gsis_id (99% linked), plus a
+  # pre-2022 entrant who is out of scope.
+  ids <- sprintf("00-00%05d", 1:99)
   outcomes <- tibble::tibble(
-    playerId = c("1", "1", "2", "3", "4"),
-    draft_year = c(2022L, 2023L, 2023L, 2024L, 2021L),
-    outcome_nfl_entry_d = c(FALSE, TRUE, TRUE, TRUE, TRUE),
-    gsis_id = c("00-0000001", "00-0000001", "00-0000002", NA, "00-0000009")
+    playerId = c("0", as.character(1:100), "999"),
+    draft_year = c(2022L, rep(2023L, 100), 2021L),
+    outcome_nfl_entry_d = c(FALSE, rep(TRUE, 100), TRUE),
+    gsis_id = c(ids[1], ids, NA, "00-0099999")
   )
-  weekly <- tibble::tibble(gsis_id = c("00-0000001", "00-0000002"))
+  weekly <- tibble::tibble(gsis_id = ids)
   snaps <- tibble::tibble(pfr_player_id = c("A", "B", "A"))
   players <- tibble::tibble(pfr_id = c("A", "B"), gsis_id = c("x", "y"))
 
@@ -226,7 +229,7 @@ test_that("contract_nfl_bridge fails when entrants or snaps stop linking", {
 
   expect_false(pointblank::all_passed(contract_nfl_bridge(
     outcomes,
-    weekly[1, ],
+    weekly[-1, , drop = FALSE],
     snaps,
     players,
     stop_on_fail = FALSE

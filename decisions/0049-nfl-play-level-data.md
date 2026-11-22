@@ -56,12 +56,12 @@ change), which bundles every table.
    window, since a splice needs a published table to splice into.
 6. **Bridge contract** (`contract_nfl_bridge()`): at least **99%** of NFL
    entrants from 2022 on (distinct players with `outcome_nfl_entry_d` on a
-   row with `draft_year >= 2022`, joined on non-NA `gsis_id`) appear in
+   row with `draft_year >= 2022`; one with no `gsis_id` counts as missing) appear in
    `nfl_rosters_weekly`, and at least **99%** of snap-count rows map to a
    `gsis_id` through the nflverse pfr -> gsis crosswalk (`nfl_players`, now a
    pipeline target the explorer reuses; a live nflreadr download in both
-   modes). First backfill: 100% of 2,288 entrants with a `gsis_id` (7 more
-   have none), and 99.88% of snap rows.
+   modes). First backfill: 99.7% (2,288 of 2,295 entrants; the other 7 have
+   no `gsis_id`), and 99.88% of snap rows.
 7. **Leakage test**: no play-level NFL table may be upstream of `model_table`
    or `model_fit` (decision 0014).
 8. `build_duckdb()` aborts when the bundle reaches 2 GiB, so an oversized
@@ -69,7 +69,8 @@ change), which bundles every table.
 
 ## Hypotheses / expectations
 
-- `cfb2nfl.duckdb` grows to about 560 MB and then about 75 MB a year (35 MB
+- `cfb2nfl.duckdb` grows to about 560 MB (measured after the first
+  backfill: 535.8 MB) and then about 75 MB a year (35 MB
   college, 40 MB NFL), reaching 2 GiB in roughly 21 years (about 16 if
   college play volume keeps rising as it did in 2022).
 - Participation arrives some time after a season ends; the season-coverage

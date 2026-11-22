@@ -200,16 +200,16 @@ acceptance criteria.
     `nfl_snap_counts` and `nfl_rosters_weekly` from `data-latest` and query
     them in the DuckDB, covering 2022 through the last completed NFL season
     (participation: through the last season nflverse published).
-  - [ ] Of `outcomes` players (drafted or undrafted) with an NFL entry
+  - [x] Of `outcomes` players (drafted or undrafted) with an NFL entry
     season of 2022 or later, at least X% appear in `nfl_rosters_weekly`, and
     at least Y% of `nfl_snap_counts` rows map to a `gsis_id` (through a
     pipeline crosswalk target, not the explorer's); the contract fails below
     these thresholds, with X and Y set from the first backfill and recorded
     in the decision record and the contract.
-  - [ ] A test fails if any of the four tables is upstream of `model_table`
+  - [x] A test fails if any of the four tables is upstream of `model_table`
     or `model_fit` in `tar_network()` (NFL data stays an outcome, decision
     0014).
-  - [ ] The one-time `Rscript data-raw/refresh-nfl.R --yes` backfill (2022
+  - [x] The one-time `Rscript data-raw/refresh-nfl.R --yes` backfill (2022
     to current) with `CFB2NFL_CALL_LOG` set logs 0 CFBD calls, and every
     non-NFL parquet is unchanged afterwards.
   - [ ] A `data-current.yaml` run replaces only the current NFL season's
@@ -217,7 +217,7 @@ acceptance criteria.
     to 2025 row counts unchanged.
   - [ ] `cfb2nfl.duckdb` stays under the 2 GiB asset limit and `site.yaml`
     succeeds with the larger download.
-  - [ ] `inst/dict` and `inst/data-model.md` give each table's grain, key and
+  - [x] `inst/dict` and `inst/data-model.md` give each table's grain, key and
     join path, say that season-grain `nfl_rosters` remains the longevity
     source, state that coverage starts in 2022 (careers that began earlier
     are truncated; use season-grain `nfl_rosters` for whole careers) and
@@ -226,9 +226,10 @@ acceptance criteria.
 - **Out of scope:** any performance metric or thrive/fizzle classification
   (F19); injury reports and the trades table; NFL seasons before 2022; CFB
   `play_stats` backfill.
-- **Cost:** 0 CFBD calls; ~190 MB added to `cfb2nfl.duckdb` (~560 MB total,
-  ~21 years of headroom to the 2 GiB asset limit); four new tables; one
-  decision record; new `data-raw/refresh-nfl.R`. Plan: `plans/nfl-pbp.md`.
+- **Cost:** 0 CFBD calls; ~168 MB added to `cfb2nfl.duckdb` (535.8 MB
+  measured after the backfill, ~21 years of headroom to the 2 GiB limit);
+  four new tables; one decision record; new `data-raw/refresh-nfl.R`.
+  Plan: `plans/nfl-pbp.md`.
 - **Review:** feature-reviewer 2026-11-22: aligned after changes (2
   required + 4 optional findings, all applied)
 - **Tasks:**

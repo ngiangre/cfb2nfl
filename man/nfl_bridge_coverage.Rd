@@ -18,7 +18,8 @@ nfl_bridge_coverage(outcomes, nfl_rosters_weekly, nfl_snap_counts, nfl_players)
 }
 \value{
 A one-row tibble: \code{n_entrants}, \code{n_no_gsis}, \code{roster_share} (share
-of entrants with a \code{gsis_id} found in the weekly rosters) and
+of all entrants found in the weekly rosters; one with no \code{gsis_id} counts
+as not found) and
 \code{snap_share} (share of snap rows whose \code{pfr_player_id} maps to a
 \code{gsis_id}).
 }
