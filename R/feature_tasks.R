@@ -55,7 +55,10 @@ feature_goals <- function(lines) {
     function(i) {
       end <- if (i < length(heads)) heads[i + 1L] - 1L else length(lines)
       card <- lines[heads[i]:end]
-      hit <- regmatches(card, regexec("\\*\\*Goals:\\*\\*\\s*([^·]+)", card))
+      hit <- regmatches(
+        card,
+        regexec("\\*\\*Goals:\\*\\*\\s*([^\u00b7]+)", card)
+      )
       hit <- Filter(length, hit)
       if (length(hit) == 0L) NA_character_ else trimws(hit[[1]][2])
     },
