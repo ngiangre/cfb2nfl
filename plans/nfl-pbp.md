@@ -2,8 +2,8 @@
 
 Feature: F23 (all criteria). Builds toward F19 (thrive or fizzle).
 
-**Status (2026-11-22):** card F23 is in `product/features.md` under G4;
-reviews below.
+**Status (2026-11-22):** built on `data/nfl-pbp` (#93); backfill run
+locally (0 CFBD calls). Not yet published or merged.
 
 Goal: give every drafted and UDFA player an NFL record of **what they did on
 a play** (play-by-play, EPA), **whether they were on the field** (snap
@@ -114,8 +114,8 @@ runner. A site build downloads ~690 MB instead of ~560 MB.
    (`contract_nfl_bridge()`): share of `outcomes` players with an NFL entry
    (`draft_year >= 2022`) found in weekly rosters, and share of snap rows
    mapping to a gsis id through a pipeline-stage target `nfl_players`
-   (the `ingest_nfl_players()` pfr -> gsis crosswalk, which the explorer's
-   `explorer_nfl_players` then reuses instead of pulling its own), each with
+   (the `ingest_nfl_players()` pfr -> gsis crosswalk, which replaces the
+   explorer's own `explorer_nfl_players` pull), each with
    a failing threshold recorded in the contract and the decision record.
 6. Leakage test (testthat): walk `tar_network()` and fail if any of the four
    NFL tables is upstream of `model_table` or `model_fit`.
@@ -163,38 +163,38 @@ into the NFL), the source of truth for its acceptance criteria.
 Tracked in the F23 issue; task-reviewer 2026-11-22 (pre-build): gaps (5),
 folded in below.
 
-- [ ] Ingest (`R/ingest.R`, roxygen): `ingest_nfl_pbp()`,
+- [x] Ingest (`R/ingest.R`, roxygen): `ingest_nfl_pbp()`,
   `ingest_nfl_participation()`, `ingest_nfl_snap_counts()`,
   `ingest_nfl_rosters_weekly()`, clamped to seasons nflverse has published.
-- [ ] Seasons (`R/seasons.R`): the four sources in `refresh_source_groups`
+- [x] Seasons (`R/seasons.R`): the four sources in `refresh_source_groups`
   (`nfl`) with a 2022 floor. A selector that picks **no** season in the NFL
   window (e.g. `refresh-historical.R 2015`) skips the NFL sources (raw is
   `NULL`, the published parquet is kept) instead of aborting; testthat case
   for a pre-2022 selector. A CFB selector overlapping 2022 on (e.g.
   `2021:2023`) also re-pulls those NFL seasons, at 0 CFBD calls.
-- [ ] Clean (`R/clean.R`, roxygen): each table conformed to its dict
+- [x] Clean (`R/clean.R`, roxygen): each table conformed to its dict
   columns and types (missing columns added as `NA`, new nflverse columns
   dropped with a message), so a schema change upstream cannot break the
   weekly splice. Participation gets `season` from the game id.
-- [ ] Targets: `raw_*`, `*_file` (spliced by season), table targets,
-  `nfl_players` crosswalk target reused by `explorer_nfl_players` (a live
+- [x] Targets: `raw_*`, `*_file` (spliced by season), table targets,
+  `nfl_players` crosswalk target, also used by the explorer (a live
   nflreadr download in both modes; noted in the decision record).
-- [ ] Contracts: per table (keys, ranges, id pattern, status set),
+- [x] Contracts: per table (keys, ranges, id pattern, status set),
   `season_coverage` from 2022, and `contract_nfl_bridge()`: denominator =
   distinct players with `outcome_nfl_entry_d` TRUE on a row with
   `draft_year >= 2022` (one row per player, joined on non-NA `gsis_id`;
   entrants with no `gsis_id` reported); thresholds X (weekly rosters) and Y
   (snap rows -> gsis) set from the first backfill.
-- [ ] Leakage test: no NFL table upstream of `model_table` / `model_fit`.
-- [ ] `build_duckdb()` (or the publish step) aborts if the file is 2 GiB or
+- [x] Leakage test: no NFL table upstream of `model_table` / `model_fit`.
+- [x] `build_duckdb()` (or the publish step) aborts if the file is 2 GiB or
   more.
-- [ ] `data-raw/refresh-nfl.R`: targeted refresh-mode build, then a
+- [x] `data-raw/refresh-nfl.R`: targeted refresh-mode build, then a
   track-mode build; stops before publishing if the CFBD call log is not 0 or
   if any non-NFL `data/*.parquet` md5 changed; prints per-season row counts
   for the four tables.
-- [ ] `data-current.yaml`: write per-season row counts of the four NFL
+- [x] `data-current.yaml`: write per-season row counts of the four NFL
   tables to the step summary (evidence that only the current season moved).
-- [ ] Docs: `inst/dict/*.yml` (from nflreadr's dictionaries), DuckDB table
+- [x] Docs: `inst/dict/*.yml` (from nflreadr's dictionaries), DuckDB table
   list, `inst/data-model.md` (join paths, 2022 truncation, partial current
   season, longevity stays in `nfl_rosters`, worked query), AGENTS.md table,
   decision record with X and Y, NEWS.

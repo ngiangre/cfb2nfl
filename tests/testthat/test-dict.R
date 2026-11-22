@@ -24,6 +24,10 @@ dict_parquet <- c(
   nfl_draft_picks = "nfl_draft_picks.parquet",
   nfl_rosters = "nfl_rosters.parquet",
   nfl_player_stats = "nfl_player_stats.parquet",
+  nfl_pbp = "nfl_pbp.parquet",
+  nfl_participation = "nfl_participation.parquet",
+  nfl_snap_counts = "nfl_snap_counts.parquet",
+  nfl_rosters_weekly = "nfl_rosters_weekly.parquet",
   combine = "combine.parquet"
 )
 

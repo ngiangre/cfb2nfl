@@ -58,7 +58,14 @@ their own rows in `play_stats.parquet`. **Past seasons are opt-in**
 selection (the full window aborts), e.g. `CFB2NFL_PLAYS_STATS=true Rscript
 data-raw/refresh-historical.R 2025 --yes --publish`; backfill ad hoc, newest
 first. A full refresh needs the published `play_stats.parquet` to start from
-(`data-refresh.yaml` downloads it). "Current" recruiting is the **enrolled** class: the
+(`data-refresh.yaml` downloads it). **Play-level NFL tables** (`nfl_pbp`, `nfl_participation`,
+`nfl_snap_counts`, `nfl_rosters_weekly`; feature F23, decision 0049) cover
+2022 on (`nfl_play_min_season`), cost no CFBD calls, and splice by season
+like the CFBD tables: the weekly run replaces the current NFL season; a
+selector with no season from 2022 on leaves them as published. Re-pull them
+alone with `Rscript data-raw/refresh-nfl.R [selector] --yes [--publish]`
+(refresh-mode build of only the NFL targets, then a track-mode build; it
+refuses to publish if any CFBD call was made or a non-NFL parquet changed). "Current" recruiting is the **enrolled** class: the
 incoming class has no CFBD athlete ids until enrollment, so the cleaner drops
 all of it. Years 2010–2026.
 
@@ -74,6 +81,10 @@ all of it. Years 2010–2026.
 | `data/nfl_draft_picks.parquet` | one NFL draft pick | nflverse; key `(season, round, pick)`. Bridge to `gsis_id`/`pfr_player_id` + PFR career summary (decision 0014) |
 | `data/nfl_rosters.parquet` | one player-season on an NFL roster | nflverse; key `(gsis_id, season)`. Longevity source: distinct roster seasons |
 | `data/nfl_player_stats.parquet` | one player-season (regular season) | nflverse; key `(gsis_id, season)`. Weekly stats aggregated to season totals |
+| `data/nfl_pbp.parquet` | one NFL play, 2022 on | nflverse; key `(game_id, play_id)`. Every nflverse column (EPA, WPA, success); each `*_player_id` is a `gsis_id` (feature F23) |
+| `data/nfl_participation.parquet` | one NFL play, 2022 on | nflverse; key `(nflverse_game_id, play_id)`. `offense_players`/`defense_players` are `;`-separated gsis ids, linemen included. A season arrives some time after it ends |
+| `data/nfl_snap_counts.parquet` | one NFL player-game, 2022 on | nflverse (PFR); key `(game_id, pfr_player_id)`. Join `nfl_rosters_weekly` on `pfr_id` + season + week |
+| `data/nfl_rosters_weekly.parquet` | one player-team-week, 2022 on | nflverse; key `(season, week, team, gsis_id)`. Weekly `status` (ACT, DEV practice squad, INA, RES reserve/IR, CUT, TRD...). Season-grain `nfl_rosters` stays the longevity source |
 | `data/plays.parquet` | one play | key `id` (string); `gameId` → `games.id`; `season`/`week`/`seasonType` stamped at ingest; down/distance/field position/score/clock (`clock_minutes`, `clock_seconds`), `playType` + `playTypeId`, `ppa`, `playText`. No athlete id. ~280 calls for every season (one per played week) |
 | `data/play_stats.parquet` | **long**: athlete-play-stat | key `(playId, athleteId, statTypeId)`; `athleteId` is the shared athlete namespace (no name guard); `playId` → `plays.id`. Pulled per game: the current season weekly (2026 on), past seasons only when backfilled, so they have no rows yet |
 | `data/play_types.parquet`, `data/play_stat_types.parquet` | one play / play-stat type | key `id`; display dimensions for `plays.playTypeId` / `play_stats.statTypeId`. CFBD's `Uncategorized`/`placeholder` types are kept |

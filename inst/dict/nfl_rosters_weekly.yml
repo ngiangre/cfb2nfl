@@ -1,0 +1,83 @@
+dataset: nfl_rosters_weekly
+source: nflverse nflreadr::load_rosters_weekly (seasons 2022 to the current NFL season)
+grain: one player on one team's roster in one week
+key: (season, week, team, gsis_id)
+description: 'Where a player stood each week: status ACT (active), DEV (practice squad),
+  INA (inactive), RES (reserve, mostly injured reserve), CUT, RET, TRD and others;
+  a change of team between weeks is a move. A player can appear for two teams in the
+  week of a move. Rows with no gsis_id are dropped. Season-grain nfl_rosters stays
+  the longevity source. Cross-platform ids, headshots and physicals are not kept (physicals
+  are in nfl_rosters). Coverage starts in 2022, so careers that began earlier are
+  truncated: use season-grain nfl_rosters for whole careers and for longevity. The
+  current season is partial until it ends.'
+columns:
+- name: season
+  type: int32
+  description: NFL season.
+  provenance: raw
+- name: week
+  type: int32
+  description: Week of the season this roster row describes.
+  provenance: raw
+- name: game_type
+  type: string
+  description: 'Game type of that week: REG, WC, DIV, CON or SB.'
+  provenance: raw
+- name: team
+  type: string
+  description: NFL team. Uses official abbreviations as per NFL.com
+  provenance: raw
+- name: gsis_id
+  type: string
+  description: 'Game Stats and Info Service ID: the primary ID for play-by-play data.'
+  provenance: raw
+- name: pfr_id
+  type: string
+  description: Player ID for Pro Football Reference
+  provenance: raw
+- name: full_name
+  type: string
+  description: Full name as per NFL.com
+  provenance: raw
+- name: position
+  type: string
+  description: Primary position as reported by NFL.com
+  provenance: raw
+- name: depth_chart_position
+  type: string
+  description: Position assigned on depth chart. Not always accurate!
+  provenance: raw
+- name: jersey_number
+  type: int32
+  description: Jersey number. Often useful for joins by name/team/jersey.
+  provenance: raw
+- name: status
+  type: string
+  description: 'Roster status: describes things like Active, Inactive, Injured Reserve,
+    Practice Squad etc'
+  provenance: raw
+- name: status_description_abbr
+  type: string
+  description: A code corresponding to a particular NFL status.
+  provenance: raw
+- name: years_exp
+  type: int32
+  description: Years played in league
+  provenance: raw
+- name: entry_year
+  type: int32
+  description: The year a player first became eligible to play in the NFL.
+  provenance: raw
+- name: rookie_year
+  type: int32
+  description: The year a player lost their rookie eligibility.
+  provenance: raw
+- name: draft_club
+  type: string
+  description: The team that originally drafted a player. NA if a player went undrafted
+    in their draft-eligible year.
+  provenance: raw
+- name: draft_number
+  type: int32
+  description: The number pick that was used to select a given player.
+  provenance: raw

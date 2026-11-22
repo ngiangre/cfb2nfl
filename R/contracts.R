@@ -994,6 +994,231 @@ contract_nfl_player_stats <- function(nfl_player_stats, stop_on_fail = TRUE) {
   enforce_contract(agent, "nfl_player_stats", stop_on_fail)
 }
 
+# ---- play-level NFL tables (feature F23) ------------------------------------
+
+# GSIS ids look like 00-0035228.
+gsis_pattern <- "^00-00[0-9]{5}$"
+
+#' Data contract for cleaned NFL play-by-play
+#'
+#' One row per `(game_id, play_id)`, seasons inside the play-level NFL window
+#' (`nfl_play_min_season` to the current NFL season), regular season or
+#' postseason, EPA in a plausible range, and every credited-player column a
+#' GSIS id (the join to `outcomes.gsis_id`).
+#'
+#' @param nfl_pbp Cleaned play-by-play ([clean_nfl_pbp()]).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_nfl_pbp <- function(nfl_pbp, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  id_cols <- grep("_player_id$", names(nfl_pbp), value = TRUE)
+  agent <- pointblank::create_agent(nfl_pbp, label = "nfl_pbp") |>
+    pointblank::col_vals_not_null(pointblank::vars(game_id, play_id, season)) |>
+    pointblank::rows_distinct(pointblank::vars(game_id, play_id)) |>
+    pointblank::col_vals_between(
+      "season",
+      nfl_play_min_season,
+      refresh_season_for("nfl_pbp")
+    ) |>
+    pointblank::col_vals_in_set("season_type", c("REG", "POST")) |>
+    pointblank::col_vals_between("epa", -15, 15, na_pass = TRUE) |>
+    pointblank::col_vals_regex(
+      pointblank::vars(!!!rlang::syms(id_cols)),
+      gsis_pattern,
+      na_pass = TRUE
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "nfl_pbp", stop_on_fail)
+}
+
+#' Data contract for cleaned NFL play participation
+#'
+#' One row per `(nflverse_game_id, play_id)`, seasons inside the play-level
+#' NFL window.
+#'
+#' @param nfl_participation Cleaned participation
+#'   ([clean_nfl_participation()]).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_nfl_participation <- function(nfl_participation, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  agent <- pointblank::create_agent(
+    nfl_participation,
+    label = "nfl_participation"
+  ) |>
+    pointblank::col_vals_not_null(
+      pointblank::vars(nflverse_game_id, play_id, season)
+    ) |>
+    pointblank::rows_distinct(pointblank::vars(nflverse_game_id, play_id)) |>
+    pointblank::col_vals_between(
+      "season",
+      nfl_play_min_season,
+      refresh_season_for("nfl_participation")
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "nfl_participation", stop_on_fail)
+}
+
+#' Data contract for cleaned NFL snap counts
+#'
+#' One row per `(game_id, pfr_player_id)`, seasons inside the play-level NFL
+#' window, non-negative snaps and snap shares between 0 and 1.
+#'
+#' @param nfl_snap_counts Cleaned snap counts ([clean_nfl_snap_counts()]).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_nfl_snap_counts <- function(nfl_snap_counts, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  agent <- pointblank::create_agent(
+    nfl_snap_counts,
+    label = "nfl_snap_counts"
+  ) |>
+    pointblank::col_vals_not_null(
+      pointblank::vars(game_id, pfr_player_id, season)
+    ) |>
+    pointblank::rows_distinct(pointblank::vars(game_id, pfr_player_id)) |>
+    pointblank::col_vals_between(
+      "season",
+      nfl_play_min_season,
+      refresh_season_for("nfl_snap_counts")
+    ) |>
+    pointblank::col_vals_in_set(
+      "game_type",
+      c("REG", "WC", "DIV", "CON", "SB")
+    ) |>
+    pointblank::col_vals_gte(
+      pointblank::vars(offense_snaps, defense_snaps, st_snaps),
+      0,
+      na_pass = TRUE
+    ) |>
+    pointblank::col_vals_between(
+      pointblank::vars(offense_pct, defense_pct, st_pct),
+      0,
+      1,
+      na_pass = TRUE
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "nfl_snap_counts", stop_on_fail)
+}
+
+#' Data contract for cleaned NFL weekly rosters
+#'
+#' One row per `(season, week, team, gsis_id)`, seasons inside the play-level
+#' NFL window, GSIS ids well formed, and status a three-character nflverse
+#' code. The code set is not closed: besides ACT, DEV, RES, INA, CUT, RET and
+#' TRD, nflverse uses rare codes such as E14, TRT, PUP and SUS.
+#'
+#' @param nfl_rosters_weekly Cleaned weekly rosters
+#'   ([clean_nfl_rosters_weekly()]).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_nfl_rosters_weekly <- function(
+  nfl_rosters_weekly,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  agent <- pointblank::create_agent(
+    nfl_rosters_weekly,
+    label = "nfl_rosters_weekly"
+  ) |>
+    pointblank::col_vals_not_null(
+      pointblank::vars(season, week, team, gsis_id)
+    ) |>
+    pointblank::rows_distinct(pointblank::vars(season, week, team, gsis_id)) |>
+    pointblank::col_vals_between(
+      "season",
+      nfl_play_min_season,
+      refresh_season_for("nfl_rosters_weekly")
+    ) |>
+    pointblank::col_vals_regex("gsis_id", gsis_pattern) |>
+    pointblank::col_vals_regex("status", "^[A-Z0-9]{3}$", na_pass = TRUE) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "nfl_rosters_weekly", stop_on_fail)
+}
+
+#' Coverage of the play-level NFL bridge
+#'
+#' The model population reaches the play-level NFL tables two ways:
+#' `outcomes.gsis_id` (drafted and undrafted alike) joins `nfl_rosters_weekly`
+#' and `nfl_pbp` directly, and `nfl_snap_counts` reaches a `gsis_id` through
+#' the nflverse pfr -> gsis crosswalk (`nfl_players`). The entrants are the
+#' distinct players with an NFL entry (`outcome_nfl_entry_d`) on a row with
+#' `draft_year >= nfl_play_min_season`; those with no `gsis_id` are counted
+#' separately, since they cannot join any NFL table.
+#'
+#' @param outcomes The `outcomes` table.
+#' @param nfl_rosters_weekly Cleaned weekly rosters.
+#' @param nfl_snap_counts Cleaned snap counts.
+#' @param nfl_players The crosswalk, with `pfr_id` and `gsis_id`
+#'   ([ingest_nfl_players()]).
+#' @return A one-row tibble: `n_entrants`, `n_no_gsis`, `roster_share` (share
+#'   of entrants with a `gsis_id` found in the weekly rosters) and
+#'   `snap_share` (share of snap rows whose `pfr_player_id` maps to a
+#'   `gsis_id`).
+#' @keywords internal
+nfl_bridge_coverage <- function(
+  outcomes,
+  nfl_rosters_weekly,
+  nfl_snap_counts,
+  nfl_players
+) {
+  entrants <- outcomes |>
+    dplyr::filter(
+      .data$outcome_nfl_entry_d %in% TRUE,
+      .data$draft_year >= nfl_play_min_season
+    ) |>
+    dplyr::distinct(.data$playerId, .keep_all = TRUE)
+  linked <- entrants$gsis_id[!is.na(entrants$gsis_id)]
+  mapped <- nfl_players$pfr_id[!is.na(nfl_players$gsis_id)]
+  tibble::tibble(
+    n_entrants = nrow(entrants),
+    n_no_gsis = sum(is.na(entrants$gsis_id)),
+    roster_share = mean(linked %in% nfl_rosters_weekly$gsis_id),
+    snap_share = mean(nfl_snap_counts$pfr_player_id %in% mapped)
+  )
+}
+
+#' Data contract for the play-level NFL bridge
+#'
+#' Fails when the model population stops reaching the play-level NFL tables
+#' ([nfl_bridge_coverage()]): fewer than `min_roster_share` of NFL entrants
+#' from 2022 on found in the weekly rosters, or fewer than `min_snap_share`
+#' of snap rows mapping to a `gsis_id`. The thresholds were set from the
+#' first backfill (2026-11-22: 100% and 99.88%).
+#'
+#' @inheritParams nfl_bridge_coverage
+#' @param min_roster_share,min_snap_share Smallest allowed shares.
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_nfl_bridge <- function(
+  outcomes,
+  nfl_rosters_weekly,
+  nfl_snap_counts,
+  nfl_players,
+  min_roster_share = 0.99,
+  min_snap_share = 0.99,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  coverage <- nfl_bridge_coverage(
+    outcomes,
+    nfl_rosters_weekly,
+    nfl_snap_counts,
+    nfl_players
+  )
+  agent <- pointblank::create_agent(coverage, label = "nfl_bridge") |>
+    pointblank::col_vals_gt("n_entrants", 0) |>
+    pointblank::col_vals_gte("roster_share", min_roster_share) |>
+    pointblank::col_vals_gte("snap_share", min_snap_share) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "nfl_bridge", stop_on_fail)
+}
+
 #' Data contract for the NFL draft-slot bridge
 #'
 #' Guards [link_nfl_draft()]: the slot join must preserve the `picks` row count

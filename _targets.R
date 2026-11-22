@@ -190,6 +190,42 @@ list(
     raw_nfl_player_stats,
     if (refresh_enabled()) ingest_nfl_player_stats()
   ),
+  # Play-level NFL tables (feature F23): nflverse, no CFBD calls, 2022 on.
+  # They follow the seasons selector inside their own window; a selector with
+  # no NFL season in it (a college backfill of 2015) pulls nothing and the
+  # published tables are kept (nfl_refresh_seasons()).
+  tar_target(
+    raw_nfl_pbp,
+    if (refresh_enabled()) {
+      seasons <- nfl_refresh_seasons(source = "nfl_pbp")
+      if (length(seasons)) ingest_nfl_pbp(seasons)
+    }
+  ),
+  tar_target(
+    raw_nfl_participation,
+    if (refresh_enabled()) {
+      seasons <- nfl_refresh_seasons(source = "nfl_participation")
+      if (length(seasons)) ingest_nfl_participation(seasons)
+    }
+  ),
+  tar_target(
+    raw_nfl_snap_counts,
+    if (refresh_enabled()) {
+      seasons <- nfl_refresh_seasons(source = "nfl_snap_counts")
+      if (length(seasons)) ingest_nfl_snap_counts(seasons)
+    }
+  ),
+  tar_target(
+    raw_nfl_rosters_weekly,
+    if (refresh_enabled()) {
+      seasons <- nfl_refresh_seasons(source = "nfl_rosters_weekly")
+      if (length(seasons)) ingest_nfl_rosters_weekly(seasons)
+    }
+  ),
+  # The nflverse pfr -> gsis crosswalk: maps snap counts to gsis ids (the
+  # nfl_bridge contract) and relabels undrafted combine invitees in the
+  # explorer. A static nflreadr download (no API key), needed in both modes.
+  tar_target(nfl_players, ingest_nfl_players()),
   # NFL Scouting Combine via nflverse (decision 0043); no CFBD calls.
   tar_target(
     raw_combine,
@@ -382,6 +418,67 @@ list(
     format = "file"
   ),
   tar_target(nfl_player_stats, arrow::read_parquet(nfl_player_stats_file)),
+  # Play-level NFL tables (feature F23), spliced by season. Large, so the
+  # in-store copies are parquet, not rds.
+  tar_target(
+    nfl_pbp_file,
+    parquet_asset("data/nfl_pbp.parquet", function() {
+      splice_nfl_play(
+        raw_nfl_pbp,
+        clean_nfl_pbp,
+        "nfl_pbp",
+        "data/nfl_pbp.parquet"
+      )
+    }),
+    format = "file"
+  ),
+  tar_target(nfl_pbp, arrow::read_parquet(nfl_pbp_file), format = "parquet"),
+  tar_target(
+    nfl_participation_file,
+    parquet_asset("data/nfl_participation.parquet", function() {
+      splice_nfl_play(
+        raw_nfl_participation,
+        clean_nfl_participation,
+        "nfl_participation",
+        "data/nfl_participation.parquet"
+      )
+    }),
+    format = "file"
+  ),
+  tar_target(
+    nfl_participation,
+    arrow::read_parquet(nfl_participation_file),
+    format = "parquet"
+  ),
+  tar_target(
+    nfl_snap_counts_file,
+    parquet_asset("data/nfl_snap_counts.parquet", function() {
+      splice_nfl_play(
+        raw_nfl_snap_counts,
+        clean_nfl_snap_counts,
+        "nfl_snap_counts",
+        "data/nfl_snap_counts.parquet"
+      )
+    }),
+    format = "file"
+  ),
+  tar_target(nfl_snap_counts, arrow::read_parquet(nfl_snap_counts_file)),
+  tar_target(
+    nfl_rosters_weekly_file,
+    parquet_asset("data/nfl_rosters_weekly.parquet", function() {
+      splice_nfl_play(
+        raw_nfl_rosters_weekly,
+        clean_nfl_rosters_weekly,
+        "nfl_rosters_weekly",
+        "data/nfl_rosters_weekly.parquet"
+      )
+    }),
+    format = "file"
+  ),
+  tar_target(
+    nfl_rosters_weekly,
+    arrow::read_parquet(nfl_rosters_weekly_file)
+  ),
   # Combine measurables linked to CFBD athlete ids (decision 0043). The link
   # runs inside the asset so the published parquet carries athlete_id and
   # link_method (parquet == DuckDB == dict); a link change needs a refresh.
@@ -471,17 +568,35 @@ list(
           games = games$season,
           game_team_stats = game_team_stats$season,
           game_player_stats = game_player_stats$season,
-          plays = plays$season
+          plays = plays$season,
+          nfl_pbp = nfl_pbp$season,
+          nfl_snap_counts = nfl_snap_counts$season,
+          nfl_rosters_weekly = nfl_rosters_weekly$season,
+          nfl_participation = nfl_participation$season
         ),
-        required = required_seasons(c(
-          "player_stats",
-          "roster",
-          "recruiting",
-          "games",
-          "game_team_stats",
-          "game_player_stats",
-          "plays"
-        )),
+        required = c(
+          required_seasons(c(
+            "player_stats",
+            "roster",
+            "recruiting",
+            "games",
+            "game_team_stats",
+            "game_player_stats",
+            "plays"
+          )),
+          required_seasons(
+            c("nfl_pbp", "nfl_snap_counts", "nfl_rosters_weekly"),
+            min_season = nfl_play_min_season
+          ),
+          # nflverse publishes participation some time after a season ends,
+          # so the last completed season may not be there yet.
+          list(
+            nfl_participation = seq.int(
+              nfl_play_min_season,
+              refresh_season_for("nfl_participation") - 2L
+            )
+          )
+        ),
         stop_on_fail = FALSE
       )
     )
@@ -601,6 +716,40 @@ list(
     )
   ),
   tar_target(
+    ok_nfl_pbp,
+    pointblank::all_passed(contract_nfl_pbp(nfl_pbp, stop_on_fail = FALSE))
+  ),
+  tar_target(
+    ok_nfl_participation,
+    pointblank::all_passed(
+      contract_nfl_participation(nfl_participation, stop_on_fail = FALSE)
+    )
+  ),
+  tar_target(
+    ok_nfl_snap_counts,
+    pointblank::all_passed(
+      contract_nfl_snap_counts(nfl_snap_counts, stop_on_fail = FALSE)
+    )
+  ),
+  tar_target(
+    ok_nfl_rosters_weekly,
+    pointblank::all_passed(
+      contract_nfl_rosters_weekly(nfl_rosters_weekly, stop_on_fail = FALSE)
+    )
+  ),
+  tar_target(
+    ok_nfl_bridge,
+    pointblank::all_passed(
+      contract_nfl_bridge(
+        outcomes,
+        nfl_rosters_weekly,
+        nfl_snap_counts,
+        nfl_players,
+        stop_on_fail = FALSE
+      )
+    )
+  ),
+  tar_target(
     ok_combine,
     pointblank::all_passed(
       contract_combine(
@@ -717,6 +866,11 @@ list(
       nfl_rosters = ok_nfl_rosters,
       nfl_player_stats = ok_nfl_player_stats,
       nfl_link = ok_nfl_link,
+      nfl_pbp = ok_nfl_pbp,
+      nfl_participation = ok_nfl_participation,
+      nfl_snap_counts = ok_nfl_snap_counts,
+      nfl_rosters_weekly = ok_nfl_rosters_weekly,
+      nfl_bridge = ok_nfl_bridge,
       combine = ok_combine,
       career_summary = ok_career,
       position_mapping = ok_position_mapping,
@@ -955,16 +1109,14 @@ list(
   ),
   # Combine tab (plans/explorer.md step 5): every invitee's measurables and
   # draft outcome as one columnar JSON file. The nflverse player crosswalk
-  # (target-only, decision 0041) relabels undrafted invitees who made an NFL
-  # roster; it is a static nflreadr download (no API key) needed in both modes.
-  tar_target(explorer_nfl_players, ingest_nfl_players()),
+  # (`nfl_players`) relabels undrafted invitees who made an NFL roster.
   tar_target(
     explorer_combine,
     build_explorer_combine(
       combine,
       explorer_player_seasons,
       picks,
-      explorer_nfl_players
+      nfl_players
     )
   ),
   tar_target(
@@ -1074,6 +1226,10 @@ list(
         nfl_draft_picks = nfl_draft_picks,
         nfl_rosters = nfl_rosters,
         nfl_player_stats = nfl_player_stats,
+        nfl_pbp = nfl_pbp,
+        nfl_participation = nfl_participation,
+        nfl_snap_counts = nfl_snap_counts,
+        nfl_rosters_weekly = nfl_rosters_weekly,
         combine = combine,
         stat_taxonomy = stat_taxonomy_tbl,
         ps_change = ps_change,
@@ -1316,6 +1472,38 @@ list(
         raw_nfl_player_stats,
         keys = c("gsis_id", "season"),
         contract_passed = ok_nfl_player_stats
+      ),
+      audit_step(
+        nfl_pbp,
+        "clean_nfl_pbp",
+        "clean",
+        raw_nfl_pbp,
+        keys = c("game_id", "play_id"),
+        contract_passed = ok_nfl_pbp
+      ),
+      audit_step(
+        nfl_participation,
+        "clean_nfl_participation",
+        "clean",
+        raw_nfl_participation,
+        keys = c("nflverse_game_id", "play_id"),
+        contract_passed = ok_nfl_participation
+      ),
+      audit_step(
+        nfl_snap_counts,
+        "clean_nfl_snap_counts",
+        "clean",
+        raw_nfl_snap_counts,
+        keys = c("game_id", "pfr_player_id"),
+        contract_passed = ok_nfl_snap_counts
+      ),
+      audit_step(
+        nfl_rosters_weekly,
+        "clean_nfl_rosters_weekly",
+        "clean",
+        raw_nfl_rosters_weekly,
+        keys = c("season", "week", "team", "gsis_id"),
+        contract_passed = ok_nfl_rosters_weekly
       ),
       audit_step(
         picks_nfl,

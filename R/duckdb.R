@@ -69,11 +69,18 @@ build_player_season_stats <- function(player_stats) {
 #' @param tables A named list of data frames. Each name becomes a DuckDB table
 #'   (e.g. `conference_tiers = tiers`).
 #' @param db_path Output DuckDB file path.
+#' @param max_bytes Largest allowed file size; the default is GitHub's 2 GiB
+#'   release-asset limit, so an oversized bundle fails the build instead of
+#'   the upload.
 #'
 #' @return `db_path`, invisibly (so the target can track it with
 #'   `format = "file"`).
 #' @export
-build_duckdb <- function(tables, db_path = "data/cfb2nfl.duckdb") {
+build_duckdb <- function(
+  tables,
+  db_path = "data/cfb2nfl.duckdb",
+  max_bytes = 2 * 1024^3
+) {
   rlang::check_installed(
     c("DBI", "duckdb", "yaml"),
     reason = "to build the DuckDB data asset."
@@ -90,7 +97,8 @@ build_duckdb <- function(tables, db_path = "data/cfb2nfl.duckdb") {
     file.remove(db_path)
   }
   con <- DBI::dbConnect(duckdb::duckdb(), dbdir = db_path)
-  on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
+  open <- TRUE
+  on.exit(if (open) DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
 
   for (name in names(tables)) {
     DBI::dbWriteTable(
@@ -107,6 +115,17 @@ build_duckdb <- function(tables, db_path = "data/cfb2nfl.duckdb") {
   meta <- build_meta()
   DBI::dbWriteTable(con, "_schema_manifest", manifest)
   DBI::dbWriteTable(con, "_meta", meta)
+  DBI::dbDisconnect(con, shutdown = TRUE)
+  open <- FALSE
+
+  # GitHub release assets must be under 2 GiB; fail here, not at upload.
+  size <- file.size(db_path)
+  if (size >= max_bytes) {
+    cli::cli_abort(c(
+      "{.path {db_path}} is {round(size / 1024^3, 2)} GiB, over the {round(max_bytes / 1024^3, 2)} GiB release-asset limit.",
+      "i" = "Drop or slim a table before publishing (plans/nfl-pbp.md, release capacity)."
+    ))
+  }
 
   cli::cli_alert_success(
     "Built DuckDB {.path {db_path}} with {length(tables)} table{?s}: {.val {names(tables)}}."

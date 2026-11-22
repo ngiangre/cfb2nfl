@@ -1,0 +1,140 @@
+dataset: nfl_participation
+source: nflverse nflreadr::load_participation (seasons 2022 to the current NFL season,
+  as nflverse publishes them)
+grain: one NFL play
+key: (nflverse_game_id, play_id)
+description: 'Who was on the field for each play: offense_players and defense_players
+  are '';''-separated GSIS ids, so linemen and others with no credited play still
+  appear. Joins nfl_pbp on nflverse_game_id = game_id and play_id. 2022 uses the older
+  NGS-sourced format, so the name/position/number lists are NA there; nflverse publishes
+  a season some time after it ends. Coverage starts in 2022, so careers that began
+  earlier are truncated: use season-grain nfl_rosters for whole careers and for longevity.
+  The current season is partial until it ends.'
+columns:
+- name: nflverse_game_id
+  type: string
+  description: nflverse identifier for games. Format is season, week, away_team, home_team
+  provenance: raw
+- name: old_game_id
+  type: string
+  description: Legacy NFL game ID.
+  provenance: raw
+- name: play_id
+  type: double
+  description: Numeric play id that when used with game_id and drive provides the
+    unique identifier for a single play.
+  provenance: raw
+- name: season
+  type: int32
+  description: NFL season, from the first four characters of nflverse_game_id.
+  provenance: derived
+- name: possession_team
+  type: string
+  description: String abbreviation for the team with possession.
+  provenance: raw
+- name: offense_formation
+  type: string
+  description: Formation the offense lines up in to snap the ball.
+  provenance: raw
+- name: offense_personnel
+  type: string
+  description: The positions of the offensive personnel lined up on the field for
+    a play.
+  provenance: raw
+- name: defenders_in_box
+  type: int32
+  description: Number of defensive players lined up in the box at the snap.
+  provenance: raw
+- name: defense_personnel
+  type: string
+  description: The positions of the defensive personnel lined up on the field for
+    a play.
+  provenance: raw
+- name: number_of_pass_rushers
+  type: int32
+  description: Number of defensive player who rushed the passer.
+  provenance: raw
+- name: players_on_play
+  type: string
+  description: A list of every player on the field for the play, by gsis_id
+  provenance: raw
+- name: offense_players
+  type: string
+  description: A list of every offensive player on the field for the play, by gsis_id
+  provenance: raw
+- name: defense_players
+  type: string
+  description: A list of every defensive player on the field for the play, by gsis_id
+  provenance: raw
+- name: n_offense
+  type: int32
+  description: Number of offensive players on the field for the play
+  provenance: raw
+- name: n_defense
+  type: int32
+  description: Number of defensive players on the field for the play
+  provenance: raw
+- name: ngs_air_yards
+  type: double
+  description: Legacy column. For 2023 and prior years, reflects the distance (in
+    yards) that the ball traveled in the air on a given passing play as tracked by
+    NGS. Is NA for 2024 on--we advise instead using the air_yards column from nflreadr::load_pbp()
+    moving forward.
+  provenance: raw
+- name: time_to_throw
+  type: double
+  description: Duration (in seconds) between the time of the ball being snapped and
+    the time of release of a pass attempt
+  provenance: raw
+- name: was_pressure
+  type: logical
+  description: A boolean indicating whether or not the QB was pressured on a play
+  provenance: raw
+- name: route
+  type: string
+  description: 'A string indicating the route the primary receiver on a play took.
+    Has the following possible values: "CORNER", "DEEP OUT", "GO", "HITCH/CURL", "IN/DIG",
+    "POST", "QUICK OUT", "SCREEN", "SHALLOW CROSS/DRAG", "SLANT", "SWING", "TEXAS/ANGLE",
+    "WHEEL".'
+  provenance: raw
+- name: defense_man_zone_type
+  type: string
+  description: A string indicating whether the defense was in man or zone coverage
+    on a play
+  provenance: raw
+- name: defense_coverage_type
+  type: string
+  description: 'A string indicating what type of cover the defense was in on a play.
+    Has one of the following values: "COVER_0", "COVER_1", "COVER_2", "2_MAN", "COVER_3",
+    "COVER_4", "COVER_6", "COVER_9", "COMBO", "BLOWN".'
+  provenance: raw
+- name: offense_names
+  type: string
+  description: A string listing all of the names of offensive players in the order
+    of their gsis_ids in offense_players.
+  provenance: raw
+- name: defense_names
+  type: string
+  description: A string listing all of the names of defensive players in the order
+    of their gsis_ids in defense_players.
+  provenance: raw
+- name: offense_positions
+  type: string
+  description: A string listing all of the positions of offensive players in the order
+    of their gsis_ids in offense_players.
+  provenance: raw
+- name: defense_positions
+  type: string
+  description: A string listing all of the positions of defensive players in the order
+    of their gsis_ids in defense_players.
+  provenance: raw
+- name: offense_numbers
+  type: string
+  description: A string listing all of the numbers of offensive players in the order
+    of their gsis_ids in offense_players.
+  provenance: raw
+- name: defense_numbers
+  type: string
+  description: A string listing all of the numbers of defensive players in the order
+    of their gsis_ids in defense_players.
+  provenance: raw

@@ -1,0 +1,1625 @@
+dataset: nfl_pbp
+source: nflverse nflreadr::load_pbp (seasons 2022 to the current NFL season)
+grain: one NFL play (regular season and postseason)
+key: (game_id, play_id)
+description: 'nflverse (nflfastR) play-by-play with every column nflverse ships, including
+  EPA, WPA and success. Every *_player_id column is a GSIS id that joins outcomes.gsis_id,
+  nfl_rosters.gsis_id and nfl_rosters_weekly.gsis_id. An outcome table: never an in-career
+  model input (decision 0014). Coverage starts in 2022, so careers that began earlier
+  are truncated: use season-grain nfl_rosters for whole careers and for longevity.
+  The current season is partial until it ends.'
+columns:
+- name: play_id
+  type: double
+  description: Numeric play id that when used with game_id and drive provides the
+    unique identifier for a single play.
+  provenance: raw
+- name: game_id
+  type: string
+  description: Ten digit identifier for NFL game.
+  provenance: raw
+- name: old_game_id
+  type: string
+  description: Legacy NFL game ID.
+  provenance: raw
+- name: home_team
+  type: string
+  description: String abbreviation for the home team.
+  provenance: raw
+- name: away_team
+  type: string
+  description: String abbreviation for the away team.
+  provenance: raw
+- name: season_type
+  type: string
+  description: '''REG'' or ''POST'' indicating if the game belongs to regular or post
+    season.'
+  provenance: raw
+- name: week
+  type: int32
+  description: Season week.
+  provenance: raw
+- name: posteam
+  type: string
+  description: String abbreviation for the team with possession.
+  provenance: raw
+- name: posteam_type
+  type: string
+  description: String indicating whether the posteam team is home or away.
+  provenance: raw
+- name: defteam
+  type: string
+  description: String abbreviation for the team on defense.
+  provenance: raw
+- name: side_of_field
+  type: string
+  description: String abbreviation for which team's side of the field the team with
+    possession is currently on.
+  provenance: raw
+- name: yardline_100
+  type: double
+  description: Numeric distance in the number of yards from the opponent's endzone
+    for the posteam.
+  provenance: raw
+- name: game_date
+  type: string
+  description: Date of the game.
+  provenance: raw
+- name: quarter_seconds_remaining
+  type: double
+  description: Numeric seconds remaining in the quarter.
+  provenance: raw
+- name: half_seconds_remaining
+  type: double
+  description: Numeric seconds remaining in the half.
+  provenance: raw
+- name: game_seconds_remaining
+  type: double
+  description: Numeric seconds remaining in the game.
+  provenance: raw
+- name: game_half
+  type: string
+  description: String indicating which half the play is in, either Half1, Half2, or
+    Overtime.
+  provenance: raw
+- name: quarter_end
+  type: double
+  description: Binary indicator for whether or not the row of the data is marking
+    the end of a quarter.
+  provenance: raw
+- name: drive
+  type: double
+  description: Numeric drive number in the game.
+  provenance: raw
+- name: sp
+  type: double
+  description: Binary indicator for whether or not a score occurred on the play.
+  provenance: raw
+- name: qtr
+  type: double
+  description: Quarter of the game (5 is overtime).
+  provenance: raw
+- name: down
+  type: double
+  description: The down for the given play.
+  provenance: raw
+- name: goal_to_go
+  type: double
+  description: Binary indicator for whether or not the posteam is in a goal down situation.
+  provenance: raw
+- name: time
+  type: string
+  description: Time at start of play provided in string format as minutes:seconds
+    remaining in the quarter.
+  provenance: raw
+- name: yrdln
+  type: string
+  description: String indicating the current field position for a given play.
+  provenance: raw
+- name: ydstogo
+  type: double
+  description: Numeric yards in distance from either the first down marker or the
+    endzone in goal down situations.
+  provenance: raw
+- name: ydsnet
+  type: double
+  description: Numeric value for total yards gained on the given drive.
+  provenance: raw
+- name: desc
+  type: string
+  description: Detailed string description for the given play.
+  provenance: raw
+- name: play_type
+  type: string
+  description: 'String indicating the type of play: pass (includes sacks), run (includes
+    scrambles), punt, field_goal, kickoff, extra_point, qb_kneel, qb_spike, no_play
+    (timeouts and penalties), and missing for rows indicating end of play.'
+  provenance: raw
+- name: yards_gained
+  type: double
+  description: Numeric yards gained (or lost) by the possessing team, excluding yards
+    gained via fumble recoveries and laterals.
+  provenance: raw
+- name: shotgun
+  type: double
+  description: Binary indicator for whether or not the play was in shotgun formation.
+  provenance: raw
+- name: no_huddle
+  type: double
+  description: Binary indicator for whether or not the play was in no_huddle formation.
+  provenance: raw
+- name: qb_dropback
+  type: double
+  description: Binary indicator for whether or not the QB dropped back on the play
+    (pass attempt, sack, or scrambled).
+  provenance: raw
+- name: qb_kneel
+  type: double
+  description: Binary indicator for whether or not the QB took a knee.
+  provenance: raw
+- name: qb_spike
+  type: double
+  description: Binary indicator for whether or not the QB spiked the ball.
+  provenance: raw
+- name: qb_scramble
+  type: double
+  description: Binary indicator for whether or not the QB scrambled.
+  provenance: raw
+- name: pass_length
+  type: string
+  description: 'String indicator for pass length: short or deep.'
+  provenance: raw
+- name: pass_location
+  type: string
+  description: 'String indicator for pass location: left, middle, or right.'
+  provenance: raw
+- name: air_yards
+  type: double
+  description: Numeric value for distance in yards perpendicular to the line of scrimmage
+    at where the targeted receiver either caught or didn't catch the ball.
+  provenance: raw
+- name: yards_after_catch
+  type: double
+  description: Numeric value for distance in yards perpendicular to the yard line
+    where the receiver made the reception to where the play ended.
+  provenance: raw
+- name: run_location
+  type: string
+  description: 'String indicator for location of run: left, middle, or right.'
+  provenance: raw
+- name: run_gap
+  type: string
+  description: 'String indicator for line gap of run: end, guard, or tackle'
+  provenance: raw
+- name: field_goal_result
+  type: string
+  description: 'String indicator for result of field goal attempt: made, missed, or
+    blocked.'
+  provenance: raw
+- name: kick_distance
+  type: double
+  description: Numeric distance in yards for kickoffs, field goals, and punts.
+  provenance: raw
+- name: extra_point_result
+  type: string
+  description: 'String indicator for the result of the extra point attempt: good,
+    failed, blocked, safety (touchback in defensive endzone is 1 point apparently),
+    or aborted.'
+  provenance: raw
+- name: two_point_conv_result
+  type: string
+  description: 'String indicator for result of two point conversion attempt: success,
+    failure, safety (touchback in defensive endzone is 1 point apparently), or return.'
+  provenance: raw
+- name: home_timeouts_remaining
+  type: double
+  description: Numeric timeouts remaining in the half for the home team.
+  provenance: raw
+- name: away_timeouts_remaining
+  type: double
+  description: Numeric timeouts remaining in the half for the away team.
+  provenance: raw
+- name: timeout
+  type: double
+  description: Binary indicator for whether or not a timeout was called by either
+    team.
+  provenance: raw
+- name: timeout_team
+  type: string
+  description: String abbreviation for which team called the timeout.
+  provenance: raw
+- name: td_team
+  type: string
+  description: String abbreviation for which team scored the touchdown.
+  provenance: raw
+- name: td_player_name
+  type: string
+  description: String name of the player who scored a touchdown.
+  provenance: raw
+- name: td_player_id
+  type: string
+  description: Unique identifier of the player who scored a touchdown.
+  provenance: raw
+- name: posteam_timeouts_remaining
+  type: double
+  description: Number of timeouts remaining for the possession team.
+  provenance: raw
+- name: defteam_timeouts_remaining
+  type: double
+  description: Number of timeouts remaining for the team on defense.
+  provenance: raw
+- name: total_home_score
+  type: double
+  description: Score for the home team at the start of the play.
+  provenance: raw
+- name: total_away_score
+  type: double
+  description: Score for the away team at the start of the play.
+  provenance: raw
+- name: posteam_score
+  type: double
+  description: Score the posteam at the start of the play.
+  provenance: raw
+- name: defteam_score
+  type: double
+  description: Score the defteam at the start of the play.
+  provenance: raw
+- name: score_differential
+  type: double
+  description: Score differential between the posteam and defteam at the start of
+    the play.
+  provenance: raw
+- name: posteam_score_post
+  type: double
+  description: Score for the posteam at the end of the play.
+  provenance: raw
+- name: defteam_score_post
+  type: double
+  description: Score for the defteam at the end of the play.
+  provenance: raw
+- name: score_differential_post
+  type: double
+  description: Score differential between the posteam and defteam at the end of the
+    play.
+  provenance: raw
+- name: no_score_prob
+  type: double
+  description: Predicted probability of no score occurring for the rest of the half
+    based on the expected points model.
+  provenance: raw
+- name: opp_fg_prob
+  type: double
+  description: Predicted probability of the defteam scoring a FG next. 'Next' in this
+    context means the next score in the same game half.
+  provenance: raw
+- name: opp_safety_prob
+  type: double
+  description: Predicted probability of the defteam scoring a safety next. 'Next'
+    in this context means the next score in the same game half.
+  provenance: raw
+- name: opp_td_prob
+  type: double
+  description: Predicted probability of the defteam scoring a TD next. 'Next' in this
+    context means the next score in the same game half.
+  provenance: raw
+- name: fg_prob
+  type: double
+  description: Predicted probability of the posteam scoring a FG next. 'Next' in this
+    context means the next score in the same game half.
+  provenance: raw
+- name: safety_prob
+  type: double
+  description: Predicted probability of the posteam scoring a safety next. 'Next'
+    in this context means the next score in the same game half.
+  provenance: raw
+- name: td_prob
+  type: double
+  description: Predicted probability of the posteam scoring a TD next. 'Next' in this
+    context means the next score in the same game half.
+  provenance: raw
+- name: extra_point_prob
+  type: double
+  description: Predicted probability of the posteam scoring an extra point.
+  provenance: raw
+- name: two_point_conversion_prob
+  type: double
+  description: Predicted probability of the posteam scoring the two point conversion.
+  provenance: raw
+- name: ep
+  type: double
+  description: Using the scoring event probabilities, the estimated expected points
+    with respect to the possession team for the given play.
+  provenance: raw
+- name: epa
+  type: double
+  description: Expected points added (EPA) by the posteam for the given play.
+  provenance: raw
+- name: total_home_epa
+  type: double
+  description: Cumulative total EPA for the home team in the game so far.
+  provenance: raw
+- name: total_away_epa
+  type: double
+  description: Cumulative total EPA for the away team in the game so far.
+  provenance: raw
+- name: total_home_rush_epa
+  type: double
+  description: Cumulative total rushing EPA for the home team in the game so far.
+  provenance: raw
+- name: total_away_rush_epa
+  type: double
+  description: Cumulative total rushing EPA for the away team in the game so far.
+  provenance: raw
+- name: total_home_pass_epa
+  type: double
+  description: Cumulative total passing EPA for the home team in the game so far.
+  provenance: raw
+- name: total_away_pass_epa
+  type: double
+  description: Cumulative total passing EPA for the away team in the game so far.
+  provenance: raw
+- name: air_epa
+  type: double
+  description: EPA from the air yards alone. For completions this represents the actual
+    value provided through the air. For incompletions this represents the hypothetical
+    value that could've been added through the air if the pass was completed.
+  provenance: raw
+- name: yac_epa
+  type: double
+  description: EPA from the yards after catch alone. For completions this represents
+    the actual value provided after the catch. For incompletions this represents the
+    difference between the hypothetical air_epa and the play's raw observed EPA (how
+    much the incomplete pass cost the posteam).
+  provenance: raw
+- name: comp_air_epa
+  type: double
+  description: EPA from the air yards alone only for completions.
+  provenance: raw
+- name: comp_yac_epa
+  type: double
+  description: EPA from the yards after catch alone only for completions.
+  provenance: raw
+- name: total_home_comp_air_epa
+  type: double
+  description: Cumulative total completions air EPA for the home team in the game
+    so far.
+  provenance: raw
+- name: total_away_comp_air_epa
+  type: double
+  description: Cumulative total completions air EPA for the away team in the game
+    so far.
+  provenance: raw
+- name: total_home_comp_yac_epa
+  type: double
+  description: Cumulative total completions yac EPA for the home team in the game
+    so far.
+  provenance: raw
+- name: total_away_comp_yac_epa
+  type: double
+  description: Cumulative total completions yac EPA for the away team in the game
+    so far.
+  provenance: raw
+- name: total_home_raw_air_epa
+  type: double
+  description: Cumulative total raw air EPA for the home team in the game so far.
+  provenance: raw
+- name: total_away_raw_air_epa
+  type: double
+  description: Cumulative total raw air EPA for the away team in the game so far.
+  provenance: raw
+- name: total_home_raw_yac_epa
+  type: double
+  description: Cumulative total raw yac EPA for the home team in the game so far.
+  provenance: raw
+- name: total_away_raw_yac_epa
+  type: double
+  description: Cumulative total raw yac EPA for the away team in the game so far.
+  provenance: raw
+- name: wp
+  type: double
+  description: Estimated win probabiity for the posteam given the current situation
+    at the start of the given play.
+  provenance: raw
+- name: def_wp
+  type: double
+  description: Estimated win probability for the defteam.
+  provenance: raw
+- name: home_wp
+  type: double
+  description: Estimated win probability for the home team.
+  provenance: raw
+- name: away_wp
+  type: double
+  description: Estimated win probability for the away team.
+  provenance: raw
+- name: wpa
+  type: double
+  description: Win probability added (WPA) for the posteam.
+  provenance: raw
+- name: vegas_wpa
+  type: double
+  description: 'Win probability added (WPA) for the posteam: spread_adjusted model.'
+  provenance: raw
+- name: vegas_home_wpa
+  type: double
+  description: 'Win probability added (WPA) for the home team: spread_adjusted model.'
+  provenance: raw
+- name: home_wp_post
+  type: double
+  description: Estimated win probability for the home team at the end of the play.
+  provenance: raw
+- name: away_wp_post
+  type: double
+  description: Estimated win probability for the away team at the end of the play.
+  provenance: raw
+- name: vegas_wp
+  type: double
+  description: Estimated win probabiity for the posteam given the current situation
+    at the start of the given play, incorporating pre-game Vegas line.
+  provenance: raw
+- name: vegas_home_wp
+  type: double
+  description: Estimated win probability for the home team incorporating pre-game
+    Vegas line.
+  provenance: raw
+- name: total_home_rush_wpa
+  type: double
+  description: Cumulative total rushing WPA for the home team in the game so far.
+  provenance: raw
+- name: total_away_rush_wpa
+  type: double
+  description: Cumulative total rushing WPA for the away team in the game so far.
+  provenance: raw
+- name: total_home_pass_wpa
+  type: double
+  description: Cumulative total passing WPA for the home team in the game so far.
+  provenance: raw
+- name: total_away_pass_wpa
+  type: double
+  description: Cumulative total passing WPA for the away team in the game so far.
+  provenance: raw
+- name: air_wpa
+  type: double
+  description: WPA through the air (same logic as air_epa).
+  provenance: raw
+- name: yac_wpa
+  type: double
+  description: WPA from yards after the catch (same logic as yac_epa).
+  provenance: raw
+- name: comp_air_wpa
+  type: double
+  description: The air_wpa for completions only.
+  provenance: raw
+- name: comp_yac_wpa
+  type: double
+  description: The yac_wpa for completions only.
+  provenance: raw
+- name: total_home_comp_air_wpa
+  type: double
+  description: Cumulative total completions air WPA for the home team in the game
+    so far.
+  provenance: raw
+- name: total_away_comp_air_wpa
+  type: double
+  description: Cumulative total completions air WPA for the away team in the game
+    so far.
+  provenance: raw
+- name: total_home_comp_yac_wpa
+  type: double
+  description: Cumulative total completions yac WPA for the home team in the game
+    so far.
+  provenance: raw
+- name: total_away_comp_yac_wpa
+  type: double
+  description: Cumulative total completions yac WPA for the away team in the game
+    so far.
+  provenance: raw
+- name: total_home_raw_air_wpa
+  type: double
+  description: Cumulative total raw air WPA for the home team in the game so far.
+  provenance: raw
+- name: total_away_raw_air_wpa
+  type: double
+  description: Cumulative total raw air WPA for the away team in the game so far.
+  provenance: raw
+- name: total_home_raw_yac_wpa
+  type: double
+  description: Cumulative total raw yac WPA for the home team in the game so far.
+  provenance: raw
+- name: total_away_raw_yac_wpa
+  type: double
+  description: Cumulative total raw yac WPA for the away team in the game so far.
+  provenance: raw
+- name: punt_blocked
+  type: double
+  description: Binary indicator for if the punt was blocked.
+  provenance: raw
+- name: first_down_rush
+  type: double
+  description: Binary indicator for if a running play converted the first down.
+  provenance: raw
+- name: first_down_pass
+  type: double
+  description: Binary indicator for if a passing play converted the first down.
+  provenance: raw
+- name: first_down_penalty
+  type: double
+  description: Binary indicator for if a penalty converted the first down.
+  provenance: raw
+- name: third_down_converted
+  type: double
+  description: Binary indicator for if the first down was converted on third down.
+  provenance: raw
+- name: third_down_failed
+  type: double
+  description: Binary indicator for if the posteam failed to convert first down on
+    third down.
+  provenance: raw
+- name: fourth_down_converted
+  type: double
+  description: Binary indicator for if the first down was converted on fourth down.
+  provenance: raw
+- name: fourth_down_failed
+  type: double
+  description: Binary indicator for if the posteam failed to convert first down on
+    fourth down.
+  provenance: raw
+- name: incomplete_pass
+  type: double
+  description: Binary indicator for if the pass was incomplete.
+  provenance: raw
+- name: touchback
+  type: double
+  description: Binary indicator for if a touchback occurred on the play.
+  provenance: raw
+- name: interception
+  type: double
+  description: Binary indicator for if the pass was intercepted.
+  provenance: raw
+- name: punt_inside_twenty
+  type: double
+  description: Binary indicator for if the punt ended inside the twenty yard line.
+  provenance: raw
+- name: punt_in_endzone
+  type: double
+  description: Binary indicator for if the punt was in the endzone.
+  provenance: raw
+- name: punt_out_of_bounds
+  type: double
+  description: Binary indicator for if the punt went out of bounds.
+  provenance: raw
+- name: punt_downed
+  type: double
+  description: Binary indicator for if the punt was downed.
+  provenance: raw
+- name: punt_fair_catch
+  type: double
+  description: Binary indicator for if the punt was caught with a fair catch.
+  provenance: raw
+- name: kickoff_inside_twenty
+  type: double
+  description: Binary indicator for if the kickoff ended inside the twenty yard line.
+  provenance: raw
+- name: kickoff_in_endzone
+  type: double
+  description: Binary indicator for if the kickoff was in the endzone.
+  provenance: raw
+- name: kickoff_out_of_bounds
+  type: double
+  description: Binary indicator for if the kickoff went out of bounds.
+  provenance: raw
+- name: kickoff_downed
+  type: double
+  description: Binary indicator for if the kickoff was downed.
+  provenance: raw
+- name: kickoff_fair_catch
+  type: double
+  description: Binary indicator for if the kickoff was caught with a fair catch.
+  provenance: raw
+- name: fumble_forced
+  type: double
+  description: Binary indicator for if the fumble was forced.
+  provenance: raw
+- name: fumble_not_forced
+  type: double
+  description: Binary indicator for if the fumble was not forced.
+  provenance: raw
+- name: fumble_out_of_bounds
+  type: double
+  description: Binary indicator for if the fumble went out of bounds.
+  provenance: raw
+- name: solo_tackle
+  type: double
+  description: Binary indicator if the play had a solo tackle (could be multiple due
+    to fumbles).
+  provenance: raw
+- name: safety
+  type: double
+  description: Binary indicator for whether or not a safety occurred.
+  provenance: raw
+- name: penalty
+  type: double
+  description: Binary indicator for whether or not a penalty occurred.
+  provenance: raw
+- name: tackled_for_loss
+  type: double
+  description: Binary indicator for whether or not a tackle for loss on a run play
+    occurred.
+  provenance: raw
+- name: fumble_lost
+  type: double
+  description: Binary indicator for if the fumble was lost.
+  provenance: raw
+- name: own_kickoff_recovery
+  type: double
+  description: Binary indicator for if the kicking team recovered the kickoff.
+  provenance: raw
+- name: own_kickoff_recovery_td
+  type: double
+  description: Binary indicator for if the kicking team recovered the kickoff and
+    scored a TD.
+  provenance: raw
+- name: qb_hit
+  type: double
+  description: Binary indicator if the QB was hit on the play.
+  provenance: raw
+- name: rush_attempt
+  type: double
+  description: Binary indicator for if the play was a run.
+  provenance: raw
+- name: pass_attempt
+  type: double
+  description: Binary indicator for if the play was a pass attempt (includes sacks).
+  provenance: raw
+- name: sack
+  type: double
+  description: Binary indicator for if the play ended in a sack.
+  provenance: raw
+- name: touchdown
+  type: double
+  description: Binary indicator for if the play resulted in a TD.
+  provenance: raw
+- name: pass_touchdown
+  type: double
+  description: Binary indicator for if the play resulted in a passing TD.
+  provenance: raw
+- name: rush_touchdown
+  type: double
+  description: Binary indicator for if the play resulted in a rushing TD.
+  provenance: raw
+- name: return_touchdown
+  type: double
+  description: 'Binary indicator for if the play resulted in a return TD. Returns
+    may occur on any of: interception, fumble, kickoff, punt, or blocked kicks.'
+  provenance: raw
+- name: extra_point_attempt
+  type: double
+  description: Binary indicator for extra point attempt.
+  provenance: raw
+- name: two_point_attempt
+  type: double
+  description: Binary indicator for two point conversion attempt.
+  provenance: raw
+- name: field_goal_attempt
+  type: double
+  description: Binary indicator for field goal attempt.
+  provenance: raw
+- name: kickoff_attempt
+  type: double
+  description: Binary indicator for kickoff.
+  provenance: raw
+- name: punt_attempt
+  type: double
+  description: Binary indicator for punts.
+  provenance: raw
+- name: fumble
+  type: double
+  description: Binary indicator for if a fumble occurred.
+  provenance: raw
+- name: complete_pass
+  type: double
+  description: Binary indicator for if the pass was completed.
+  provenance: raw
+- name: assist_tackle
+  type: double
+  description: Binary indicator for if an assist tackle occurred.
+  provenance: raw
+- name: lateral_reception
+  type: double
+  description: Binary indicator for if a lateral occurred on the reception.
+  provenance: raw
+- name: lateral_rush
+  type: double
+  description: Binary indicator for if a lateral occurred on a run.
+  provenance: raw
+- name: lateral_return
+  type: double
+  description: 'Binary indicator for if a lateral occurred on a return. Returns may
+    occur on any of: interception, fumble, kickoff, punt, or blocked kicks.'
+  provenance: raw
+- name: lateral_recovery
+  type: double
+  description: Binary indicator for if a lateral occurred on a fumble recovery.
+  provenance: raw
+- name: passer_player_id
+  type: string
+  description: Unique identifier for the player that attempted the pass.
+  provenance: raw
+- name: passer_player_name
+  type: string
+  description: String name for the player that attempted the pass.
+  provenance: raw
+- name: passing_yards
+  type: double
+  description: Numeric yards by the passer_player_name, including yards gained in
+    pass plays with laterals. This should equal official passing statistics.
+  provenance: raw
+- name: receiver_player_id
+  type: string
+  description: Unique identifier for the receiver that was targeted on the pass.
+  provenance: raw
+- name: receiver_player_name
+  type: string
+  description: String name for the targeted receiver.
+  provenance: raw
+- name: receiving_yards
+  type: double
+  description: Numeric yards by the receiver_player_name, excluding yards gained in
+    pass plays with laterals. This should equal official receiving statistics but
+    could miss yards gained in pass plays with laterals. Please see the description
+    of `lateral_receiver_player_name` for further information.
+  provenance: raw
+- name: rusher_player_id
+  type: string
+  description: Unique identifier for the player that attempted the run.
+  provenance: raw
+- name: rusher_player_name
+  type: string
+  description: String name for the player that attempted the run.
+  provenance: raw
+- name: rushing_yards
+  type: double
+  description: Numeric yards by the rusher_player_name, excluding yards gained in
+    rush plays with laterals. This should equal official rushing statistics but could
+    miss yards gained in rush plays with laterals. Please see the description of `lateral_rusher_player_name`
+    for further information.
+  provenance: raw
+- name: lateral_receiver_player_id
+  type: string
+  description: Unique identifier for the player that received the last(!) lateral
+    on a pass play.
+  provenance: raw
+- name: lateral_receiver_player_name
+  type: string
+  description: String name for the player that received the last(!) lateral on a pass
+    play. If there were multiple laterals in the same play, this will only be the
+    last player who received a lateral. Please see <https://github.com/mrcaseb/nfl-data/tree/master/data/lateral_yards>
+    for a list of plays where multiple players recorded lateral receiving yards.
+  provenance: raw
+- name: lateral_receiving_yards
+  type: double
+  description: Numeric yards by the `lateral_receiver_player_name` in pass plays with
+    laterals. Please see the description of `lateral_receiver_player_name` for further
+    information.
+  provenance: raw
+- name: lateral_rusher_player_id
+  type: string
+  description: Unique identifier for the player that received the last(!) lateral
+    on a run play.
+  provenance: raw
+- name: lateral_rusher_player_name
+  type: string
+  description: String name for the player that received the last(!) lateral on a run
+    play. If there were multiple laterals in the same play, this will only be the
+    last player who received a lateral. Please see <https://github.com/mrcaseb/nfl-data/tree/master/data/lateral_yards>
+    for a list of plays where multiple players recorded lateral rushing yards.
+  provenance: raw
+- name: lateral_rushing_yards
+  type: double
+  description: Numeric yards by the `lateral_rusher_player_name` in run plays with
+    laterals. Please see the description of `lateral_rusher_player_name` for further
+    information.
+  provenance: raw
+- name: lateral_sack_player_id
+  type: string
+  description: Unique identifier for the player that received the lateral on a sack.
+  provenance: raw
+- name: lateral_sack_player_name
+  type: string
+  description: String name for the player that received the lateral on a sack.
+  provenance: raw
+- name: interception_player_id
+  type: string
+  description: Unique identifier for the player that intercepted the pass.
+  provenance: raw
+- name: interception_player_name
+  type: string
+  description: String name for the player that intercepted the pass.
+  provenance: raw
+- name: lateral_interception_player_id
+  type: string
+  description: Unique indentifier for the player that received the lateral on an interception.
+  provenance: raw
+- name: lateral_interception_player_name
+  type: string
+  description: String name for the player that received the lateral on an interception.
+  provenance: raw
+- name: punt_returner_player_id
+  type: string
+  description: Unique identifier for the punt returner.
+  provenance: raw
+- name: punt_returner_player_name
+  type: string
+  description: String name for the punt returner.
+  provenance: raw
+- name: lateral_punt_returner_player_id
+  type: string
+  description: Unique identifier for the player that received the lateral on a punt
+    return.
+  provenance: raw
+- name: lateral_punt_returner_player_name
+  type: string
+  description: String name for the player that received the lateral on a punt return.
+  provenance: raw
+- name: kickoff_returner_player_name
+  type: string
+  description: String name for the kickoff returner.
+  provenance: raw
+- name: kickoff_returner_player_id
+  type: string
+  description: Unique identifier for the kickoff returner.
+  provenance: raw
+- name: lateral_kickoff_returner_player_id
+  type: string
+  description: Unique identifier for the player that received the lateral on a kickoff
+    return.
+  provenance: raw
+- name: lateral_kickoff_returner_player_name
+  type: string
+  description: String name for the player that received the lateral on a kickoff return.
+  provenance: raw
+- name: punter_player_id
+  type: string
+  description: Unique identifier for the punter.
+  provenance: raw
+- name: punter_player_name
+  type: string
+  description: String name for the punter.
+  provenance: raw
+- name: kicker_player_name
+  type: string
+  description: String name for the kicker on FG or kickoff.
+  provenance: raw
+- name: kicker_player_id
+  type: string
+  description: Unique identifier for the kicker on FG or kickoff.
+  provenance: raw
+- name: own_kickoff_recovery_player_id
+  type: string
+  description: Unique identifier for the player that recovered their own kickoff.
+  provenance: raw
+- name: own_kickoff_recovery_player_name
+  type: string
+  description: String name for the player that recovered their own kickoff.
+  provenance: raw
+- name: blocked_player_id
+  type: string
+  description: Unique identifier for the player that blocked the punt or FG.
+  provenance: raw
+- name: blocked_player_name
+  type: string
+  description: String name for the player that blocked the punt or FG.
+  provenance: raw
+- name: tackle_for_loss_1_player_id
+  type: string
+  description: Unique identifier for one of the potential players with the tackle
+    for loss.
+  provenance: raw
+- name: tackle_for_loss_1_player_name
+  type: string
+  description: String name for one of the potential players with the tackle for loss.
+  provenance: raw
+- name: tackle_for_loss_2_player_id
+  type: string
+  description: Unique identifier for one of the potential players with the tackle
+    for loss.
+  provenance: raw
+- name: tackle_for_loss_2_player_name
+  type: string
+  description: String name for one of the potential players with the tackle for loss.
+  provenance: raw
+- name: qb_hit_1_player_id
+  type: string
+  description: Unique identifier for one of the potential players that hit the QB.
+    No sack as the QB was not the ball carrier. For sacks please see `sack_player`
+    or `half_sack_*_player`.
+  provenance: raw
+- name: qb_hit_1_player_name
+  type: string
+  description: String name for one of the potential players that hit the QB. No sack
+    as the QB was not the ball carrier. For sacks please see `sack_player` or `half_sack_*_player`.
+  provenance: raw
+- name: qb_hit_2_player_id
+  type: string
+  description: Unique identifier for one of the potential players that hit the QB.
+    No sack as the QB was not the ball carrier. For sacks please see `sack_player`
+    or `half_sack_*_player`.
+  provenance: raw
+- name: qb_hit_2_player_name
+  type: string
+  description: String name for one of the potential players that hit the QB. No sack
+    as the QB was not the ball carrier. For sacks please see `sack_player` or `half_sack_*_player`.
+  provenance: raw
+- name: forced_fumble_player_1_team
+  type: string
+  description: Team of one of the players with a forced fumble.
+  provenance: raw
+- name: forced_fumble_player_1_player_id
+  type: string
+  description: Unique identifier of one of the players with a forced fumble.
+  provenance: raw
+- name: forced_fumble_player_1_player_name
+  type: string
+  description: String name of one of the players with a forced fumble.
+  provenance: raw
+- name: forced_fumble_player_2_team
+  type: string
+  description: Team of one of the players with a forced fumble.
+  provenance: raw
+- name: forced_fumble_player_2_player_id
+  type: string
+  description: Unique identifier of one of the players with a forced fumble.
+  provenance: raw
+- name: forced_fumble_player_2_player_name
+  type: string
+  description: String name of one of the players with a forced fumble.
+  provenance: raw
+- name: solo_tackle_1_team
+  type: string
+  description: Team of one of the players with a solo tackle.
+  provenance: raw
+- name: solo_tackle_2_team
+  type: string
+  description: Team of one of the players with a solo tackle.
+  provenance: raw
+- name: solo_tackle_1_player_id
+  type: string
+  description: Unique identifier of one of the players with a solo tackle.
+  provenance: raw
+- name: solo_tackle_2_player_id
+  type: string
+  description: Unique identifier of one of the players with a solo tackle.
+  provenance: raw
+- name: solo_tackle_1_player_name
+  type: string
+  description: String name of one of the players with a solo tackle.
+  provenance: raw
+- name: solo_tackle_2_player_name
+  type: string
+  description: String name of one of the players with a solo tackle.
+  provenance: raw
+- name: assist_tackle_1_player_id
+  type: string
+  description: Unique identifier of one of the players with a tackle assist.
+  provenance: raw
+- name: assist_tackle_1_player_name
+  type: string
+  description: String name of one of the players with a tackle assist.
+  provenance: raw
+- name: assist_tackle_1_team
+  type: string
+  description: Team of one of the players with a tackle assist.
+  provenance: raw
+- name: assist_tackle_2_player_id
+  type: string
+  description: Unique identifier of one of the players with a tackle assist.
+  provenance: raw
+- name: assist_tackle_2_player_name
+  type: string
+  description: String name of one of the players with a tackle assist.
+  provenance: raw
+- name: assist_tackle_2_team
+  type: string
+  description: Team of one of the players with a tackle assist.
+  provenance: raw
+- name: assist_tackle_3_player_id
+  type: string
+  description: Unique identifier of one of the players with a tackle assist.
+  provenance: raw
+- name: assist_tackle_3_player_name
+  type: string
+  description: String name of one of the players with a tackle assist.
+  provenance: raw
+- name: assist_tackle_3_team
+  type: string
+  description: Team of one of the players with a tackle assist.
+  provenance: raw
+- name: assist_tackle_4_player_id
+  type: string
+  description: Unique identifier of one of the players with a tackle assist.
+  provenance: raw
+- name: assist_tackle_4_player_name
+  type: string
+  description: String name of one of the players with a tackle assist.
+  provenance: raw
+- name: assist_tackle_4_team
+  type: string
+  description: Team of one of the players with a tackle assist.
+  provenance: raw
+- name: tackle_with_assist
+  type: double
+  description: Binary indicator for if there has been a tackle with assist.
+  provenance: raw
+- name: tackle_with_assist_1_player_id
+  type: string
+  description: Unique identifier of one of the players with a tackle with assist.
+  provenance: raw
+- name: tackle_with_assist_1_player_name
+  type: string
+  description: String name of one of the players with a tackle with assist.
+  provenance: raw
+- name: tackle_with_assist_1_team
+  type: string
+  description: Team of one of the players with a tackle with assist.
+  provenance: raw
+- name: tackle_with_assist_2_player_id
+  type: string
+  description: Unique identifier of one of the players with a tackle with assist.
+  provenance: raw
+- name: tackle_with_assist_2_player_name
+  type: string
+  description: String name of one of the players with a tackle with assist.
+  provenance: raw
+- name: tackle_with_assist_2_team
+  type: string
+  description: Team of one of the players with a tackle with assist.
+  provenance: raw
+- name: pass_defense_1_player_id
+  type: string
+  description: Unique identifier of one of the players with a pass defense.
+  provenance: raw
+- name: pass_defense_1_player_name
+  type: string
+  description: String name of one of the players with a pass defense.
+  provenance: raw
+- name: pass_defense_2_player_id
+  type: string
+  description: Unique identifier of one of the players with a pass defense.
+  provenance: raw
+- name: pass_defense_2_player_name
+  type: string
+  description: String name of one of the players with a pass defense.
+  provenance: raw
+- name: fumbled_1_team
+  type: string
+  description: Team of one of the first player with a fumble.
+  provenance: raw
+- name: fumbled_1_player_id
+  type: string
+  description: Unique identifier of the first player who fumbled on the play.
+  provenance: raw
+- name: fumbled_1_player_name
+  type: string
+  description: String name of one of the first player who fumbled on the play.
+  provenance: raw
+- name: fumbled_2_player_id
+  type: string
+  description: Unique identifier of the second player who fumbled on the play.
+  provenance: raw
+- name: fumbled_2_player_name
+  type: string
+  description: String name of one of the second player who fumbled on the play.
+  provenance: raw
+- name: fumbled_2_team
+  type: string
+  description: Team of one of the second player with a fumble.
+  provenance: raw
+- name: fumble_recovery_1_team
+  type: string
+  description: Team of one of the players with a fumble recovery.
+  provenance: raw
+- name: fumble_recovery_1_yards
+  type: double
+  description: Yards gained by one of the players with a fumble recovery.
+  provenance: raw
+- name: fumble_recovery_1_player_id
+  type: string
+  description: Unique identifier of one of the players with a fumble recovery.
+  provenance: raw
+- name: fumble_recovery_1_player_name
+  type: string
+  description: String name of one of the players with a fumble recovery.
+  provenance: raw
+- name: fumble_recovery_2_team
+  type: string
+  description: Team of one of the players with a fumble recovery.
+  provenance: raw
+- name: fumble_recovery_2_yards
+  type: double
+  description: Yards gained by one of the players with a fumble recovery.
+  provenance: raw
+- name: fumble_recovery_2_player_id
+  type: string
+  description: Unique identifier of one of the players with a fumble recovery.
+  provenance: raw
+- name: fumble_recovery_2_player_name
+  type: string
+  description: String name of one of the players with a fumble recovery.
+  provenance: raw
+- name: sack_player_id
+  type: string
+  description: Unique identifier of the player who recorded a solo sack.
+  provenance: raw
+- name: sack_player_name
+  type: string
+  description: String name of the player who recorded a solo sack.
+  provenance: raw
+- name: half_sack_1_player_id
+  type: string
+  description: Unique identifier of the first player who recorded half a sack.
+  provenance: raw
+- name: half_sack_1_player_name
+  type: string
+  description: String name of the first player who recorded half a sack.
+  provenance: raw
+- name: half_sack_2_player_id
+  type: string
+  description: Unique identifier of the second player who recorded half a sack.
+  provenance: raw
+- name: half_sack_2_player_name
+  type: string
+  description: String name of the second player who recorded half a sack.
+  provenance: raw
+- name: return_team
+  type: string
+  description: 'String abbreviation of the return team. Returns may occur on any of:
+    interception, fumble, kickoff, punt, or blocked kicks.'
+  provenance: raw
+- name: return_yards
+  type: double
+  description: 'Yards gained by the return team. Returns may occur on any of: interception,
+    fumble, kickoff, punt, or blocked kicks.'
+  provenance: raw
+- name: penalty_team
+  type: string
+  description: String abbreviation of the team with the penalty.
+  provenance: raw
+- name: penalty_player_id
+  type: string
+  description: Unique identifier for the player with the penalty.
+  provenance: raw
+- name: penalty_player_name
+  type: string
+  description: String name for the player with the penalty.
+  provenance: raw
+- name: penalty_yards
+  type: double
+  description: Yards gained (or lost) by the posteam from the penalty.
+  provenance: raw
+- name: replay_or_challenge
+  type: double
+  description: Binary indicator for whether or not a replay or challenge.
+  provenance: raw
+- name: replay_or_challenge_result
+  type: string
+  description: String indicating the result of the replay or challenge.
+  provenance: raw
+- name: penalty_type
+  type: string
+  description: String indicating the penalty type of the first penalty in the given
+    play. Will be `NA` if `desc` is missing the type.
+  provenance: raw
+- name: defensive_two_point_attempt
+  type: double
+  description: Binary indicator whether or not the defense was able to have an attempt
+    on a two point conversion, this results following a turnover.
+  provenance: raw
+- name: defensive_two_point_conv
+  type: double
+  description: Binary indicator whether or not the defense successfully scored on
+    the two point conversion.
+  provenance: raw
+- name: defensive_extra_point_attempt
+  type: double
+  description: Binary indicator whether or not the defense was able to have an attempt
+    on an extra point attempt, this results following a blocked attempt that the defense
+    recovers the ball.
+  provenance: raw
+- name: defensive_extra_point_conv
+  type: double
+  description: Binary indicator whether or not the defense successfully scored on
+    an extra point attempt.
+  provenance: raw
+- name: safety_player_name
+  type: string
+  description: String name for the player who scored a safety.
+  provenance: raw
+- name: safety_player_id
+  type: string
+  description: Unique identifier for the player who scored a safety.
+  provenance: raw
+- name: season
+  type: int32
+  description: 4 digit number indicating to which season the game belongs to.
+  provenance: raw
+- name: cp
+  type: double
+  description: Numeric value indicating the probability for a complete pass based
+    on comparable game situations.
+  provenance: raw
+- name: cpoe
+  type: double
+  description: For a single pass play this is 1 - cp when the pass was completed or
+    0 - cp when the pass was incomplete. Analyzed for a whole game or season an indicator
+    for the passer how much over or under expectation his completion percentage was.
+  provenance: raw
+- name: series
+  type: double
+  description: 'Starts at 1, each new first down increments, numbers shared across
+    both teams NA: kickoffs, extra point/two point conversion attempts, non-plays,
+    no posteam'
+  provenance: raw
+- name: series_success
+  type: double
+  description: '1: scored touchdown, gained enough yards for first down.'
+  provenance: raw
+- name: series_result
+  type: string
+  description: 'Possible values: First down, Touchdown, Opp touchdown, Field goal,
+    Missed field goal, Safety, Turnover, Punt, Turnover on downs, QB kneel, End of
+    half'
+  provenance: raw
+- name: order_sequence
+  type: double
+  description: Column provided by NFL to fix out-of-order plays. Available 2011 and
+    beyond with source "nfl".
+  provenance: raw
+- name: start_time
+  type: string
+  description: Kickoff time in eastern time zone.
+  provenance: raw
+- name: time_of_day
+  type: string
+  description: Time of day of play in UTC "HH:MM:SS" format. Available 2011 and beyond
+    with source "nfl".
+  provenance: raw
+- name: stadium
+  type: string
+  description: Game site name.
+  provenance: raw
+- name: weather
+  type: string
+  description: String describing the weather including temperature, humidity and wind
+    (direction and speed). Doesn't change during the game!
+  provenance: raw
+- name: nfl_api_id
+  type: string
+  description: UUID of the game in the new NFL API.
+  provenance: raw
+- name: play_clock
+  type: string
+  description: Time on the playclock when the ball was snapped.
+  provenance: raw
+- name: play_deleted
+  type: double
+  description: Binary indicator for deleted plays.
+  provenance: raw
+- name: play_type_nfl
+  type: string
+  description: Play type as listed in the NFL source. Slightly different to the regular
+    play_type variable.
+  provenance: raw
+- name: special_teams_play
+  type: double
+  description: Binary indicator for whether play is special teams play from NFL source.
+    Available 2011 and beyond with source "nfl".
+  provenance: raw
+- name: st_play_type
+  type: string
+  description: Type of special teams play from NFL source. Available 2011 and beyond
+    with source "nfl".
+  provenance: raw
+- name: end_clock_time
+  type: string
+  description: Game time at the end of a given play.
+  provenance: raw
+- name: end_yard_line
+  type: string
+  description: String indicating the yardline at the end of the given play consisting
+    of team half and yard line number.
+  provenance: raw
+- name: fixed_drive
+  type: double
+  description: Manually created drive number in a game.
+  provenance: raw
+- name: fixed_drive_result
+  type: string
+  description: Manually created drive result.
+  provenance: raw
+- name: drive_real_start_time
+  type: string
+  description: Local day time when the drive started (currently not used by the NFL
+    and therefore mostly 'NA').
+  provenance: raw
+- name: drive_play_count
+  type: double
+  description: Numeric value of how many regular plays happened in a given drive.
+  provenance: raw
+- name: drive_time_of_possession
+  type: string
+  description: Time of possession in a given drive.
+  provenance: raw
+- name: drive_first_downs
+  type: double
+  description: Number of first downs in a given drive.
+  provenance: raw
+- name: drive_inside20
+  type: double
+  description: Binary indicator if the offense was able to get inside the opponents
+    20 yard line.
+  provenance: raw
+- name: drive_ended_with_score
+  type: double
+  description: Binary indicator the drive ended with a score.
+  provenance: raw
+- name: drive_quarter_start
+  type: double
+  description: Numeric value indicating in which quarter the given drive has started.
+  provenance: raw
+- name: drive_quarter_end
+  type: double
+  description: Numeric value indicating in which quarter the given drive has ended.
+  provenance: raw
+- name: drive_yards_penalized
+  type: double
+  description: Numeric value of how many yards the offense gained or lost through
+    penalties in the given drive.
+  provenance: raw
+- name: drive_start_transition
+  type: string
+  description: String indicating how the offense got the ball.
+  provenance: raw
+- name: drive_end_transition
+  type: string
+  description: String indicating how the offense lost the ball.
+  provenance: raw
+- name: drive_game_clock_start
+  type: string
+  description: Game time at the beginning of a given drive.
+  provenance: raw
+- name: drive_game_clock_end
+  type: string
+  description: Game time at the end of a given drive.
+  provenance: raw
+- name: drive_start_yard_line
+  type: string
+  description: String indicating where a given drive started consisting of team half
+    and yard line number.
+  provenance: raw
+- name: drive_end_yard_line
+  type: string
+  description: String indicating where a given drive ended consisting of team half
+    and yard line number.
+  provenance: raw
+- name: drive_play_id_started
+  type: double
+  description: Play_id of the first play in the given drive.
+  provenance: raw
+- name: drive_play_id_ended
+  type: double
+  description: Play_id of the last play in the given drive.
+  provenance: raw
+- name: away_score
+  type: int32
+  description: Total points scored by the away team.
+  provenance: raw
+- name: home_score
+  type: int32
+  description: Total points scored by the home team.
+  provenance: raw
+- name: location
+  type: string
+  description: Either 'Home' o 'Neutral' indicating if the home team played at home
+    or at a neutral site.
+  provenance: raw
+- name: result
+  type: int32
+  description: Equals home_score - away_score and means the game outcome from the
+    perspective of the home team.
+  provenance: raw
+- name: total
+  type: int32
+  description: Equals home_score + away_score and means the total points scored in
+    the given game.
+  provenance: raw
+- name: spread_line
+  type: double
+  description: 'The closing spread line for the game. A positive number means the
+    home team was favored by that many points, a negative number means the away team
+    was favored by that many points. (Source: Pro-Football-Reference)'
+  provenance: raw
+- name: total_line
+  type: double
+  description: 'The closing total line for the game. (Source: Pro-Football-Reference)'
+  provenance: raw
+- name: div_game
+  type: int32
+  description: Binary indicator for if the given game was a division game.
+  provenance: raw
+- name: roof
+  type: string
+  description: 'One of ''dome'', ''outdoors'', ''closed'', ''open'' indicating indicating
+    the roof status of the stadium the game was played in. (Source: Pro-Football-Reference)'
+  provenance: raw
+- name: surface
+  type: string
+  description: 'What type of ground the game was played on. (Source: Pro-Football-Reference)'
+  provenance: raw
+- name: temp
+  type: int32
+  description: 'The temperature at the stadium only for ''roof'' = ''outdoors'' or
+    ''open''.(Source: Pro-Football-Reference)'
+  provenance: raw
+- name: wind
+  type: int32
+  description: 'The speed of the wind in miles/hour only for ''roof'' = ''outdoors''
+    or ''open''. (Source: Pro-Football-Reference)'
+  provenance: raw
+- name: home_coach
+  type: string
+  description: 'First and last name of the home team coach. (Source: Pro-Football-Reference)'
+  provenance: raw
+- name: away_coach
+  type: string
+  description: 'First and last name of the away team coach. (Source: Pro-Football-Reference)'
+  provenance: raw
+- name: stadium_id
+  type: string
+  description: 'ID of the stadium the game was played in. (Source: Pro-Football-Reference)'
+  provenance: raw
+- name: game_stadium
+  type: string
+  description: 'Name of the stadium the game was played in. (Source: Pro-Football-Reference)'
+  provenance: raw
+- name: aborted_play
+  type: double
+  description: Binary indicator if the play description indicates "Aborted".
+  provenance: raw
+- name: success
+  type: double
+  description: Binary indicator wheter epa > 0 in the given play.
+  provenance: raw
+- name: passer
+  type: string
+  description: Name of the dropback player (scrambles included) including plays with
+    penalties.
+  provenance: raw
+- name: passer_jersey_number
+  type: int32
+  description: Jersey number of the passer.
+  provenance: raw
+- name: rusher
+  type: string
+  description: Name of the rusher (no scrambles) including plays with penalties.
+  provenance: raw
+- name: rusher_jersey_number
+  type: int32
+  description: Jersey number of the rusher.
+  provenance: raw
+- name: receiver
+  type: string
+  description: Name of the receiver including plays with penalties.
+  provenance: raw
+- name: receiver_jersey_number
+  type: int32
+  description: Jersey number of the receiver.
+  provenance: raw
+- name: pass
+  type: double
+  description: Binary indicator if the play was a pass play (sacks and scrambles included).
+  provenance: raw
+- name: rush
+  type: double
+  description: Binary indicator if the play was a rushing play.
+  provenance: raw
+- name: first_down
+  type: double
+  description: Binary indicator if the play ended in a first down.
+  provenance: raw
+- name: special
+  type: double
+  description: Binary indicator if "play_type" is one of "extra_point", "field_goal",
+    "kickoff", or "punt".
+  provenance: raw
+- name: play
+  type: double
+  description: 'Binary indicator: 1 if the play was a ''normal'' play (including penalties),
+    0 otherwise.'
+  provenance: raw
+- name: passer_id
+  type: string
+  description: ID of the player in the 'passer' column.
+  provenance: raw
+- name: rusher_id
+  type: string
+  description: ID of the player in the 'rusher' column.
+  provenance: raw
+- name: receiver_id
+  type: string
+  description: ID of the player in the 'receiver' column.
+  provenance: raw
+- name: name
+  type: string
+  description: Name of the 'passer' if it is not 'NA', or name of the 'rusher' otherwise.
+  provenance: raw
+- name: jersey_number
+  type: int32
+  description: Jersey number of the player listed in the 'name' column.
+  provenance: raw
+- name: id
+  type: string
+  description: ID of the player in the 'name' column.
+  provenance: raw
+- name: fantasy_player_name
+  type: string
+  description: Name of the rusher on rush plays or receiver on pass plays (from official
+    stats).
+  provenance: raw
+- name: fantasy_player_id
+  type: string
+  description: ID of the rusher on rush plays or receiver on pass plays (from official
+    stats).
+  provenance: raw
+- name: fantasy
+  type: string
+  description: Name of the rusher on rush plays or receiver on pass plays.
+  provenance: raw
+- name: fantasy_id
+  type: string
+  description: ID of the rusher on rush plays or receiver on pass plays.
+  provenance: raw
+- name: out_of_bounds
+  type: double
+  description: 1 if play description contains ran ob, pushed ob, or sacked ob; 0 otherwise.
+  provenance: raw
+- name: home_opening_kickoff
+  type: double
+  description: 1 if the home team received the opening kickoff, 0 otherwise.
+  provenance: raw
+- name: qb_epa
+  type: double
+  description: Gives QB credit for EPA for up to the point where a receiver lost a
+    fumble after a completed catch and makes EPA work more like passing yards on plays
+    with fumbles.
+  provenance: raw
+- name: xyac_epa
+  type: double
+  description: Expected value of EPA gained after the catch, starting from where the
+    catch was made. Zero yards after the catch would be listed as zero EPA.
+  provenance: raw
+- name: xyac_mean_yardage
+  type: double
+  description: Average expected yards after the catch based on where the ball was
+    caught.
+  provenance: raw
+- name: xyac_median_yardage
+  type: double
+  description: Median expected yards after the catch based on where the ball was caught.
+  provenance: raw
+- name: xyac_success
+  type: double
+  description: Probability play earns positive EPA (relative to where play started)
+    based on where ball was caught.
+  provenance: raw
+- name: xyac_fd
+  type: double
+  description: Probability play earns a first down based on where the ball was caught.
+  provenance: raw
+- name: xpass
+  type: double
+  description: Probability of dropback scaled from 0 to 1.
+  provenance: raw
+- name: pass_oe
+  type: double
+  description: Dropback percent over expected on a given play scaled from 0 to 100.
+  provenance: raw

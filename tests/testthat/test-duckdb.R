@@ -164,3 +164,13 @@ test_that("slim_audit_log drops the nested NA profile and keeps the scalars", {
   expect_false("na_by_col" %in% names(slim))
   expect_equal(nrow(slim), 1L)
 })
+
+test_that("build_duckdb fails a bundle over the release-asset limit", {
+  skip_if_not_installed("duckdb")
+  db <- tempfile(fileext = ".duckdb")
+  on.exit(unlink(db), add = TRUE)
+  expect_error(
+    build_duckdb(list(t = data.frame(x = 1:10)), db, max_bytes = 1),
+    "release-asset limit"
+  )
+})

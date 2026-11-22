@@ -1,0 +1,75 @@
+dataset: nfl_snap_counts
+source: nflverse nflreadr::load_snap_counts (seasons 2022 to the current NFL season)
+grain: one player-game (regular season and postseason)
+key: (game_id, pfr_player_id)
+description: 'Offense, defense and special-teams snaps and shares for every player
+  who played, every position included (Pro-Football-Reference). Keyed by pfr_player_id,
+  not GSIS: map to gsis_id through the nflverse player crosswalk (nflreadr::load_players,
+  the pipeline''s nfl_players target). game_id joins nfl_pbp.game_id. Coverage starts
+  in 2022, so careers that began earlier are truncated: use season-grain nfl_rosters
+  for whole careers and for longevity. The current season is partial until it ends.'
+columns:
+- name: game_id
+  type: string
+  description: nflfastR game ID
+  provenance: raw
+- name: pfr_game_id
+  type: string
+  description: PFR game ID
+  provenance: raw
+- name: season
+  type: int32
+  description: Season of game
+  provenance: raw
+- name: game_type
+  type: string
+  description: Type of game (regular or postseason)
+  provenance: raw
+- name: week
+  type: int32
+  description: Week of game in NFL season
+  provenance: raw
+- name: player
+  type: string
+  description: Player name
+  provenance: raw
+- name: pfr_player_id
+  type: string
+  description: Player PFR ID
+  provenance: raw
+- name: position
+  type: string
+  description: Position of player
+  provenance: raw
+- name: team
+  type: string
+  description: Team of player
+  provenance: raw
+- name: opponent
+  type: string
+  description: Opposing team of player
+  provenance: raw
+- name: offense_snaps
+  type: double
+  description: Number of snaps on offense
+  provenance: raw
+- name: offense_pct
+  type: double
+  description: Percent of offensive snaps taken
+  provenance: raw
+- name: defense_snaps
+  type: double
+  description: Number of snaps on defense
+  provenance: raw
+- name: defense_pct
+  type: double
+  description: Percent of defensive snaps taken
+  provenance: raw
+- name: st_snaps
+  type: double
+  description: Number of snaps on special teams
+  provenance: raw
+- name: st_pct
+  type: double
+  description: Percent of special teams snaps taken
+  provenance: raw
