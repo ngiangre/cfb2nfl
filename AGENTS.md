@@ -162,6 +162,18 @@ all of it. Years 2010–2026.
   pipeline, fail fast — enforced by the `contract_gate` target (decision 0023):
   any `ok_* = FALSE` aborts `tar_make()`. Add/update a contract with any
   data-touching code.
+- **Goals → features → tasks** (decision 0048): `product/personas.md` (who
+  the site serves: P1 invested fan, primary; P2 coder & researcher),
+  `product/goals.md` (priority G1 questions, G3 fan self-serve, G4 NFL
+  careers, G2 forecast; constraints C1 trust, C2 API budget) and
+  `product/features.md` (Fnn cards grouped by goal). **Tasks are GitHub
+  issues**: each carries a `Feature: Fnn` line and its feature's
+  `goal:Gn`/`constraint:*` labels; `sync_feature_tasks()`
+  (`R/feature_tasks.R`) regenerates each card's task checklist. Use the
+  `sdlc-alignment` skill when scoping or finishing work: the
+  `feature-reviewer` agent checks a feature against the goals, the
+  `task-reviewer` agent checks issues (or the branch diff, before the PR)
+  against the feature. Use `site-personas` for who a surface is for.
 - **Plans:** multi-session work plans live in `plans/*.md` (e.g.
   `plans/explore-questions.md` — the question-driven Explore revision).
   `decisions/` is for ratified choices only.

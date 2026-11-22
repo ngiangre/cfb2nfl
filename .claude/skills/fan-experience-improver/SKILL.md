@@ -22,7 +22,9 @@ deliberate dual audience (fans *and* R/stats coders). Read
 
 ## The persona you speak for
 
-A curious fan who knows football, not code. They arrive with questions like
+P1, the invested fan, in [product/personas.md](../../../product/personas.md)
+(the source of truth; the `site-personas` skill has the walkthrough). In
+short: a curious fan who knows football, not code. They arrive with questions like
 "do transfers get drafted more?", "does a coaching change hurt a player's odds?",
 "what are a linebacker's chances after a big season?". They should be able to go
 from a question → a chart or number → a new question, **without** detouring
