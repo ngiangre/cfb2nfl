@@ -235,6 +235,7 @@ acceptance criteria.
 - **Tasks:**
 <!-- tasks F23 -->
 - [ ] [#93](https://github.com/ngiangre/cfb2nfl/issues/93) feat(data): NFL play, snap and roster-status data, 2022 on (F23)
+- [ ] [PR #94](https://github.com/ngiangre/cfb2nfl/pull/94) feat(data): NFL play, snap and roster-status data from 2022 (F23)
 <!-- /tasks -->
 
 ### F19 · NFL thrive-or-fizzle from NFL play-by-play
