@@ -43,6 +43,7 @@ Suggests:
     DBI,
     duckdb,
     gert,
+    gh,
     ggbeeswarm,
     ggiraph,
     ggpath,
