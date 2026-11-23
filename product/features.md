@@ -92,6 +92,7 @@ acceptance criteria.
 <!-- tasks F04 -->
 - [x] [#44](https://github.com/ngiangre/cfb2nfl/issues/44) feat(data): ingest CFBD play-by-play into the pipeline, assets, and data model
 - [ ] [#68](https://github.com/ngiangre/cfb2nfl/issues/68) Measure play-stats revisions (Nov 15 + Nov 22 runs), record, then remove the measurement
+- [ ] [#95](https://github.com/ngiangre/cfb2nfl/issues/95) data(play_stats): backfill 2025 and 2024 in December, 2023 in January
 <!-- /tasks -->
 
 ### F05 · Combine measurables linked to college players
@@ -196,7 +197,7 @@ acceptance criteria.
   `nfl_participation`, on-field presence per play for players with no
   credited plays (linemen), plus formation and personnel.
 - **Acceptance criteria:**
-  - [ ] A P2 reader can download `nfl_pbp`, `nfl_participation`,
+  - [x] A P2 reader can download `nfl_pbp`, `nfl_participation`,
     `nfl_snap_counts` and `nfl_rosters_weekly` from `data-latest` and query
     them in the DuckDB, covering 2022 through the last completed NFL season
     (participation: through the last season nflverse published).
@@ -215,7 +216,7 @@ acceptance criteria.
   - [ ] A `data-current.yaml` run replaces only the current NFL season's
     rows in the four tables with 0 CFBD calls for them, and leaves the 2022
     to 2025 row counts unchanged.
-  - [ ] `cfb2nfl.duckdb` stays under the 2 GiB asset limit and `site.yaml`
+  - [x] `cfb2nfl.duckdb` stays under the 2 GiB asset limit and `site.yaml`
     succeeds with the larger download.
   - [x] `inst/dict` and `inst/data-model.md` give each table's grain, key and
     join path, say that season-grain `nfl_rosters` remains the longevity
@@ -235,7 +236,7 @@ acceptance criteria.
 - **Tasks:**
 <!-- tasks F23 -->
 - [ ] [#93](https://github.com/ngiangre/cfb2nfl/issues/93) feat(data): NFL play, snap and roster-status data, 2022 on (F23)
-- [ ] [PR #94](https://github.com/ngiangre/cfb2nfl/pull/94) feat(data): NFL play, snap and roster-status data from 2022 (F23)
+- [x] [PR #94](https://github.com/ngiangre/cfb2nfl/pull/94) feat(data): NFL play, snap and roster-status data from 2022 (F23)
 <!-- /tasks -->
 
 ### F19 · NFL thrive-or-fizzle from NFL play-by-play
