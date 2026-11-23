@@ -336,6 +336,7 @@ tibble::tribble(
   "Position group", "His roster position in his first eligible season, in the nine groups of the [earlier position post](2026-10-24-draft-eligibility-by-position.html).",
   "Cumulative share", "Of the group's eligible players, the share whose career has ended a given way by a given season. Each season's four shares plus the share still playing add to 100%.",
   "At risk", "Players still playing going into a season, the denominator for that season.",
+  "95% interval", "The range the true share plausibly occupies given how many players are behind it; wider when fewer players are at risk.",
   "Per-season chance", "Of players still playing going into a season, the share whose career ends a given way that season."
 ) |>
   kable(caption = "The terms used throughout.")
@@ -608,7 +609,7 @@ p33 <- ggplot(hz_all, aes(time, 100 * hazard, color = hz_lab[ending])) +
   geom_line(linewidth = 1.8) +
   geom_point_interactive(
     aes(
-      tooltip = sprintf("All positions, season %d: %s %s (%s of %s at risk)", time, pct(hazard), tolower(hz_lab[ending]), fmt(events), fmt(at_risk)),
+      tooltip = sprintf("All positions, season %d: %s %s (95%% CI %s to %s; %s of %s at risk)", time, pct(hazard), tolower(hz_lab[ending]), pct(lower), pct(upper), fmt(events), fmt(at_risk)),
       data_id = paste(ending, time)
     ),
     size = 3.4
@@ -643,7 +644,7 @@ p33b <- ggplot(hz_group, aes(time, 100 * hazard, color = hz_lab[ending])) +
   geom_line(linewidth = 1.1) +
   geom_point_interactive(
     aes(
-      tooltip = sprintf("%s, season %d: %s %s (%s of %s at risk)", group, time, pct(hazard), tolower(hz_lab[ending]), fmt(events), fmt(at_risk)),
+      tooltip = sprintf("%s, season %d: %s %s (95%% CI %s to %s; %s of %s at risk)", group, time, pct(hazard), tolower(hz_lab[ending]), pct(lower), pct(upper), fmt(events), fmt(at_risk)),
       data_id = paste(group, ending, time)
     ),
     size = 2.4

@@ -264,8 +264,8 @@ naive_drafted <- function(endings, by = "group") {
 #' that season.
 #'
 #' @inheritParams ending_incidence
-#' @return A tibble: the `by` column, `time`, `ending`, `at_risk`, `events`
-#'   and `hazard`.
+#' @return A tibble: the `by` column, `time`, `ending`, `at_risk`, `events`,
+#'   `hazard`, and its 95% Wilson interval `lower` and `upper`.
 #' @export
 ending_hazards <- function(endings, by = "group") {
   endings <- dplyr::filter(endings, .data$time > 0L)
@@ -289,8 +289,22 @@ ending_hazards <- function(endings, by = "group") {
     dplyr::left_join(events, by = c(by_cols, "time", "ending")) |>
     dplyr::mutate(
       events = dplyr::coalesce(.data$events, 0L),
-      hazard = .data$events / .data$at_risk
+      hazard = .data$events / .data$at_risk,
+      # Wilson interval for a binomial share.
+      centre = (.data$hazard + 1.96^2 / (2 * .data$at_risk)) /
+        (1 + 1.96^2 / .data$at_risk),
+      half = 1.96 /
+        (1 + 1.96^2 / .data$at_risk) *
+        sqrt(
+          .data$hazard *
+            (1 - .data$hazard) /
+            .data$at_risk +
+            1.96^2 / (4 * .data$at_risk^2)
+        ),
+      lower = pmax(0, .data$centre - .data$half),
+      upper = pmin(1, .data$centre + .data$half)
     ) |>
+    dplyr::select(-"centre", -"half") |>
     dplyr::relocate(dplyr::all_of(by_cols), "time", "ending")
 }
 

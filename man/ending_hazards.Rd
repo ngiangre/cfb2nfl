@@ -12,8 +12,8 @@ ending_hazards(endings, by = "group")
 \item{by}{Grouping column, or \code{NULL} for everyone together.}
 }
 \value{
-A tibble: the \code{by} column, \code{time}, \code{ending}, \code{at_risk}, \code{events}
-and \code{hazard}.
+A tibble: the \code{by} column, \code{time}, \code{ending}, \code{at_risk}, \code{events},
+\code{hazard}, and its 95\% Wilson interval \code{lower} and \code{upper}.
 }
 \description{
 The discrete-time cause-specific hazard: of the players still playing

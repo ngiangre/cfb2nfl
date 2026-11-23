@@ -133,6 +133,8 @@ test_that("ending_hazards divides each season's endings by those still playing",
   expect_equal(at(2, "drafted")$at_risk, 2L)
   expect_equal(at(2, "drafted")$hazard, 0.5)
   expect_equal(at(2, "left_data")$hazard, 0)
+  expect_true(all(h$lower <= h$hazard & h$hazard <= h$upper))
+  expect_equal(at(2, "left_data")$lower, 0)
 })
 
 test_that("explorer_player_url links stat groups and skips the offensive line", {
