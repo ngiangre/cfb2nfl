@@ -14,6 +14,10 @@
   `contract_outcomes()` now checks one entry row per player, that every
   entrant has one, and that no undrafted entrant is a drafted player
   ([#99](https://github.com/ngiangre/cfb2nfl/issues/99)).
+- Fix: `last_complete_nfl_draft()` was one year behind. It now returns the
+  current year from May 1, so the April 2026 draft class counts as observed
+  in `outcomes` (and in `_meta`) instead of censored. That class's rookie
+  roster and games labels stay partial until its first NFL season ends.
 - Data (feature F23): **NFL play, snap and roster-status data from 2022 on**,
   for following drafted and undrafted players into the NFL. Four new tables
   on `data-latest` and in the DuckDB: `nfl_pbp` (every nflverse
