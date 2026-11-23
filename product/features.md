@@ -22,7 +22,7 @@ Statuses: `idea` → `accepted` (passed the `feature-reviewer` agent) →
 shipped before 2026-11-22 were backfilled from the repo history and have no
 acceptance criteria.
 
-<!-- Next free ID: F24 -->
+<!-- Next free ID: F25 -->
 
 ## G1 · Answer the project's questions with evidence
 
@@ -110,6 +110,73 @@ acceptance criteria.
 - **Links:** decisions 0025, 0040; `R/post_style.R`
 - **Tasks:**
 <!-- tasks F16 -->
+<!-- /tasks -->
+
+### F24 · Post: how college careers end, by position, as competing outcomes over time
+
+- **Goals:** G1 · **Personas:** P1 (P2 for method) · **Status:** accepted
+- **Links:** posts 2026-10-24 (outcome prevalence, eligibility by
+  position), extending F07; decision 0032 (`outcomes` survival bookkeeping)
+- **Why:** reading the 2026-10-24 posts, the user asked whether, by
+  position group, the NFL outcome is a time-to-event question with mutually
+  exclusive events over time. Those posts report per-season rates, which
+  answer "how often" but not "by when, and instead of what". Each eligible
+  season a player is drafted, signs as an undrafted free agent, exhausts
+  eligibility undrafted, leaves the data, or plays on; the first four are
+  mutually exclusive and absorbing. P1 wants "of every 100 eligible
+  linebackers, how many are drafted by their third eligible season, and
+  what happened to the rest?". F17 later uses the hazards this post
+  describes (the prevalence post's eligible-season-index followup).
+- **Acceptance criteria:**
+  - [ ] A dated post shows, for each position group, the cumulative
+    incidence of drafted, signed undrafted, exhausted eligibility
+    undrafted, and left the data, by eligible season, each curve with an
+    interval.
+  - [ ] At every eligible season, the four cumulative incidences plus the
+    share still playing sum to 100% (an `expect_equal` check in the
+    tests).
+  - [ ] The Data section states that `continuing` and `censored` (classes
+    not yet drafted) are treated as censored, that each player's ending is
+    his final eligible row (a mid-career `left_data` row is a missed
+    season, not an ending), and which season's position
+    defines a player's group (the first eligible season, using the
+    2026-10-24 eligibility post's nine groups so the two reconcile).
+  - [ ] The Data section reports, by position group, how many NFL entrants
+    never enter the risk set (drafted or signed before their first
+    eligible season by the clock) and says in plain language why they are
+    missing from the curves.
+  - [ ] The post states, in plain language before naming the method, why
+    one minus a drafted-only survival curve overstates the drafted share
+    when other endings compete, and shows the gap for at least one group.
+  - [ ] A table gives each group's drafted share at eligible season 3
+    under three treatments: left the data as a competing ending (the
+    primary), left the data as censored, and imputed high-school years
+    excluded.
+  - [ ] A fan can hover any curve point and read the group, season, share,
+    interval and players at risk; every number is an inline variable.
+  - [ ] Each ending is illustrated by named players whose path is
+    computed from the data and linked to their Explorer Players page
+    (`explorer.html#tab=players&player=<id>`), and the post says the
+    curves describe groups, not any one player's chances.
+  - [ ] The functions that build the competing-risks frame and the curves
+    are tested (`testthat`), including a fixture where the estimate
+    matches a hand-computed Aalen-Johansen value.
+- **Depends on:** the `outcomes` label fixes found 2026-11-22 (drafted
+  players labeled `left_data` after a final season with no stat line, and
+  labeled `signed_udfa` when the pick's id differs from the stat id);
+  without them the drafted curves are understated, most for linemen.
+- **Out of scope:** covariate models, cause-specific hazard regressions or
+  forecasts (F17); NFL careers after entry (F19); a new published table
+  (decision 0041: build on the fly from `outcomes`).
+- **Cost:** 0 CFBD calls; no new tables; `survival::survfit()` multi-state
+  (installed), optionally `tidycmprsk`/`ggsurvfit` in Suggests. Decision
+  record: one, if the primary `left_data` treatment is adopted as the
+  project convention for F17; otherwise none.
+- **Review:** feature-reviewer 2026-11-22: aligned after changes (8
+  findings, all applied)
+- **Tasks:**
+<!-- tasks F24 -->
+- [ ] [#97](https://github.com/ngiangre/cfb2nfl/issues/97) Post: how college careers end, by position, as competing outcomes over time (F24)
 <!-- /tasks -->
 
 ### F21 · Question status board
@@ -237,6 +304,7 @@ acceptance criteria.
 <!-- tasks F23 -->
 - [ ] [#93](https://github.com/ngiangre/cfb2nfl/issues/93) feat(data): NFL play, snap and roster-status data, 2022 on (F23)
 - [x] [PR #94](https://github.com/ngiangre/cfb2nfl/pull/94) feat(data): NFL play, snap and roster-status data from 2022 (F23)
+- [x] [PR #96](https://github.com/ngiangre/cfb2nfl/pull/96) docs(product): tick F23 criteria 1 and 6; link #95 to F04
 <!-- /tasks -->
 
 ### F19 · NFL thrive-or-fizzle from NFL play-by-play
