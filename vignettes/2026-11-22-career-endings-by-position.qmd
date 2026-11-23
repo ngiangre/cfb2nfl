@@ -1,7 +1,7 @@
 ---
-title: "Most draft-eligible college careers end without an NFL outcome at every position, and the undrafted route overtakes the draft after the first eligible season"
+title: "Most draft-eligible college careers end without an NFL outcome at every position, and after the first eligible season the chance of signing undrafted passes the chance of being drafted"
 date: "2026-11-22"
-description: "Followed season by season, at every position most draft-eligible college careers end with eligibility running out undrafted, the per-season chance of signing undrafted passes the chance of being drafted after the first eligible season, and counting only the drafted as an ending overstates the drafted share."
+description: "Followed season by season, at every position except the offensive line most draft-eligible college careers end with eligibility running out undrafted, from the second eligible season a player still playing is likelier to sign undrafted than be drafted that season, and counting only the drafted as an ending overstates the drafted share."
 followups:
   - "Fit cause-specific hazard models of the four endings with position, conference tier and recruiting rating, as the competing-risks baseline for the draft forecast (F17)."
   - "Check whether the timing of each ending is stable across draft classes before a forecast relies on it."
@@ -12,7 +12,7 @@ author:
   - "AI directed by Nick Giangreco"
 freeze: auto
 vignette: >
-  %\VignetteIndexEntry{Most draft-eligible college careers end without an NFL outcome at every position, and the undrafted route overtakes the draft after the first eligible season}
+  %\VignetteIndexEntry{Most draft-eligible college careers end without an NFL outcome at every position, and after the first eligible season the chance of signing undrafted passes the chance of being drafted}
   %\VignetteEngine{quarto::html}
   %\VignetteEncoding{UTF-8}
 ---
@@ -161,11 +161,20 @@ vaughn <- cast[cast$who == "Ke'Shawn Vaughn", ]
 
 # ---- 3.1 Cumulative shares by position ------------------------------------
 horizon <- 3L
+# Fewest players at risk for a group's curve or bar to be shown.
+min_curve <- 30
 ci <- ending_incidence(endings)
 ci_all <- ending_incidence(endings, by = NULL)
-at_horizon <- ci |>
+at_horizon_all <- ci |>
   filter(time == horizon) |>
-  comparable() |>
+  comparable()
+thin_groups <- at_horizon_all |>
+  filter(n_risk < min_curve) |>
+  distinct(group) |>
+  pull(group) |>
+  as.character()
+at_horizon <- at_horizon_all |>
+  filter(!group %in% thin_groups) |>
   mutate(label = factor(state_lab[state], names(state_fill)))
 nfl_share <- at_horizon |>
   filter(state %in% c("drafted", "signed_udfa")) |>
@@ -174,29 +183,31 @@ nfl_share <- at_horizon |>
 exhausted_share <- at_horizon |>
   filter(state == "exhausted_undrafted") |>
   arrange(estimate)
-all_at <- function(s, t = horizon) {
-  ci_all$estimate[ci_all$state == s & ci_all$time == t]
-}
+ol_last <- max(ci$time[ci$group == "Offensive line" & ci$n_risk >= min_curve])
 e1_holds <- any(nfl_share$nfl > 0.5)
 
 # ---- 3.2 The drafted-only curve -------------------------------------------
 naive <- naive_drafted(endings)
 gap <- ci |>
   filter(state == "drafted") |>
-  select(group, time, aj = estimate, lower, upper) |>
+  select(group, time, aj = estimate, lower, upper, n_risk) |>
   inner_join(rename(naive, naive = estimate), by = c("group", "time")) |>
   comparable()
-gap_h <- filter(gap, time == horizon) |> mutate(ratio = naive / aj)
+gap_h <- gap |>
+  filter(time == horizon, !group %in% thin_groups) |>
+  mutate(ratio = naive / aj)
 qb_gap <- filter(gap_h, group == "Quarterback")
-ol_gap <- filter(gap_h, group == "Offensive line")
+widest_gap <- slice_max(gap_h, naive - aj, n = 1)
 
 # ---- 3.3 The per-season chance of each NFL route ---------------------------
-# Seasons with fewer than 500 players at risk are too thin to read a rate.
+# Too few players at risk make a per-season rate noise: 500 for all
+# positions together, 100 for one group.
 min_risk <- 500
+min_risk_group <- 100
 hz_all <- ending_hazards(endings, by = NULL) |>
   filter(ending %in% c("drafted", "signed_udfa"), at_risk >= min_risk)
 hz_group <- ending_hazards(endings) |>
-  filter(ending %in% c("drafted", "signed_udfa"), at_risk >= 100) |>
+  filter(ending %in% c("drafted", "signed_udfa"), at_risk >= min_risk_group) |>
   comparable()
 hz_at <- function(s, t) hz_all$hazard[hz_all$ending == s & hz_all$time == t]
 hz_wide <- hz_all |>
@@ -206,8 +217,14 @@ cross_season <- min(hz_wide$time[hz_wide$signed_udfa > hz_wide$drafted])
 draft_peak <- hz_wide$time[which.max(hz_wide$drafted)]
 last_hz <- max(hz_wide$time)
 e3_holds <- all(diff(hz_wide$drafted) > 0)
+hz_group_wide <- hz_group |>
+  select(group, time, ending, hazard) |>
+  tidyr::pivot_wider(names_from = ending, values_from = hazard)
+n_groups_cross <- hz_group_wide |>
+  filter(time == last_hz) |>
+  summarise(n = sum(signed_udfa > drafted), of = n())
 
-# ---- 3.4 Recruited and unrecruited players ---------------------------------
+# ---- 3.4 How leaving the data is treated -----------------------------------
 treatments <- list(
   "Left the data is an ending (main view)" = ci,
   "Left the data is censored" = ending_incidence(endings, left_data = "censored"),
@@ -219,38 +236,51 @@ sens <- purrr::imap(treatments, \(x, nm) {
     transmute(group, treatment = nm, estimate)
 }) |>
   purrr::list_rbind() |>
-  comparable()
+  comparable() |>
+  filter(!group %in% thin_groups)
+sens_wide <- sens |>
+  tidyr::pivot_wider(names_from = treatment, values_from = estimate) |>
+  mutate(
+    censored_shift = `Left the data is censored` -
+      `Left the data is an ending (main view)`,
+    recruited_shift = `Recruited players only` -
+      `Left the data is an ending (main view)`
+  )
+max_ld_shift <- max(abs(sens_wide$censored_shift))
+ld_curves <- bind_rows(
+  mutate(ci_all, treatment = "Left the data is an ending"),
+  mutate(
+    ending_incidence(endings, by = NULL, left_data = "censored"),
+    treatment = "Left the data is censored"
+  )
+) |>
+  filter(state == "drafted", n_risk >= min_curve)
+ld_all_at <- function(tr) {
+  ld_curves$estimate[ld_curves$treatment == tr & ld_curves$time == horizon]
+}
+
+# ---- 3.5 Recruited and unrecruited players ---------------------------------
 ci_rec <- ending_incidence(endings, by = "recruited")
 ci_rec_group <- endings |>
   comparable() |>
   mutate(cell = paste(group, recruited, sep = "|")) |>
   ending_incidence(by = "cell") |>
   tidyr::separate_wider_delim(cell, "|", names = c("group", "recruited"))
-ever <- endings |>
-  filter(ending != "censored") |>
-  summarise(
-    players = n(),
-    drafted = mean(ending == "drafted"),
-    mean_time_exhausted = mean(time[ending == "exhausted_undrafted"]),
-    mean_time_drafted = mean(time[ending == "drafted"]),
-    .by = "recruited"
-  )
-ever_of <- function(col, who) ever[[col]][ever$recruited == who]
+rec_at <- function(s, who, t = horizon) {
+  ci_rec$estimate[ci_rec$state == s & ci_rec$recruited == who & ci_rec$time == t]
+}
+rec_ratio <- rec_at("drafted", "Recruited") /
+  rec_at("drafted", "No recruiting record")
 share_recruited <- mean(!endings$hs_year_imputed)
-e4_holds <- ever_of("drafted", "Recruited") > ever_of("drafted", "No recruiting record")
-ld_shift <- sens |>
-  tidyr::pivot_wider(names_from = treatment, values_from = estimate) |>
-  mutate(
-    censored_shift = `Left the data is censored` -
-      `Left the data is an ending (main view)`
-  )
+e4_holds <- rec_ratio > 1
+rec_exceptions <- sens_wide$group[sens_wide$recruited_shift <= 0]
 ```
 
 ::: {.callout-note appearance="minimal"}
 *Data as of the `data-latest` release, retrieved 2026-11-22. Draft classes
 after the last complete draft are right-censored: a player whose next
 outcome is not yet known counts as still playing up to his last known
-season, never as a failure.*
+season, never as a career that ended.*
 :::
 
 ## 1. Introduction
@@ -271,8 +301,8 @@ rule each other out, and asks how those endings differ by position.
 
 ### 2.1 Each eligible player's college career ends once, in one of four ways
 
-The table defines the clock, the four endings, and the two quantities every
-figure reports; the curves describe position groups, never any one player's
+The table defines the clock, the four endings, and the quantities the
+figures report; the curves describe position groups, never any one player's
 chances.
 
 ```{r}
@@ -284,11 +314,12 @@ tibble::tribble(
   "Signed undrafted", "Not drafted, and first on an NFL roster the following season.",
   "Eligibility ended, undrafted", "His last college season, with no NFL outcome.",
   "Left the data", "Still on a college roster but with no further stat line, so his later path is not observed.",
-  "Still playing", "Played on into another eligible season; once the next outcome is not yet known (a draft not yet complete), he counts as still playing up to his last known season.",
-  "Missed season", "A season off the stat sheet (injury, a transfer sit-out) followed by a return; not an ending.",
-  "Position group", "His roster position in his first eligible season, in the nine groups of the earlier position post.",
+  "Still playing", "His career had not ended by the last season in the data, including players whose next draft has not happened yet; the curves count him only through the seasons observed.",
+  "Missed season", "A season off the stat sheet (injury, a transfer sit-out) followed by a return; not an ending, since a career ends only in his final eligible season.",
+  "Position group", "His roster position in his first eligible season, in the nine groups of the [earlier position post](2026-10-24-draft-eligibility-by-position.html).",
   "Cumulative share", "Of the group's eligible players, the share whose career has ended a given way by a given season. Each season's four shares plus the share still playing add to 100%.",
-  "At risk", "Players still playing going into a season, the denominator for that season."
+  "At risk", "Players still playing going into a season, the denominator for that season.",
+  "Per-season chance", "Of players still playing going into a season, the share whose career ends a given way that season."
 ) |>
   kable(caption = "The terms used throughout.")
 ```
@@ -299,7 +330,9 @@ The table reconciles the players behind the curves: those whose first
 eligible outcome is not yet known start no clock, and NFL entrants drafted
 or signed before their first eligible season by the clock (early entrants,
 or players whose estimated high-school year runs late) fall outside every
-risk set, most of them offensive linemen.
+risk set, the largest group of them the `r fmt(never_ol)` offensive
+linemen;
+players with no recorded position (last row) are left out of the curves.
 
 ```{r}
 #| label: risk-set
@@ -320,12 +353,13 @@ risk_table |>
   )
 ```
 
-### 2.3 Twelve players trace the four endings, and `r vaughn$who` shows a missed season that is not an ending
+### 2.3 `r nrow(cast)` players trace the four endings, and `r vaughn$who` shows a missed season that is not an ending
 
 Each named player's path is computed from the data and links to his page in
 the [Explorer](explorer.html); `r vaughn$who` left the stat sheet for a
 season mid-career and came back, one of `r fmt(n_missed)` players with a
-missed season.
+missed season. "Estimated" means no recruiting record could be safely
+matched to him, not that he was unrecruited.
 
 ```{r}
 #| label: cast
@@ -350,10 +384,13 @@ cast |>
 the NFL by their third eligible season.* ❌
 
 The first figure stacks each group's cumulative shares at season
-`r horizon`: `r tolower(nfl_share$group[1])` leads with `r per100(nfl_share$nfl[1])` in
-100 reaching the NFL by either route, while eligibility running out
-undrafted claims at least `r per100(exhausted_share$estimate[1])` in 100 in
-every group; the second follows every share season by season.
+`r horizon`: the `r tolower(nfl_share$group[1])` group leads with
+`r per100(nfl_share$nfl[1])` in 100 reaching the NFL by either route, while
+eligibility running out undrafted claims at least
+`r per100(exhausted_share$estimate[1])` in 100 in every group shown; the
+offensive line, where only linemen with a stat line count, has too few
+players left to show past season `r ol_last`, and the second figure follows
+every group season by season.
 
 ```{r}
 #| label: s31-explain
@@ -398,7 +435,7 @@ p31 <- at_horizon |>
     x = "Share of the group's eligible players",
     y = NULL,
     fill = NULL,
-    caption = "Aalen-Johansen cumulative shares; hover a segment for its interval and the players at risk."
+    caption = sprintf("Cumulative shares counting all four endings; groups with fewer than %d players at risk are omitted. Hover a segment for its interval and the players at risk.", min_curve)
   ) +
   theme_cfb2nfl() +
   guides(fill = guide_legend(nrow = 2))
@@ -410,7 +447,7 @@ girafe(ggobj = p31, width_svg = 13, height_svg = 7)
 #| fig-height: 10
 p31b <- ci |>
   comparable() |>
-  filter(state != "playing", n_risk >= 30) |>
+  filter(state != "playing", n_risk >= min_curve) |>
   mutate(
     label = factor(state_lab[state], names(state_fill)),
     tooltip = sprintf(
@@ -434,35 +471,43 @@ p31b <- ci |>
     y = "Cumulative share (%)",
     color = NULL,
     fill = NULL,
-    caption = "Seasons with fewer than 30 players at risk are omitted; hover a point for its interval."
+    caption = sprintf("Seasons with fewer than %d players at risk are omitted; hover a point for its interval.", min_curve)
   ) +
   theme_cfb2nfl()
 girafe(ggobj = p31b, width_svg = 13, height_svg = 10)
 ```
 
-### 3.2 Counting only the drafted as an ending overstates the quarterback drafted share by `r round(100 * (qb_gap$ratio - 1))`%
+### 3.2 Counting only the drafted as an ending reads `r per100(qb_gap$naive)` in 100 quarterbacks drafted by season `r horizon`, when the four-ending share is `r per100(qb_gap$aj)`
 
-A player whose career ended another way can no longer be drafted, but a
-survival curve with the draft as its only event treats him as if he might
-still be (statisticians call this ignoring competing risks), so it reads
-`r pct(qb_gap$naive)` of quarterbacks drafted by season `r horizon` against
-the `r pct(qb_gap$aj)` the four-ending estimate gives; the second figure
-shows the same gap for every group, widest for the offensive line.
+A survival curve with the draft as its only event treats a player whose
+career ended another way as if he could still be drafted, handing the
+careers that already ended to those still playing (statisticians call this
+ignoring competing risks), so it overstates the drafted share; the second
+figure shows the gap in every group, widest in the
+`r tolower(widest_gap$group)` group.
 
 ```{r}
 #| label: s32-explain
 #| fig-height: 6
-qb <- filter(gap, group == "Quarterback")
+qb <- filter(gap, group == "Quarterback", n_risk >= min_curve)
 p32 <- ggplot(qb, aes(time)) +
   geom_ribbon(aes(ymin = 100 * lower, ymax = 100 * upper), fill = state_fill[["Drafted"]], alpha = 0.2) +
   geom_line(aes(y = 100 * aj), color = state_fill[["Drafted"]], linewidth = 1.4) +
   geom_line(aes(y = 100 * naive), color = claim_color, linewidth = 1.4, linetype = "dashed") +
   geom_point_interactive(
-    aes(y = 100 * aj, tooltip = sprintf("Season %d: %s drafted, counting all four endings", time, pct(aj)), data_id = paste("aj", time)),
+    aes(
+      y = 100 * aj,
+      tooltip = sprintf("Season %d: %s drafted, counting all four endings (95%% CI %s to %s; %s at risk)", time, pct(aj), pct(lower), pct(upper), fmt(n_risk)),
+      data_id = paste("aj", time)
+    ),
     color = state_fill[["Drafted"]], size = 3
   ) +
   geom_point_interactive(
-    aes(y = 100 * naive, tooltip = sprintf("Season %d: %s drafted, counting only the draft", time, pct(naive)), data_id = paste("km", time)),
+    aes(
+      y = 100 * naive,
+      tooltip = sprintf("Season %d: %s drafted, counting only the draft (%s at risk)", time, pct(naive), fmt(n_risk)),
+      data_id = paste("km", time)
+    ),
     color = claim_color, size = 3
   ) +
   annotate(
@@ -486,7 +531,7 @@ p32 <- ggplot(qb, aes(time)) +
     subtitle = "Share of eligible quarterbacks drafted by each eligible season, two ways",
     x = "Eligible season",
     y = "Drafted (%)",
-    caption = "Solid: Aalen-Johansen with 95% interval. Dashed: one minus a Kaplan-Meier curve that censors every other ending."
+    caption = "Solid: Aalen-Johansen estimate with 95% interval. Dashed: one minus a Kaplan-Meier curve that censors every other ending."
   ) +
   theme_cfb2nfl()
 girafe(ggobj = p32, width_svg = 13, height_svg = 6)
@@ -501,7 +546,7 @@ p32b <- gap_h |>
   ggplot(aes(y = group)) +
   geom_segment(aes(x = 100 * aj, xend = 100 * naive, yend = group), color = context_color, linewidth = 1.2) +
   geom_point_interactive(
-    aes(x = 100 * aj, tooltip = sprintf("%s: %s drafted by season %d, counting all four endings (95%% CI %s to %s)", group, pct(aj), horizon, pct(lower), pct(upper)), data_id = paste(group, "aj")),
+    aes(x = 100 * aj, tooltip = sprintf("%s: %s drafted by season %d, counting all four endings (95%% CI %s to %s; %s at risk)", group, pct(aj), horizon, pct(lower), pct(upper), fmt(n_risk)), data_id = paste(group, "aj")),
     color = state_fill[["Drafted"]], size = 4
   ) +
   geom_point_interactive(
@@ -514,7 +559,7 @@ p32b <- gap_h |>
     subtitle = "Green: all four endings. Orange: the draft as the only ending.",
     x = "Drafted",
     y = NULL,
-    caption = "Hover a point for the interval and the ratio between the two."
+    caption = sprintf("Groups with fewer than %d players at risk are omitted; hover a point for the interval and the ratio.", min_curve)
   ) +
   theme_cfb2nfl()
 girafe(ggobj = p32b, width_svg = 13, height_svg = 7)
@@ -527,43 +572,29 @@ drafted that season.* ❌
 
 Of players still playing, `r pct(hz_at("drafted", 1))` are drafted after
 their first eligible season and `r pct(hz_at("drafted", draft_peak))` after
-season `r draft_peak`, then fewer, while the undrafted chance rises from
-`r pct(hz_at("signed_udfa", 1))` to `r pct(hz_at("signed_udfa", last_hz))`
-by season `r last_hz`; the faint lines are the individual groups.
+season `r draft_peak`, then lower in season `r last_hz`, while the undrafted
+chance rises from `r pct(hz_at("signed_udfa", 1))` to
+`r pct(hz_at("signed_udfa", last_hz))`; the second figure repeats it for
+each group, and in `r n_groups_cross$n` of `r n_groups_cross$of` groups the
+undrafted chance is the larger by season `r last_hz`.
 
 ```{r}
 #| label: s33-explain
 #| fig-height: 6
 hz_lab <- c(drafted = "Drafted", signed_udfa = "Signed undrafted")
-p33 <- ggplot(mapping = aes(time, 100 * hazard, color = hz_lab[ending])) +
-  geom_line(
-    data = hz_group,
-    aes(group = paste(group, ending)),
-    alpha = 0.25,
-    linewidth = 0.7
-  ) +
+p33 <- ggplot(hz_all, aes(time, 100 * hazard, color = hz_lab[ending])) +
+  geom_line(linewidth = 1.8) +
   geom_point_interactive(
-    data = hz_group,
-    aes(
-      tooltip = sprintf("%s, season %d: %s %s (%s of %s at risk)", group, time, pct(hazard), tolower(hz_lab[ending]), fmt(events), fmt(at_risk)),
-      data_id = paste(group, ending)
-    ),
-    alpha = 0.35,
-    size = 1.6
-  ) +
-  geom_line(data = hz_all, linewidth = 1.8) +
-  geom_point_interactive(
-    data = hz_all,
     aes(
       tooltip = sprintf("All positions, season %d: %s %s (%s of %s at risk)", time, pct(hazard), tolower(hz_lab[ending]), fmt(events), fmt(at_risk)),
-      data_id = paste("all", ending, time)
+      data_id = paste(ending, time)
     ),
     size = 3.4
   ) +
   annotate(
     "text",
-    x = 1.05,
-    y = 17,
+    x = cross_season + 0.05,
+    y = 100 * hz_at("signed_udfa", draft_peak) + 2,
     label = sprintf("From season %d, signing undrafted\nis the likelier NFL route", cross_season),
     hjust = 0,
     size = 4.4,
@@ -573,38 +604,56 @@ p33 <- ggplot(mapping = aes(time, 100 * hazard, color = hz_lab[ending])) +
   scale_x_continuous(breaks = hz_wide$time) +
   labs(
     title = "Waiting raises the undrafted chance far more than the drafted chance",
-    subtitle = "Of players still playing going into each eligible season, the share drafted or signed undrafted that season",
+    subtitle = "Of players still playing going into each eligible season, all positions, the share drafted or signed undrafted that season",
     x = "Eligible season",
     y = "Share that season (%)",
     color = NULL,
-    caption = sprintf("Bold: all positions. Faint: each position group. Seasons with fewer than %s players at risk (all positions) or 100 (a group) are omitted.", fmt(min_risk))
+    caption = sprintf("Seasons with fewer than %s players at risk are omitted; hover a point for the counts.", fmt(min_risk))
   ) +
   theme_cfb2nfl()
 girafe(ggobj = p33, width_svg = 13, height_svg = 6)
 ```
 
-### 3.4 Recruited players are drafted `r round(ever_of("drafted", "Recruited") / ever_of("drafted", "No recruiting record"), 1)` times as often as players without a recruiting record, a gap in who they are more than in the clock
+```{r}
+#| label: s33-explore
+#| fig-height: 10
+p33b <- ggplot(hz_group, aes(time, 100 * hazard, color = hz_lab[ending])) +
+  geom_line(linewidth = 1.1) +
+  geom_point_interactive(
+    aes(
+      tooltip = sprintf("%s, season %d: %s %s (%s of %s at risk)", group, time, pct(hazard), tolower(hz_lab[ending]), fmt(events), fmt(at_risk)),
+      data_id = paste(group, ending, time)
+    ),
+    size = 2.4
+  ) +
+  facet_wrap(~group, ncol = 3) +
+  scale_color_manual(values = state_fill[c("Drafted", "Signed undrafted")]) +
+  scale_x_continuous(breaks = hz_wide$time) +
+  labs(
+    title = "The per-season chance of each NFL route, in every group",
+    subtitle = "Of players still playing going into each eligible season, the share drafted or signed undrafted that season",
+    x = "Eligible season",
+    y = "Share that season (%)",
+    color = NULL,
+    caption = sprintf("Seasons with fewer than %d players at risk in a group are omitted; hover a point for the counts.", min_risk_group)
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p33b, width_svg = 13, height_svg = 10)
+```
 
-*Expecting recruited players to reach the draft more often than players
-without a recruiting record.* ✅
+### 3.4 Counting leaving the data as censoring moves a group's drafted share by at most `r round(100 * max_ld_shift, 1)` points
 
-The table gives each group's drafted share by season `r horizon` under the
-two alternative treatments: counting leaving the data as censoring moves it
-by at most `r round(100 * max(abs(ld_shift$censored_shift)), 1)` points,
-while keeping only the `r pct(share_recruited, 0)` of players with a
-recruiting record raises it sharply, because recruited players end their
-careers drafted `r pct(ever_of("drafted", "Recruited"))` of the time against
-`r pct(ever_of("drafted", "No recruiting record"))` for the rest; the
-figures show that the estimated high-school year shifts mainly the timing
-of eligibility running out, in eligible season
-`r round(ever_of("mean_time_exhausted", "No recruiting record"), 1)` on
-average without a recruiting record against
-`r round(ever_of("mean_time_exhausted", "Recruited"), 1)` with one.
+The table gives each group's drafted share by season `r horizon` in the
+main view, with leaving the data counted as censoring instead of as an
+ending, and with only the `r pct(share_recruited, 0)` of players who have a
+recruiting record, which raises it in
+`r if (length(rec_exceptions)) paste("every group but", paste(tolower(rec_exceptions), collapse = " and ")) else "every group shown"`; the figure shows the
+first two treatments over every season, all positions together.
 
 ```{r}
 #| label: s34-table
-sens |>
-  tidyr::pivot_wider(names_from = treatment, values_from = estimate) |>
+sens_wide |>
+  select(-censored_shift, -recruited_shift) |>
   arrange(desc(`Left the data is an ending (main view)`)) |>
   mutate(across(-group, pct)) |>
   rename(`Position group` = group) |>
@@ -616,9 +665,49 @@ sens |>
 
 ```{r}
 #| label: s34-explain
+#| fig-height: 6
+p34 <- ld_curves |>
+  mutate(
+    tooltip = sprintf(
+      "%s, season %d: %s drafted (95%% CI %s to %s; %s at risk)",
+      treatment, time, pct(estimate), pct(lower), pct(upper), fmt(n_risk)
+    )
+  ) |>
+  ggplot(aes(time, 100 * estimate, linetype = treatment)) +
+  geom_ribbon(aes(ymin = 100 * lower, ymax = 100 * upper, group = treatment), fill = state_fill[["Drafted"]], alpha = 0.15) +
+  geom_line(color = state_fill[["Drafted"]], linewidth = 1.3) +
+  geom_point_interactive(aes(tooltip = tooltip, data_id = paste(treatment, time)), color = state_fill[["Drafted"]], size = 2.8) +
+  scale_linetype_manual(values = c("Left the data is an ending" = "solid", "Left the data is censored" = "dashed")) +
+  scale_x_continuous(breaks = 0:5) +
+  labs(
+    title = "How leaving the data is counted barely moves the drafted share",
+    subtitle = sprintf("Share of eligible players drafted by each eligible season, all positions: %s against %s by season %d", pct(ld_all_at("Left the data is an ending")), pct(ld_all_at("Left the data is censored")), horizon),
+    x = "Eligible season",
+    y = "Drafted (%)",
+    linetype = NULL,
+    caption = sprintf("Seasons with fewer than %d players at risk are omitted; hover a point for its interval.", min_curve)
+  ) +
+  theme_cfb2nfl()
+girafe(ggobj = p34, width_svg = 13, height_svg = 6)
+```
+
+### 3.5 Recruited players are drafted `r round(rec_ratio, 1)` times as often by season `r horizon` as players without a recruiting record, and run out of eligibility less often
+
+*Expecting recruited players to reach the draft more often than players
+without a recruiting record.* ✅
+
+By season `r horizon`, `r pct(rec_at("drafted", "Recruited"))` of recruited
+players are drafted against `r pct(rec_at("drafted", "No recruiting record"))`
+of the rest, and `r pct(rec_at("exhausted_undrafted", "Recruited"))` against
+`r pct(rec_at("exhausted_undrafted", "No recruiting record"))` have run out of
+eligibility undrafted; the second figure repeats the drafted comparison in
+every group.
+
+```{r}
+#| label: s35-explain
 #| fig-height: 7
-p34 <- ci_rec |>
-  filter(state != "playing", n_risk >= 30) |>
+p35 <- ci_rec |>
+  filter(state != "playing", n_risk >= min_curve) |>
   mutate(
     label = factor(state_lab[state], names(state_fill)),
     is_draft = state == "drafted",
@@ -636,22 +725,22 @@ p34 <- ci_rec |>
   scale_color_manual(values = c(`TRUE` = state_fill[["Drafted"]], `FALSE` = "#4B5563"), guide = "none") +
   scale_x_continuous(breaks = 0:5) +
   labs(
-    title = "Recruited players are drafted more; unrecruited players run out of eligibility sooner",
+    title = "Recruited players are drafted more and run out of eligibility less",
     subtitle = "Cumulative share of eligible players by ending, all positions, recruited (solid) and not (dashed)",
     x = "Eligible season",
     y = "Cumulative share (%)",
     linetype = NULL,
-    caption = "Each panel has its own scale. Seasons with fewer than 30 players at risk are omitted."
+    caption = sprintf("Each panel has its own scale. Seasons with fewer than %d players at risk are omitted.", min_curve)
   ) +
   theme_cfb2nfl()
-girafe(ggobj = p34, width_svg = 13, height_svg = 7)
+girafe(ggobj = p35, width_svg = 13, height_svg = 7)
 ```
 
 ```{r}
-#| label: s34-explore
+#| label: s35-explore
 #| fig-height: 9
-p34b <- ci_rec_group |>
-  filter(state == "drafted", n_risk >= 30) |>
+p35b <- ci_rec_group |>
+  filter(state == "drafted", n_risk >= min_curve) |>
   mutate(
     group = factor(group, pos_levels),
     tooltip = sprintf(
@@ -672,26 +761,27 @@ p34b <- ci_rec_group |>
     x = "Eligible season",
     y = "Drafted (%)",
     linetype = NULL,
-    caption = "Seasons with fewer than 30 players at risk are omitted; hover a point for its interval."
+    caption = sprintf("Seasons with fewer than %d players at risk are omitted; hover a point for its interval.", min_curve)
   ) +
   theme_cfb2nfl()
-girafe(ggobj = p34b, width_svg = 13, height_svg = 9)
+girafe(ggobj = p35b, width_svg = 13, height_svg = 9)
 ```
 
 ## 4. Summary
 
-Followed to their ending, most eligible careers at every position run out
-undrafted, the undrafted route becomes the likelier way into the NFL after
-the first eligible season, and the drafted share depends far more on who
-is counted than on how the endings are treated.
+Followed to their ending, most eligible careers in every well-populated
+group run out undrafted, signing undrafted becomes the likelier NFL route
+for a player still playing after his first eligible season, and the
+drafted share depends far more on who is counted than on how leaving the
+data is treated.
 
 ```{r}
 #| label: summary
 tibble::tribble(
   ~Expectation, ~Verdict, ~Evidence,
-  sprintf("At least one group sends most eligible players to the NFL by season %d", horizon), if (e1_holds) "✅" else "❌", sprintf("The highest, %s, is %s", nfl_share$group[1], pct(nfl_share$nfl[1])),
-  "Each extra eligible season raises the chance of being drafted", if (e3_holds) "✅" else "❌", sprintf("It peaks in season %d at %s, then falls", draft_peak, pct(hz_at("drafted", draft_peak))),
-  "Recruited players reach the draft more often", if (e4_holds) "✅" else "❌", sprintf("%s against %s of players with a known ending", pct(ever_of("drafted", "Recruited")), pct(ever_of("drafted", "No recruiting record")))
+  sprintf("At least one group sends most eligible players to the NFL by season %d", horizon), if (e1_holds) "✅" else "❌", sprintf("The highest, %s, is %s", tolower(nfl_share$group[1]), pct(nfl_share$nfl[1])),
+  "Each extra eligible season raises the chance of being drafted", if (e3_holds) "✅" else "❌", sprintf("It peaks in season %d at %s, then is lower in season %d", draft_peak, pct(hz_at("drafted", draft_peak)), last_hz),
+  "Recruited players reach the draft more often", if (e4_holds) "✅" else "❌", sprintf("%s against %s drafted by season %d", pct(rec_at("drafted", "Recruited")), pct(rec_at("drafted", "No recruiting record")), horizon)
 ) |>
   kable(caption = "Each expectation and what the data showed.")
 ```
@@ -703,20 +793,20 @@ The NFL routes compete with each other and with the end of eligibility.
 
 - Each season a player stays, the undrafted chance grows faster than the
   drafted chance, so a forecast that pools the two routes, or ignores the
-  endings that compete with them, mixes processes that move in different
-  directions over a career.
+  endings that compete with them, mixes processes that grow at different
+  rates.
 :::
 
 ::: {.callout-important}
-The drafted-only curve is the wrong yardstick.
+The drafted-only curve overstates the drafted share.
 
 - Treating every other ending as censoring keeps counting careers that
-  already ended, so it overstates the drafted share in every group, most
-  where other endings are most common.
+  already ended, so the overstatement is largest where other endings are
+  most common.
 :::
 
 ::: {.callout-important}
-Who is counted matters more than how.
+Who is counted matters more than how leaving the data is treated.
 
 - Players without a recruiting record make up most of the risk set and are
   drafted far less often; for them the data says how a career ended more
@@ -725,8 +815,9 @@ Who is counted matters more than how.
 
 Several caveats bound these figures. The population is players with a stat
 line, so the offensive line rate describes the few linemen who left one,
-and its curves thin out after season 2. "Left the data" mixes transfers out
-of the data, injuries and early departures that the data cannot separate.
-Position is fixed at the first eligible season, so a player who changed
-position later is counted at his first one. The most recent classes are
-right-censored, and their later seasons carry fewer players at risk.
+and its curves end after season `r ol_last`. "Left the data" mixes
+transfers out of the data, injuries and early departures that the data
+cannot separate. Position is fixed at the first eligible season, so a
+player who changed position later is counted at his first one. The most
+recent classes are right-censored, and their later seasons carry fewer
+players at risk.
