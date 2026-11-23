@@ -1,5 +1,16 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Post (feature F24): **how college careers end, by position, as competing
+  outcomes**. It follows every draft-eligible player season by season to one
+  of four endings (drafted, signed undrafted, eligibility ended undrafted,
+  left the data), and reports cumulative shares by position, why a
+  drafted-only survival curve overstates the drafted share, the per-season
+  chance of each NFL route, and the gap between players with and without a
+  matched recruiting record. New helpers `career_endings()`,
+  `ending_incidence()`, `naive_drafted()`, `ending_hazards()`,
+  `never_eligible_entrants()` and `explorer_player_url()`; `survival` is now
+  a suggested package
+  ([#97](https://github.com/ngiangre/cfb2nfl/issues/97)).
 - Fix (feature F22): **NFL outcome labels in `outcomes` are corrected**, so
   drafted rates rise across every post that reads them. 254 more player
   seasons are labeled drafted (2,718 to 2,972) and the undrafted signings are
