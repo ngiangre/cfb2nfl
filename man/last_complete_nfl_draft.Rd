@@ -2,7 +2,7 @@
 % Please edit documentation in R/duckdb.R
 \name{last_complete_nfl_draft}
 \alias{last_complete_nfl_draft}
-\title{Last complete NFL draft class as of a date}
+\title{Last complete NFL draft as of a date}
 \usage{
 last_complete_nfl_draft(as_of = Sys.Date())
 }
@@ -13,6 +13,8 @@ last_complete_nfl_draft(as_of = Sys.Date())
 Integer draft year.
 }
 \description{
-The NFL draft for class year Y happens in April of Y+1, so a draft class is
-treated as complete once the refresh date is past May 1 of Y+1.
+The NFL draft is held in late April, so the draft of year Y (the one after
+college season Y - 1) is complete from May 1 of Y. Callers compare the
+result to a draft year. Entry-year NFL labels for that class (rookie
+roster, rookie games) are partial until its first NFL season ends.
 }

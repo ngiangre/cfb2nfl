@@ -127,7 +127,7 @@ columns:
     provenance: derived (nfl_rosters via gsis_id)
   - name: outcome_rookie_games_entry_year
     type: int32
-    description: Games played in the entry season, 0 if none; NA when the player did not enter (or is censored). A numeric outcome.
+    description: Games played in the entry season, 0 if none; NA when the player did not enter (or is censored). A numeric outcome. Partial for the latest draft class until its first NFL season ends.
     provenance: derived (nfl_player_stats.games via gsis_id)
   - name: outcome_source
     type: string

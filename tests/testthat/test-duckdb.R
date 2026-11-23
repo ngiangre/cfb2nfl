@@ -150,8 +150,11 @@ test_that("season-completeness helpers use the date cutoffs", {
   expect_equal(last_complete_cfb_season(as.Date("2026-10-17")), 2025L)
   expect_equal(last_complete_cfb_season(as.Date("2026-02-15")), 2024L)
   expect_equal(last_complete_cfb_season(as.Date("2027-03-01")), 2026L)
-  expect_equal(last_complete_nfl_draft(as.Date("2026-10-17")), 2025L)
-  expect_equal(last_complete_nfl_draft(as.Date("2026-04-15")), 2024L)
+  # Callers compare it to a draft year: the April 2026 draft is complete
+  # after May 1, 2026, not a year later.
+  expect_equal(last_complete_nfl_draft(as.Date("2026-10-17")), 2026L)
+  expect_equal(last_complete_nfl_draft(as.Date("2026-05-01")), 2026L)
+  expect_equal(last_complete_nfl_draft(as.Date("2026-04-15")), 2025L)
 })
 
 test_that("slim_audit_log drops the nested NA profile and keeps the scalars", {
