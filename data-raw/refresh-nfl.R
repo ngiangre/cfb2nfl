@@ -123,11 +123,35 @@ if (publish) {
       "); run data-raw/pull-data.R, then this script again."
     )
   }
-  piggyback::pb_upload(
-    file = c(nfl_paths[file.exists(nfl_paths)], "data/cfb2nfl.duckdb"),
-    repo = "ngiangre/cfb2nfl",
-    tag = "data-latest",
-    overwrite = TRUE
+  # pb_list() above caches the release; with that cache in place pb_upload()
+  # silently uploaded nothing (2026-11-22), so clear it and confirm each
+  # asset through the GitHub API.
+  piggyback::.pb_cache_clear()
+  upload <- unname(c(nfl_paths[file.exists(nfl_paths)], "data/cfb2nfl.duckdb"))
+  for (f in upload) {
+    piggyback::pb_upload(
+      f,
+      repo = "ngiangre/cfb2nfl",
+      tag = "data-latest",
+      overwrite = TRUE
+    )
+  }
+  id <- gh::gh("GET /repos/ngiangre/cfb2nfl/releases/tags/data-latest")$id
+  assets <- gh::gh(
+    "GET /repos/ngiangre/cfb2nfl/releases/{id}/assets",
+    id = id,
+    .limit = 100
   )
-  cat("Published; dispatch site.yaml to rebuild the site.\n")
+  on_release <- stats::setNames(
+    vapply(assets, \(a) a$size, numeric(1)),
+    vapply(assets, \(a) a$name, character(1))
+  )
+  missing <- upload[
+    on_release[basename(upload)] != file.size(upload) |
+      is.na(on_release[basename(upload)])
+  ]
+  if (length(missing) > 0L) {
+    stop("Upload did not land for: ", paste(basename(missing), collapse = ", "))
+  }
+  cat("Published and verified; dispatch site.yaml to rebuild the site.\n")
 }
