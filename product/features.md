@@ -156,7 +156,8 @@ acceptance criteria.
     interval and players at risk; every number is an inline variable.
   - [ ] Each ending is illustrated by named players whose path is
     computed from the data and linked to their Explorer Players page
-    (`explorer.html#tab=players&player=<id>`), and the post says the
+    (`explorer.html#tab=players&pos=<group>&player=<id>`; offensive
+    linemen have no player page, so they are unlinked), and the post says the
     curves describe groups, not any one player's chances.
   - [ ] The functions that build the competing-risks frame and the curves
     are tested (`testthat`), including a fixture where the estimate
