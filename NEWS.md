@@ -1,5 +1,19 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Fix (feature F22): **NFL outcome labels in `outcomes` are corrected**, so
+  drafted rates rise across every post that reads them. 260 more player
+  seasons are labeled drafted (2,718 to 2,978) and the undrafted signings are
+  cleaner:
+  - a draft or undrafted signing that follows final college seasons with no
+    stat line (linemen, injured seniors: Isaiah Wynn, Matt Bushman) now
+    lands on the player's last stat season instead of being lost;
+  - a pick whose CFBD id differs from the player's stat id now links by name
+    and school (Carson Wentz, Le'Veon Bell, Tyrann Mathieu, Zay Jones);
+  - the undrafted name match no longer links a drafted namesake, or an NFL
+    player who debuted while the college player was still playing.
+  `contract_outcomes()` now checks one entry row per player, that every
+  entrant has one, and that no undrafted entrant is a drafted player
+  ([#99](https://github.com/ngiangre/cfb2nfl/issues/99)).
 - Data (feature F23): **NFL play, snap and roster-status data from 2022 on**,
   for following drafted and undrafted players into the NFL. Four new tables
   on `data-latest` and in the DuckDB: `nfl_pbp` (every nflverse

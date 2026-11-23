@@ -22,7 +22,14 @@
 #' - **survival bookkeeping**: event time, event indicator, end-of-season
 #'   status, and administrative right-censoring (`outcome_observed_d`).
 #'
-#' Rows whose draft `d` is after `last_complete_draft` carry `NA` outcomes and
+#' An NFL entry after seasons with no stat line (a lineman's or an injured
+#' senior's final year) lands on the player's **last stat row**, so every
+#' entrant has exactly one entry row. A pick whose CFBD id is outside the
+#' population links by name + college team when the match is unique. The
+#' undrafted name guard skips any `gsis_id` that belongs to a draft pick and
+#' any first NFL season before the player's last college season (namesakes).
+#'
+#' Rows whose outcome year is after `last_complete_draft` carry `NA` outcomes and
 #' `status_end_of_season = "censored"` — administrative right-censoring, never a
 #' fabricated 0.
 #'
@@ -41,6 +48,9 @@
 #' @param nfl_rosters Cleaned NFL rosters (see [clean_nfl_rosters()]).
 #' @param nfl_player_stats Cleaned NFL player-season stats
 #'   (see [clean_nfl_player_stats()]).
+#' @param nfl_draft_picks Optional nflverse draft picks
+#'   (see [clean_nfl_draft_picks()]); their `gsis_id`s join the CFBD picks'
+#'   as drafted players the undrafted name guard must never link.
 #' @param k Fixed-horizon window (in draft classes) for
 #'   `outcome_nfl_entry_by_d_plus_k`.
 #' @param min_years_since_hs Required gap between HS graduation and the draft
@@ -57,6 +67,7 @@ build_outcomes <- function(
   picks_nfl,
   nfl_rosters,
   nfl_player_stats,
+  nfl_draft_picks = NULL,
   k = 1L,
   min_years_since_hs = 3L,
   last_complete_draft = last_complete_nfl_draft()
@@ -126,7 +137,10 @@ build_outcomes <- function(
 
   backbone <- backbone |>
     dplyr::group_by(.data$playerId) |>
-    dplyr::mutate(next_season = dplyr::lead(.data$season)) |>
+    dplyr::mutate(
+      next_season = dplyr::lead(.data$season),
+      is_last_stat = .data$season == max(.data$season)
+    ) |>
     dplyr::ungroup() |>
     dplyr::left_join(hs, by = "playerId") |>
     dplyr::mutate(
@@ -168,6 +182,58 @@ build_outcomes <- function(
     dplyr::filter(.data$pick_draft_year > .data$first_stat_season) |>
     dplyr::select(-"first_stat_season")
 
+  # A pick whose CFBD id is not in the population (the pick and the stat line
+  # carry different ids, e.g. Zay Jones) links by name + college team, only
+  # when exactly one player and one pick match, within the entry window.
+  pop_teams <- if ("team" %in% names(ps_pop)) {
+    dplyr::collect(ps_pop) |> dplyr::distinct(.data$playerId, .data$team)
+  }
+  if (
+    !is.null(pop_teams) && all(c("name", "collegeTeam") %in% names(picks_nfl))
+  ) {
+    fallback <- picks_nfl |>
+      dplyr::filter(
+        .data$year %in% 2010:2027,
+        is.na(.data$playerId) | !.data$playerId %in% players$playerId
+      ) |>
+      dplyr::transmute(
+        pick_key = dplyr::row_number(),
+        norm = normalize_name(.data$name),
+        team = .data$collegeTeam,
+        pick_draft_year = as.integer(.data$year),
+        pick_round = as.integer(.data$round),
+        pick_overall = as.integer(.data$overall),
+        .data$gsis_id
+      ) |>
+      dplyr::inner_join(
+        players |>
+          dplyr::filter(!.data$playerId %in% pick_lookup$playerId) |>
+          dplyr::transmute(
+            .data$playerId,
+            norm = normalize_name(.data$player),
+            .data$first_stat_season,
+            .data$last_season
+          ) |>
+          dplyr::inner_join(pop_teams, by = "playerId"),
+        by = c("norm", "team"),
+        relationship = "many-to-many"
+      ) |>
+      dplyr::filter(
+        .data$pick_draft_year > .data$first_stat_season,
+        .data$pick_draft_year <= .data$last_season + 2L
+      ) |>
+      dplyr::distinct(.data$pick_key, .data$playerId, .keep_all = TRUE) |>
+      dplyr::filter(dplyr::n() == 1L, .by = "pick_key") |>
+      dplyr::filter(dplyr::n() == 1L, .by = "playerId") |>
+      dplyr::select(dplyr::all_of(names(pick_lookup)))
+    pick_lookup <- dplyr::bind_rows(pick_lookup, fallback)
+  }
+  # Any gsis that belongs to a draft pick is a drafted player, never a UDFA.
+  drafted_gsis <- unique(stats::na.omit(c(
+    picks_nfl$gsis_id,
+    if (!is.null(nfl_draft_picks)) dplyr::collect(nfl_draft_picks)$gsis_id
+  )))
+
   # ---- UDFA entry: name-guarded roster match for undrafted players ----------
   # No draft slot to key on, so the match is by normalized name; an ambiguous
   # name (multiple candidate gsis_ids) resolves to no link rather than a guess
@@ -183,15 +249,18 @@ build_outcomes <- function(
     dplyr::summarise(nfl_first_season = min(.data$season), .groups = "drop")
 
   udfa_map <- players |>
+    dplyr::filter(!.data$playerId %in% pick_lookup$playerId) |>
     dplyr::transmute(
       .data$playerId,
       norm = normalize_name(.data$player),
-      entry_lo = .data$first_stat_season + 1L,
+      # The same person cannot debut in the NFL before his last college
+      # season: an earlier first NFL season is a namesake.
+      entry_lo = .data$last_stat_season + 1L,
       entry_hi = .data$last_season + 2L
     ) |>
     dplyr::inner_join(
       dplyr::mutate(
-        rosters,
+        dplyr::filter(rosters, !.data$gsis_id %in% drafted_gsis),
         norm = normalize_name(.data$player_name)
       ) |>
         dplyr::select("norm", "gsis_id"),
@@ -244,11 +313,21 @@ build_outcomes <- function(
         .data$pick_draft_year,
         .data$nfl_first_season
       ),
-      outcome_observed_d = .data$draft_year <= .env$last_complete_draft,
+      # The year this row's outcome is decided: the next draft, except on a
+      # player's last stat row, where a later entry (after seasons with no
+      # stat line) is the outcome that follows it.
+      event_year = dplyr::if_else(
+        .data$is_last_stat &
+          !is.na(.data$entry_year) &
+          .data$entry_year > .data$draft_year,
+        .data$entry_year,
+        .data$draft_year
+      ),
+      outcome_observed_d = .data$event_year <= .env$last_complete_draft,
       outcome_drafted_d = dplyr::if_else(
         .data$outcome_observed_d,
         !is.na(.data$pick_draft_year) &
-          .data$pick_draft_year == .data$draft_year,
+          .data$pick_draft_year == .data$event_year,
         NA
       ),
       outcome_draft_round_d = dplyr::if_else(
@@ -276,7 +355,7 @@ build_outcomes <- function(
         !.data$outcome_observed_d ~ NA,
         .data$outcome_drafted_d %in% TRUE ~ FALSE,
         !is.na(.data$nfl_first_season) ~
-          .data$draft_year == .data$nfl_first_season,
+          .data$event_year == .data$nfl_first_season,
         TRUE ~ FALSE
       ),
       outcome_nfl_entry_d = dplyr::if_else(
@@ -301,17 +380,17 @@ build_outcomes <- function(
       outcome_nfl_entry_by_d_plus_k = dplyr::if_else(
         .data$outcome_observed_d,
         !is.na(.data$entry_year) &
-          .data$entry_year <= .data$draft_year + as.integer(.env$k) - 1L,
+          .data$entry_year <= .data$event_year + as.integer(.env$k) - 1L,
         NA
       )
     ) |>
     dplyr::left_join(
       roster_seasons,
-      by = c("gsis_id", "draft_year" = "season")
+      by = c("gsis_id", "event_year" = "season")
     ) |>
     dplyr::left_join(
       games_lookup,
-      by = c("gsis_id", "draft_year" = "season")
+      by = c("gsis_id", "event_year" = "season")
     ) |>
     dplyr::mutate(
       outcome_made_roster_entry_year = dplyr::if_else(
@@ -379,7 +458,9 @@ build_outcomes <- function(
         "entry_games",
         "on_roster",
         "exhausted",
-        "first_eligible_season"
+        "first_eligible_season",
+        "is_last_stat",
+        "event_year"
       ))
     )
 

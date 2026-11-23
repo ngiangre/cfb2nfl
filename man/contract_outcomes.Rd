@@ -4,13 +4,23 @@
 \alias{contract_outcomes}
 \title{Contract for the person-period outcome table}
 \usage{
-contract_outcomes(outcomes, ps_pop, stop_on_fail = TRUE)
+contract_outcomes(
+  outcomes,
+  ps_pop,
+  picks_nfl = NULL,
+  nfl_draft_picks = NULL,
+  stop_on_fail = TRUE
+)
 }
 \arguments{
 \item{outcomes}{Person-period outcome table (see \code{\link[=build_outcomes]{build_outcomes()}}).}
 
 \item{ps_pop}{Model population the table was built from; its
 \verb{(playerId, season)} row count is the expected row count.}
+
+\item{picks_nfl, nfl_draft_picks}{Optional CFBD picks bridged to nflverse
+(\code{\link[=link_nfl_draft]{link_nfl_draft()}}) and nflverse draft picks; their \code{gsis_id}s are the
+drafted players.}
 
 \item{stop_on_fail}{Abort on failure? \code{FALSE} records the result for the
 audit log instead (the \verb{ok_*} target pattern).}
@@ -23,5 +33,7 @@ Validates \code{build_outcomes()} output: the modeling labels must preserve the
 population grain (no silent join loss), the drafted/UDFA events must stay
 mutually exclusive, \code{nfl_entry} must equal the union of its components, and
 administrative right-censoring must carry \code{NA} outcomes — never a fabricated
-0.
+0. Each player enters the NFL on at most one row, every entrant whose entry
+falls inside the observed window has that row, and (given \code{picks_nfl}) no
+undrafted entrant carries the \code{gsis_id} of a drafted player.
 }

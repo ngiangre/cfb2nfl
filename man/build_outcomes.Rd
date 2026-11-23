@@ -11,6 +11,7 @@ build_outcomes(
   picks_nfl,
   nfl_rosters,
   nfl_player_stats,
+  nfl_draft_picks = NULL,
   k = 1L,
   min_years_since_hs = 3L,
   last_complete_draft = last_complete_nfl_draft()
@@ -31,6 +32,10 @@ backbone; used for the last observed college season).}
 
 \item{nfl_player_stats}{Cleaned NFL player-season stats
 (see \code{\link[=clean_nfl_player_stats]{clean_nfl_player_stats()}}).}
+
+\item{nfl_draft_picks}{Optional nflverse draft picks
+(see \code{\link[=clean_nfl_draft_picks]{clean_nfl_draft_picks()}}); their \code{gsis_id}s join the CFBD picks'
+as drafted players the undrafted name guard must never link.}
 
 \item{k}{Fixed-horizon window (in draft classes) for
 \code{outcome_nfl_entry_by_d_plus_k}.}
@@ -64,7 +69,14 @@ the entry year;
 status, and administrative right-censoring (\code{outcome_observed_d}).
 }
 
-Rows whose draft \code{d} is after \code{last_complete_draft} carry \code{NA} outcomes and
+An NFL entry after seasons with no stat line (a lineman's or an injured
+senior's final year) lands on the player's \strong{last stat row}, so every
+entrant has exactly one entry row. A pick whose CFBD id is outside the
+population links by name + college team when the match is unique. The
+undrafted name guard skips any \code{gsis_id} that belongs to a draft pick and
+any first NFL season before the player's last college season (namesakes).
+
+Rows whose outcome year is after \code{last_complete_draft} carry \code{NA} outcomes and
 \code{status_end_of_season = "censored"} — administrative right-censoring, never a
 fabricated 0.
 

@@ -279,3 +279,222 @@ test_that("survival bookkeeping: statuses, event time, no silent fan-out", {
   )
   expect_false(any(duplicated(out[c("playerId", "season")])))
 })
+
+# ---- label fixes (#99) --------------------------------------------------------
+
+run_outcomes <- function(d, ...) {
+  build_outcomes(
+    d$ps_pop,
+    d$career,
+    d$recruiting,
+    d$picks_nfl,
+    d$nfl_rosters,
+    d$nfl_player_stats,
+    last_complete_draft = 2025L,
+    ...
+  )
+}
+
+test_that("a draft after a final season with no stat line lands on the last stat row", {
+  d <- make_inputs()
+  # Wynn: stat lines 2014-2016, on the roster in 2017 without one, drafted
+  # 2018. No row has draft_year 2018, so the pick lands on the 2016 row.
+  d$ps_pop <- dplyr::bind_rows(
+    d$ps_pop,
+    ps(playerId = "40", player = "Isaiah Wynn", season = 2014:2016)
+  )
+  d$career <- dplyr::bind_rows(
+    d$career,
+    ps(playerId = "40", last_season = 2017L)
+  )
+  d$picks_nfl <- dplyr::bind_rows(
+    d$picks_nfl,
+    ps(
+      playerId = "40",
+      year = 2018L,
+      round = 1L,
+      overall = 23L,
+      gsis_id = "00-4"
+    )
+  )
+  out <- run_outcomes(d)
+  wynn <- out[out$playerId == "40", ]
+  expect_equal(wynn$outcome_drafted_d, c(FALSE, FALSE, TRUE))
+  expect_equal(wynn$outcome_draft_round_d[3], 1L)
+  expect_equal(
+    wynn$status_end_of_season,
+    c("continuing", "continuing", "drafted")
+  )
+  expect_true(all(wynn$nfl_entry_event))
+})
+
+test_that("an undrafted signing after a no-stat final season lands on the last stat row", {
+  d <- make_inputs()
+  # Bushman: stat lines 2018-2019, injured through 2020, signed 2021.
+  d$ps_pop <- dplyr::bind_rows(
+    d$ps_pop,
+    ps(playerId = "50", player = "Matt Bushman", season = 2018:2019)
+  )
+  d$career <- dplyr::bind_rows(
+    d$career,
+    ps(playerId = "50", last_season = 2020L)
+  )
+  d$nfl_rosters <- dplyr::bind_rows(
+    d$nfl_rosters,
+    ps(gsis_id = "00-5", player_name = "Matt Bushman", season = 2021L)
+  )
+  out <- run_outcomes(d)
+  bush <- out[out$playerId == "50", ]
+  expect_equal(bush$outcome_signed_udfa_d, c(FALSE, TRUE))
+  expect_equal(bush$status_end_of_season, c("continuing", "signed_udfa"))
+})
+
+test_that("an entry after the completeness cutoff stays censored, not flagged", {
+  d <- make_inputs()
+  d$ps_pop <- dplyr::bind_rows(
+    d$ps_pop,
+    ps(playerId = "40", player = "Isaiah Wynn", season = 2023L)
+  )
+  d$career <- dplyr::bind_rows(
+    d$career,
+    ps(playerId = "40", last_season = 2024L)
+  )
+  d$picks_nfl <- dplyr::bind_rows(
+    d$picks_nfl,
+    ps(
+      playerId = "40",
+      year = 2026L,
+      round = 1L,
+      overall = 23L,
+      gsis_id = "00-4"
+    )
+  )
+  out <- run_outcomes(d)
+  # The outcome after his last season is decided in 2026, past the cutoff.
+  wynn <- out[out$playerId == "40", ]
+  expect_false(wynn$outcome_observed_d)
+  expect_true(is.na(wynn$outcome_drafted_d))
+  expect_equal(wynn$status_end_of_season, "censored")
+})
+
+test_that("a pick on an id outside the population links by name and school", {
+  d <- make_inputs()
+  d$ps_pop <- dplyr::bind_rows(
+    dplyr::mutate(d$ps_pop, team = "Elsewhere"),
+    ps(
+      playerId = "60",
+      player = "Zay Jones",
+      season = 2015:2016,
+      team = "East Carolina"
+    )
+  )
+  d$career <- dplyr::bind_rows(
+    d$career,
+    ps(playerId = "60", last_season = 2016L)
+  )
+  d$picks_nfl <- dplyr::bind_rows(
+    dplyr::mutate(d$picks_nfl, name = "Cam Ward", collegeTeam = "Miami"),
+    # The pick carries a different CFBD id than the stat line.
+    ps(
+      playerId = "999",
+      year = 2017L,
+      round = 2L,
+      overall = 37L,
+      gsis_id = "00-6",
+      name = "Zay Jones",
+      collegeTeam = "East Carolina"
+    )
+  )
+  # The name guard would also find him on a roster: drafted must win.
+  d$nfl_rosters <- dplyr::bind_rows(
+    d$nfl_rosters,
+    ps(gsis_id = "00-6", player_name = "Zay Jones", season = 2017L)
+  )
+  out <- run_outcomes(d)
+  zay <- out[out$playerId == "60", ]
+  expect_equal(zay$outcome_drafted_d, c(FALSE, TRUE))
+  expect_equal(zay$outcome_draft_pick_d[2], 37L)
+  expect_false(any(zay$outcome_signed_udfa_d))
+  expect_equal(unique(zay$gsis_id), "00-6")
+})
+
+test_that("the name+school fallback skips a pick with two candidates", {
+  d <- make_inputs()
+  d$ps_pop <- dplyr::bind_rows(
+    dplyr::mutate(d$ps_pop, team = "Elsewhere"),
+    ps(
+      playerId = c("60", "61"),
+      player = "Zay Jones",
+      season = 2016L,
+      team = "East Carolina"
+    )
+  )
+  d$career <- dplyr::bind_rows(
+    d$career,
+    ps(playerId = c("60", "61"), last_season = 2016L)
+  )
+  d$picks_nfl <- dplyr::bind_rows(
+    dplyr::mutate(d$picks_nfl, name = "Cam Ward", collegeTeam = "Miami"),
+    ps(
+      playerId = "999",
+      year = 2017L,
+      round = 2L,
+      overall = 37L,
+      gsis_id = "00-6",
+      name = "Zay Jones",
+      collegeTeam = "East Carolina"
+    )
+  )
+  out <- run_outcomes(d)
+  expect_false(any(out$outcome_drafted_d[out$playerId %in% c("60", "61")]))
+})
+
+test_that("the UDFA guard never links a drafted player's gsis or an NFL debut during college", {
+  d <- make_inputs()
+  d$ps_pop <- dplyr::bind_rows(
+    d$ps_pop,
+    # A namesake of a drafted player (Cam Ward, gsis 00-1, drafted 2025).
+    ps(playerId = "70", player = "Cam Ward", season = 2022:2024),
+    # A namesake already on an NFL roster while still playing college.
+    ps(playerId = "80", player = "John Johnson", season = 2015:2017)
+  )
+  d$career <- dplyr::bind_rows(
+    d$career,
+    ps(playerId = c("70", "80"), last_season = c(2024L, 2017L))
+  )
+  d$nfl_rosters <- dplyr::bind_rows(
+    d$nfl_rosters,
+    ps(gsis_id = "00-8", player_name = "John Johnson", season = 2017:2018)
+  )
+  out <- run_outcomes(d)
+  # "Cam Ward" now has two candidate ids in the population: the real one
+  # keeps his pick, the namesake gets nothing.
+  expect_false(any(out$outcome_signed_udfa_d[out$playerId == "70"]))
+  expect_true(all(is.na(out$gsis_id[out$playerId == "70"])))
+  expect_false(any(out$outcome_signed_udfa_d[out$playerId == "80"]))
+  expect_false(any(out$nfl_entry_event[out$playerId == "80"]))
+  expect_true(any(out$outcome_drafted_d[out$playerId == "10"]))
+})
+
+test_that("contract_outcomes passes the fixture and catches a lost entry row", {
+  skip_if_not_installed("pointblank")
+  d <- make_inputs()
+  out <- run_outcomes(d)
+  expect_true(pointblank::all_passed(
+    contract_outcomes(out, d$ps_pop, d$picks_nfl, stop_on_fail = FALSE)
+  ))
+  # An entrant whose entry row was lost.
+  bad <- out
+  bad$outcome_signed_udfa_d[bad$playerId == "20"] <- FALSE
+  bad$outcome_nfl_entry_d[bad$playerId == "20"] <- FALSE
+  bad$outcome_made_roster_entry_year[bad$playerId == "20"] <- NA
+  expect_false(pointblank::all_passed(
+    contract_outcomes(bad, d$ps_pop, d$picks_nfl, stop_on_fail = FALSE)
+  ))
+  # A UDFA carrying a drafted player's gsis.
+  bad2 <- out
+  bad2$gsis_id[bad2$playerId == "20"] <- "00-1"
+  expect_false(pointblank::all_passed(
+    contract_outcomes(bad2, d$ps_pop, d$picks_nfl, stop_on_fail = FALSE)
+  ))
+})

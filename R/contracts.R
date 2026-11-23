@@ -2168,19 +2168,46 @@ contract_player_usage <- function(
 #' population grain (no silent join loss), the drafted/UDFA events must stay
 #' mutually exclusive, `nfl_entry` must equal the union of its components, and
 #' administrative right-censoring must carry `NA` outcomes — never a fabricated
-#' 0.
+#' 0. Each player enters the NFL on at most one row, every entrant whose entry
+#' falls inside the observed window has that row, and (given `picks_nfl`) no
+#' undrafted entrant carries the `gsis_id` of a drafted player.
 #'
 #' @param outcomes Person-period outcome table (see [build_outcomes()]).
 #' @param ps_pop Model population the table was built from; its
 #'   `(playerId, season)` row count is the expected row count.
+#' @param picks_nfl,nfl_draft_picks Optional CFBD picks bridged to nflverse
+#'   ([link_nfl_draft()]) and nflverse draft picks; their `gsis_id`s are the
+#'   drafted players.
 #' @param stop_on_fail Abort on failure? `FALSE` records the result for the
 #'   audit log instead (the `ok_*` target pattern).
 #'
 #' @return The interrogated pointblank agent (invisible).
 #' @export
-contract_outcomes <- function(outcomes, ps_pop, stop_on_fail = TRUE) {
+contract_outcomes <- function(
+  outcomes,
+  ps_pop,
+  picks_nfl = NULL,
+  nfl_draft_picks = NULL,
+  stop_on_fail = TRUE
+) {
   rlang::check_installed("pointblank")
   expected <- nrow(dplyr::distinct(ps_pop, .data$playerId, .data$season))
+  drafted_gsis <- unique(stats::na.omit(c(
+    picks_nfl$gsis_id,
+    if (!is.null(nfl_draft_picks)) dplyr::collect(nfl_draft_picks)$gsis_id
+  )))
+  observed_to <- max(outcomes$draft_year[outcomes$outcome_observed_d %in% TRUE])
+  per_player <- function(x) {
+    x |>
+      dplyr::summarise(
+        entry_rows = sum(.data$outcome_nfl_entry_d %in% TRUE),
+        entrant = any(.data$nfl_entry_event),
+        entry_year = dplyr::first(
+          .data$years_to_nfl_entry + .data$hs_grad_year
+        ),
+        .by = "playerId"
+      )
+  }
   agent <- pointblank::create_agent(outcomes, label = "outcomes") |>
     pointblank::col_vals_not_null(
       pointblank::vars(
@@ -2238,6 +2265,32 @@ contract_outcomes <- function(outcomes, ps_pop, stop_on_fail = TRUE) {
       0,
       preconditions = function(x) {
         dplyr::transmute(x, t = .data$years_to_nfl_entry)
+      }
+    ) |>
+    # One entry row per player, and an entrant inside the observed window
+    # always has it (a lost row reads as "never entered").
+    pointblank::col_vals_lte(
+      pointblank::vars(entry_rows),
+      1,
+      preconditions = per_player
+    ) |>
+    pointblank::col_vals_equal(
+      pointblank::vars(entry_rows),
+      1,
+      preconditions = function(x) {
+        dplyr::filter(
+          per_player(x),
+          .data$entrant,
+          .data$entry_year <= .env$observed_to
+        )
+      }
+    ) |>
+    # A drafted player's gsis on an undrafted entrant is a namesake link.
+    pointblank::col_vals_not_in_set(
+      pointblank::vars(gsis_id),
+      drafted_gsis,
+      preconditions = function(x) {
+        dplyr::filter(x, .data$outcome_signed_udfa_d %in% TRUE)
       }
     ) |>
     pointblank::interrogate()
