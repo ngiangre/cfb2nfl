@@ -174,9 +174,13 @@ ending_incidence <- function(
   purrr::imap(groups, function(d, g) {
     present <- intersect(states, unique(d$ending))
     status <- factor(d$ending, levels = c("censored", present))
-    fit <- survival::survfit(survival::Surv(d$time, status) ~ 1)
+    fit <- suppressWarnings(survival::survfit(
+      survival::Surv(d$time, status) ~ 1
+    ))
     times <- seq_len(max(d$time))
-    s <- summary(fit, times = times, extend = TRUE)
+    # The log-scale interval is undefined at a share of exactly 0 or 1, where
+    # it collapses to the estimate.
+    s <- suppressWarnings(summary(fit, times = times, extend = TRUE))
     cols <- match(c(present, "(s0)"), s$states)
     long <- function(m, nm) {
       m <- matrix(m[, cols], ncol = length(cols))
@@ -192,6 +196,18 @@ ending_incidence <- function(
       dplyr::left_join(
         tibble::tibble(time = times, n_risk = n_risk),
         by = "time"
+      ) |>
+      dplyr::mutate(
+        lower = dplyr::if_else(
+          is.finite(.data$lower),
+          .data$lower,
+          .data$estimate
+        ),
+        upper = dplyr::if_else(
+          is.finite(.data$upper),
+          .data$upper,
+          .data$estimate
+        )
       )
     start <- tibble::tibble(
       time = 0,
