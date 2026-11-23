@@ -1,8 +1,8 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
 - Fix (feature F22): **NFL outcome labels in `outcomes` are corrected**, so
-  drafted rates rise across every post that reads them. 260 more player
-  seasons are labeled drafted (2,718 to 2,978) and the undrafted signings are
+  drafted rates rise across every post that reads them. 254 more player
+  seasons are labeled drafted (2,718 to 2,972) and the undrafted signings are
   cleaner:
   - a draft or undrafted signing that follows final college seasons with no
     stat line (linemen, injured seniors: Isaiah Wynn, Matt Bushman) now

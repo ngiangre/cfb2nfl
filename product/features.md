@@ -180,6 +180,8 @@ acceptance criteria.
 - **Links:** decisions 0014, 0032
 - **Tasks:**
 <!-- tasks F22 -->
+- [ ] [#99](https://github.com/ngiangre/cfb2nfl/issues/99) fix(outcomes): drafted and undrafted labels lost or misassigned (late entry, id mismatch, namesakes)
+- [ ] [PR #100](https://github.com/ngiangre/cfb2nfl/pull/100) fix(outcomes): keep late, id-mismatched and namesake NFL labels straight
 <!-- /tasks -->
 
 ### F23 · NFL play, snap and roster-status data, 2022 on
@@ -237,6 +239,7 @@ acceptance criteria.
 <!-- tasks F23 -->
 - [ ] [#93](https://github.com/ngiangre/cfb2nfl/issues/93) feat(data): NFL play, snap and roster-status data, 2022 on (F23)
 - [x] [PR #94](https://github.com/ngiangre/cfb2nfl/pull/94) feat(data): NFL play, snap and roster-status data from 2022 (F23)
+- [x] [PR #96](https://github.com/ngiangre/cfb2nfl/pull/96) docs(product): tick F23 criteria 1 and 6; link #95 to F04
 <!-- /tasks -->
 
 ### F19 · NFL thrive-or-fizzle from NFL play-by-play

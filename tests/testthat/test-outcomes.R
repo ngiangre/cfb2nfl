@@ -498,3 +498,29 @@ test_that("contract_outcomes passes the fixture and catches a lost entry row", {
     contract_outcomes(bad2, d$ps_pop, d$picks_nfl, stop_on_fail = FALSE)
   ))
 })
+
+test_that("a pick years after the last college season is not a late entry", {
+  d <- make_inputs()
+  # A recycled id: stat lines end in 2014, a pick on the same id in 2020.
+  d$ps_pop <- dplyr::bind_rows(
+    d$ps_pop,
+    ps(playerId = "90", player = "Re Used", season = 2013:2014)
+  )
+  d$career <- dplyr::bind_rows(
+    d$career,
+    ps(playerId = "90", last_season = 2014L)
+  )
+  d$picks_nfl <- dplyr::bind_rows(
+    d$picks_nfl,
+    ps(
+      playerId = "90",
+      year = 2020L,
+      round = 5L,
+      overall = 150L,
+      gsis_id = "00-9"
+    )
+  )
+  out <- run_outcomes(d)
+  expect_false(any(out$outcome_drafted_d[out$playerId == "90"]))
+  expect_false(any(out$nfl_entry_event[out$playerId == "90"]))
+})

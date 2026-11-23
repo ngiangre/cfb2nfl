@@ -176,11 +176,16 @@ build_outcomes <- function(
     # year at or before the player's first stat season is impossible for a real
     # career, so the whole link is nulled rather than trusted.
     dplyr::left_join(
-      dplyr::select(players, "playerId", "first_stat_season"),
+      dplyr::select(players, "playerId", "first_stat_season", "last_season"),
       by = "playerId"
     ) |>
-    dplyr::filter(.data$pick_draft_year > .data$first_stat_season) |>
-    dplyr::select(-"first_stat_season")
+    # The same entry window as the UDFA match: a pick years after the last
+    # college season is another person on a recycled id, not a late entry.
+    dplyr::filter(
+      .data$pick_draft_year > .data$first_stat_season,
+      .data$pick_draft_year <= .data$last_season + 2L
+    ) |>
+    dplyr::select(-"first_stat_season", -"last_season")
 
   # A pick whose CFBD id is not in the population (the pick and the stat line
   # carry different ids, e.g. Zay Jones) links by name + college team, only
@@ -188,9 +193,9 @@ build_outcomes <- function(
   pop_teams <- if ("team" %in% names(ps_pop)) {
     dplyr::collect(ps_pop) |> dplyr::distinct(.data$playerId, .data$team)
   }
-  if (
-    !is.null(pop_teams) && all(c("name", "collegeTeam") %in% names(picks_nfl))
-  ) {
+  if (!is.null(pop_teams)) {
+    # Fail loudly rather than quietly dropping the recovered picks.
+    stopifnot(all(c("name", "collegeTeam") %in% names(picks_nfl)))
     fallback <- picks_nfl |>
       dplyr::filter(
         .data$year %in% 2010:2027,
