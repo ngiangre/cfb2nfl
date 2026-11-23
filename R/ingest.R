@@ -32,15 +32,25 @@ refresh_enabled <- function() {
 #'
 #' @param path Destination parquet path.
 #' @param build A zero-argument function returning the table to write (e.g. an
-#'   `ingest_*()` function). Only evaluated in refresh mode.
+#'   `ingest_*()` function). Only evaluated in refresh mode. It may return
+#'   `NULL` when the refresh selects none of the table's seasons; the
+#'   published file is then kept as is.
 #'
 #' @return `path` (returned visibly so a `format = "file"` target can track it).
 #' @keywords internal
 parquet_asset <- function(path, build) {
   if (refresh_enabled()) {
     rlang::check_installed("arrow", reason = "to write a parquet data asset.")
-    dir.create(dirname(path), showWarnings = FALSE, recursive = TRUE)
-    arrow::write_parquet(build(), path)
+    out <- build()
+    if (!is.null(out)) {
+      dir.create(dirname(path), showWarnings = FALSE, recursive = TRUE)
+      arrow::write_parquet(out, path)
+    } else if (!file.exists(path)) {
+      cli::cli_abort(c(
+        "The refresh selected nothing to write for {.path {path}}, and it is not published yet.",
+        "i" = "Download the {.val data-latest} release, or pull the table's full window."
+      ))
+    }
   } else if (!file.exists(path)) {
     cli::cli_abort(c(
       "Data asset {.path {path}} not found and refresh is off.",
@@ -388,6 +398,102 @@ ingest_nfl_player_stats <- function(seasons = 2010:2026) {
   # Drop seasons that haven't been played yet (no stats to pull).
   seasons <- seasons[seasons <= nflreadr::most_recent_season()]
   nflreadr::load_player_stats(seasons = seasons)
+}
+
+# ---- play-level NFL tables (feature F23) ------------------------------------
+# Play-by-play, participation, snap counts and weekly rosters, from 2022 on
+# (`nfl_play_min_season`). nflverse rebuilds the current season nightly; the
+# pipeline re-pulls the selected seasons and splices them in by season.
+
+#' Seasons nflverse has started publishing
+#'
+#' nflverse loaders error or return nothing for a season that has not begun,
+#' so every play-level NFL ingest drops seasons after
+#' `nflreadr::most_recent_season()` (as [ingest_nfl_player_stats()] does).
+#'
+#' @param seasons Integer vector of NFL seasons.
+#' @return The seasons that have started.
+#' @keywords internal
+nfl_published_seasons <- function(seasons) {
+  seasons <- as.integer(seasons)
+  seasons[seasons <= nflreadr::most_recent_season()]
+}
+
+#' Ingest NFL play-by-play (nflverse)
+#'
+#' Pulls nflverse (nflfastR) play-by-play (`nflreadr::load_pbp()`) with every
+#' column nflverse ships: EPA, WPA, success, and a GSIS id for each credited
+#' player (`passer_player_id`, `rusher_player_id`, `solo_tackle_1_player_id`,
+#' ...). All columns are kept while the attribution method is open (feature
+#' F23); [clean_nfl_pbp()] conforms them to `inst/dict/nfl_pbp.yml`.
+#'
+#' @param seasons Integer vector of NFL seasons.
+#' @return A tibble, one row per play.
+#' @export
+ingest_nfl_pbp <- function(seasons) {
+  rlang::check_installed("nflreadr", reason = "to pull nflverse play-by-play.")
+  tibble::as_tibble(nflreadr::load_pbp(nfl_published_seasons(seasons)))
+}
+
+#' Ingest NFL play participation (nflverse)
+#'
+#' Pulls who was on the field for each play (`nflreadr::load_participation()`),
+#' the only per-play record of linemen and other players with no credited
+#' play. nflverse publishes a season some time after it ends, so a season with
+#' no file yet is skipped with a message rather than failing the refresh; it
+#' arrives with a later refresh.
+#'
+#' @param seasons Integer vector of NFL seasons.
+#' @return A tibble, one row per play.
+#' @export
+ingest_nfl_participation <- function(seasons) {
+  rlang::check_installed(
+    "nflreadr",
+    reason = "to pull nflverse play participation."
+  )
+  pulled <- lapply(nfl_published_seasons(seasons), function(s) {
+    out <- suppressWarnings(nflreadr::load_participation(seasons = s))
+    if (nrow(out) == 0L) {
+      cli::cli_inform("nflverse has not published participation for {s} yet.")
+    }
+    tibble::as_tibble(out)
+  })
+  dplyr::bind_rows(pulled)
+}
+
+#' Ingest NFL snap counts (nflverse)
+#'
+#' Pulls offense, defense and special-teams snaps per player-game
+#' (`nflreadr::load_snap_counts()`, Pro-Football-Reference), every position
+#' included. Keyed by `pfr_player_id`.
+#'
+#' @param seasons Integer vector of NFL seasons.
+#' @return A tibble, one row per player-game.
+#' @export
+ingest_nfl_snap_counts <- function(seasons) {
+  rlang::check_installed("nflreadr", reason = "to pull nflverse snap counts.")
+  tibble::as_tibble(
+    nflreadr::load_snap_counts(seasons = nfl_published_seasons(seasons))
+  )
+}
+
+#' Ingest NFL weekly rosters (nflverse)
+#'
+#' Pulls every team's roster each week (`nflreadr::load_rosters_weekly()`):
+#' a player's status that week (active, practice squad, inactive, reserve,
+#' cut, traded) and depth-chart position.
+#'
+#' @param seasons Integer vector of NFL seasons.
+#' @return A tibble, one row per player-team-week.
+#' @export
+ingest_nfl_rosters_weekly <- function(seasons) {
+  rlang::check_installed(
+    "nflreadr",
+    reason = "to pull nflverse weekly rosters."
+  )
+  tibble::as_tibble(
+    nflreadr::load_rosters_weekly(seasons = nfl_published_seasons(seasons))
+  )
 }
 
 #' Ingest NFL Scouting Combine results (nflverse)

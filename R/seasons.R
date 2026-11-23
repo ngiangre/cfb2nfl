@@ -25,8 +25,31 @@ refresh_source_groups <- c(
   nfl_draft_picks = "draft",
   combine = "draft",
   nfl_rosters = "nfl",
-  nfl_player_stats = "nfl"
+  nfl_player_stats = "nfl",
+  nfl_pbp = "nfl",
+  nfl_participation = "nfl",
+  nfl_snap_counts = "nfl",
+  nfl_rosters_weekly = "nfl"
 )
+
+#' Play-level NFL sources and their first season
+#'
+#' The NFL play-by-play, participation, snap-count and weekly-roster tables
+#' (feature F23) start in 2022: only the seasons the next investigations use.
+#' Widening the window is a change to `nfl_play_min_season` plus a full NFL
+#' pull (`data-raw/refresh-nfl.R`).
+#'
+#' @keywords internal
+nfl_play_sources <- c(
+  "nfl_pbp",
+  "nfl_participation",
+  "nfl_snap_counts",
+  "nfl_rosters_weekly"
+)
+
+#' @rdname nfl_play_sources
+#' @keywords internal
+nfl_play_min_season <- 2022L
 
 #' Current college football season
 #'
@@ -231,6 +254,102 @@ refresh_is_full <- function(
   setequal(
     refresh_seasons(spec, source, min_season, date),
     refresh_seasons("", source, min_season, date)
+  )
+}
+
+#' Seasons to pull for a play-level NFL source
+#'
+#' The play-level NFL tables follow the same `CFB2NFL_REFRESH_SEASONS`
+#' selector as every other season-keyed source, but only inside their own
+#' window (`nfl_play_min_season` to the current NFL season). A selector that
+#' names no season in that window, such as a college backfill of 2015,
+#' selects nothing here instead of aborting, so the NFL tables are kept as
+#' published. A college selector that overlaps the window (`2021:2023`) also
+#' re-pulls those NFL seasons; nflverse costs no CFBD calls.
+#'
+#' @inheritParams refresh_seasons
+#' @return An integer vector of seasons, possibly empty.
+#' @keywords internal
+nfl_refresh_seasons <- function(
+  spec = Sys.getenv("CFB2NFL_REFRESH_SEASONS", ""),
+  source,
+  min_season = nfl_play_min_season,
+  date = Sys.Date()
+) {
+  window <- refresh_seasons("", source, min_season, date)
+  # Parse against an open lower bound so out-of-window years drop silently;
+  # malformed or all-future selectors still abort as they do for CFB sources.
+  selected <- suppressWarnings(refresh_seasons(spec, source, 1L, date))
+  window[window %in% selected]
+}
+
+#' Does the selector cover a play-level NFL source's whole window?
+#'
+#' @inheritParams nfl_refresh_seasons
+#' @return `TRUE` when every season from `min_season` to the current NFL
+#'   season is selected.
+#' @keywords internal
+nfl_refresh_is_full <- function(
+  spec = Sys.getenv("CFB2NFL_REFRESH_SEASONS", ""),
+  source,
+  min_season = nfl_play_min_season,
+  date = Sys.Date()
+) {
+  identical(
+    nfl_refresh_seasons(spec, source, min_season, date),
+    refresh_seasons("", source, min_season, date)
+  )
+}
+
+#' Splice a play-level NFL source into its published table
+#'
+#' The `*_file` build for the play-level NFL tables: clean the pulled rows and
+#' splice them over the selected seasons ([splice_seasons()]), rebuilding the
+#' table on a full-window pull. `NULL` when the selector names no NFL season,
+#' so [parquet_asset()] keeps the published file.
+#'
+#' @param raw The pulled rows (`NULL` when nothing was pulled).
+#' @param clean The table's clean function.
+#' @param source The source name (one of `nfl_play_sources`).
+#' @param path The published parquet.
+#' @return The table to write, or `NULL`.
+#' @keywords internal
+splice_nfl_play <- function(raw, clean, source, path) {
+  seasons <- nfl_refresh_seasons(source = source)
+  if (length(seasons) == 0L) {
+    return(NULL)
+  }
+  splice_seasons(
+    clean(raw),
+    path,
+    "season",
+    seasons,
+    full = nfl_refresh_is_full(source = source)
+  )
+}
+
+#' Rows per season of the published play-level NFL tables
+#'
+#' Evidence for the weekly refresh: compared before and after a run, only the
+#' refreshed seasons should move (`data-current.yaml`, `data-raw/refresh-nfl.R`).
+#'
+#' @param data_dir Directory holding the published parquet.
+#' @return A tibble with `table`, `season` and `rows`; tables not yet
+#'   published are absent.
+#' @keywords internal
+nfl_play_row_counts <- function(data_dir = "data") {
+  counts <- lapply(nfl_play_sources, function(s) {
+    path <- file.path(data_dir, paste0(s, ".parquet"))
+    if (!file.exists(path)) {
+      return(NULL)
+    }
+    arrow::read_parquet(path, col_select = "season") |>
+      dplyr::count(.data$season, name = "rows") |>
+      dplyr::mutate(table = s, .before = 1)
+  })
+  dplyr::bind_rows(
+    tibble::tibble(table = character(), season = integer(), rows = integer()),
+    counts
   )
 }
 

@@ -69,3 +69,19 @@ test_that("parquet_asset ingests and writes in refresh mode", {
   expect_equal(out, path)
   expect_equal(nrow(arrow::read_parquet(path)), 3L)
 })
+
+test_that("parquet_asset keeps the published file when build() has nothing", {
+  skip_if_not_installed("arrow")
+  Sys.setenv(CFB2NFL_REFRESH = "true")
+  on.exit(Sys.unsetenv("CFB2NFL_REFRESH"), add = TRUE)
+  path <- tempfile(fileext = ".parquet")
+  on.exit(unlink(path), add = TRUE)
+  arrow::write_parquet(data.frame(x = 1:2), path)
+
+  # A refresh that selects no season of this table leaves it as published.
+  expect_equal(parquet_asset(path, function() NULL), path)
+  expect_equal(nrow(arrow::read_parquet(path)), 2L)
+
+  unlink(path)
+  expect_error(parquet_asset(path, function() NULL), "nothing to write")
+})

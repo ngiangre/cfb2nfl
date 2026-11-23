@@ -442,6 +442,112 @@ clean_nfl_rosters <- function(nfl_rosters) {
     dplyr::distinct(.data$gsis_id, .data$season, .keep_all = TRUE)
 }
 
+#' Conform a table to its data dictionary
+#'
+#' Selects and types exactly the columns `inst/dict/<dataset>.yml` lists, in
+#' that order: a listed column the pull lacks becomes a typed `NA`, and a
+#' column the dictionary does not list is dropped with a message. Used for
+#' the nflverse tables kept close to their source schema (feature F23), so a
+#' column nflverse adds or removes mid-season cannot make the season splice
+#' ([splice_seasons()]) refuse the weekly refresh. Keep a new column by
+#' regenerating the dictionary (`data-raw/make-nfl-dicts.R`).
+#'
+#' @param x A data frame.
+#' @param dataset Dictionary name, e.g. `"nfl_pbp"`.
+#' @return A tibble with the dictionary's columns and types.
+#' @keywords internal
+conform_to_dict <- function(x, dataset) {
+  dict <- yaml::read_yaml(app_sys("dict", paste0(dataset, ".yml")))
+  cols <- vapply(dict$columns, \(col) col$name, character(1))
+  types <- vapply(dict$columns, \(col) col$type, character(1))
+  x <- tibble::as_tibble(x %||% tibble::tibble())
+  extra <- setdiff(names(x), cols)
+  if (length(extra) > 0L) {
+    cli::cli_inform(
+      "{dataset}: dropping {length(extra)} column{?s} not in its dictionary: {.val {extra}}."
+    )
+  }
+  cast <- list(
+    int32 = as.integer,
+    string = as.character,
+    double = as.double,
+    logical = as.logical
+  )
+  out <- lapply(seq_along(cols), function(i) {
+    v <- if (cols[[i]] %in% names(x)) x[[cols[[i]]]] else rep(NA, nrow(x))
+    cast[[types[[i]]]](v)
+  })
+  tibble::as_tibble(stats::setNames(out, cols))
+}
+
+#' Clean NFL play-by-play (nflverse)
+#'
+#' Conforms the pull to `inst/dict/nfl_pbp.yml` ([conform_to_dict()]) and keeps
+#' one row per `(game_id, play_id)`.
+#'
+#' @param nfl_pbp Raw tibble from [ingest_nfl_pbp()].
+#' @return A tibble, one row per play.
+#' @export
+clean_nfl_pbp <- function(nfl_pbp) {
+  conform_to_dict(nfl_pbp, "nfl_pbp") |>
+    dplyr::distinct(.data$game_id, .data$play_id, .keep_all = TRUE)
+}
+
+#' Clean NFL play participation (nflverse)
+#'
+#' Adds `season` (the first four characters of `nflverse_game_id`, which
+#' nflverse does not ship as a column) so the table splices by season like
+#' the others, then conforms to `inst/dict/nfl_participation.yml`.
+#'
+#' @param nfl_participation Raw tibble from [ingest_nfl_participation()].
+#' @return A tibble, one row per play.
+#' @export
+clean_nfl_participation <- function(nfl_participation) {
+  x <- tibble::as_tibble(nfl_participation %||% tibble::tibble())
+  x$season <- as.integer(substr(x$nflverse_game_id, 1, 4))
+  conform_to_dict(x, "nfl_participation") |>
+    dplyr::distinct(.data$nflverse_game_id, .data$play_id, .keep_all = TRUE)
+}
+
+#' Clean NFL snap counts (nflverse)
+#'
+#' Conforms to `inst/dict/nfl_snap_counts.yml` and drops rows with no
+#' `pfr_player_id` (they cannot be tied to a player).
+#'
+#' @param nfl_snap_counts Raw tibble from [ingest_nfl_snap_counts()].
+#' @return A tibble, one row per player-game.
+#' @export
+clean_nfl_snap_counts <- function(nfl_snap_counts) {
+  conform_to_dict(nfl_snap_counts, "nfl_snap_counts") |>
+    dplyr::filter(!is.na(.data$pfr_player_id)) |>
+    dplyr::distinct(.data$game_id, .data$pfr_player_id, .keep_all = TRUE)
+}
+
+#' Clean NFL weekly rosters (nflverse)
+#'
+#' Drops rows with no `gsis_id` (missing or empty: unlinkable), conforms to
+#' `inst/dict/nfl_rosters_weekly.yml`, and keeps one row per
+#' `(season, week, team, gsis_id)`. A player who changes teams keeps a row for
+#' each team in the week of the move.
+#'
+#' @param nfl_rosters_weekly Raw tibble from [ingest_nfl_rosters_weekly()].
+#' @return A tibble, one row per player-team-week.
+#' @export
+clean_nfl_rosters_weekly <- function(nfl_rosters_weekly) {
+  x <- tibble::as_tibble(nfl_rosters_weekly %||% tibble::tibble())
+  if ("gsis_id" %in% names(x)) {
+    x <- x[!is.na(x$gsis_id) & nzchar(x$gsis_id), , drop = FALSE]
+  }
+  conform_to_dict(x, "nfl_rosters_weekly") |>
+    dplyr::distinct(
+      .data$season,
+      .data$week,
+      .data$team,
+      .data$gsis_id,
+      .keep_all = TRUE
+    )
+}
+
 #' Clean NFL player stats (nflverse)
 #'
 #' Aggregates the long weekly nflverse stats to the **player-season** grain,

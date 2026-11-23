@@ -73,6 +73,10 @@ jobs:
             )
           '
 
+      # Evidence that only the refreshed NFL season moves (feature F23).
+      - name: Record NFL rows per season before the refresh
+        run: Rscript -e 'pkgload::load_all(quiet = TRUE); write.csv(nfl_play_row_counts(), "nfl-rows-before.csv", row.names = FALSE)'
+
       # One pass: ingest the selected seasons -> splice -> process -> write
       # every parquet and the DuckDB bundle (decisions 0017, 0034). Contracts
       # (incl. season coverage) abort before anything is published.
@@ -84,6 +88,19 @@ jobs:
         run: |
           n=$( [ -f cfbd-calls.tsv ] && wc -l < cfbd-calls.tsv || echo 0 )
           echo "CFBD calls made: $n" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Report NFL rows per season
+        if: always()
+        run: |
+          Rscript -e '
+            pkgload::load_all(quiet = TRUE)
+            before <- if (file.exists("nfl-rows-before.csv")) read.csv("nfl-rows-before.csv") else nfl_play_row_counts()[0, ]
+            rows <- dplyr::full_join(before, nfl_play_row_counts(), by = c("table", "season"), suffix = c("_before", "_after"))
+            out <- c("### NFL play-level rows per season (feature F23)", "", "| table | season | before | after |", "|---|---|---|---|",
+              sprintf("| %s | %s | %s | %s |", rows$table, rows$season, rows$rows_before, rows$rows_after))
+            cat(out, sep = "\n", file = Sys.getenv("GITHUB_STEP_SUMMARY"), append = TRUE)
+            cat(out, sep = "\n")
+          '
 
       # Temporary (decision 0045): the play-stats revision measurement.
       - name: Report play-stats revisions

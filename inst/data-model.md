@@ -27,6 +27,10 @@ dictionaries next to this file, one YAML per table:
 | `nfl_draft_picks` | one NFL draft pick | [`dict/nfl_draft_picks.yml`](dict/nfl_draft_picks.yml) |
 | `nfl_rosters` | one player-season on an NFL roster | [`dict/nfl_rosters.yml`](dict/nfl_rosters.yml) |
 | `nfl_player_stats` | one NFL player-season (regular season) | [`dict/nfl_player_stats.yml`](dict/nfl_player_stats.yml) |
+| `nfl_pbp` | one NFL play, 2022 on (every nflverse column: EPA, WPA, credited players) | [`dict/nfl_pbp.yml`](dict/nfl_pbp.yml) |
+| `nfl_participation` | one NFL play, 2022 on: who was on the field (linemen included) | [`dict/nfl_participation.yml`](dict/nfl_participation.yml) |
+| `nfl_snap_counts` | one NFL player-game, 2022 on: offense / defense / special-teams snaps | [`dict/nfl_snap_counts.yml`](dict/nfl_snap_counts.yml) |
+| `nfl_rosters_weekly` | one player on one team's roster in one week, 2022 on: status | [`dict/nfl_rosters_weekly.yml`](dict/nfl_rosters_weekly.yml) |
 | `combine` | one NFL Scouting Combine invitee (pre-draft measurables) | [`dict/combine.yml`](dict/combine.yml) |
 | `stat_taxonomy` | one (category, statType) pair | [`dict/stat_taxonomy.yml`](dict/stat_taxonomy.yml) |
 | `ps_change` | one player-season (stat-line grain) + change features | [`dict/ps_change.yml`](dict/ps_change.yml) |
@@ -132,6 +136,10 @@ erDiagram
     ps_change }o--o| roster : "playerId, season"
     nfl_draft_picks ||--o{ nfl_rosters : "gsis_id, season"
     nfl_draft_picks ||--o{ nfl_player_stats : "gsis_id, season"
+    outcomes }o..o{ nfl_rosters_weekly : "gsis_id (name-guarded)"
+    nfl_rosters_weekly }o--o{ nfl_snap_counts : "pfr_id = pfr_player_id, season, week"
+    nfl_pbp ||--|| nfl_participation : "game_id = nflverse_game_id, play_id"
+    nfl_pbp }o--o{ nfl_rosters_weekly : "*_player_id = gsis_id"
     combine }o..o| player_stats : "athlete_id = playerId (name-guarded)"
     combine |o..o| picks : "draft slot (draft_year, draft_round, draft_ovr), name-guarded"
     roster |o--o{ career_summary : "playerId (collapsed)"
@@ -173,6 +181,19 @@ wrong rows, so they are called out explicitly.
    `(season, round, pick)` — **not** by `nflAthleteId` (a different namespace).
    From `nfl_draft_picks`, `gsis_id` is the key into `nfl_rosters` and
    `nfl_player_stats` (both keyed `(gsis_id, season)`).
+   **Play-level NFL tables (2022 on, feature F23).** `outcomes.gsis_id`
+   (drafted and undrafted alike) joins `nfl_rosters_weekly.gsis_id` and every
+   `nfl_pbp.*_player_id` column (passer, rusher, receiver, tacklers, ...).
+   `nfl_participation` joins `nfl_pbp` on `nflverse_game_id = game_id` and
+   `play_id`; its `offense_players` / `defense_players` are `;`-separated
+   gsis ids, the only per-play record of linemen. `nfl_snap_counts` is keyed
+   by Pro-Football-Reference id: join it to `nfl_rosters_weekly` on
+   `pfr_player_id = pfr_id` plus `season` and `week`. Coverage starts in
+   2022, so a career that began earlier is truncated in these tables: use
+   season-grain `nfl_rosters`, which stays the longevity source, for whole
+   careers. The current season is partial until it ends, and participation
+   arrives some time after a season ends. All of it is outcome data, never a
+   model input.
 
 6. **CFBD game id (`games.id` == `game_*_stats.gameId`, integer).** The
    game-level namespace. Both game-stat tables also carry `season`/`week`/
@@ -308,6 +329,27 @@ LEFT JOIN nfl_rosters r
   ON l.gsis_id = r.gsis_id
 GROUP BY l.playerId
 ORDER BY nfl_seasons DESC;
+```
+
+One player's rookie season week by week, through the same `gsis_id`: roster
+status, and snaps from `nfl_snap_counts` through the weekly roster's `pfr_id`
+(Cam Ward, the first pick of the 2025 draft):
+
+```sql
+WITH player AS (
+  SELECT DISTINCT o.gsis_id
+  FROM outcomes o
+  WHERE o.playerId = '4688380'  -- Cameron (Cam) Ward
+    AND o.gsis_id IS NOT NULL
+)
+SELECT w.season, w.week, w.team, w.status, w.depth_chart_position,
+       s.offense_snaps, s.offense_pct
+FROM nfl_rosters_weekly w
+JOIN player p ON w.gsis_id = p.gsis_id
+LEFT JOIN nfl_snap_counts s
+  ON s.pfr_player_id = w.pfr_id AND s.season = w.season AND s.week = w.week
+WHERE w.season = 2025
+ORDER BY w.week;
 ```
 
 Combine 40-yard dash next to each invitee's final college season, through the

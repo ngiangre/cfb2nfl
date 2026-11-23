@@ -4,13 +4,17 @@
 \alias{build_duckdb}
 \title{Bundle cleaned tables into a queryable DuckDB database}
 \usage{
-build_duckdb(tables, db_path = "data/cfb2nfl.duckdb")
+build_duckdb(tables, db_path = "data/cfb2nfl.duckdb", max_bytes = 2 * 1024^3)
 }
 \arguments{
 \item{tables}{A named list of data frames. Each name becomes a DuckDB table
 (e.g. \code{conference_tiers = tiers}).}
 
 \item{db_path}{Output DuckDB file path.}
+
+\item{max_bytes}{Largest allowed file size; the default is GitHub's 2 GiB
+release-asset limit, so an oversized bundle fails the build instead of
+the upload.}
 }
 \value{
 \code{db_path}, invisibly (so the target can track it with

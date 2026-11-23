@@ -1,5 +1,19 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Data (feature F23): **NFL play, snap and roster-status data from 2022 on**,
+  for following drafted and undrafted players into the NFL. Four new tables
+  on `data-latest` and in the DuckDB: `nfl_pbp` (every nflverse
+  play-by-play column, EPA and the players credited on each play),
+  `nfl_participation` (who was on the field each play, linemen included),
+  `nfl_snap_counts` (snaps per player-game) and `nfl_rosters_weekly` (each
+  player's status each week: active, practice squad, inactive, injured
+  reserve, cut, traded). All join the model population through
+  `outcomes.gsis_id`, cost no CFBD calls, and refresh the current NFL season
+  every week; `data-raw/refresh-nfl.R` re-pulls them without touching CFBD.
+  New contracts guard the tables, the bridge from college players (at least
+  99% coverage) and the model path (NFL data never feeds the model), and the
+  DuckDB build now fails before reaching the 2 GiB release-asset limit
+  ([decision 0049](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0049-nfl-play-level-data.md)).
 - Process: work now traces **issue → feature → goal → persona**. `product/`
   holds who the site serves (`personas.md`: the invested fan first, then
   coders and researchers), what it is for (`goals.md`: answer the questions,

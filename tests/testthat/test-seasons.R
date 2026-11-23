@@ -335,6 +335,42 @@ test_that("refresh_is_full distinguishes the full window from a slice", {
   expect_false(refresh_is_full("2011:2026", "recruiting", date = d))
 })
 
+test_that("play-level NFL sources follow the selector inside their 2022 window", {
+  d <- as.Date("2026-11-22")
+  expect_identical(nfl_refresh_seasons("", "nfl_pbp", date = d), 2022:2026)
+  expect_identical(nfl_refresh_seasons("current", "nfl_pbp", date = d), 2026L)
+  expect_identical(
+    nfl_refresh_seasons("2021:2023", "nfl_snap_counts", date = d),
+    2022:2023
+  )
+  # A college backfill of earlier seasons skips the NFL sources, no abort.
+  expect_identical(
+    nfl_refresh_seasons("2015", "nfl_rosters_weekly", date = d),
+    integer(0)
+  )
+  expect_no_warning(nfl_refresh_seasons("2010:2021", "nfl_pbp", date = d))
+  expect_error(nfl_refresh_seasons("abc", "nfl_pbp", date = d), "Unrecognized")
+})
+
+test_that("nfl_refresh_is_full is the whole 2022-to-current NFL window", {
+  d <- as.Date("2026-11-22")
+  expect_true(nfl_refresh_is_full("", "nfl_pbp", date = d))
+  expect_true(nfl_refresh_is_full("2010:2026", "nfl_pbp", date = d))
+  expect_false(nfl_refresh_is_full("current", "nfl_pbp", date = d))
+  expect_false(nfl_refresh_is_full("2015", "nfl_pbp", date = d))
+})
+
+test_that("play-level NFL sources take the NFL calendar", {
+  for (s in nfl_play_sources) {
+    expect_identical(refresh_source_group(s), "nfl")
+  }
+  # The Super Bowl in February still belongs to the prior season.
+  expect_identical(
+    nfl_refresh_seasons("current", "nfl_pbp", date = as.Date("2027-03-10")),
+    2026L
+  )
+})
+
 test_that("estimate_refresh_calls counts calls per endpoint", {
   games <- tibble::tibble(
     season = c(2025L, 2025L, 2025L, 2026L, 2026L),
@@ -390,4 +426,37 @@ test_that("required_seasons stops before each source's current season", {
   r <- required_seasons(c("roster", "recruiting"), date = as.Date("2026-11-05"))
   expect_equal(range(r$roster), c(2010L, 2025L))
   expect_equal(range(r$recruiting), c(2010L, 2025L))
+})
+
+test_that("splice_nfl_play keeps the published table when no NFL season is selected", {
+  withr::local_envvar(CFB2NFL_REFRESH_SEASONS = "2015")
+  expect_null(splice_nfl_play(
+    tibble::tibble(),
+    identity,
+    "nfl_pbp",
+    tempfile(fileext = ".parquet")
+  ))
+})
+
+test_that("splice_nfl_play rebuilds on the full NFL window", {
+  withr::local_envvar(CFB2NFL_REFRESH_SEASONS = "")
+  fresh <- tibble::tibble(season = 2022:2026, x = 1:5)
+  # Full window: no published file needed, the fresh table is the table.
+  expect_identical(
+    splice_nfl_play(fresh, identity, "nfl_pbp", tempfile(fileext = ".parquet")),
+    fresh
+  )
+})
+
+test_that("nfl_play_row_counts counts each published table's seasons", {
+  skip_if_not_installed("arrow")
+  dir <- withr::local_tempdir()
+  arrow::write_parquet(
+    data.frame(season = c(2025L, 2025L, 2026L)),
+    file.path(dir, "nfl_pbp.parquet")
+  )
+  out <- nfl_play_row_counts(dir)
+  expect_identical(out$table, c("nfl_pbp", "nfl_pbp"))
+  expect_identical(out$rows, c(2L, 1L))
+  expect_identical(nrow(nfl_play_row_counts(withr::local_tempdir())), 0L)
 })

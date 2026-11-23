@@ -10,7 +10,9 @@ parquet_asset(path, build)
 \item{path}{Destination parquet path.}
 
 \item{build}{A zero-argument function returning the table to write (e.g. an
-\verb{ingest_*()} function). Only evaluated in refresh mode.}
+\verb{ingest_*()} function). Only evaluated in refresh mode. It may return
+\code{NULL} when the refresh selects none of the table's seasons; the
+published file is then kept as is.}
 }
 \value{
 \code{path} (returned visibly so a \code{format = "file"} target can track it).

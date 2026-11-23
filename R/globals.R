@@ -143,5 +143,14 @@ utils::globalVariables(c(
   "outcome_label",
   # pointblank::vars() targets in contract_teams()
   "latitude",
-  "longitude"
+  "longitude",
+  # pointblank::vars() targets in the play-level NFL contracts (feature F23)
+  "nflverse_game_id",
+  "pfr_player_id",
+  "offense_snaps",
+  "defense_snaps",
+  "st_snaps",
+  "offense_pct",
+  "defense_pct",
+  "st_pct"
 ))
