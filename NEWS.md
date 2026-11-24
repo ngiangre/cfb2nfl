@@ -20,6 +20,10 @@
   earlier (most by one or two years), draft-eligible player seasons rise
   from 86,800 to 102,403, and drafted seasons labeled not yet eligible fall
   from 382 to 229. No other column changes.
+- Process: new feature card **F24**, a planned post on how college careers
+  end, by position, as competing outcomes over eligible seasons (drafted,
+  signed undrafted, eligibility exhausted, left the data), tracked in
+  [#97](https://github.com/ngiangre/cfb2nfl/issues/97).
 - Fix (feature F22): **NFL outcome labels in `outcomes` are corrected**, so
   drafted rates rise across every post that reads them. 254 more player
   seasons are labeled drafted (2,718 to 2,972) and the undrafted signings are
