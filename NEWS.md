@@ -38,6 +38,10 @@
   current year from May 1, so the April 2026 draft class counts as observed
   in `outcomes` (and in `_meta`) instead of censored. That class's rookie
   roster and games labels stay partial until its first NFL season ends.
+- Process: new feature card **F24**, a planned post on how college careers
+  end, by position, as competing outcomes over eligible seasons (drafted,
+  signed undrafted, eligibility exhausted, left the data), tracked in
+  [#97](https://github.com/ngiangre/cfb2nfl/issues/97).
 - Data (feature F23): **NFL play, snap and roster-status data from 2022 on**,
   for following drafted and undrafted players into the NFL. Four new tables
   on `data-latest` and in the DuckDB: `nfl_pbp` (every nflverse
