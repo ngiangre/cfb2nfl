@@ -816,6 +816,8 @@ list(
         ps_pop,
         picks_nfl,
         nfl_draft_picks,
+        roster = roster,
+        career = career,
         stop_on_fail = FALSE
       )
     )
@@ -1197,7 +1199,9 @@ list(
           picks_nfl,
           nfl_rosters,
           nfl_player_stats,
-          nfl_draft_picks
+          nfl_draft_picks,
+          roster = roster,
+          team_season = team_season
         )
       }
     ),

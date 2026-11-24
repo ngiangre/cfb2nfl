@@ -14,12 +14,15 @@ build_outcomes(
   nfl_draft_picks = NULL,
   k = 1L,
   min_years_since_hs = 3L,
-  last_complete_draft = last_complete_nfl_draft()
+  last_complete_draft = last_complete_nfl_draft(),
+  roster = NULL,
+  team_season = NULL
 )
 }
 \arguments{
-\item{ps_pop}{Model population (the \code{ps_pop} target: player-seasons with a
-stat line, reused ids excluded). Must carry \code{playerId}, \code{player}, \code{season}.}
+\item{ps_pop}{Stat-line population (the \code{ps_pop} target: player-seasons
+with a stat line, reused ids excluded). Must carry \code{playerId}, \code{player},
+\code{season}; \code{team} enables the name + school pick fallback.}
 
 \item{career}{Per-player career summary from \code{\link[=career_summary]{career_summary()}} (roster
 backbone; used for the last observed college season).}
@@ -45,13 +48,24 @@ as drafted players the undrafted name guard must never link.}
 
 \item{last_complete_draft}{Last NFL draft class with complete outcome data
 (default \code{\link[=last_complete_nfl_draft]{last_complete_nfl_draft()}}).}
+
+\item{roster}{Optional cleaned roster (\code{\link[=clean_roster]{clean_roster()}}). Given, the grain
+is every roster player-season (decision 0050).}
+
+\item{team_season}{Optional team-season table (\code{\link[=build_team_season]{build_team_season()}}),
+the source of each row's \code{tier}.}
 }
 \value{
-A tibble, one row per \verb{(playerId, season)} in \code{ps_pop}.
+A tibble, one row per \verb{(playerId, season)} in
+\code{\link[=outcomes_backbone]{outcomes_backbone()}}.
 }
 \description{
-Assembles the modeling labels at the player-season grain. Every row is one
-observed stat season \code{s} for a player in the model population, with:
+Assembles the modeling labels at the player-season grain. Given \code{roster},
+every row is one season \code{s} a player spends on a college roster, plus any
+stat-line season without a roster row (decision 0050; \code{\link[=outcomes_backbone]{outcomes_backbone()}});
+without it, the stat-line seasons in \code{ps_pop} alone. Each row carries
+\code{has_stat_line}, the season tier of its team (given \code{team_season}), the
+player's first roster season, and:
 }
 \details{
 \itemize{
@@ -69,12 +83,15 @@ the entry year;
 status, and administrative right-censoring (\code{outcome_observed_d}).
 }
 
-An NFL entry after seasons with no stat line (a lineman's or an injured
-senior's final year) lands on the player's \strong{last stat row}, so every
-entrant has exactly one entry row. A pick whose CFBD id is outside the
+An NFL entry later than the draft after the player's latest row before it
+(a season off every roster, or a roster that skips seasons) lands on that
+row, whose \code{draft_year} and eligibility clock then describe the entry's
+draft, so every entrant has exactly one entry row. A pick whose CFBD id is outside the
 population links by name + college team when the match is unique. The
 undrafted name guard skips any \code{gsis_id} that belongs to a draft pick and
-any first NFL season before the player's last college season (namesakes).
+any NFL debut before the player's last stat season (namesakes).
+A roster-only player has no stat-line name; a pick on his id supplies one,
+and a player with no name gets no name-guarded match.
 
 Rows whose outcome year is after \code{last_complete_draft} carry \code{NA} outcomes and
 \code{status_end_of_season = "censored"} — administrative right-censoring, never a
@@ -82,7 +99,8 @@ fabricated 0.
 
 \code{hs_grad_year} comes from the name-guarded recruiting link (\code{hs_class},
 decision 0013); when unavailable it is \strong{imputed} as the first observed
-college season minus one (a direct HS enrollee's graduation year) and
+college season minus one (a direct HS enrollee's graduation year), taking
+the earlier of the first roster season and the first stat season, and
 \code{hs_year_imputed} is set to 1, so models can filter or flag the mis-timed
 clock (redshirts, JUCO, late enrollees).
 }

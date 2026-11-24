@@ -89,7 +89,7 @@ all of it. Years 2010–2026.
 | `data/play_stats.parquet` | **long**: athlete-play-stat | key `(playId, athleteId, statTypeId)`; `athleteId` is the shared athlete namespace (no name guard); `playId` → `plays.id`. Pulled per game: the current season weekly (2026 on), past seasons only when backfilled, so they have no rows yet |
 | `data/play_types.parquet`, `data/play_stat_types.parquet` | one play / play-stat type | key `id`; display dimensions for `plays.playTypeId` / `play_stats.statTypeId`. CFBD's `Uncategorized`/`placeholder` types are kept |
 | `data/combine.parquet` | one NFL Scouting Combine invitee | nflverse; key `(season, player_name, school, pos)`. Measurables + draft slot, linked to the CFBD athlete id as `athlete_id` with `link_method` (`draft_slot`/`name_school`/`unmatched`; decision 0043). **Pre-draft** inputs: keep off the in-career model path |
-| `data/outcomes.parquet` | one player-season in the model population (person-period) | **The modeling dependent variables** (decision 0032): eligibility clock (`hs_grad_year`, `draft_eligible`, `eligible_season_index`), `outcome_*` labels (drafted, NFL entry, entry-year success), survival bookkeeping. Contract `contract_outcomes()` |
+| `data/outcomes.parquet` | one roster or stat-line player-season (person-period) | **The modeling dependent variables** (decisions 0032, 0050): `has_stat_line`, the row's `team` and season `tier`, `first_roster_season`; eligibility clock (`hs_grad_year`, `draft_eligible`, `eligible_season_index`), `outcome_*` labels (drafted, NFL entry, entry-year success), survival bookkeeping. Contract `contract_outcomes()` |
 
 ### Gotchas (do not ignore)
 
@@ -164,8 +164,12 @@ all of it. Years 2010–2026.
 
 ## How we work
 
-- **Population/outcome (v1):** outcome = drafted; denominator = players with a
-  stat line, in **draft-eligible seasons**.
+- **Population/outcome:** outcome = drafted; denominator = players on a
+  college roster, in **draft-eligible seasons** (decision 0050; the v1
+  stat-line population is the `has_stat_line` filter). Rosters are complete
+  every season; stat lines miss linemen, every defender before 2016 and
+  no-stat seasons. `outcomes` is on rosters; the model population
+  (`ps_pop` → `model_table`) moves in #104.
 - **Evaluation:** out-of-time validation — a model never sees data from on/after
   the draft class it predicts. Guard against leakage.
 - **Contracts + TDD:** test logic (`testthat`) and data (`pointblank`: expected

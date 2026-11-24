@@ -1,5 +1,23 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Data (feature F22): **`outcomes` now covers every roster player-season**,
+  not only seasons with a stat line
+  ([decision 0050](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0050-roster-outcome-population.md)).
+  Offensive linemen, every defender before 2016 (CFBD has no defensive stats
+  until then) and seasons without a stat line join the population: 336,241
+  rows (from 160,771), 134,985 players, and 3,803 drafted players (from
+  3,206). New columns `has_stat_line` (the old population is that filter),
+  the row's `team` and season `tier` / `tier_label`, `first_roster_season`
+  and `is_first_roster_season`. A drafted row's `draft_year` is now always
+  the draft it records, with the eligibility clock computed against it; an
+  entry after a skipped season lands on the latest row before it.
+  Undrafted signings are unchanged (4,337): roster-only players have no
+  name yet, so they cannot be matched to an NFL roster.
+  `contract_outcomes()` checks the roster grain, a tier on every row, and
+  that every in-window pick on a population id has its drafted row. New
+  `outcomes_backbone()`; `data-raw/refresh-outcomes.R` republishes the table
+  with no CFBD calls
+  ([#102](https://github.com/ngiangre/cfb2nfl/issues/102)).
 - Post (feature F24): **how college careers end, by position, as competing
   outcomes**. It follows every draft-eligible player season by season to one
   of four endings (drafted, signed undrafted, eligibility ended undrafted,
