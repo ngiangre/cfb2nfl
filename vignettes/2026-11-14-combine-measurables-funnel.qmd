@@ -5,7 +5,7 @@ description: "Fewer than one in ten draft-eligible players is invited to the NFL
 followups:
   - "Add pro-day results for invitees who skip combine drills, to separate a skipped drill from an unmeasured player."
   - "Ask whether combine measurables add to in-career production in a draft-time model, kept apart from the in-career forecasts."
-  - "Link more unmatched invitees, mostly offensive linemen without a stat line, through roster names and schools."
+  - "Link more unmatched invitees, mostly offensive linemen without a stat line, through the roster names CFBD now supplies and schools."
   - "Check whether the faster 40-yard dash medians since 2022 come from faster players or from slower players choosing not to run."
 author:
   - "AI directed by Nick Giangreco"
@@ -304,14 +304,14 @@ cast_funnel <- funnel |>
 cf <- function(name, col) cast_funnel[[col]][cast_funnel$who == name]
 not_invited <- and_list(setdiff(subjects$who, cast_combine$who))
 n_no_pos <- sum(funnel$position_group == "Position not recorded")
-# Players with a stat line per season: the coverage that drives the
+# Players on a college roster per season: the coverage that drives the
 # eligible count.
 statline_season <- count(outcomes, season, name = "players")
 sl <- function(s) statline_season$players[statline_season$season == s]
 ```
 
 ::: {.callout-note appearance="minimal"}
-*Data as of the `data-latest` release, retrieved 2026-11-14. The
+*Data as of the `data-latest` release, retrieved 2026-11-24. The
 `r combine_years[2]` combine class has not been drafted yet, so it appears in
 the measurables but not in the draft rates.*
 :::
@@ -839,7 +839,7 @@ girafe(ggobj = p8, width_svg = 13, height_svg = 12)
 
 *Expectation: fewer than one in ten draft-eligible players is invited in every draft year.* `r if (e5_holds) "✅" else "❌"`
 
-The table follows each draft year from eligible seasons to invitees; the falling rate comes mostly from data coverage, as players with a stat line grow from `r fmt(sl(funnel_years[1] - 1L))` in the `r funnel_years[1] - 1L` season to `r fmt(sl(funnel_years[2] - 1L))` in `r funnel_years[2] - 1L` (with a dip in the shortened 2020 season), so eligible seasons grow from `r fmt(eligible_first)` to `r fmt(eligible_last)` while invitees placed among them go from `r fmt(invited_first)` to `r fmt(invited_last)`.
+The table follows each draft year from eligible seasons to invitees; the falling rate comes mostly from data coverage, as players on a college roster grow from `r fmt(sl(funnel_years[1] - 1L))` in the `r funnel_years[1] - 1L` season to `r fmt(sl(funnel_years[2] - 1L))` in `r funnel_years[2] - 1L` (with a dip in the shortened 2020 season), so eligible seasons grow from `r fmt(eligible_first)` to `r fmt(eligible_last)` while invitees placed among them go from `r fmt(invited_first)` to `r fmt(invited_last)`.
 
 ```{r}
 #| label: s35-table
@@ -1054,7 +1054,7 @@ A missing drill more often reflects the player's choice than a gap in the record
 - The thinning since 2021 means a later combine's medians describe the invitees who chose to run, so comparisons across years carry that selection.
 :::
 
-Caveats: combine measurables are taken after the final college season, so they describe draft-time players and are kept apart from the in-career forecasts. The 2021 records come from campus workouts and include more players than a normal combine. The draft rates compare draft-eligible seasons with a stat line; invitees without a college id or outside that population (`r fmt(sum(by_year[["Linked, outside the population"]]) + sum(by_year[["No college id"]]))` in the draft years shown) are counted in the measurables only. The eligible count grows with the data's stat-line coverage, so invitation rates are comparable within a draft year but not as a trend across years.
+Caveats: combine measurables are taken after the final college season, so they describe draft-time players and are kept apart from the in-career forecasts. The 2021 records come from campus workouts and include more players than a normal combine. The draft rates compare draft-eligible seasons on a college roster; invitees without a college id or outside that population (`r fmt(sum(by_year[["Linked, outside the population"]]) + sum(by_year[["No college id"]]))` in the draft years shown) are counted in the measurables only. The eligible count grows with the data's stat-line coverage, so invitation rates are comparable within a draft year but not as a trend across years.
 
 ```{r}
 #| label: teardown
