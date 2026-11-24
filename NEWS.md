@@ -1,5 +1,25 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Post (feature F24): **how college careers end, by position, as competing
+  outcomes**. It follows every draft-eligible player season by season to one
+  of four endings (drafted, signed undrafted, eligibility ended undrafted,
+  left the data), and reports cumulative shares by position, why a
+  drafted-only survival curve overstates the drafted share, the per-season
+  chance of each NFL route, and the gap between players with and without a
+  matched recruiting record. New helpers `career_endings()`,
+  `ending_incidence()`, `naive_drafted()`, `ending_hazards()`,
+  `never_eligible_entrants()` and `explorer_player_url()`; `survival` is now
+  a suggested package
+  ([#97](https://github.com/ngiangre/cfb2nfl/issues/97)).
+- Fix (feature F22): **an imputed high-school year now starts at the first
+  roster season**. For players without a matched recruiting record,
+  `outcomes$hs_grad_year` was the first *stat* season minus one, so a
+  lineman, redshirt or pre-2016 defender on the roster for years before a
+  first stat line got a clock that started too late. It now takes the
+  earlier of the first roster and first stat season. 15,603 players move
+  earlier (most by one or two years), draft-eligible player seasons rise
+  from 86,800 to 102,403, and drafted seasons labeled not yet eligible fall
+  from 382 to 229. No other column changes.
 - Process: new feature card **F24**, a planned post on how college careers
   end, by position, as competing outcomes over eligible seasons (drafted,
   signed undrafted, eligibility exhausted, left the data), tracked in
