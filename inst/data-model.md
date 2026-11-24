@@ -236,7 +236,10 @@ wrong rows, so they are called out explicitly.
 in a draft-eligible season (decision 0050; the v1 population required a stat
 line, now the `has_stat_line` filter); the positive label is `drafted`. The
 `outcomes` table materializes this at the **person-period** grain: one row per
-roster or stat-line player-season, with the
+roster or stat-line player-season (`has_stat_line` marks the stat-line
+seasons; `tier` is the season tier of the row's team from `team_season`,
+whose nearest-season and tier-1 fallbacks are in `dict/outcomes.yml`), with
+the
 eligibility clock (`hs_grad_year`, `draft_eligible`, `eligible_season_index`),
 the drafted / NFL-entry / NFL-success labels (`outcome_*` columns), and the
 survival bookkeeping (`years_to_nfl_entry` + `nfl_entry_event`,

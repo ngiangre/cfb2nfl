@@ -9,8 +9,10 @@
   3,206). New columns `has_stat_line` (the old population is that filter),
   the row's `team` and season `tier` / `tier_label`, `first_roster_season`
   and `is_first_roster_season`. A drafted row's `draft_year` is now always
-  the draft it records, with the eligibility clock computed against it, and
-  an undrafted signing must debut after the player's last roster season.
+  the draft it records, with the eligibility clock computed against it; an
+  entry after a skipped season lands on the latest row before it.
+  Undrafted signings are unchanged (4,337): roster-only players have no
+  name yet, so they cannot be matched to an NFL roster.
   `contract_outcomes()` checks the roster grain, a tier on every row, and
   that every in-window pick on a population id has its drafted row. New
   `outcomes_backbone()`; `data-raw/refresh-outcomes.R` republishes the table

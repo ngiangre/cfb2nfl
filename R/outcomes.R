@@ -26,13 +26,13 @@
 #' - **survival bookkeeping**: event time, event indicator, end-of-season
 #'   status, and administrative right-censoring (`outcome_observed_d`).
 #'
-#' An NFL entry a year after the player's last row (a season off every
-#' roster) lands on that last row, whose `draft_year` and eligibility clock
-#' then describe that entry's draft, so every entrant has exactly one entry
-#' row. A pick whose CFBD id is outside the
+#' An NFL entry later than the draft after the player's latest row before it
+#' (a season off every roster, or a roster that skips seasons) lands on that
+#' row, whose `draft_year` and eligibility clock then describe the entry's
+#' draft, so every entrant has exactly one entry row. A pick whose CFBD id is outside the
 #' population links by name + college team when the match is unique. The
 #' undrafted name guard skips any `gsis_id` that belongs to a draft pick and
-#' any NFL debut while the player is still on a college roster (namesakes).
+#' any NFL debut before the player's last stat season (namesakes).
 #' A roster-only player has no stat-line name; a pick on his id supplies one,
 #' and a player with no name gets no name-guarded match.
 #'
@@ -187,10 +187,7 @@ build_outcomes <- function(
 
   backbone <- backbone |>
     dplyr::group_by(.data$playerId) |>
-    dplyr::mutate(
-      next_season = dplyr::lead(.data$season),
-      is_last_row = .data$season == max(.data$season)
-    ) |>
+    dplyr::mutate(next_season = dplyr::lead(.data$season)) |>
     dplyr::ungroup() |>
     dplyr::left_join(hs, by = "playerId") |>
     dplyr::mutate(
@@ -329,9 +326,11 @@ build_outcomes <- function(
     dplyr::transmute(
       .data$playerId,
       norm = normalize_name(.data$player),
-      # The same person cannot debut in the NFL while still on a college
-      # roster: an earlier first NFL season is a namesake.
-      entry_lo = .data$last_season + 1L,
+      # The same person cannot debut in the NFL before his last stat season:
+      # an earlier first NFL season is a namesake. Rosters can list a player
+      # a season past his debut (roster lag), so the roster does not bound it.
+      entry_lo = dplyr::coalesce(.data$last_stat_season, .data$last_season) +
+        1L,
       entry_hi = .data$last_season + 2L
     ) |>
     dplyr::inner_join(
@@ -388,14 +387,20 @@ build_outcomes <- function(
       entry_year = dplyr::coalesce(
         .data$pick_draft_year,
         .data$nfl_first_season
-      ),
-      # The year this row's outcome is decided: the next draft, except on a
-      # player's last row, where a later entry (after seasons off every
-      # roster) is the outcome that follows it.
+      )
+    ) |>
+    dplyr::mutate(
+      is_entry_row = (.data$season ==
+        max_or_na(.data$season[.data$season + 1L <= .data$entry_year])) %in%
+        TRUE,
+      .by = "playerId"
+    ) |>
+    dplyr::mutate(
+      # The year this row's outcome is decided: the next draft, except on the
+      # player's latest row before his NFL entry, when the entry comes later
+      # (a season off every roster, or a roster that skips seasons).
       event_year = dplyr::if_else(
-        .data$is_last_row &
-          !is.na(.data$entry_year) &
-          .data$entry_year > .data$draft_year,
+        .data$is_entry_row & .data$entry_year > .data$draft_year,
         .data$entry_year,
         .data$draft_year
       ),
@@ -547,7 +552,7 @@ build_outcomes <- function(
         "on_roster",
         "exhausted",
         "first_eligible_season",
-        "is_last_row",
+        "is_entry_row",
         "first_row_season",
         "last_row_season",
         "event_year"

@@ -83,13 +83,13 @@ the entry year;
 status, and administrative right-censoring (\code{outcome_observed_d}).
 }
 
-An NFL entry a year after the player's last row (a season off every
-roster) lands on that last row, whose \code{draft_year} and eligibility clock
-then describe that entry's draft, so every entrant has exactly one entry
-row. A pick whose CFBD id is outside the
+An NFL entry later than the draft after the player's latest row before it
+(a season off every roster, or a roster that skips seasons) lands on that
+row, whose \code{draft_year} and eligibility clock then describe the entry's
+draft, so every entrant has exactly one entry row. A pick whose CFBD id is outside the
 population links by name + college team when the match is unique. The
 undrafted name guard skips any \code{gsis_id} that belongs to a draft pick and
-any NFL debut while the player is still on a college roster (namesakes).
+any NFL debut before the player's last stat season (namesakes).
 A roster-only player has no stat-line name; a pick on his id supplies one,
 and a player with no name gets no name-guarded match.
 

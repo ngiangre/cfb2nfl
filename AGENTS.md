@@ -168,7 +168,8 @@ all of it. Years 2010–2026.
   college roster, in **draft-eligible seasons** (decision 0050; the v1
   stat-line population is the `has_stat_line` filter). Rosters are complete
   every season; stat lines miss linemen, every defender before 2016 and
-  no-stat seasons.
+  no-stat seasons. `outcomes` is on rosters; the model population
+  (`ps_pop` → `model_table`) moves in #104.
 - **Evaluation:** out-of-time validation — a model never sees data from on/after
   the draft class it predicts. Guard against leakage.
 - **Contracts + TDD:** test logic (`testthat`) and data (`pointblank`: expected

@@ -718,3 +718,90 @@ test_that("contract_outcomes checks the roster grain and the tier", {
   bad2$draft_eligible <- bad2$years_since_hs >= bad2$min_years_since_hs
   expect_false(ok(bad2))
 })
+
+test_that("a pick after roster-only final seasons lands on the last roster row", {
+  d <- roster_inputs()
+  # Kenyon Green's shape: a stat line in 2019, on the roster without one in
+  # 2020-2021, drafted 2022.
+  d$ps_pop <- dplyr::bind_rows(
+    d$ps_pop,
+    ps(playerId = "55", player = "Kenyon Green", season = 2019L)
+  )
+  d$roster <- dplyr::bind_rows(
+    d$roster,
+    ps(playerId = "55", season = 2019:2021, team = "Iowa")
+  )
+  d$career <- dplyr::bind_rows(
+    d$career,
+    ps(playerId = "55", first_season = 2019L, last_season = 2021L)
+  )
+  d$picks_nfl <- dplyr::bind_rows(
+    d$picks_nfl,
+    ps(
+      playerId = "55",
+      year = 2022L,
+      round = 1L,
+      overall = 15L,
+      gsis_id = "00-55"
+    )
+  )
+  out <- run_roster(d)
+  green <- out[out$playerId == "55", ]
+  expect_equal(green$has_stat_line, c(TRUE, FALSE, FALSE))
+  expect_equal(green$outcome_drafted_d, c(FALSE, FALSE, TRUE))
+  expect_equal(green$draft_year, 2020:2022)
+})
+
+test_that("a censored roster-only row carries NA outcomes, never 0", {
+  d <- roster_inputs()
+  d$roster <- dplyr::bind_rows(
+    d$roster,
+    ps(playerId = "65", season = 2024:2025, team = "Iowa")
+  )
+  d$team_season <- dplyr::bind_rows(
+    d$team_season,
+    ps(team = "Iowa", season = 2023:2025, tier = 3L, tier_label = "Power")
+  )
+  d$career <- dplyr::bind_rows(
+    d$career,
+    ps(playerId = "65", first_season = 2024L, last_season = 2025L)
+  )
+  out <- run_roster(d)
+  late <- out[out$playerId == "65" & out$season == 2025L, ]
+  expect_false(late$has_stat_line)
+  expect_false(late$outcome_observed_d)
+  expect_true(is.na(late$outcome_drafted_d))
+  expect_true(is.na(late$outcome_signed_udfa_d))
+  expect_equal(late$status_end_of_season, "censored")
+})
+
+test_that("a debut while the roster still lists the player lands on his row before it", {
+  d <- roster_inputs()
+  # Justin Hall's shape: rosters in 2018, 2019 and (lagging) 2022; signed
+  # undrafted and on an NFL roster in 2022.
+  d$ps_pop <- dplyr::bind_rows(
+    d$ps_pop,
+    ps(playerId = "75", player = "Justin Hall", season = 2019L)
+  )
+  d$roster <- dplyr::bind_rows(
+    d$roster,
+    ps(playerId = "75", season = c(2018L, 2019L, 2022L), team = "Iowa")
+  )
+  d$team_season <- dplyr::bind_rows(
+    d$team_season,
+    ps(team = "Iowa", season = 2018L, tier = 3L, tier_label = "Power")
+  )
+  d$career <- dplyr::bind_rows(
+    d$career,
+    ps(playerId = "75", first_season = 2018L, last_season = 2022L)
+  )
+  d$nfl_rosters <- dplyr::bind_rows(
+    d$nfl_rosters,
+    ps(gsis_id = "00-75", player_name = "Justin Hall", season = 2022L)
+  )
+  out <- run_roster(d)
+  hall <- out[out$playerId == "75", ]
+  expect_equal(hall$outcome_signed_udfa_d, c(FALSE, TRUE, FALSE))
+  expect_equal(hall$draft_year[2], 2022L)
+  expect_equal(sum(hall$outcome_nfl_entry_d %in% TRUE), 1L)
+})

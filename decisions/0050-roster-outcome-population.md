@@ -34,12 +34,17 @@ out:
   without a roster row (`outcomes_backbone()`). `has_stat_line` marks the
   stat-line seasons, so the old population is one filter away.
 - **Tier:** every row carries the season-aware tier of its team, from
-  `team_season` (decision 0003 lookup, with its nearest-season fill for
-  roster-only team-seasons). The contract fails on a missing tier rather than
-  defaulting.
+  `team_season`, and the contract fails on a missing tier. `team_season`
+  itself has two fallbacks, so "no NA" is not the same as "every row looked
+  up": 334,226 rows take the (season, conference) lookup (decision 0003), 366
+  borrow the conference of the team's nearest season with games (a
+  team-season with no games ingested), and 1,649 take tier 1 because the
+  team's conference is not in the lookup (Division II/III and other
+  conferences with no stat lines).
 - **Draft year:** a row's `draft_year` is the draft its outcome is about, and
   the eligibility clock is computed against it. That is `season + 1`, except
-  on a player's last row when the NFL entry comes one year later.
+  on the player's latest row before his NFL entry when the entry comes later:
+  a season off every roster, or a roster that skips seasons.
 - **Imputed high-school year:** the earlier of the first roster and first
   stat season, minus one.
 - **First roster season:** carried per player, with a flag on that season's
@@ -48,9 +53,17 @@ out:
   after their first roster season, nearly all transfers from programs the data
   does not cover (Bruce Irvin, Cordarrelle Patterson, Kyle Long, Cody Mauch,
   Jabril Cox).
-- **Undrafted debut window:** an NFL debut must come after the last roster
-  season, not the last stat season. A debut while still on a college roster
-  is a namesake.
+- **Undrafted debut window:** unchanged, the debut must follow the last
+  stat season (the last roster season for a roster-only player). Bounding it
+  by the last roster season instead dropped 34 links that were nearly all
+  real signings, whose NFL college matches a roster team, listed by a roster
+  in or past their debut season (transfers, roster lag). Such a debut now
+  lands on the player's latest row before it (Justin Hall: rosters 2018,
+  2019 and 2022, signed 2022, entry on the 2019 row).
+- **Reused-id pick guard:** a pick must come after the player's first
+  roster season, not his first stat season. All 599 newly drafted players
+  have no stat line at all, so the looser guard linked no pick that the old
+  population held.
 - **Model population:** the same roster backbone (task #104).
 
 Not chosen: excluding each player's first roster season as never
@@ -74,19 +87,23 @@ more late-entry special cases.
 | Players | 68,932 | 134,985 |
 | Draft-eligible rows | 86,800 | 181,009 |
 | Drafted players | 3,206 | 3,803 |
-| Undrafted signings | 4,337 | 4,305 |
+| Undrafted signings | 4,337 | 4,337 |
 
 - Of the eligible-row increase, 15,603 rows come from the earlier imputed
   high-school year alone (86,800 to 102,403 before the backbone changed).
-- The stricter undrafted debut window drops 30 links that were namesakes.
 - **65,449 players have no name.** The cleaned roster drops CFBD's first and
   last names, so a roster-only player who was never drafted gets no
   recruiting match (an imputed high-school year) and no undrafted-signing
   match. Adding the names back means re-pulling `/roster` (about 17 CFBD
   calls) and publishing the roster's new columns.
 - Every post that reads `outcomes` moves and must state its population
-  (#105-#110). Downstream target grains (`career_end_status()`, `exits`,
-  `team_draft`, the explorer player outcomes) do not change.
+  (#105-#110). Downstream target grains do not change: `career_end_status()`
+  134,922, `exits` 103,353 (4,329 undrafted), `team_draft` 26,859, explorer
+  player outcomes 134,922, player seasons 144,035, combine 5,710.
+  `funnel_population()` grows from 77,623 to 162,444 rows.
+- Undrafted signings are unchanged because roster-only players carry no name
+  (below), so none can match: the roster population adds no undrafted
+  signing until the roster names return.
 - Publishing goes through `data-raw/refresh-outcomes.R` (0 CFBD calls), in
   the same sitting as the merge, Monday to Saturday.
 
