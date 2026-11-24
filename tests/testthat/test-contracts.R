@@ -386,6 +386,30 @@ test_that("contract_roster guards key uniqueness and class_year range", {
   ))
 })
 
+test_that("contract_model_table checks the roster grain and the weight range", {
+  skip_if_not_installed("pointblank")
+  backbone <- tibble::tibble(playerId = c("1", "2"), season = 2020L)
+  good <- backbone |>
+    dplyr::mutate(has_stat_line = c(TRUE, FALSE), weight = c(210L, NA))
+  expect_true(pointblank::all_passed(
+    contract_model_table(good, backbone, stop_on_fail = FALSE)
+  ))
+  expect_false(pointblank::all_passed(
+    contract_model_table(good[1, ], backbone, stop_on_fail = FALSE)
+  ))
+  expect_false(pointblank::all_passed(
+    contract_model_table(
+      dplyr::bind_rows(good, good[1, ]),
+      backbone,
+      stop_on_fail = FALSE
+    )
+  ))
+  bad <- dplyr::mutate(good, weight = c(23L, NA))
+  expect_false(pointblank::all_passed(
+    contract_model_table(bad, backbone, stop_on_fail = FALSE)
+  ))
+})
+
 test_that("contract_roster_weight asserts row preservation and range", {
   skip_if_not_installed("pointblank")
   ps_change <- tibble::tibble(

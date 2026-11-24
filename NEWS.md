@@ -1,5 +1,12 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Model (feature F17): **the model table now has one row per roster
+  player-season**, the same keys as `outcomes` (decision 0050), instead of
+  stat-line seasons with a row per head coach. `build_model_table()` takes
+  stat-line features from `ps_change` (missing where a season has no stat
+  line, marked by `has_stat_line`) and team, position, tier and weight from
+  the roster for every season. `contract_model_table()` checks the grain
+  ([#104](https://github.com/ngiangre/cfb2nfl/issues/104)).
 - Fix (feature F22): **draft picks link through nicknames and spellings**.
   When a pick sits on another CFBD id, the name + school fallback now runs a
   second, stricter pass after exact names: the same surname, school and
