@@ -306,9 +306,66 @@ build_outcomes <- function(
       ) |>
       dplyr::distinct(.data$pick_key, .data$playerId, .keep_all = TRUE) |>
       dplyr::filter(dplyr::n() == 1L, .by = "pick_key") |>
-      dplyr::filter(dplyr::n() == 1L, .by = "playerId") |>
-      dplyr::select(dplyr::all_of(names(pick_lookup)))
-    pick_lookup <- dplyr::bind_rows(pick_lookup, fallback)
+      dplyr::filter(dplyr::n() == 1L, .by = "playerId")
+    pick_lookup <- dplyr::bind_rows(
+      pick_lookup,
+      dplyr::select(fallback, dplyr::all_of(names(pick_lookup)))
+    )
+    # A second pass for names that differ by a nickname or a spelling
+    # (Mitchell / Mitch Trubisky, Dawaune / Dawuane Smoot): the same school,
+    # surname and window, a strict name variant, and one candidate each way.
+    pick_rows <- picks_nfl |>
+      dplyr::filter(
+        .data$year %in% 2010:2027,
+        is.na(.data$playerId) | !.data$playerId %in% players$playerId
+      ) |>
+      dplyr::transmute(
+        pick_key = dplyr::row_number(),
+        pick_name = .data$name,
+        team = .data$collegeTeam,
+        pick_draft_year = as.integer(.data$year),
+        pick_round = as.integer(.data$round),
+        pick_overall = as.integer(.data$overall),
+        .data$gsis_id
+      ) |>
+      dplyr::filter(!.data$pick_key %in% fallback$pick_key)
+    surname <- function(x) sub(".* ", "", normalize_name(x))
+    variant <- pick_rows |>
+      dplyr::mutate(last = surname(.data$pick_name)) |>
+      dplyr::inner_join(
+        players |>
+          dplyr::filter(
+            !.data$playerId %in% pick_lookup$playerId,
+            !is.na(.data$player)
+          ) |>
+          dplyr::transmute(
+            .data$playerId,
+            .data$player,
+            last = surname(.data$player),
+            .data$first_season,
+            .data$last_season
+          ) |>
+          dplyr::inner_join(pop_teams, by = "playerId"),
+        by = c("last", "team"),
+        relationship = "many-to-many"
+      ) |>
+      dplyr::filter(
+        .data$pick_draft_year > .data$first_season,
+        .data$pick_draft_year <= .data$last_season + 2L
+      )
+    if (nrow(variant) > 0) {
+      variant <- variant |>
+        dplyr::filter(as.logical(name_variant(
+          .data$pick_name,
+          .data$player,
+          initials = FALSE
+        ))) |>
+        dplyr::distinct(.data$pick_key, .data$playerId, .keep_all = TRUE) |>
+        dplyr::filter(dplyr::n() == 1L, .by = "pick_key") |>
+        dplyr::filter(dplyr::n() == 1L, .by = "playerId") |>
+        dplyr::select(dplyr::all_of(names(pick_lookup)))
+      pick_lookup <- dplyr::bind_rows(pick_lookup, variant)
+    }
   }
   # Any gsis that belongs to a draft pick is a drafted player, never a UDFA.
   drafted_gsis <- unique(stats::na.omit(c(

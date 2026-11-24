@@ -1,5 +1,14 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Fix (feature F22): **draft picks link through nicknames and spellings**.
+  When a pick sits on another CFBD id, the name + school fallback now runs a
+  second, stricter pass after exact names: the same surname, school and
+  entry window, first names that are a prefix, a small spelling edit or a
+  common nickname of each other (never just a shared initial), and one
+  candidate each way. 47 more players are labeled drafted, including
+  Mitchell / Mitch Trubisky (2017, second overall), Mo / Maurice Hurst and
+  Dawaune / Dawuane Smoot; Donovan and Devon Smith stay apart
+  ([#103](https://github.com/ngiangre/cfb2nfl/issues/103)).
 - Post (feature F24): **the career-endings post now counts every player on
   a college roster**, following the new `outcomes` population. Careers end
   in three ways (no career ends by leaving the data on rosters), signing

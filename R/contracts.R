@@ -2216,7 +2216,7 @@ contract_outcomes <- function(
         pick_id = .data$playerId,
         pick_gsis = .data$gsis_id,
         pick_name = if ("name" %in% names(picks_nfl)) {
-          normalize_name(.data$name)
+          .data$name
         } else {
           NA_character_
         }
@@ -2233,7 +2233,14 @@ contract_outcomes <- function(
             .data$playerId[1] |
             (!is.na(.data$pick_gsis) & .data$pick_gsis %in% .data$gsis_id[1]) |
             (!is.na(.data$pick_name) &
-              .data$pick_name %in% normalize_name(.data$player[1]))
+              !is.na(.data$player[1]) &
+              # The same strict variant build_outcomes() links picks by.
+              as.logical(name_variant(
+                .data$pick_name,
+                .data$player[1],
+                initials = FALSE
+              )) %in%
+                TRUE)
         ),
         .by = c("playerId", "season")
       )
