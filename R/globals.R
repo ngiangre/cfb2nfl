@@ -95,6 +95,7 @@ utils::globalVariables(c(
   "n",
   "outcome_draft_round_d",
   "outcome_draft_pick_d",
+  "entry_rows",
   # pointblank::vars() / expr targets in the team-table contracts
   "games_played",
   "n_roster",
