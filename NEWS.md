@@ -11,6 +11,15 @@
   `never_eligible_entrants()` and `explorer_player_url()`; `survival` is now
   a suggested package
   ([#97](https://github.com/ngiangre/cfb2nfl/issues/97)).
+- Fix (feature F22): **an imputed high-school year now starts at the first
+  roster season**. For players without a matched recruiting record,
+  `outcomes$hs_grad_year` was the first *stat* season minus one, so a
+  lineman, redshirt or pre-2016 defender on the roster for years before a
+  first stat line got a clock that started too late. It now takes the
+  earlier of the first roster and first stat season. 15,603 players move
+  earlier (most by one or two years), draft-eligible player seasons rise
+  from 86,800 to 102,403, and drafted seasons labeled not yet eligible fall
+  from 382 to 229. No other column changes.
 - Fix (feature F22): **NFL outcome labels in `outcomes` are corrected**, so
   drafted rates rise across every post that reads them. 254 more player
   seasons are labeled drafted (2,718 to 2,972) and the undrafted signings are

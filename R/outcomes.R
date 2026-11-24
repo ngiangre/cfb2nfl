@@ -35,7 +35,8 @@
 #'
 #' `hs_grad_year` comes from the name-guarded recruiting link (`hs_class`,
 #' decision 0013); when unavailable it is **imputed** as the first observed
-#' college season minus one (a direct HS enrollee's graduation year) and
+#' college season minus one (a direct HS enrollee's graduation year), taking
+#' the earlier of the first roster season and the first stat season, and
 #' `hs_year_imputed` is set to 1, so models can filter or flag the mis-timed
 #' clock (redshirts, JUCO, late enrollees).
 #'
@@ -89,10 +90,21 @@ build_outcomes <- function(
     # no-stat final year still means "no further college season").
     dplyr::left_join(
       dplyr::collect(career) |>
-        dplyr::select("playerId", career_last_season = "last_season"),
+        dplyr::select(
+          "playerId",
+          career_first_season = "first_season",
+          career_last_season = "last_season"
+        ),
       by = "playerId"
     ) |>
     dplyr::mutate(
+      # A third of stat players are on a roster before their first stat line
+      # (redshirts, linemen, pre-2016 defenders), so the roster dates the
+      # start of college better than the stats do.
+      first_season = pmin(
+        dplyr::coalesce(.data$career_first_season, .data$first_stat_season),
+        .data$first_stat_season
+      ),
       # The later of the two observations is "no further college season";
       # a backbone with stats past the roster would otherwise make the
       # censored event time collapse to 0 or less.
@@ -125,7 +137,7 @@ build_outcomes <- function(
       hs_year_imputed = is.na(.data$hs_class_matched),
       hs_grad_year = dplyr::coalesce(
         .data$hs_class_matched,
-        .data$first_stat_season - 1L
+        .data$first_season - 1L
       )
     ) |>
     dplyr::select(
@@ -446,7 +458,9 @@ build_outcomes <- function(
     dplyr::select(
       -dplyr::any_of(c(
         "next_season",
+        "career_first_season",
         "career_last_season",
+        "first_season",
         "last_stat_season",
         "first_stat_season",
         "recruit_name",
