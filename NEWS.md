@@ -1,5 +1,22 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Explorer (feature F13): **players who reached the NFL are findable even
+  without a stat line**. The Players tab adds an offensive-line group, ranked
+  on roster weight and height among linemen who reached the NFL, and lists a
+  drafted or signed player's college seasons with no stat line as "No stat
+  line" in his career table (Eric Fisher, Jadeveon Clowney)
+  ([#110](https://github.com/ngiangre/cfb2nfl/issues/110)).
+- Posts (features F07, F09, F10, F11): **the posts that read `outcomes` now
+  count every rostered player** (decision 0050). Every rate falls (drafted
+  2.3% of eligible seasons, from 3.6%); offensive linemen are no longer the
+  most drafted group (their 8.4% described only linemen with a stat line),
+  quarterbacks are the only group whose entrants are mostly drafted, and
+  undrafted linemen are matched through roster names. Each post states its
+  population, and its examples are keyed on athlete id
+  ([#105](https://github.com/ngiangre/cfb2nfl/issues/105),
+  [#106](https://github.com/ngiangre/cfb2nfl/issues/106),
+  [#107](https://github.com/ngiangre/cfb2nfl/issues/107),
+  [#108](https://github.com/ngiangre/cfb2nfl/issues/108)).
 - Model (feature F17): **the model table now has one row per roster
   player-season**, the same keys as `outcomes` (decision 0050), instead of
   stat-line seasons with a row per head coach. `build_model_table()` takes

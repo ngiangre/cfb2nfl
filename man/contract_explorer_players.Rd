@@ -27,9 +27,10 @@ contract_explorer_players(
 The interrogated pointblank agent, invisibly.
 }
 \description{
-Guards \code{\link[=build_explorer_player_seasons]{build_explorer_player_seasons()}} and its files: one row per
-player-season-team with a headline stat line in a stat position group (no
-silent loss against \code{player_stats}, no duplicates), no offensive linemen,
-every percentile in 0-100, every outcome a known code with a label, and
-one file per group under \code{max_bytes} (each is fetched whole).
+Guards \code{\link[=build_explorer_player_seasons]{build_explorer_player_seasons()}} and its files: every
+player-season-team with a headline stat line in a stat position group is
+kept (no silent loss against \code{player_stats}), NFL entrants' roster-only
+seasons and linemen come on top, no duplicates, every percentile in 0-100,
+every outcome a known code with a label, and one file per group under
+\code{max_bytes} (each is fetched whole).
 }

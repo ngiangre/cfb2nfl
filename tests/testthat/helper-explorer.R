@@ -224,23 +224,77 @@ explorer_player_stats_fixture <- function() {
 
 explorer_player_outcomes_fixture <- function() {
   tibble::tibble(
-    playerId = c("q1", "q2", "q3", "w1"),
-    outcome = c("active", "udfa", "r1", "active"),
+    playerId = c("q1", "q2", "q3", "w1", "o1", "o2", "o3"),
+    outcome = c("active", "udfa", "r1", "active", "none", "r1", "udfa"),
     outcome_label = c(
       "Still playing",
       "Signed UDFA",
       "Drafted R1 #3 (Chicago)",
-      "Still playing"
+      "Still playing",
+      "No NFL",
+      "Drafted R1 #9 (Seattle)",
+      "Signed UDFA"
     )
   )
 }
 
 explorer_roster_fixture <- function() {
+  # q3 was on the roster in 2024 without a stat line; o2 and o3 are
+  # offensive linemen who reached the NFL, o1 one who did not.
   tibble::tibble(
-    playerId = c("q1", "q2", "q3", "w1", "d2"),
-    season = c(2025L, 2025L, 2025L, 2026L, 2025L),
-    team = c("Texas", "Texas", "Texas", "Texas", "Ferris State"),
-    jersey = c(7L, 10L, 3L, 1L, NA_integer_)
+    playerId = c("q1", "q2", "q3", "q3", "w1", "d2", "o1", "o2", "o2", "o3"),
+    season = c(
+      2025L,
+      2025L,
+      2024L,
+      2025L,
+      2026L,
+      2025L,
+      2025L,
+      2024L,
+      2025L,
+      2025L
+    ),
+    team = c(
+      "Texas",
+      "Texas",
+      "Alabama",
+      "Texas",
+      "Texas",
+      "Ferris State",
+      "Texas",
+      "Alabama",
+      "Alabama",
+      "Texas"
+    ),
+    first_name = c(
+      "Quinn",
+      "Quentin",
+      "Quade",
+      "Quade",
+      "Wes",
+      "Dan",
+      "Otis",
+      "Omar",
+      "Omar",
+      "Ollie"
+    ),
+    last_name = c(
+      "Starter",
+      "Backup",
+      "Other",
+      "Other",
+      "Wideout",
+      "School",
+      "Lineman",
+      "Tackle",
+      "Tackle",
+      "Guard"
+    ),
+    position = c("QB", "QB", "QB", "QB", "WR", "WR", "OT", "OT", "OT", "G"),
+    jersey = c(7L, 10L, 3L, 3L, 1L, NA, 70L, 75L, 75L, 66L),
+    weight = c(220L, 210L, 215L, 215L, 190L, 185L, 300L, 315L, 315L, 305L),
+    height = c(75L, 74L, 76L, 76L, 72L, 71L, 77L, 78L, 78L, 76L)
   )
 }
 

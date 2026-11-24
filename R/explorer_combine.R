@@ -59,6 +59,7 @@ explorer_combine_groups <- function() {
     pos = c(players$pos, "OL"),
     group = c(players$group, "Offensive line")
   ) |>
+    dplyr::distinct() |>
     dplyr::arrange(match(.data$group, position_group_levels()))
 }
 

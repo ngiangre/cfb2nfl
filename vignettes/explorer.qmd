@@ -25,7 +25,8 @@ import {
 import {readShard, gameRows, playsShardPath, hyparquetUrl} from "./explorer/plays.js"
 import {
   TIERS, positionGroups, resolvePlayersPos, positionStats, formatStat, ordinal, swarmRows,
-  beeswarm, careerRows, seasonForPlayer, careerPercentiles, searchPlayers, groupPlural
+  beeswarm, careerRows, seasonForPlayer, careerPercentiles, searchPlayers, groupPlural,
+  hasStatLine
 } from "./explorer/players.js"
 import {
   columnsToRows, resolveCombinePos, combinePoints, missingCount, formatMeasure, canOpenPlayer, combineTraces,
@@ -954,7 +955,7 @@ swarm = {
     scroller.scrollLeft = Math.max(0, x - scroller.clientWidth / 2);
   });
   const legend = html`<div class="explorer-legend">${outcomeLevels.map(o => html`<span><i style="background:${outcomeColor.get(o.outcome)}"></i>${o.label}</span>`)}</div>`;
-  return html`<div><h4>${groupPlural(playersGroup)} in ${season}: ${stat.label.toLowerCase()}</h4>${legend}${scroller}<p class="explorer-note">${placed.length.toLocaleString("en-US")} players. Tap a dot to open the player.</p></div>`;
+  return html`<div><h4>${groupPlural(playersGroup)} in ${season}: ${stat.label.toLowerCase()}</h4>${legend}${scroller}<p class="explorer-note">${placed.length.toLocaleString("en-US")} players${playersPos === "OL" ? " who reached the NFL (linemen rarely have a stat line, so the roster's weight and height stand in)" : ""}. Tap a dot to open the player.</p></div>`;
 }
 ```
 
@@ -970,7 +971,10 @@ Rate stats count only players with enough volume (at least 100 pass attempts,
 50 carries, 15 catches for receivers and 10 for tight ends, 10 field goal
 tries, 20 punts). Interceptions thrown are ranked in reverse, so a higher
 percentile is always better. Where many players share a value, the dots
-overlap.
+overlap. Offensive linemen, who rarely have a stat line, are ranked on
+roster weight and height, and only those who reached the NFL are listed. A
+drafted or signed player's college seasons without a stat line are in his
+career table as "No stat line".
 :::
 
 ```{ojs}
@@ -1017,10 +1021,12 @@ careerView = {
   })));
   const head = playersStats.map(s => `<th scope="col">${escapeHtml(s.label)}</th>`).join("");
   const body = career.map(d => `<tr><th scope="row">${d.season}</th><td>${escapeHtml(playerTeam(d))}</td>` +
-    playersStats.map(s => {
-      const p = d[`${s.key}_pct`];
-      return `<td>${formatStat(d[s.key], s.format)}${p === null || p === undefined ? "" : ` <span>(${ordinal(p)})</span>`}</td>`;
-    }).join("") + "</tr>").join("");
+    (hasStatLine(d, playersStats)
+      ? playersStats.map(s => {
+          const p = d[`${s.key}_pct`];
+          return `<td>${formatStat(d[s.key], s.format)}${p === null || p === undefined ? "" : ` <span>(${ordinal(p)})</span>`}</td>`;
+        }).join("")
+      : `<td colspan="${playersStats.length}">No stat line</td>`) + "</tr>").join("");
   out.append(asNode(`<div class="explorer-table"><table><thead><tr><th scope="col">Season</th><th scope="col">Team</th>${head}</tr></thead><tbody>${body}</tbody></table></div>`));
   return out;
 }

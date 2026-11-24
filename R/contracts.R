@@ -2881,11 +2881,12 @@ contract_explorer_plays_files <- function(
 
 #' Data contract for the explorer player-season table
 #'
-#' Guards [build_explorer_player_seasons()] and its files: one row per
-#' player-season-team with a headline stat line in a stat position group (no
-#' silent loss against `player_stats`, no duplicates), no offensive linemen,
-#' every percentile in 0-100, every outcome a known code with a label, and
-#' one file per group under `max_bytes` (each is fetched whole).
+#' Guards [build_explorer_player_seasons()] and its files: every
+#' player-season-team with a headline stat line in a stat position group is
+#' kept (no silent loss against `player_stats`), NFL entrants' roster-only
+#' seasons and linemen come on top, no duplicates, every percentile in 0-100,
+#' every outcome a known code with a label, and one file per group under
+#' `max_bytes` (each is fetched whole).
 #'
 #' @param player_seasons Output of [build_explorer_player_seasons()].
 #' @param player_stats Cleaned long player stats.
@@ -2947,7 +2948,15 @@ contract_explorer_players <- function(
     pointblank::col_vals_in_set("pos", unique(defs$pos)) |>
     pointblank::col_vals_in_set("outcome", explorer_outcome_levels()$outcome) |>
     pointblank::col_vals_in_set("tier", 1:3) |>
-    check(nrow(player_seasons) == nrow(expected)) |>
+    # No stat row is lost; NFL entrants' roster-only seasons come on top.
+    check(
+      nrow(dplyr::anti_join(
+        expected,
+        player_seasons,
+        by = c(playerId = "player_id", "season", "team")
+      )) ==
+        0L
+    ) |>
     check(all(pct >= 0L & pct <= 100L)) |>
     check(setequal(
       basename(paths),

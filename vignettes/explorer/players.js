@@ -15,12 +15,13 @@ export function positionGroups(meta) {
   return [...seen].map(([pos, group]) => ({pos, group}));
 }
 
-// The hash's pos if it is a stat group (offensive linemen have none), else QB.
+// The hash's pos if it is one of the Players tab's groups, else QB.
 export function resolvePlayersPos(pos, meta) {
   return meta.positions.some(s => s.pos === pos) ? pos : "QB";
 }
 
 const PLURAL = {
+  "Offensive line": "Offensive linemen",
   "Defensive line": "Defensive linemen",
   "Special teams": "Specialists"
 };
@@ -123,6 +124,12 @@ export function careerPercentiles(career, stats) {
     stat: s.label,
     pct: d[`${s.key}_pct`] ?? null
   })));
+}
+
+// Does a season carry any of the group's stats? A drafted or signed player's
+// roster season without a stat line has none.
+export function hasStatLine(row, stats) {
+  return stats.some(s => row[s.key] !== null && row[s.key] !== undefined);
 }
 
 // Name or school search: one result per player (their latest season), best
