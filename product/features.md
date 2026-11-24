@@ -312,6 +312,7 @@ acceptance criteria.
 - [ ] [PR #100](https://github.com/ngiangre/cfb2nfl/pull/100) fix(outcomes): keep late, id-mismatched and namesake NFL labels straight
 - [ ] [#102](https://github.com/ngiangre/cfb2nfl/issues/102) Outcomes population: roster player-seasons with a stat-line flag, not stat lines only
 - [ ] [#103](https://github.com/ngiangre/cfb2nfl/issues/103) fix(outcomes): pick name fallback misses nicknames and spellings (Trubisky labeled undrafted)
+- [ ] [#111](https://github.com/ngiangre/cfb2nfl/issues/111) fix(roster): keep CFBD roster names so roster-only players can match undrafted signings
 <!-- /tasks -->
 
 ### F23 · NFL play, snap and roster-status data, 2022 on
