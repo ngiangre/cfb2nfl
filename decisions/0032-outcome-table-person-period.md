@@ -1,6 +1,6 @@
 # 0032 — Person-period `outcomes` table as the published modeling label
 
-- **Status:** Accepted
+- **Status:** Accepted; population and imputed high-school year superseded by 0050
 - **Date:** 2026-10-24
 
 ## Context

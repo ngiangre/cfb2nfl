@@ -1,11 +1,13 @@
 dataset: outcomes
-source: derived in-pipeline (build_outcomes(ps_pop, career, recruiting, picks_nfl, nfl_rosters, nfl_player_stats))
-grain: one player-season in the model population (person-period)
+source: derived in-pipeline (build_outcomes(ps_pop, career, recruiting, picks_nfl, nfl_rosters, nfl_player_stats, nfl_draft_picks, roster, team_season))
+grain: one roster or stat-line player-season (person-period)
 key: (playerId, season)
 description: >
-  The modeling dependent variables, at the person-period grain: every observed
-  stat season for a player in the model population (stat line in `player_stats`,
-  reused CFBD ids excluded). Season rows carry an eligibility clock anchored at
+  The modeling dependent variables, at the person-period grain: every season a
+  player is on a college roster, plus any stat-line season without a roster row
+  (reused CFBD ids excluded; `outcomes_backbone()`). `has_stat_line` marks the
+  seasons with a stat line in `player_stats`, the population before decision
+  0050. Season rows carry an eligibility clock anchored at
   high-school graduation; career-level labels (drafted, NFL entry, first-year
   NFL success) are resolved once per player and stamped on the relevant rows, so
   models query the dependent variable directly with no further derivation.
@@ -15,8 +17,10 @@ description: >
   guess). Rows whose draft year is after `last_complete_draft` carry NA outcomes
   and `status_end_of_season = "censored"` (administrative right-censoring), never
   a fabricated 0. Published as parquet on data-latest and bundled into the DuckDB
-  asset. Contract: contract_outcomes() (population grain preserved, event mutual
-  exclusivity, censoring carries NAs, positive event times).
+  asset. Contract: contract_outcomes() (population grain preserved, every row
+  tiered, every in-window pick on a population id drafted on the row of its own
+  draft year, event mutual exclusivity, censoring carries NAs, positive event
+  times).
 columns:
   - name: playerId
     type: string
@@ -24,12 +28,44 @@ columns:
     provenance: derived (player_stats.playerId)
   - name: player
     type: string
-    description: Player name (first stat-season name; used for the name guards).
-    provenance: derived (player_stats.player)
+    description: >
+      Player name, used for the name guards: the stat-line name, else the name
+      on a draft pick with the same id. NA for a roster-only player who was
+      never drafted (the cleaned roster carries no names), so those players get
+      no recruiting or undrafted-signing match.
+    provenance: derived (player_stats.player, else picks.name)
   - name: season
     type: int32
     description: The college season being evaluated (s).
-    provenance: derived (player_stats.season)
+    provenance: derived (roster.season, player_stats.season)
+  - name: has_stat_line
+    type: logical
+    description: 1 if the player has a stat line in `player_stats` that season, else 0 (on a roster without one).
+    provenance: derived (player_stats)
+  - name: team
+    type: string
+    description: The row's college team, the stat-line team when there is one, else the roster team.
+    provenance: derived (player_stats.team, roster.team)
+  - name: tier
+    type: int32
+    description: Season-aware conference tier of the row's team (3 Power, 2 Group of 5, 1 FCS and below; decision 0003). Never NA; the contract fails rather than defaulting.
+    provenance: derived (team_season.tier)
+  - name: tier_label
+    type: string
+    description: Reader-facing label of `tier`.
+    provenance: derived (team_season.tier_label)
+  - name: first_roster_season
+    type: int32
+    description: >
+      The player's first season on any college roster in the data. NA only for
+      the few stat-line players never on a roster. Earlier college years may be
+      missing (transfers from programs the data does not cover, or careers that
+      began before 2010).
+    provenance: derived (career_summary.first_season)
+  - name: is_first_roster_season
+    type: logical
+    description: 1 on the row of the player's first roster season, else 0. Never NA. Use it to check how much a result rests on players' first seasons in the data; flagged rows are kept.
+    provenance: derived
   - name: hs_grad_year
     type: int32
     description: >
@@ -50,7 +86,11 @@ columns:
     provenance: derived (career_summary.last_season)
   - name: draft_year
     type: int32
-    description: The draft that follows the season (d = s + 1).
+    description: >
+      The draft this row's outcome is about: the draft after the season
+      (d = s + 1), except on a player's last row when his NFL entry comes a
+      year later (after a season off every roster), where it is that entry's
+      draft. The eligibility clock is computed against it.
     provenance: derived
   - name: years_since_hs
     type: int32

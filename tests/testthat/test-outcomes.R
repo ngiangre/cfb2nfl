@@ -547,3 +547,174 @@ test_that("a pick years after the last college season is not a late entry", {
   expect_false(any(out$outcome_drafted_d[out$playerId == "90"]))
   expect_false(any(out$nfl_entry_event[out$playerId == "90"]))
 })
+
+# ---- roster population (#102) -------------------------------------------------
+
+roster_inputs <- function() {
+  d <- make_inputs()
+  # Cam Ward is on a roster from 2021, a season with no stat line; a lineman
+  # (40) is on rosters 2019-2022 with no stat line at all and drafted 2023.
+  d$roster <- ps(
+    playerId = c(rep("10", 4), "20", "20", "30", rep("40", 4)),
+    season = c(2021:2024, 2016:2017, 2020L, 2019:2022),
+    team = c(
+      rep("Miami", 4),
+      rep("Texas A&M", 2),
+      "Toledo",
+      rep("Iowa", 4)
+    )
+  )
+  d$career <- dplyr::bind_rows(
+    dplyr::mutate(
+      d$career,
+      first_season = c(2021L, 2016L, 2020L),
+      seasons = c(4L, 2L, 1L)
+    ),
+    ps(
+      playerId = "40",
+      seasons = 4L,
+      first_season = 2019L,
+      last_season = 2022L,
+      teams = 1L,
+      gap_seasons = 0L,
+      transfers = 0L
+    )
+  )
+  d$picks_nfl <- dplyr::bind_rows(
+    d$picks_nfl,
+    ps(
+      playerId = "40",
+      year = 2023L,
+      round = 3L,
+      overall = 70L,
+      gsis_id = "00-4",
+      name = "Big Lineman",
+      collegeTeam = "Iowa"
+    )
+  )
+  d$picks_nfl$name[1] <- "Cam Ward"
+  d$picks_nfl$collegeTeam[1] <- "Miami"
+  d$team_season <- ps(
+    team = c(rep("Miami", 4), rep("Texas A&M", 2), "Toledo", rep("Iowa", 4)),
+    season = c(2021:2024, 2016:2017, 2020L, 2019:2022),
+    tier = c(3L, 3L, 3L, 3L, 3L, 3L, 2L, 3L, 3L, 3L, 3L),
+    tier_label = c(rep("Power", 6), "Group of 5", rep("Power", 4))
+  )
+  d
+}
+
+run_roster <- function(d, ...) {
+  build_outcomes(
+    d$ps_pop,
+    d$career,
+    d$recruiting,
+    d$picks_nfl,
+    d$nfl_rosters,
+    d$nfl_player_stats,
+    roster = d$roster,
+    team_season = d$team_season,
+    last_complete_draft = 2025L,
+    ...
+  )
+}
+
+test_that("the roster backbone keeps every roster player-season, flagged by stat line", {
+  d <- roster_inputs()
+  out <- run_roster(d)
+  expect_equal(nrow(out), 11L)
+  expect_equal(
+    nrow(out),
+    nrow(outcomes_backbone(d$ps_pop, d$roster, d$career))
+  )
+  ward <- out[out$playerId == "10", ]
+  expect_equal(ward$season, 2021:2024)
+  expect_equal(ward$has_stat_line, c(FALSE, TRUE, TRUE, TRUE))
+  lineman <- out[out$playerId == "40", ]
+  expect_false(any(lineman$has_stat_line))
+  expect_equal(lineman$tier, rep(3L, 4))
+  expect_equal(unique(out$tier_label[out$playerId == "30"]), "Group of 5")
+})
+
+test_that("a drafted player with no stat line has his drafted row", {
+  d <- roster_inputs()
+  out <- run_roster(d)
+  lineman <- out[out$playerId == "40", ]
+  expect_equal(lineman$outcome_drafted_d, c(FALSE, FALSE, FALSE, TRUE))
+  expect_equal(lineman$draft_year[lineman$outcome_drafted_d], 2023L)
+  expect_equal(lineman$status_end_of_season[4], "drafted")
+  # The pick's name stands in for the missing stat-line name.
+  expect_equal(unique(lineman$player), "Big Lineman")
+})
+
+test_that("each player's first roster season is carried and flagged", {
+  d <- roster_inputs()
+  out <- run_roster(d)
+  ward <- out[out$playerId == "10", ]
+  expect_equal(unique(ward$first_roster_season), 2021L)
+  expect_equal(ward$is_first_roster_season, c(TRUE, FALSE, FALSE, FALSE))
+  expect_false(anyNA(out$is_first_roster_season))
+})
+
+test_that("a drafted row's draft_year is the draft it records", {
+  d <- roster_inputs()
+  # Off the roster after 2019, drafted in 2021: the pick lands on the 2019
+  # row, and that row's draft and eligibility clock describe the 2021 draft.
+  d$roster <- dplyr::bind_rows(
+    d$roster,
+    ps(playerId = "50", season = 2018:2019, team = "Iowa")
+  )
+  d$team_season <- dplyr::bind_rows(
+    d$team_season,
+    ps(team = "Iowa", season = 2018L, tier = 3L, tier_label = "Power")
+  )
+  d$career <- dplyr::bind_rows(
+    d$career,
+    ps(playerId = "50", first_season = 2018L, last_season = 2019L)
+  )
+  d$picks_nfl <- dplyr::bind_rows(
+    d$picks_nfl,
+    ps(
+      playerId = "50",
+      year = 2021L,
+      round = 1L,
+      overall = 15L,
+      gsis_id = "00-5"
+    )
+  )
+  out <- run_roster(d)
+  late <- out[out$playerId == "50", ]
+  expect_equal(late$outcome_drafted_d, c(FALSE, TRUE))
+  expect_equal(late$draft_year, c(2019L, 2021L))
+  # Imputed clock: first roster season 2018 - 1 = 2017; 2021 - 2017 = 4.
+  expect_equal(late$years_since_hs[2], 4L)
+  expect_true(late$draft_eligible[2])
+})
+
+test_that("contract_outcomes checks the roster grain and the tier", {
+  skip_if_not_installed("pointblank")
+  d <- roster_inputs()
+  out <- run_roster(d)
+  ok <- function(x) {
+    pointblank::all_passed(contract_outcomes(
+      x,
+      d$ps_pop,
+      d$picks_nfl,
+      roster = d$roster,
+      career = d$career,
+      stop_on_fail = FALSE
+    ))
+  }
+  expect_true(ok(out))
+  # A lost roster-only row is silent join loss.
+  expect_false(ok(out[!(out$playerId == "40" & out$season == 2019L), ]))
+  # A missing tier fails rather than defaulting.
+  bad <- out
+  bad$tier[1] <- NA
+  expect_false(ok(bad))
+  # A drafted row whose draft_year is not the pick's year.
+  bad2 <- out
+  bad2$draft_year[bad2$playerId == "40" & bad2$outcome_drafted_d] <- 2022L
+  bad2$years_since_hs <- bad2$draft_year - bad2$hs_grad_year
+  bad2$draft_eligible <- bad2$years_since_hs >= bad2$min_years_since_hs
+  expect_false(ok(bad2))
+})

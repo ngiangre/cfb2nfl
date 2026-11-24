@@ -2177,7 +2177,12 @@ contract_player_usage <- function(
 #'   `(playerId, season)` row count is the expected row count.
 #' @param picks_nfl,nfl_draft_picks Optional CFBD picks bridged to nflverse
 #'   ([link_nfl_draft()]) and nflverse draft picks; their `gsis_id`s are the
-#'   drafted players.
+#'   drafted players, and every drafted row's `draft_year` must be one of its
+#'   player's draft years.
+#' @param roster,career Optional cleaned roster and career summary. Given,
+#'   the expected grain is every roster player-season too
+#'   ([outcomes_backbone()]), every row must carry a tier, and every pick on a
+#'   population id inside its entry window must have its drafted row.
 #' @param stop_on_fail Abort on failure? `FALSE` records the result for the
 #'   audit log instead (the `ok_*` target pattern).
 #'
@@ -2188,15 +2193,74 @@ contract_outcomes <- function(
   ps_pop,
   picks_nfl = NULL,
   nfl_draft_picks = NULL,
+  roster = NULL,
+  career = NULL,
   stop_on_fail = TRUE
 ) {
   rlang::check_installed("pointblank")
-  expected <- nrow(dplyr::distinct(ps_pop, .data$playerId, .data$season))
+  expected <- nrow(outcomes_backbone(ps_pop, roster, career))
   drafted_gsis <- unique(stats::na.omit(c(
     picks_nfl$gsis_id,
     if (!is.null(nfl_draft_picks)) dplyr::collect(nfl_draft_picks)$gsis_id
   )))
   observed_to <- max(outcomes$draft_year[outcomes$outcome_observed_d %in% TRUE])
+  # A drafted row must name a real pick, `(draft_year, overall)`, that is its
+  # player's: same CFBD id, same gsis, or same name (picks linked by name +
+  # school sit on another CFBD id and may lack a gsis).
+  wrong_pick_year <- function(x) {
+    d <- dplyr::filter(x, .data$outcome_drafted_d %in% TRUE)
+    picks <- dplyr::collect(picks_nfl) |>
+      dplyr::transmute(
+        draft_year = as.integer(.data$year),
+        outcome_draft_pick_d = as.integer(.data$overall),
+        pick_id = .data$playerId,
+        pick_gsis = .data$gsis_id,
+        pick_name = if ("name" %in% names(picks_nfl)) {
+          normalize_name(.data$name)
+        } else {
+          NA_character_
+        }
+      )
+    ok <- dplyr::left_join(
+      d,
+      picks,
+      by = c("draft_year", "outcome_draft_pick_d"),
+      relationship = "many-to-many"
+    ) |>
+      dplyr::summarise(
+        ok = any(
+          .data$pick_id %in%
+            .data$playerId[1] |
+            (!is.na(.data$pick_gsis) & .data$pick_gsis %in% .data$gsis_id[1]) |
+            (!is.na(.data$pick_name) &
+              .data$pick_name %in% normalize_name(.data$player[1]))
+        ),
+        .by = c("playerId", "season")
+      )
+    tibble::tibble(n = sum(!ok$ok))
+  }
+  # A pick on a population id, inside the entry window and the observed
+  # years, that never became a drafted row (the no-stat-line lineman case).
+  lost_picks <- function(x) {
+    span <- x |>
+      dplyr::summarise(
+        first = min(.data$season),
+        last = max(.data$last_season),
+        drafted = any(.data$outcome_drafted_d %in% TRUE),
+        .by = "playerId"
+      )
+    latest <- dplyr::collect(picks_nfl) |>
+      dplyr::filter(!is.na(.data$playerId)) |>
+      dplyr::summarise(year = max(as.integer(.data$year)), .by = "playerId")
+    lost <- dplyr::inner_join(span, latest, by = "playerId") |>
+      dplyr::filter(
+        .data$year > .data$first,
+        .data$year <= .data$last + 2L,
+        .data$year <= .env$observed_to,
+        !.data$drafted
+      )
+    tibble::tibble(n = nrow(lost))
+  }
   per_player <- function(x) {
     x |>
       dplyr::summarise(
@@ -2292,8 +2356,33 @@ contract_outcomes <- function(
       preconditions = function(x) {
         dplyr::filter(x, .data$outcome_signed_udfa_d %in% TRUE)
       }
-    ) |>
-    pointblank::interrogate()
+    )
+  if (!is.null(picks_nfl)) {
+    agent <- agent |>
+      pointblank::col_vals_equal(
+        pointblank::vars(n),
+        0L,
+        preconditions = wrong_pick_year,
+        label = "drafted rows carry the pick's draft year"
+      )
+  }
+  if (!is.null(roster)) {
+    # A missing tier fails here; it is never defaulted.
+    agent <- agent |>
+      pointblank::col_vals_not_null(
+        pointblank::vars(has_stat_line, tier, is_first_roster_season)
+      )
+    if (!is.null(picks_nfl)) {
+      agent <- agent |>
+        pointblank::col_vals_equal(
+          pointblank::vars(n),
+          0L,
+          preconditions = lost_picks,
+          label = "every pick on a population id has its drafted row"
+        )
+    }
+  }
+  agent <- pointblank::interrogate(agent)
   enforce_contract(agent, "outcomes", stop_on_fail)
 }
 

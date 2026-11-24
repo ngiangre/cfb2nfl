@@ -9,6 +9,8 @@ contract_outcomes(
   ps_pop,
   picks_nfl = NULL,
   nfl_draft_picks = NULL,
+  roster = NULL,
+  career = NULL,
   stop_on_fail = TRUE
 )
 }
@@ -20,7 +22,13 @@ contract_outcomes(
 
 \item{picks_nfl, nfl_draft_picks}{Optional CFBD picks bridged to nflverse
 (\code{\link[=link_nfl_draft]{link_nfl_draft()}}) and nflverse draft picks; their \code{gsis_id}s are the
-drafted players.}
+drafted players, and every drafted row's \code{draft_year} must be one of its
+player's draft years.}
+
+\item{roster, career}{Optional cleaned roster and career summary. Given,
+the expected grain is every roster player-season too
+(\code{\link[=outcomes_backbone]{outcomes_backbone()}}), every row must carry a tier, and every pick on a
+population id inside its entry window must have its drafted row.}
 
 \item{stop_on_fail}{Abort on failure? \code{FALSE} records the result for the
 audit log instead (the \verb{ok_*} target pattern).}

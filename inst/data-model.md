@@ -38,7 +38,7 @@ dictionaries next to this file, one YAML per table:
 | `player_game` | one player in one game (stat line + team, opponent, Elo, team games) | [`dict/player_game.yml`](dict/player_game.yml) |
 | `team_season` | one team in one season (every division) | [`dict/team_season.yml`](dict/team_season.yml) |
 | `team_draft` | team × final college season × position group | [`dict/team_draft.yml`](dict/team_draft.yml) |
-| `outcomes` | one player-season in the model population (person-period labels) | [`dict/outcomes.yml`](dict/outcomes.yml) |
+| `outcomes` | one roster or stat-line player-season (person-period labels; decision 0050) | [`dict/outcomes.yml`](dict/outcomes.yml) |
 | `audit_log` | one audited pipeline step | [`dict/audit_log.yml`](dict/audit_log.yml) |
 
 **Bundle-only tables.** Five tables are **derived in-pipeline** and not
@@ -232,10 +232,11 @@ wrong rows, so they are called out explicitly.
 
 ## Reasoning over the tables for the project's questions
 
-**Population / outcome (v1).** The unit is a player-season with a qualifying
-stat line in a draft-eligible season; the positive label is `drafted`. The
+**Population / outcome.** The unit is a player-season on a college roster
+in a draft-eligible season (decision 0050; the v1 population required a stat
+line, now the `has_stat_line` filter); the positive label is `drafted`. The
 `outcomes` table materializes this at the **person-period** grain: one row per
-player-season in the model population, with the
+roster or stat-line player-season, with the
 eligibility clock (`hs_grad_year`, `draft_eligible`, `eligible_season_index`),
 the drafted / NFL-entry / NFL-success labels (`outcome_*` columns), and the
 survival bookkeeping (`years_to_nfl_entry` + `nfl_entry_event`,
