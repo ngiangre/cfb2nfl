@@ -805,3 +805,44 @@ test_that("a debut while the roster still lists the player lands on his row befo
   expect_equal(hall$draft_year[2], 2022L)
   expect_equal(sum(hall$outcome_nfl_entry_d %in% TRUE), 1L)
 })
+
+test_that("a roster-only player is named from the roster and can sign undrafted", {
+  d <- roster_inputs()
+  # An undrafted lineman with no stat line, on the roster 2020-2021 and on an
+  # NFL roster in 2022: only the roster carries his name.
+  d$roster <- dplyr::bind_rows(
+    dplyr::mutate(
+      d$roster,
+      first_name = NA_character_,
+      last_name = NA_character_
+    ),
+    ps(
+      playerId = "85",
+      season = 2020:2021,
+      team = "Iowa",
+      first_name = "Lane",
+      last_name = "Tackle"
+    )
+  )
+  d$team_season <- dplyr::bind_rows(
+    d$team_season,
+    ps(team = "Iowa", season = 2020:2021, tier = 3L, tier_label = "Power") |>
+      dplyr::filter(
+        !.data$season %in% d$team_season$season[d$team_season$team == "Iowa"]
+      )
+  )
+  d$career <- dplyr::bind_rows(
+    d$career,
+    ps(playerId = "85", first_season = 2020L, last_season = 2021L)
+  )
+  d$nfl_rosters <- dplyr::bind_rows(
+    d$nfl_rosters,
+    ps(gsis_id = "00-85", player_name = "Lane Tackle", season = 2022L)
+  )
+  out <- run_roster(d)
+  lane <- out[out$playerId == "85", ]
+  expect_equal(unique(lane$player), "Lane Tackle")
+  expect_equal(lane$outcome_signed_udfa_d, c(FALSE, TRUE))
+  # A stat-line name still wins over the roster's.
+  expect_equal(unique(out$player[out$playerId == "10"]), "Cam Ward")
+})

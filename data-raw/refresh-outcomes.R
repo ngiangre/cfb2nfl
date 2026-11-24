@@ -6,6 +6,12 @@
 #
 #   Rscript data-raw/refresh-outcomes.R --yes             # rebuild locally
 #   Rscript data-raw/refresh-outcomes.R --yes --publish   # and upload
+#   Rscript data-raw/refresh-outcomes.R --roster --yes    # re-pull the roster
+#
+# `--roster` first re-pulls the whole `/roster` window (one CFBD call per
+# season, about 17), for a roster schema change that a season-scoped splice
+# refuses; then `roster.parquet` is published with `outcomes`. It stops if
+# more calls than seasons were made or any parquet besides those two changed.
 #
 # How it stays off CFBD: `tar_make(names = outcomes_file, shortcut = TRUE)`
 # builds only `outcomes_file` from the stored upstream values, so no `raw_*`
@@ -22,12 +28,21 @@
 args <- commandArgs(trailingOnly = TRUE)
 yes <- "--yes" %in% args
 publish <- "--publish" %in% args
+with_roster <- "--roster" %in% args
 
 pkgload::load_all(quiet = TRUE)
 
 path <- "data/outcomes.parquet"
-cat("Rebuilds ", path, " from the targets store.\n", sep = "")
-cat("CFBD calls expected: 0.\n")
+rebuilt <- c(path, if (with_roster) "data/roster.parquet")
+# The full roster window: no season selector, so roster_file writes it whole.
+Sys.unsetenv("CFB2NFL_REFRESH_SEASONS")
+expected_calls <- if (with_roster) {
+  length(refresh_seasons(source = "roster"))
+} else {
+  0L
+}
+cat("Rebuilds ", paste(rebuilt, collapse = " and "), ".\n", sep = "")
+cat("CFBD calls expected: ", expected_calls, ".\n", sep = "")
 if (!yes) {
   if (!interactive()) {
     stop("Re-run with --yes to rebuild.")
@@ -37,12 +52,25 @@ if (!yes) {
   }
 }
 
-others <- setdiff(list.files("data", "\\.parquet$", full.names = TRUE), path)
+others <- setdiff(list.files("data", "\\.parquet$", full.names = TRUE), rebuilt)
 before_md5 <- tools::md5sum(others)
 before <- if (file.exists(path)) arrow::read_parquet(path) else NULL
 
 call_log <- tempfile("cfbd-calls-", fileext = ".tsv")
-Sys.setenv(CFB2NFL_REFRESH = "true", CFB2NFL_CALL_LOG = call_log)
+Sys.setenv(CFB2NFL_CALL_LOG = call_log)
+if (with_roster) {
+  roster_targets <- c("raw_roster", "roster_file", "roster")
+  Sys.setenv(CFB2NFL_REFRESH = "true")
+  targets::tar_invalidate(tidyselect::any_of(roster_targets))
+  rlang::inject(targets::tar_make(
+    names = tidyselect::any_of(!!roster_targets),
+    shortcut = TRUE
+  ))
+  # Everything built from the roster, in track mode, before outcomes reads it.
+  Sys.setenv(CFB2NFL_REFRESH = "false")
+  targets::tar_make()
+}
+Sys.setenv(CFB2NFL_REFRESH = "true")
 targets::tar_invalidate(tidyselect::any_of("outcomes_file"))
 targets::tar_make(names = tidyselect::any_of("outcomes_file"), shortcut = TRUE)
 
@@ -68,9 +96,9 @@ summ <- function(x, label) {
   )
 }
 print(rbind(summ(before, "before"), summ(after, "after")), row.names = FALSE)
-cat(sprintf("\nCFBD calls made: %d.\n", made))
-if (made > 0L) {
-  stop("CFBD calls were made; not publishing. See ", call_log, ".")
+cat(sprintf("\nCFBD calls made: %d (expected %d).\n", made, expected_calls))
+if (made > expected_calls) {
+  stop("More CFBD calls than expected; not publishing. See ", call_log, ".")
 }
 if (length(changed) > 0L) {
   stop(
@@ -98,7 +126,7 @@ if (publish) {
   # A cached pb_list() made pb_upload() silently upload nothing (2026-11-22):
   # clear it and confirm each asset through the GitHub API.
   piggyback::.pb_cache_clear()
-  upload <- c(path, "data/cfb2nfl.duckdb")
+  upload <- c(rebuilt, "data/cfb2nfl.duckdb")
   for (f in upload) {
     piggyback::pb_upload(
       f,
