@@ -1,5 +1,9 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Process: new feature card **F24**, a planned post on how college careers
+  end, by position, as competing outcomes over eligible seasons (drafted,
+  signed undrafted, eligibility exhausted, left the data), tracked in
+  [#97](https://github.com/ngiangre/cfb2nfl/issues/97).
 - Fix (feature F22): **NFL outcome labels in `outcomes` are corrected**, so
   drafted rates rise across every post that reads them. 254 more player
   seasons are labeled drafted (2,718 to 2,972) and the undrafted signings are
