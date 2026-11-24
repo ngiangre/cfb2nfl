@@ -1,7 +1,7 @@
 ---
 title: "Power-conference players are drafted at five times the Group of 5 rate, and Alabama leads four positions"
 date: "2026-10-31"
-description: "Players who finished their college careers at Power-conference schools from 2013 to 2025 were drafted at five times the Group of 5 rate, 13.8% against 2.7%, and the gap held at every position."
+description: "Players who finished their college careers at Power-conference schools from 2013 to 2025 were drafted at five times the Group of 5 rate, and the gap held at every position."
 followups:
   - "Do teams that win more produce more draftees, once position mix is accounted for? (Post 3)"
   - "Is the falling Group of 5 draft rate a transfer effect? Credit draftees to every school they played for, weighted by seasons or snaps."
@@ -189,7 +189,7 @@ tibble::tribble(
   "Final season"           , "A player's last season on a college roster before the draft. Each player is counted once, for the school and conference of that season, so a transfer counts for the last stop."                                                                                                                                                                       ,
   "Eligible player"        , "A player whose college career has ended and who had a real shot at the NFL: at least three seasons on college rosters, or drafted, or signed with an NFL team undrafted. Players who left after one or two seasons without reaching the NFL are not counted, and neither are undrafted players still on a 2026 roster, whose outcome is not yet known." ,
   "Draft rate"             , "Drafted players divided by eligible players. A draft rate of 10% means 10 of every 100 eligible players were drafted."                                                                                                                                                                                                                          ,
-  "Undrafted free agent"   , "An eligible player who was not drafted but later appears on an NFL roster. Matched by name, and linemen are matched through their roster names when they have no stat line." ,
+  "Undrafted free agent"   , "An eligible player who was not drafted but later appears on an NFL roster, matched by name from the college roster, so players with no college stat line (most offensive linemen) are included." ,
   "Undrafted rate"         , "Undrafted free agents divided by eligible players."                                                                                                                                                                                                                                                                                            ,
   "Tier"                   , "Power (the SEC, Big Ten, ACC, Big 12, the Pac-12 through 2023, and Notre Dame), Group of 5 (the other FBS conferences and independents), and FCS and below. FCS-and-below rosters are incomplete, so that tier appears only as one total. A school's tier is the one most of its eligible players finished in."                                                                                                         ,
   "2025 conference"        , "The conference a school played in during 2025, used only to group schools side by side in one figure (section 3.4). Conference and tier rates use the conference of each player's final season."                                                                                                                                                               ,
@@ -241,7 +241,7 @@ g5_first <- g5_season$draft_rate[g5_season$season == first_season]
 g5_last <- g5_season$draft_rate[g5_season$season == last_season]
 ```
 
-### 3.1 Power-conference players were drafted at five times the Group of 5 rate, 13.8% against 2.7%
+### 3.1 Power-conference players were drafted at five times the Group of 5 rate
 
 The table counts eligible players and draftees by tier and conference, the
 bars rank the conferences, and the season lines show the Group of 5 rate
@@ -509,7 +509,10 @@ p <- ggplot(dumb, aes(rate, league)) +
     "text",
     x = 0.19,
     y = n_g5_rows / 2 + 0.5,
-    label = "Group of 5: more players\nsigned undrafted than were drafted",
+    label = sprintf(
+      "Group of 5: %.1f undrafted\nsignings per draftee",
+      tr("Group of 5", "udfa") / tr("Group of 5", "drafted")
+    ),
     hjust = 1,
     size = 5,
     fontface = "bold",
@@ -541,7 +544,7 @@ p <- ggplot(school_rates, aes(draft_rate, udfa_rate)) +
   annotate(
     "text",
     x = 0.005,
-    y = 0.168,
+    y = 0.245,
     label = "Above the line: more undrafted than drafted",
     hjust = 0,
     size = 4.6,
@@ -585,7 +588,7 @@ p <- ggplot(school_rates, aes(draft_rate, udfa_rate)) +
   scale_size_area(max_size = 7, guide = "none") +
   scale_x_continuous(labels = scales::percent) +
   scale_y_continuous(labels = scales::percent) +
-  coord_cartesian(xlim = c(0, 0.42), ylim = c(0, 0.17)) +
+  coord_cartesian(xlim = c(0, 0.42), ylim = c(0, 0.25)) +
   labs(
     x = "Draft rate",
     y = "Undrafted rate",
@@ -1056,6 +1059,11 @@ nicknames <- tibble::tribble(
 n_hold <- sum(nicknames$holds)
 n_top5 <- sum(nicknames$top5)
 nk <- function(n, col) nicknames[[col]][nicknames$nickname == n]
+ord <- function(n) {
+  suffix <- c("th", "st", "nd", "rd", rep("th", 6))[n %% 10 + 1]
+  paste0(n, ifelse(n %% 100 %in% 11:13, "th", suffix))
+}
+and_join <- function(x) sub(", ([^,]*)$", " and \\1", paste(x, collapse = ", "))
 # defensive ends and edge rushers count in the defensive line
 psu_dl <- filter(school_pos, team == "Penn State", position_group == "Defensive line")
 byu_conf <- team_season |>
@@ -1066,13 +1074,13 @@ byu_conf <- team_season |>
 ### 3.5 Alabama leads four positions, and three of six fan nicknames hold up as top-five schools, with only LSU's WRU first
 
 Ranked by draftees above expected, LSU is first at receiver and
-`r nk("DBU", "rank")`th at defensive back, and Iowa is
-`r nk("Tight End U", "rank")`th at tight end behind Notre Dame, so DBU and
+`r ord(nk("DBU", "rank"))` at defensive back, and Iowa is
+`r ord(nk("Tight End U", "rank"))` at tight end behind Notre Dame, so DBU and
 Tight End U are close rather than misses. Penn State ranks
-`r nk("Linebacker U", "rank")`nd at linebacker (defensive ends and edge
-rushers count in the defensive line, where it ranks `r psu_dl$rank`th with
-`r psu_dl$drafted` drafted), while USC (`r nk("Tailback U", "rank")`nd at
-running back) and BYU (`r nk("QBU", "rank")`th at quarterback, an
+`r ord(nk("Linebacker U", "rank"))` at linebacker (defensive ends and edge
+rushers count in the defensive line, where it ranks `r ord(psu_dl$rank)` with
+`r psu_dl$drafted` drafted), while USC (`r ord(nk("Tailback U", "rank"))` at
+running back) and BYU (`r ord(nk("QBU", "rank"))` at quarterback, an
 independent until 2023) rest on small samples of
 `r nk("Tailback U", "eligible")` and `r nk("QBU", "eligible")` eligible
 players.
@@ -1220,7 +1228,7 @@ mix predicts.
 tibble::tribble(
   ~Finding                                                     , ~Evidence                                                                                                                                                                                                                   ,
   "Power players are drafted at five times the Group of 5 rate", sprintf("%s of Power eligible players drafted against %s for the Group of 5 (%.1f times); %s for FCS and below.", pct(tr("Power", "draft_rate")), pct(tr("Group of 5", "draft_rate")), power_g5, pct(tr("FCS and below", "draft_rate"))) ,
-  "Undrafted signings are spread more evenly"                  , sprintf("Undrafted rate %s Power against %s Group of 5 (%.1f times); every Group of 5 conference had more undrafted signings than draftees.", pct(tr("Power", "udfa_rate")), pct(tr("Group of 5", "udfa_rate")), power_g5_udfa) ,
+  "Undrafted signings are spread more evenly"                  , sprintf("Undrafted rate %s Power against %s Group of 5 (%.1f times); undrafted signings outnumber draftees far more in the Group of 5.", pct(tr("Power", "udfa_rate")), pct(tr("Group of 5", "udfa_rate")), power_g5_udfa) ,
   "The gap holds at every position"                            , sprintf("Power over Group of 5 draft rate from %.1f times (%s) to %.1f times (%s); the SEC tops %d of 9 positions.", min(pos_tier$ratio), tolower(pos_tier$position_group[which.min(pos_tier$ratio)]), max(pos_tier$ratio), tolower(pos_tier$position_group[which.max(pos_tier$ratio)]), n_sec_leads) ,
   "A few Power schools far exceed an average FBS school"       , sprintf("Alabama: %d drafted, %s expected at the FBS average; %d of %d FBS schools above it, only %s among Group of 5 schools.", bama$drafted, fmt(bama$expected, 1), n_above, nrow(school), g5_fbs_beaters) ,
   "Boise State leads the Group of 5 against its own tier"      , sprintf("%s: %d drafted, %s expected at Group of 5 rates; %d of %d Group of 5 schools above their tier's expectation.", g5_best$team, g5_best$drafted, fmt(g5_best$expected_tier, 1), n_g5_above_tier, nrow(g5)) ,
@@ -1278,8 +1286,9 @@ other_udfa <- rates(
 Draft production is concentrated inside the Power conferences, not just
 between tiers.
 
-- Alabama, Ohio State, LSU and Georgia each produced at least 65 more
-  draftees than an average FBS school with the same players by position.
+- `r and_join(slice_head(school, n = 4)$team)` each produced at least
+  `r floor(min(slice_head(school, n = 4)$above))` more draftees than an
+  average FBS school with the same players by position.
 - At `r sum(!nicknames$holds)` of the six nickname positions another
   school leads, Alabama at
   `r sum(nicknames$leader[!nicknames$holds] == "Alabama")` of them.
@@ -1295,11 +1304,12 @@ schools had earlier played at Group of 5 schools.
 :::
 
 ::: {.callout-important}
-For Group of 5 players, undrafted signings are the broader route to the
-NFL.
+For Group of 5 players, undrafted signings outnumber draftees by far more
+than at Power schools.
 
-- Every Group of 5 conference sent more players to NFL rosters undrafted
-  than through the draft.
+- Group of 5 players signed undrafted at `r pct(tr("Group of 5", "udfa_rate"))`
+  against a `r pct(tr("Group of 5", "draft_rate"))` draft rate; Power players
+  at `r pct(tr("Power", "udfa_rate"))` against `r pct(tr("Power", "draft_rate"))`.
 :::
 
 ```{r}
@@ -1311,11 +1321,11 @@ top4 <- slice_head(school, n = 4)
 Each draftee is credited to the last college roster before the draft,
 eligibility is a roster-based stand-in for a real shot at the NFL, and
 final seasons 2013 to 2025 only approximately match the classes of 2014 to
-2026. The undrafted match runs by name, now through roster names for
-players with no stat line, so offensive linemen sign undrafted at
-`r pct(ol_udfa$udfa_rate)` against `r pct(other_udfa$udfa_rate)` at the
-other non-kicking positions; a name match without a school check can still
-link a namesake. FCS-and-below rosters are incomplete, so that tier enters only
+2026. Undrafted signings are matched to NFL rosters by name from college
+rosters, so players without a stat line count: offensive linemen signed
+undrafted at `r pct(ol_udfa$udfa_rate)` against
+`r pct(other_udfa$udfa_rate)` at the other non-kicking positions. Without a
+school check, a name match can still link a namesake. FCS-and-below rosters are incomplete, so that tier enters only
 as one total.
 
 ```{r}
