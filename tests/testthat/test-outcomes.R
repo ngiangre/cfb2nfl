@@ -846,3 +846,59 @@ test_that("a roster-only player is named from the roster and can sign undrafted"
   # A stat-line name still wins over the roster's.
   expect_equal(unique(out$player[out$playerId == "10"]), "Cam Ward")
 })
+
+test_that("a pick links through a nickname or spelling variant, never a different first name", {
+  d <- roster_inputs()
+  # Picks on other CFBD ids whose names differ from the college name.
+  add_player <- function(d, id, name, team, seasons) {
+    d$ps_pop <- dplyr::bind_rows(
+      d$ps_pop,
+      ps(playerId = id, player = name, season = seasons, team = team)
+    )
+    d$roster <- dplyr::bind_rows(
+      d$roster,
+      ps(playerId = id, season = seasons, team = team)
+    )
+    d$team_season <- dplyr::bind_rows(
+      d$team_season,
+      ps(team = team, season = seasons, tier = 3L, tier_label = "Power")
+    ) |>
+      dplyr::distinct(.data$team, .data$season, .keep_all = TRUE)
+    d$career <- dplyr::bind_rows(
+      d$career,
+      ps(playerId = id, first_season = min(seasons), last_season = max(seasons))
+    )
+    d
+  }
+  d$ps_pop <- dplyr::mutate(d$ps_pop, team = "Elsewhere")
+  d <- add_player(d, "91", "Mitch Trubisky", "North Carolina", 2014:2016)
+  d <- add_player(d, "92", "Maurice Hurst", "Michigan", 2016:2017)
+  d <- add_player(d, "93", "Dawuane Smoot", "Illinois", 2015:2016)
+  d <- add_player(d, "94", "Devon Smith", "Penn State", 2013:2014)
+  d$picks_nfl <- dplyr::bind_rows(
+    d$picks_nfl,
+    ps(
+      playerId = c("901", "902", "903", "904"),
+      year = c(2017L, 2018L, 2017L, 2015L),
+      round = c(1L, 5L, 3L, 2L),
+      overall = c(2L, 140L, 68L, 34L),
+      gsis_id = c("00-91", "00-92", "00-93", "00-94"),
+      name = c(
+        "Mitchell Trubisky",
+        "Mo Hurst",
+        "Dawaune Smoot",
+        "Donovan Smith"
+      ),
+      collegeTeam = c("North Carolina", "Michigan", "Illinois", "Penn State")
+    )
+  )
+  out <- run_roster(d)
+  drafted <- function(id) {
+    any(out$outcome_drafted_d[out$playerId == id] %in% TRUE)
+  }
+  expect_true(drafted("91"))
+  expect_true(drafted("92"))
+  expect_true(drafted("93"))
+  # Donovan and Devon share a surname, a school and an initial: not one person.
+  expect_false(drafted("94"))
+})

@@ -1,5 +1,21 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Model (feature F17): **the model table now has one row per roster
+  player-season**, the same keys as `outcomes` (decision 0050), instead of
+  stat-line seasons with a row per head coach. `build_model_table()` takes
+  stat-line features from `ps_change` (missing where a season has no stat
+  line, marked by `has_stat_line`) and team, position, tier and weight from
+  the roster for every season. `contract_model_table()` checks the grain
+  ([#104](https://github.com/ngiangre/cfb2nfl/issues/104)).
+- Fix (feature F22): **draft picks link through nicknames and spellings**.
+  When a pick sits on another CFBD id, the name + school fallback now runs a
+  second, stricter pass after exact names: the same surname, school and
+  entry window, first names that are a prefix, a small spelling edit or a
+  common nickname of each other (never just a shared initial), and one
+  candidate each way. 47 more players are labeled drafted, including
+  Mitchell / Mitch Trubisky (2017, second overall), Mo / Maurice Hurst and
+  Dawaune / Dawuane Smoot; Donovan and Devon Smith stay apart
+  ([#103](https://github.com/ngiangre/cfb2nfl/issues/103)).
 - Post (feature F24): **the career-endings post now counts every player on
   a college roster**, following the new `outcomes` population. Careers end
   in three ways (no career ends by leaving the data on rosters), signing

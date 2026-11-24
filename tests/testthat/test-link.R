@@ -123,3 +123,26 @@ test_that("link_drafted marks undrafted player-seasons and completes drafted", {
   expect_true(out$drafted[out$playerId == "1"])
   expect_false(out$drafted[out$playerId == "3"])
 })
+
+test_that("name_variant(initials = FALSE) needs more than a shared initial", {
+  expect_true(name_variant(
+    "Mitchell Trubisky",
+    "Mitch Trubisky",
+    initials = FALSE
+  ))
+  expect_true(name_variant("Mo Hurst", "Maurice Hurst", initials = FALSE))
+  expect_true(name_variant(
+    "Obo Okoronkwo",
+    "Ogbonnia Okoronkwo",
+    initials = FALSE
+  ))
+  expect_true(name_variant("Dawaune Smoot", "Dawuane Smoot", initials = FALSE))
+  expect_false(name_variant("Donovan Smith", "Devon Smith", initials = FALSE))
+  expect_false(name_variant(
+    "Duke Johnson",
+    "De'Andre Johnson",
+    initials = FALSE
+  ))
+  # The default keeps the shared-initial rule the recruiting link relies on.
+  expect_true(name_variant("Donovan Smith", "Devon Smith"))
+})

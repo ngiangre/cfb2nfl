@@ -522,6 +522,43 @@ contract_roster_weight <- function(
   enforce_contract(agent, "roster_weight", stop_on_fail)
 }
 
+#' Data contract for the roster-population model table
+#'
+#' Asserts [build_model_table()] keeps exactly the outcome grain: one row per
+#' `(playerId, season)` of `backbone` ([outcomes_backbone()]), so the model
+#' table and `outcomes` join one to one; every row says whether it has a stat
+#' line; the static roster weight stays in its plausible range.
+#'
+#' @param model_table The model table ([build_model_table()]).
+#' @param backbone The outcome population keys ([outcomes_backbone()]).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_model_table <- function(model_table, backbone, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  missing_keys <- nrow(dplyr::anti_join(
+    backbone,
+    model_table,
+    by = c("playerId", "season")
+  ))
+  agent <- pointblank::create_agent(model_table, label = "model_table") |>
+    pointblank::rows_distinct(pointblank::vars(playerId, season)) |>
+    pointblank::col_vals_not_null(pointblank::vars(has_stat_line)) |>
+    pointblank::col_vals_between("weight", 100, 500, na_pass = TRUE) |>
+    pointblank::col_vals_equal(
+      pointblank::vars(n),
+      nrow(backbone),
+      preconditions = function(x) tibble::tibble(n = nrow(x))
+    ) |>
+    pointblank::col_vals_equal(
+      pointblank::vars(n),
+      0L,
+      preconditions = function(x) tibble::tibble(n = missing_keys)
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "model_table", stop_on_fail)
+}
+
 #' Data contract for the recruiting link
 #'
 #' Asserts [link_recruiting()] is row-preserving, the HS rating columns stay
@@ -2216,7 +2253,7 @@ contract_outcomes <- function(
         pick_id = .data$playerId,
         pick_gsis = .data$gsis_id,
         pick_name = if ("name" %in% names(picks_nfl)) {
-          normalize_name(.data$name)
+          .data$name
         } else {
           NA_character_
         }
@@ -2233,7 +2270,14 @@ contract_outcomes <- function(
             .data$playerId[1] |
             (!is.na(.data$pick_gsis) & .data$pick_gsis %in% .data$gsis_id[1]) |
             (!is.na(.data$pick_name) &
-              .data$pick_name %in% normalize_name(.data$player[1]))
+              !is.na(.data$player[1]) &
+              # The same strict variant build_outcomes() links picks by.
+              as.logical(name_variant(
+                .data$pick_name,
+                .data$player[1],
+                initials = FALSE
+              )) %in%
+                TRUE)
         ),
         .by = c("playerId", "season")
       )

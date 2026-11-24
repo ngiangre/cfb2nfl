@@ -220,3 +220,54 @@ add_roster_weight <- function(player_season, roster) {
   player_season |>
     dplyr::left_join(weight_by_season, by = c("playerId", "season"))
 }
+
+#' Build the model table on the roster population
+#'
+#' One row per player-season of the outcome population (decision 0050;
+#' [outcomes_backbone()]): every roster season of a non-reused id, plus any
+#' stat-line season off the roster. Stat-line features come from `ps_change`,
+#' one row per player-season (the first of a season's head coaches); a season
+#' with no stat line keeps them `NA` and takes its team, position and tier from
+#' the roster and `team_season`. `has_stat_line` marks the difference, so a
+#' model can treat "no stat line" as a category instead of imputing zeros.
+#' Labels are not joined here: they come from `outcomes`, keyed the same way.
+#'
+#' @param ps_change Stat-line player-seasons with change features
+#'   ([add_change_features()]).
+#' @param ps_pop Stat-line population (the `ps_pop` target).
+#' @param roster Cleaned roster ([clean_roster()]).
+#' @param career Career summary ([career_summary()]).
+#' @param team_season Team-season table with `tier` ([build_team_season()]).
+#'
+#' @return A tibble, one row per `(playerId, season)` in [outcomes_backbone()].
+#' @export
+build_model_table <- function(ps_change, ps_pop, roster, career, team_season) {
+  keys <- outcomes_backbone(ps_pop, roster, career)
+  stat <- ps_change |>
+    dplyr::arrange(.data$playerId, .data$season) |>
+    dplyr::distinct(.data$playerId, .data$season, .keep_all = TRUE)
+  ros <- roster |>
+    dplyr::distinct(.data$playerId, .data$season, .keep_all = TRUE) |>
+    dplyr::select(
+      "playerId",
+      "season",
+      roster_team = "team",
+      roster_position = "position",
+      "weight"
+    )
+  out <- keys |>
+    dplyr::left_join(stat, by = c("playerId", "season")) |>
+    dplyr::left_join(ros, by = c("playerId", "season")) |>
+    dplyr::mutate(
+      team = dplyr::coalesce(.data$team, .data$roster_team),
+      position = dplyr::coalesce(.data$position, .data$roster_position)
+    ) |>
+    dplyr::left_join(
+      dplyr::select(team_season, "team", "season", team_tier = "tier"),
+      by = c("team", "season")
+    ) |>
+    dplyr::mutate(tier = dplyr::coalesce(.data$tier, .data$team_tier)) |>
+    dplyr::select(-"roster_team", -"roster_position", -"team_tier")
+  stopifnot(nrow(out) == nrow(keys))
+  out
+}

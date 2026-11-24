@@ -153,3 +153,49 @@ test_that("flag_redshirt tolerates missing class_year", {
   expect_equal(out$redshirt_season[out$season == 2021L], TRUE)
   expect_equal(out$fifth_year_career[1], FALSE)
 })
+
+test_that("build_model_table keys on every roster player-season, one row each", {
+  ps_pop <- tibble::tibble(
+    playerId = c("1", "1"),
+    player = "A",
+    season = c(2020L, 2021L)
+  )
+  # Player 1 had two head coaches in 2021 (a fanned-out ps_change row).
+  ps_change <- tibble::tibble(
+    playerId = c("1", "1", "1"),
+    season = c(2020L, 2021L, 2021L),
+    team = "IU",
+    position = "QB",
+    tier = 2L,
+    coach_id = c(1L, 2L, 3L),
+    transferred = FALSE
+  )
+  roster <- tibble::tibble(
+    playerId = c("1", "1", "1", "2", "2"),
+    season = c(2019L, 2020L, 2021L, 2020L, 2021L),
+    team = c("IU", "IU", "IU", "OSU", "OSU"),
+    position = c("QB", "QB", "QB", "OT", "OT"),
+    weight = c(210L, 210L, 210L, 310L, 310L)
+  )
+  career <- career_summary(roster)
+  team_season <- tibble::tibble(
+    team = c("IU", "IU", "IU", "OSU", "OSU"),
+    season = c(2019L, 2020L, 2021L, 2020L, 2021L),
+    tier = c(2L, 2L, 2L, 3L, 3L)
+  )
+  out <- build_model_table(ps_change, ps_pop, roster, career, team_season)
+  expect_equal(nrow(out), nrow(outcomes_backbone(ps_pop, roster, career)))
+  expect_false(any(duplicated(out[c("playerId", "season")])))
+  lineman <- out[out$playerId == "2", ]
+  expect_false(any(lineman$has_stat_line))
+  expect_equal(lineman$position, c("OT", "OT"))
+  expect_equal(lineman$tier, c(3L, 3L))
+  expect_equal(lineman$weight, c(310L, 310L))
+  # Stat-derived features stay missing on seasons without a stat line.
+  expect_true(all(is.na(lineman$transferred)))
+  expect_true(is.na(out$transferred[out$playerId == "1" & out$season == 2019L]))
+  expect_equal(
+    out$transferred[out$playerId == "1" & out$season == 2020L],
+    FALSE
+  )
+})
