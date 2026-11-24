@@ -1,7 +1,7 @@
 ---
-title: "Linemen and defensive backs are drafted most often, and quarterbacks earliest"
+title: "Linemen and defensive backs lead a close drafted-rate pack, and quarterbacks go earliest on average"
 date: "2026-10-24"
-description: "Counting every rostered player, defensive and offensive linemen and defensive backs are drafted most often (about 3 in 100 eligible seasons), quarterbacks sit mid-table yet lead round 1 (26.6% of drafted quarterback seasons), and quarterbacks are the only group whose NFL entrants mostly arrive drafted."
+description: "Counting every rostered player, defensive and offensive linemen and defensive backs lead a close drafted-rate pack, quarterbacks sit mid-table yet lead round 1 and the average pick, and quarterbacks are the only group with fewer than half of NFL entrants undrafted."
 followups:
   - "Carry position as a feature in the models; the spread in drafted rates and the round mix are variance a pooled model would otherwise spend capacity on."
   - "Keep linemen on the roster population: restricted to linemen with a stat line, the line looked like the most drafted group by a wide margin."
@@ -9,7 +9,7 @@ author:
   - "AI directed by Nick Giangreco"
 freeze: auto
 vignette: >
-  %\VignetteIndexEntry{Linemen and defensive backs are drafted most often, and quarterbacks earliest}
+  %\VignetteIndexEntry{Linemen and defensive backs lead a close drafted-rate pack, and quarterbacks go earliest on average}
   %\VignetteEngine{quarto::html}
   %\VignetteEncoding{UTF-8}
 ---
@@ -210,7 +210,7 @@ kable(risk_set, caption = "The risk set: eligible seasons with a known outcome."
 
 ## 3. Results
 
-### 3.1 Linemen and defensive backs are drafted most often, and quarterbacks sit mid-table
+### 3.1 Linemen and defensive backs edge the other groups in drafted rate, and quarterbacks sit mid-table
 
 ```{r}
 #| label: rates
@@ -239,7 +239,13 @@ st_rate <- rate_of("Special teams")
 qb_rank <- which(rates_cmp$group == "Quarterback")
 top_group <- rates_cmp$group[1]
 top_rate <- rates_cmp$drafted[1]
-spread <- max(rates_cmp$drafted) / min(rates_cmp$drafted)
+min_group <- rates_cmp$group[nrow(rates_cmp)]
+min_rate <- min(rates_cmp$drafted)
+# Groups whose interval reaches the leader's.
+overlap_top <- rates_cmp$group[-1][
+  rates_cmp$drafted_hi[-1] >= rates_cmp$drafted_lo[1]
+]
+and_join <- function(x) sub(", ([^,]*)$", " and \\1", paste(x, collapse = ", "))
 # The line counted only where a lineman left a stat line, as before the
 # roster population (decision 0050).
 ol_stat <- risk |> filter(group == "Offensive line", has_stat_line)
@@ -255,11 +261,12 @@ rate_class <- comparable(risk) |>
 The table and the first figure rank the groups by the share of eligible
 seasons ending in a draft pick, each with a 95 percent confidence interval
 (the range the true rate plausibly occupies, by Wilson's method): about
-`r round(100 * top_rate)` in every 100 `r tolower(top_group)` seasons, with
-the offensive line and defensive backs inside overlapping intervals, against
-`r round(100 * qb_rate)` for quarterbacks (rank `r qb_rank` of
-`r nrow(rates_cmp)`); the second figure follows each group's rate by draft
-class.
+`r round(100 * top_rate, 1)` in every 100 `r tolower(top_group)` seasons
+against `r round(100 * qb_rate, 1)` for quarterbacks (rank `r qb_rank` of
+`r nrow(rates_cmp)`), and the `r tolower(and_join(overlap_top))` intervals
+all reach the `r tolower(top_group)`'s, so the leaders are close and
+quarterbacks are simply not ahead; the second figure follows each group's
+rate by draft class.
 
 ```{r}
 #| label: rates-table
@@ -283,7 +290,11 @@ top3 <- rates_cmp$group[1:3]
 p_rates <- ggplot(rates_cmp, aes(100 * drafted, group_f)) +
   geom_col_interactive(
     aes(
-      fill = group %in% c(top3, "Quarterback"),
+      fill = case_when(
+        group %in% top3 ~ "lead",
+        group == "Quarterback" ~ "qb",
+        TRUE ~ "other"
+      ),
       tooltip = sprintf(
         "%s: %.1f%% drafted (%s of %s eligible seasons; 95%% CI %.1f%% to %.1f%%)",
         group,
@@ -339,10 +350,15 @@ p_rates <- ggplot(rates_cmp, aes(100 * drafted, group_f)) +
     labels = function(x) sprintf("%.0f%%", x),
     expand = expansion(mult = c(0, 0.02))
   ) +
-  scale_fill_manual(values = c(`TRUE` = "#1B9E77", `FALSE` = "gray65")) +
+  scale_fill_manual(values = c(lead = "#1B9E77", qb = "#D95F02", other = "gray65")) +
   guides(fill = "none") +
   labs(
-    title = sprintf("The drafted rate spans %.1f-fold across positions", spread),
+    title = sprintf(
+      "%s lead at %.1f%% to %.1f%% of eligible seasons drafted",
+      and_join(top3),
+      100 * min(rates_cmp$drafted[1:3]),
+      100 * max(rates_cmp$drafted[1:3])
+    ),
     subtitle = "Share of eligible player-seasons ending in a draft pick, by position group",
     x = "Eligible seasons drafted",
     y = NULL,
@@ -469,15 +485,18 @@ p_round <- ggplot(round_cmp, aes(100 * round1_share, group_f)) +
   ) +
   annotate(
     "text",
-    x = 25,
+    x = 100 * qb_r1$round1_share - 1.6,
     y = r1_qb_y - 2.4,
-    label = "About one drafted quarterback\nin four goes in the first round",
+    label = sprintf(
+      "%.1f%% of drafted quarterbacks\ngo in the first round",
+      100 * qb_r1$round1_share
+    ),
     size = 4.2,
     hjust = 0
   ) +
   annotate(
     "curve",
-    x = 28,
+    x = 100 * qb_r1$round1_share + 1.4,
     y = r1_qb_y - 1.9,
     xend = 100 * qb_r1$round1_share - 1,
     yend = r1_qb_y - 0.38,
@@ -485,7 +504,7 @@ p_round <- ggplot(round_cmp, aes(100 * round1_share, group_f)) +
     linewidth = 0.7,
     alpha = 0.6
   ) +
-  expand_limits(x = 40) +
+  expand_limits(x = 100 * qb_r1$round1_share + 14) +
   scale_x_continuous(
     labels = function(x) sprintf("%.0f%%", x),
     expand = expansion(mult = c(0, 0.02))
@@ -584,6 +603,9 @@ qb_trend <- pick_trend |>
     lowest = draft_year %in%
       lowest_per_year$draft_year[lowest_per_year$group == "Quarterback"]
   )
+first_lowest <- qb_trend |>
+  filter(lowest) |>
+  slice_min(avg_pick, n = 1, with_ties = FALSE)
 ```
 
 *Expecting quarterbacks to be picked earliest on average, in every draft
@@ -657,13 +679,13 @@ p_pick <- ggplot(pick_trend, aes(draft_year, avg_pick)) +
     "curve",
     x = 2017.6,
     y = 26,
-    xend = 2020.8,
-    yend = qb_trend$avg_pick[qb_trend$draft_year == 2021] - 6,
+    xend = first_lowest$draft_year - 0.2,
+    yend = first_lowest$avg_pick - 6,
     arrow = arrow(length = unit(0.25, "cm")),
     linewidth = 0.7,
     alpha = 0.6
   ) +
-  scale_x_continuous(breaks = seq(2012, 2025, by = 2)) +
+  scale_x_continuous(breaks = seq(2012, max(qb_trend$draft_year), by = 2)) +
   scale_y_continuous(limits = c(0, NA)) +
   labs(
     title = "The quarterback average swings by dozens of picks from class to class",
@@ -671,7 +693,7 @@ p_pick <- ggplot(pick_trend, aes(draft_year, avg_pick)) +
     x = "Draft class",
     y = "Average overall pick",
     caption = sprintf(
-      "Orange: quarterbacks. Gray: the other position groups (hover for names). Dashed line: all drafted seasons, pick %.0f. Group-class cells with fewer than 5 picks omitted.",
+      "Orange: quarterbacks. Gray: the other position groups (hover for names).\nDashed line: all drafted seasons, pick %.0f. Group-class cells with fewer than 5 picks omitted.",
       pooled_pick
     )
   ) +
@@ -717,7 +739,7 @@ girafe(ggobj = p_all_picks, width_svg = 13, height_svg = 6)
 #| output: false
 ```
 
-### 3.4 Quarterbacks are the only group whose entrants mostly arrive drafted
+### 3.4 Quarterbacks are the only group with fewer than half of entrants undrafted
 
 ```{r}
 #| label: udfa-share
@@ -738,6 +760,11 @@ udfa_cmp <- comparable(udfa_share) |>
   )
 udfa_of <- function(g) udfa_share$share[udfa_share$group == g]
 qb_udfa <- udfa_of("Quarterback")
+qb_entrants <- udfa_share$entrants[udfa_share$group == "Quarterback"]
+qb_udfa_ci <- 100 * wilson(
+  udfa_share$udfa[udfa_share$group == "Quarterback"],
+  qb_entrants
+)
 ol_udfa <- udfa_of("Offensive line")
 st_udfa <- udfa_of("Special teams")
 overall_udfa <- mean(risk$outcome_signed_udfa_d[risk$outcome_nfl_entry_d])
@@ -751,7 +778,9 @@ share arriving as an undrafted free agent (signed after going unpicked):
 only quarterbacks fall below half, at `r pct(qb_udfa)`, against
 `r pct(overall_udfa)` overall and `r pct(min(udfa_cmp$share[udfa_cmp$group != "Quarterback"]))`
 for the next-lowest group; the second figure follows each group's
-undrafted share by draft class.
+undrafted share by draft class. With only `r fmt(qb_entrants)` quarterback
+entrants, that share's 95 percent interval (`r sprintf("%.1f%% to %.1f%%", qb_udfa_ci[["lo"]], qb_udfa_ci[["hi"]])`)
+still reaches half.
 
 ```{r}
 #| label: udfa-table
@@ -771,6 +800,7 @@ udfa_cmp |>
 ud_qb_y <- which(levels(udfa_cmp$group_f) == "Quarterback")
 ud_ol_y <- which(levels(udfa_cmp$group_f) == "Offensive line")
 p_udfa <- ggplot(udfa_cmp, aes(100 * share, group_f)) +
+  geom_vline(xintercept = 50, linetype = "dashed", color = "gray60") +
   geom_col_interactive(
     aes(
       fill = route,
@@ -794,11 +824,10 @@ p_udfa <- ggplot(udfa_cmp, aes(100 * share, group_f)) +
     color = "white",
     size = 4.2
   ) +
-  geom_vline(xintercept = 50, linetype = "dashed") +
   annotate(
     "text",
     x = 72,
-    y = (ud_qb_y + ud_ol_y) / 2 + 1,
+    y = ud_qb_y + 1.2,
     label = "Left of the dashed line:\nmost entrants arrived\nthrough the draft",
     size = 4.2,
     hjust = 0
@@ -806,9 +835,9 @@ p_udfa <- ggplot(udfa_cmp, aes(100 * share, group_f)) +
   annotate(
     "curve",
     x = 71.5,
-    y = (ud_qb_y + ud_ol_y) / 2 + 0.6,
-    xend = 51,
-    yend = (ud_qb_y + ud_ol_y) / 2,
+    y = ud_qb_y + 0.8,
+    xend = 100 * qb_udfa + 0.5,
+    yend = ud_qb_y + 0.1,
     arrow = arrow(length = unit(0.25, "cm")),
     linewidth = 0.7,
     alpha = 0.6
@@ -822,7 +851,7 @@ p_udfa <- ggplot(udfa_cmp, aes(100 * share, group_f)) +
     values = c("Mostly drafted" = "#D95F02", "Mostly undrafted" = "#1b4f8a")
   ) +
   labs(
-    title = "Quarterbacks lean on the draft, specialists on the undrafted route",
+    title = "Quarterbacks are the only group mostly arriving through the draft",
     subtitle = "Share of each group's NFL entrants who arrived undrafted",
     x = "NFL entrants who arrived undrafted",
     y = NULL,
@@ -904,20 +933,23 @@ tribble(
 ## 5. Discussion
 
 ::: {.callout-important appearance="minimal"}
-**Which linemen are counted decides where the line ranks.**
+**Which offensive linemen are counted decides where the offensive line
+ranks.**
 
-- The risk set counts all `r fmt(n_ol_players)` rostered linemen, whose
-  `r pct(ol_rate)` drafted rate sits with the other big groups.
+- All `r fmt(n_ol_players)` rostered offensive linemen are counted, and their
+  `r pct(ol_rate)` drafted rate sits within the leading pack.
 - Only `r pct(nrow(ol_stat) / nrow(filter(risk, group == "Offensive line")), 0)`
   of their eligible seasons carry a stat line; counted alone, those seasons
-  are drafted at `r pct(ol_stat_rate)`, likely because a lineman who leaves
-  a statistical trace is one who plays.
+  are drafted at `r pct(ol_stat_rate)`, which would top every group in the
+  table above, likely because a lineman who leaves a statistical trace is
+  one who plays.
 :::
 
 ::: {.callout-important appearance="minimal"}
 **Position is a feature the models should carry.**
 
-- Both the level (a `r round(spread, 1)`-fold spread in drafted rates) and the
+- Both the level (drafted rates from `r pct(min_rate)` for
+  `r tolower(min_group)` to `r pct(top_rate)` for the `r tolower(top_group)`) and the
   shape (round mix, average pick, entry route) differ by position.
 - A single pooled model would spend its capacity explaining variance that
   position names in one column.
