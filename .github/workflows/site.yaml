@@ -20,11 +20,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       # Vignettes read the pipeline from the project root under altdoc's build.
@@ -77,6 +74,16 @@ jobs:
         with:
           path: docs
 
+  # A separate job: deploy-pages looks the artifact up through the API, and
+  # in the same job it ran before the fresh upload was listed ("No artifacts
+  # named github-pages", 2026-11-24, three runs). A job boundary waits for it.
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
       - id: deploy
         uses: actions/deploy-pages@v5
         with:
