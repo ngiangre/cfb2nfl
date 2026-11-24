@@ -248,6 +248,8 @@ acceptance criteria.
 - **Links:** decisions 0014, 0032
 - **Tasks:**
 <!-- tasks F22 -->
+- [ ] [#99](https://github.com/ngiangre/cfb2nfl/issues/99) fix(outcomes): drafted and undrafted labels lost or misassigned (late entry, id mismatch, namesakes)
+- [ ] [PR #100](https://github.com/ngiangre/cfb2nfl/pull/100) fix(outcomes): keep late, id-mismatched and namesake NFL labels straight
 <!-- /tasks -->
 
 ### F23 · NFL play, snap and roster-status data, 2022 on

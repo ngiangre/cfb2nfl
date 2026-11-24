@@ -73,12 +73,19 @@ columns:
     provenance: derived (picks_nfl, nfl_rosters)
   - name: outcome_observed_d
     type: logical
-    description: 1 if draft_year <= the last draft year with complete data, else 0. Rows with 0 get NA outcomes, not 0 (administrative right-censoring).
+    description: 1 if the year this row's outcome is decided (draft_year, or the later NFL entry year on a player's last stat row) is <= the last draft year with complete data, else 0. Rows with 0 get NA outcomes, not 0 (administrative right-censoring).
     provenance: derived (last_complete_nfl_draft())
   - name: outcome_drafted_d
     type: logical
-    description: 1 if selected in draft d, else 0 (NA when censored). The event indicator for a draft-only analysis.
-    provenance: derived (picks via link_drafted)
+    description: >
+      1 if selected in draft d, else 0 (NA when censored). On a player's last
+      stat row, a pick in a later draft also counts (his final college
+      seasons had no stat line, e.g. a lineman or an injured senior), so the
+      event lands on the last row the population observes. The pick joins by
+      athlete id, or, when the pick's CFBD id is outside the population, by
+      normalized name + college team with exactly one candidate on each side.
+      The event indicator for a draft-only analysis.
+    provenance: derived (picks via athlete id, else name + school)
   - name: outcome_draft_round_d
     type: int32
     description: Round selected (1-7), NA if undrafted or censored. For ordinal models.
@@ -93,7 +100,14 @@ columns:
     provenance: derived (outcome_draft_round_d)
   - name: outcome_signed_udfa_d
     type: logical
-    description: 1 if not drafted in d but on an NFL roster in the window after that draft, else 0 (NA when censored). Mutually exclusive with `outcome_drafted_d`.
+    description: >
+      1 if not drafted but first on an NFL roster in the season after draft d
+      (or, on a player's last stat row, any later season in the entry window),
+      else 0 (NA when censored). The name guard never links a gsis_id that
+      belongs to a draft pick (CFBD or nflverse), never links a player who
+      holds a pick, and requires the first NFL season to follow the player's
+      last college stat season (an earlier one is a namesake). Mutually
+      exclusive with `outcome_drafted_d`.
     provenance: derived (nfl_rosters via name guard)
   - name: outcome_nfl_entry_d
     type: logical
@@ -113,7 +127,7 @@ columns:
     provenance: derived (nfl_rosters via gsis_id)
   - name: outcome_rookie_games_entry_year
     type: int32
-    description: Games played in the entry season, 0 if none; NA when the player did not enter (or is censored). A numeric outcome.
+    description: Games played in the entry season, 0 if none; NA when the player did not enter (or is censored). A numeric outcome. Partial for the latest draft class until its first NFL season ends.
     provenance: derived (nfl_player_stats.games via gsis_id)
   - name: outcome_source
     type: string

@@ -811,7 +811,13 @@ list(
   tar_target(
     ok_outcomes,
     pointblank::all_passed(
-      contract_outcomes(outcomes, ps_pop, stop_on_fail = FALSE)
+      contract_outcomes(
+        outcomes,
+        ps_pop,
+        picks_nfl,
+        nfl_draft_picks,
+        stop_on_fail = FALSE
+      )
     )
   ),
   tar_target(
@@ -1190,7 +1196,8 @@ list(
           recruiting,
           picks_nfl,
           nfl_rosters,
-          nfl_player_stats
+          nfl_player_stats,
+          nfl_draft_picks
         )
       }
     ),
