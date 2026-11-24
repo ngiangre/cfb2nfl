@@ -220,7 +220,7 @@ final_endings <- c(
   "signed_udfa",
   "drafted"
 )
-final <- finished |>
+final <- statline |>
   filter(last_season %in% game_window, career_end %in% final_endings) |>
   left_join(
     select(absence, playerId, season, observable, absence_shape),
@@ -310,7 +310,7 @@ tibble::tribble(
   ~Term, ~Meaning,
   "Career", "One player's run of college roster seasons, at any number of schools.",
   "Finished career", "A career whose end is observed: its last season is not the latest in the data, and the draft after it has happened.",
-  "Stat-line career", "A finished career with at least one season stat line. Endings are compared for these careers, since only they can show the box-score signals below.",
+  "Stat-line career", "A finished career with at least one season stat line. Endings are compared for these careers, since only a career with a stat line can show a box-score signal in its final season.",
   "Stopped with eligibility left", "A stat-line career at one school that ended with eligibility remaining and no draft pick or undrafted signing. The early-stop proxy.",
   "Eligibility", sprintf("%s seasons from the first roster season, with 2020 not counted. Medical waivers are not visible.", eligibility_seasons),
   "Box score", "The per-game stat lines for a team: every player who recorded a stat. College box scores list defensive stats from 2016 on.",
@@ -349,7 +349,7 @@ tibble::tibble(position_group = pos_levels) |>
 
 *Expectation: a stop with eligibility left is the most common ending of a finished stat-line career at every position.* `r if (e1_holds) "✅" else "❌"`
 
-The table sorts each position's finished stat-line careers into their endings; only `r pct(ol_with_line, 0)` of finished offensive line careers have a stat line at all, so the proxy reaches few linemen.
+The table sorts each position's finished stat-line careers into their endings; only `r pct(ol_with_line, 0)` of finished offensive line careers have a stat line at all, so few linemen enter the comparison.
 
 ```{r}
 #| label: s31-table
@@ -785,7 +785,7 @@ girafe(ggobj = p8, width_svg = 13, height_svg = 7)
 
 ## 4. Summary
 
-The early-stop proxy reaches every position that logs a stat line, the two in-season signals reach only regulars in the box score, and no position shows a player who entered the draft and went unselected.
+Early stops are the most common ending of a stat-line career at every position, the two in-season signals reach only regulars in the box score, and no position shows a player who entered the draft and went unselected.
 
 ```{r}
 #| label: summary
@@ -810,7 +810,7 @@ statline_share |>
   arrange(position_group) |>
   transmute(
     `Position group` = as.character(position_group),
-    `Early stop (finished careers with a stat line)` = pct(with_line, 0),
+    `Careers in the ending comparison (finished, with a stat line)` = pct(with_line, 0),
     `Injury-shaped absence (seasons)` = pct(readable),
     `Benching-shaped decline (seasons)` = if_else(
       is.na(decline_readable),
@@ -821,7 +821,7 @@ statline_share |>
   ) |>
   kable(
     align = "lrrrl",
-    caption = "What the data can define for each position: the share of careers or seasons each signal can be read for."
+    caption = "What the data can define for each position: the share of careers or seasons each comparison or signal covers."
   )
 ```
 

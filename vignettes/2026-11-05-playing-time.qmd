@@ -174,7 +174,7 @@ tibble::tribble(
   "Appeared in a game"   , "The player has at least one stat line in that game. Offensive linemen and many special teamers rarely log one, so this understates their play." ,
   "Appearance rate"      , "Games appeared divided by team games."                                                                      ,
   "Position group"       , "The roster position for that season, in one of eleven shared groups."                                       ,
-  "Drafted"              , "Selected in the draft after that season, among seasons in which the player was draft-eligible and logged a season stat line."             ,
+  "Drafted"              , "Selected in the draft after that season, among seasons in which the player was draft-eligible, with or without a season stat line."             ,
   "Class year"           , "The player's eligibility class, 1 to 5, as CFBD records it; missing for some player-seasons, which are left out."
 ) |>
   kable(caption = "The terms used throughout.")
@@ -368,7 +368,7 @@ girafe(ggobj = p4, width_svg = 13, height_svg = 6)
 
 *Expectation: drafted player-seasons log a stat line in a larger share of their team's games than other player-seasons.* `r if (e2_holds) "✅" else "❌"`
 
-Draft-eligible seasons count every rostered player, with or without a season stat line, so as few as `r pct(min(draft_summary$any_line))` of a group have a line in some game, and the comparison is the share of team games with one; Joe Burrow logged a line in `r burrow_2019$games_appeared` of LSU's `r burrow_2019$team_games` games in 2019, and Jordan Travis, a backup that year, in `r travis_2019$games_appeared` of `r travis_2019$team_games`.
+Draft-eligible seasons count every rostered player, with or without a season stat line: `r pct(draft_summary$any_line[!draft_summary$drafted])` of undrafted seasons and `r pct(draft_summary$any_line[draft_summary$drafted])` of drafted ones have a line in some game, so the comparison is the share of team games with one; Joe Burrow logged a line in `r burrow_2019$games_appeared` of LSU's `r burrow_2019$team_games` games in 2019, and Jordan Travis, a backup that year, in `r travis_2019$games_appeared` of `r travis_2019$team_games`.
 
 ```{r}
 #| label: s33-table
