@@ -65,7 +65,10 @@ like the CFBD tables: the weekly run replaces the current NFL season; a
 selector with no season from 2022 on leaves them as published. Re-pull them
 alone with `Rscript data-raw/refresh-nfl.R [selector] --yes [--publish]`
 (refresh-mode build of only the NFL targets, then a track-mode build; it
-refuses to publish if any CFBD call was made or a non-NFL parquet changed). "Current" recruiting is the **enrolled** class: the
+refuses to publish if any CFBD call was made or a non-NFL parquet changed). The derived `outcomes` table republishes the same way with
+`Rscript data-raw/refresh-outcomes.R --yes [--publish]` (0 CFBD calls;
+`--roster` first re-pulls the whole `/roster` window, 17 calls, and
+publishes it too; `--no-pull` publishes a roster already pulled). "Current" recruiting is the **enrolled** class: the
 incoming class has no CFBD athlete ids until enrollment, so the cleaner drops
 all of it. Years 2010–2026.
 

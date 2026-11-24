@@ -7,6 +7,8 @@
 #   Rscript data-raw/refresh-outcomes.R --yes             # rebuild locally
 #   Rscript data-raw/refresh-outcomes.R --yes --publish   # and upload
 #   Rscript data-raw/refresh-outcomes.R --roster --yes    # re-pull the roster
+#   Rscript data-raw/refresh-outcomes.R --roster --no-pull --yes --publish
+#     # publish a roster already re-pulled, without pulling it again
 #
 # `--roster` first re-pulls the whole `/roster` window (one CFBD call per
 # season, about 17), for a roster schema change that a season-scoped splice
@@ -29,6 +31,7 @@ args <- commandArgs(trailingOnly = TRUE)
 yes <- "--yes" %in% args
 publish <- "--publish" %in% args
 with_roster <- "--roster" %in% args
+pull_roster <- with_roster && !"--no-pull" %in% args
 
 pkgload::load_all(quiet = TRUE)
 
@@ -36,7 +39,7 @@ path <- "data/outcomes.parquet"
 rebuilt <- c(path, if (with_roster) "data/roster.parquet")
 # The full roster window: no season selector, so roster_file writes it whole.
 Sys.unsetenv("CFB2NFL_REFRESH_SEASONS")
-expected_calls <- if (with_roster) {
+expected_calls <- if (pull_roster) {
   length(refresh_seasons(source = "roster"))
 } else {
   0L
@@ -58,7 +61,7 @@ before <- if (file.exists(path)) arrow::read_parquet(path) else NULL
 
 call_log <- tempfile("cfbd-calls-", fileext = ".tsv")
 Sys.setenv(CFB2NFL_CALL_LOG = call_log)
-if (with_roster) {
+if (pull_roster) {
   roster_targets <- c("raw_roster", "roster_file", "roster")
   Sys.setenv(CFB2NFL_REFRESH = "true")
   targets::tar_invalidate(tidyselect::any_of(roster_targets))
@@ -136,19 +139,27 @@ if (publish) {
     )
   }
   id <- gh::gh("GET /repos/ngiangre/cfb2nfl/releases/tags/data-latest")$id
-  assets <- gh::gh(
-    "GET /repos/ngiangre/cfb2nfl/releases/{id}/assets",
-    id = id,
-    .limit = 100
-  )
-  on_release <- stats::setNames(
-    vapply(assets, \(a) a$size, numeric(1)),
-    vapply(assets, \(a) a$name, character(1))
-  )
-  missing <- upload[
-    on_release[basename(upload)] != file.size(upload) |
-      is.na(on_release[basename(upload)])
-  ]
+  # The asset list lags a fresh upload by a minute or so (2026-11-24: the
+  # first check saw the old sizes of files that had landed), so poll.
+  for (attempt in 1:6) {
+    assets <- gh::gh(
+      "GET /repos/ngiangre/cfb2nfl/releases/{id}/assets",
+      id = id,
+      .limit = 100
+    )
+    on_release <- stats::setNames(
+      vapply(assets, \(a) a$size, numeric(1)),
+      vapply(assets, \(a) a$name, character(1))
+    )
+    missing <- upload[
+      on_release[basename(upload)] != file.size(upload) |
+        is.na(on_release[basename(upload)])
+    ]
+    if (length(missing) == 0L) {
+      break
+    }
+    Sys.sleep(30)
+  }
   if (length(missing) > 0L) {
     stop("Upload did not land for: ", paste(basename(missing), collapse = ", "))
   }

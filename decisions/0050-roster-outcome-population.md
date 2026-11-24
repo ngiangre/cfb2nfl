@@ -109,4 +109,10 @@ more late-entry special cases.
 
 ## Outcome / what we learned
 
-_Filled in later._
+- 2026-11-24, #111: the roster now keeps CFBD's names (17 calls), so no
+  player in `outcomes` is unnamed. Undrafted signings rose from 4,337 to
+  5,307, drafted players from 3,803 to 3,835, and draft-eligible rows fell
+  from 181,010 to 174,131 (more recruited high-school years). The new
+  undrafted links match a roster school less often than the existing ones
+  (77% against 86% where the NFL roster lists a college), so a school guard
+  on the undrafted match is the next check.

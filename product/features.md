@@ -262,42 +262,43 @@ acceptance criteria.
   4,095 picks from 2011 to 2026 have no stat line at all. Rosters are
   complete every season, so they define who could have been drafted.
 - **Acceptance criteria:**
-  - [ ] Every roster player-season (reused ids excluded) appears exactly
+  - [x] Every roster player-season (reused ids excluded) appears exactly
     once in `outcomes`, each with `has_stat_line` and a season-aware tier;
     the contract fails on a missing tier rather than defaulting. Both
     columns and the tier source are defined in `inst/dict/outcomes.yml`
     and `inst/data-model.md`.
-  - [ ] Every 2011-2026 pick whose CFBD id is on a roster has a drafted row
+  - [x] Every 2011-2026 pick whose CFBD id is on a roster has a drafted row
     in `outcomes`, linemen and pre-2016 defenders included.
-  - [ ] No drafted row's `draft_year` differs from the pick's draft year
+  - [x] No drafted row's `draft_year` differs from the pick's draft year
     (234 today; Kenyon Green, 2022 pick on his 2019 row, is a test case).
   - [ ] A pick whose name differs from the college name only by a nickname
     or spelling links to the player (Mitchell/Mitch Trubisky, Mo/Maurice
     Hurst, Obo/Ogbonnia Okoronkwo, Dawaune/Dawuane Smoot, Cam/Cameron
     Sutton as tests), and none is labeled undrafted.
-  - [ ] Every roster-only player who signed as an undrafted free agent
+  - [x] Every roster-only player who signed as an undrafted free agent
     (name guard, decision 0032) has `signed_udfa` on one entry row, and no
     drafted player's `gsis_id` is on an undrafted row.
-  - [ ] Rows past `last_complete_draft` have NA outcomes, never 0, for
+  - [x] Rows past `last_complete_draft` have NA outcomes, never 0, for
     roster-only rows as for stat-line rows.
-  - [ ] `outcomes` carries each player's first roster season and a flag on
+  - [x] `outcomes` carries each player's first roster season and a flag on
     the row that is that season (never NA, defined in
     `inst/dict/outcomes.yml`); flagged rows are kept, since 1.4% of picks
     enter the NFL right after their first roster season (transfers from
     programs the data does not cover).
-  - [ ] An imputed `hs_grad_year` is the earlier of the first roster and
+  - [x] An imputed `hs_grad_year` is the earlier of the first roster and
     first stat season minus one, flagged by `hs_year_imputed`.
-  - [ ] A decision record replaces the stat-line population (decision 0032
+  - [x] A decision record replaces the stat-line population (decision 0032
     and the v1 rule in AGENTS.md) with the roster population for both
     `outcomes` and the model population, and reports before/after row,
     player, eligible and drafted counts.
-  - [ ] Rebuilding and publishing `outcomes` makes 0 CFBD calls, shown by
+  - [x] Rebuilding and publishing `outcomes` makes 0 CFBD calls, shown by
     the call log.
 - **Out of scope:** revising the posts that read `outcomes` (each owning
   post feature carries its own task); the forecast itself (F17). Explorer
   player outcomes rebuild from the new population with no code change; any
   Explorer page revision is an F13 task.
-- **Cost:** 0 CFBD calls, through a targeted refresh-mode build of
+- **Cost:** 17 CFBD calls once, to re-pull the roster with names (#111);
+  otherwise 0 CFBD calls, through a targeted refresh-mode build of
   `outcomes_file` alone (`tar_make(names = outcomes_file, shortcut = TRUE)`
   in a `data-raw/refresh-outcomes.R` like `refresh-nfl.R`) that refuses to
   publish if any CFBD call was made or another parquet changed. `outcomes`
