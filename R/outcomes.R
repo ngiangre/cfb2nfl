@@ -96,10 +96,22 @@ build_outcomes <- function(
   }
   backbone <- outcomes_backbone(ps_pop, roster, career)
 
-  # A roster-only player has no stat-line name; a pick on his id names him.
-  # Rows left without a name skip every name-guarded match below.
+  # A roster-only player has no stat-line name: the roster names him, else a
+  # pick on his id. Rows left without a name skip every name-guarded match.
+  roster_names <- if (
+    !is.null(roster) && all(c("first_name", "last_name") %in% names(roster))
+  ) {
+    roster |>
+      dplyr::filter(!is.na(.data$first_name), !is.na(.data$last_name)) |>
+      dplyr::arrange(dplyr::desc(.data$season)) |>
+      dplyr::transmute(
+        .data$playerId,
+        player = paste(.data$first_name, .data$last_name)
+      )
+  }
   player_names <- dplyr::bind_rows(
     dplyr::distinct(ps_pop, .data$playerId, .data$player),
+    roster_names,
     if ("name" %in% names(picks_nfl)) {
       picks_nfl |>
         dplyr::filter(!is.na(.data$playerId), !is.na(.data$name)) |>

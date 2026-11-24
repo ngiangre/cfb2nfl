@@ -1,5 +1,16 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Data (feature F22): **the roster now carries player names**
+  (`first_name`, `last_name` from CFBD `/roster`), so a roster-only player
+  with no stat line is named in `outcomes` and can be matched to a recruiting
+  record and to an NFL roster. Undrafted signings rise from 4,337 to 5,307
+  and drafted players from 3,803 to 3,835 (picks on another CFBD id now
+  link by name and school for roster-only players too, e.g. Jonah Williams,
+  Dante Fowler Jr.); draft-eligible rows fall from 181,010 to 174,131 as
+  more players get a recruited high-school year instead of an imputed one.
+  `data-raw/refresh-outcomes.R --roster` re-pulls the roster (17 CFBD
+  calls) and publishes it with `outcomes`
+  ([#111](https://github.com/ngiangre/cfb2nfl/issues/111)).
 - Data (feature F22): **`outcomes` now covers every roster player-season**,
   not only seasons with a stat line
   ([decision 0050](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0050-roster-outcome-population.md)).
