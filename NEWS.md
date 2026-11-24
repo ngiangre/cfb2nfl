@@ -1,5 +1,15 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Post (feature F24): **the career-endings post now counts every player on
+  a college roster**, following the new `outcomes` population. Careers end
+  in three ways (no career ends by leaving the data on rosters), signing
+  undrafted passes being drafted from the third eligible season, and a new
+  section shows that counting only players with a stat line nearly doubles
+  the offensive line's drafted share. Joe Burrow, Ke'Shawn Vaughn and Shane
+  Buechele leave the named players while their roster records are checked
+  ([#114](https://github.com/ngiangre/cfb2nfl/issues/114)); Jayden Daniels
+  and Grant Calcaterra join
+  ([#109](https://github.com/ngiangre/cfb2nfl/issues/109)).
 - Data (feature F22): **the roster now carries player names**
   (`first_name`, `last_name` from CFBD `/roster`), so a roster-only player
   with no stat line is named in `outcomes` and can be matched to a recruiting
