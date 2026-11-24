@@ -142,6 +142,15 @@ n_missed <- sum(endings$missed_season)
 risk_table <- endings |>
   mutate(ending = if_else(time == 0, "unknown", ending)) |>
   count(group, ending) |>
+  # Every ending gets a column, even one no group reaches.
+  tidyr::complete(
+    group,
+    ending = c(
+      "drafted", "signed_udfa", "exhausted_undrafted", "left_data",
+      "censored", "unknown"
+    ),
+    fill = list(n = 0L)
+  ) |>
   tidyr::pivot_wider(names_from = ending, values_from = n, values_fill = 0) |>
   left_join(
     count(mutate(never, group = factor(group, levels(endings$group))), group,
