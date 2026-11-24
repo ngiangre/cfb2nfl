@@ -48,6 +48,8 @@ explorer_positions <- function() {
     "DB" , "Defensive back" , "defense_pd"        , "defensive"     , "PD"       , "Passes defended"      , "int"   , FALSE    , NA             , NA         ,
     "DB" , "Defensive back" , "interceptions_int" , "interceptions" , "INT"      , "Interceptions"        , "int"   , FALSE    , NA             , NA         ,
     "DB" , "Defensive back" , "defense_tot"       , "defensive"     , "TOT"      , "Total tackles"        , "int"   , FALSE    , NA             , NA         ,
+    "OL" , "Offensive line" , "roster_weight"     , "roster"        , "weight"   , "Weight (lb)"          , "int"   , FALSE    , NA             , NA         ,
+    "OL" , "Offensive line" , "roster_height"     , "roster"        , "height"   , "Height (in)"          , "int"   , FALSE    , NA             , NA         ,
     "ST" , "Special teams"  , "kicking_fgm"       , "kicking"       , "FGM"      , "Field goals made"     , "int"   , FALSE    , NA             , NA         ,
     "ST" , "Special teams"  , "kicking_pct"       , "kicking"       , "PCT"      , "Field goal rate"      , "pct"   , FALSE    , "FGA"          ,         10 ,
     "ST" , "Special teams"  , "punting_ypp"       , "punting"       , "YPP"      , "Yards per punt"       , "dec1"  , FALSE    , "NO"           ,         20
@@ -312,9 +314,79 @@ build_explorer_player_seasons <- function(
   })
   keys <- unique(defs$key)
   all <- dplyr::bind_rows(out)
+  # A player who reached the NFL is findable whatever his stat sheet
+  # (decision 0050): his roster seasons without a stat row are added with no
+  # stats, and offensive linemen, who have no box-score stat, are listed on
+  # roster weight and height, ranked among the NFL linemen of their season.
+  # Only NFL entrants, to keep each group's file small.
+  entrants <- player_outcomes$playerId[
+    player_outcomes$outcome %in% c("r1", "r2_3", "r4_7", "udfa")
+  ]
+  roster_defs <- dplyr::filter(defs, .data$category == "roster")
+  ros <- roster |>
+    dplyr::filter(.data$playerId %in% entrants) |>
+    dplyr::distinct(.data$playerId, .data$season, .keep_all = TRUE) |>
+    dplyr::mutate(group = position_group(.data$position)) |>
+    dplyr::inner_join(groups, by = "group", relationship = "many-to-one") |>
+    dplyr::anti_join(all, by = c("playerId", "season")) |>
+    dplyr::left_join(
+      player_stats |>
+        dplyr::distinct(.data$team, .data$season, .data$conference) |>
+        dplyr::distinct(.data$team, .data$season, .keep_all = TRUE),
+      by = c("team", "season"),
+      relationship = "many-to-one"
+    )
+  if (nrow(ros) > 0) {
+    ros$roster_name <- if (all(c("first_name", "last_name") %in% names(ros))) {
+      dplyr::if_else(
+        is.na(ros$first_name) | is.na(ros$last_name),
+        NA_character_,
+        paste(ros$first_name, ros$last_name)
+      )
+    } else {
+      NA_character_
+    }
+    for (i in seq_len(nrow(roster_defs))) {
+      def <- roster_defs[i, ]
+      v <- if (def$stat_type %in% names(ros)) {
+        as.numeric(ros[[def$stat_type]])
+      } else {
+        rep(NA_real_, nrow(ros))
+      }
+      v[ros$pos != def$pos] <- NA_real_
+      ros[[def$key]] <- v
+      ros[[paste0(def$key, "_pct")]] <- stats::ave(
+        v,
+        ros$season,
+        FUN = function(x) explorer_percentile(x, def$reverse)
+      )
+    }
+    ros <- dplyr::select(
+      ros,
+      "playerId",
+      "season",
+      "team",
+      "conference",
+      "group",
+      "position",
+      "pos",
+      "roster_name",
+      dplyr::any_of(c(roster_defs$key, paste0(roster_defs$key, "_pct")))
+    )
+    all <- dplyr::bind_rows(all, ros)
+  }
   # Groups absent from the input still get their (empty) stat columns.
-  for (col in setdiff(c(keys, paste0(keys, "_pct")), names(all))) {
-    all[[col]] <- if (endsWith(col, "_pct")) NA_integer_ else NA_real_
+  for (col in setdiff(
+    c(keys, paste0(keys, "_pct"), "roster_name"),
+    names(all)
+  )) {
+    all[[col]] <- if (endsWith(col, "_pct")) {
+      NA_integer_
+    } else if (col == "roster_name") {
+      NA_character_
+    } else {
+      NA_real_
+    }
   }
   all |>
     # Jersey number for the season (display only): the roster row for the
@@ -379,6 +451,7 @@ build_explorer_player_seasons <- function(
         .data$outcome == "active" ~ "Still playing",
         TRUE ~ "No NFL"
       ),
+      name = dplyr::coalesce(.data$name, .data$roster_name),
       dplyr::across(dplyr::ends_with("_pct"), as.integer)
     ) |>
     dplyr::select(

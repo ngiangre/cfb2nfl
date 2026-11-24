@@ -211,7 +211,7 @@ travis <- star("Jordan Travis")
 ```
 
 ::: {.callout-note appearance="minimal"}
-*Data as of the latest published release, retrieved 2026-10-31. Records
+*Data as of the latest published release, retrieved 2026-11-24. Records
 cover FBS seasons 2010 through 2025; players are counted in their final
 college season, 2013 through 2025, which covers approximately the draft
 classes of 2014 through 2026.*
@@ -503,7 +503,7 @@ lsu <- filter(school, team == "LSU")
 bama <- filter(school, team == "Alabama")
 ```
 
-### 3.2 Florida and LSU produced 34 and 28 more draftees than their records predict, and Oklahoma State and Kansas State 23 and 22 fewer
+### 3.2 Florida and LSU produced the most draftees above what their records predict, and Oklahoma State and Kansas State the most below
 
 The table and bars rank each tier's five schools furthest above and below
 their expected draftees: LSU, where Burrow finished after starting at Ohio

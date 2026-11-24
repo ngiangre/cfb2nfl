@@ -182,9 +182,10 @@ acceptance criteria.
 - **Tasks:**
 <!-- tasks F24 -->
 - [ ] [#97](https://github.com/ngiangre/cfb2nfl/issues/97) Post: how college careers end, by position, as competing outcomes over time (F24)
-- [ ] [PR #98](https://github.com/ngiangre/cfb2nfl/pull/98) docs(product): F24 competing-outcomes post card
-- [ ] [PR #101](https://github.com/ngiangre/cfb2nfl/pull/101) feat(post): how college careers end, by position, as competing outcomes (F24)
-- [ ] [#109](https://github.com/ngiangre/cfb2nfl/issues/109) Revise the career-endings post for the roster population of outcomes
+- [x] [PR #98](https://github.com/ngiangre/cfb2nfl/pull/98) docs(product): F24 competing-outcomes post card
+- [x] [PR #101](https://github.com/ngiangre/cfb2nfl/pull/101) feat(post): how college careers end, by position, as competing outcomes (F24)
+- [x] [#109](https://github.com/ngiangre/cfb2nfl/issues/109) Revise the career-endings post for the roster population of outcomes
+- [x] [PR #115](https://github.com/ngiangre/cfb2nfl/pull/115) docs(post): career endings on the roster population; fix the site build (F24)
 <!-- /tasks -->
 
 ### F21 · Question status board
@@ -237,6 +238,7 @@ acceptance criteria.
 - **Links:** decision 0006
 - **Tasks:**
 <!-- tasks F14 -->
+- [x] [PR #116](https://github.com/ngiangre/cfb2nfl/pull/116) ci(site): deploy Pages in a separate job
 <!-- /tasks -->
 
 ### F18 · querychat companion app
@@ -309,11 +311,15 @@ acceptance criteria.
   applied)
 - **Tasks:**
 <!-- tasks F22 -->
-- [ ] [#99](https://github.com/ngiangre/cfb2nfl/issues/99) fix(outcomes): drafted and undrafted labels lost or misassigned (late entry, id mismatch, namesakes)
-- [ ] [PR #100](https://github.com/ngiangre/cfb2nfl/pull/100) fix(outcomes): keep late, id-mismatched and namesake NFL labels straight
-- [ ] [#102](https://github.com/ngiangre/cfb2nfl/issues/102) Outcomes population: roster player-seasons with a stat-line flag, not stat lines only
-- [ ] [#103](https://github.com/ngiangre/cfb2nfl/issues/103) fix(outcomes): pick name fallback misses nicknames and spellings (Trubisky labeled undrafted)
-- [ ] [#111](https://github.com/ngiangre/cfb2nfl/issues/111) fix(roster): keep CFBD roster names so roster-only players can match undrafted signings
+- [x] [#99](https://github.com/ngiangre/cfb2nfl/issues/99) fix(outcomes): drafted and undrafted labels lost or misassigned (late entry, id mismatch, namesakes)
+- [x] [PR #100](https://github.com/ngiangre/cfb2nfl/pull/100) fix(outcomes): keep late, id-mismatched and namesake NFL labels straight
+- [x] [#102](https://github.com/ngiangre/cfb2nfl/issues/102) Outcomes population: roster player-seasons with a stat-line flag, not stat lines only
+- [x] [#103](https://github.com/ngiangre/cfb2nfl/issues/103) fix(outcomes): pick name fallback misses nicknames and spellings (Trubisky labeled undrafted)
+- [x] [#111](https://github.com/ngiangre/cfb2nfl/issues/111) fix(roster): keep CFBD roster names so roster-only players can match undrafted signings
+- [x] [PR #112](https://github.com/ngiangre/cfb2nfl/pull/112) feat(outcomes): every roster player-season, with has_stat_line and tier (F22)
+- [x] [PR #113](https://github.com/ngiangre/cfb2nfl/pull/113) fix(roster): keep CFBD names so roster-only players can be matched (F22)
+- [ ] [#114](https://github.com/ngiangre/cfb2nfl/issues/114) fix(roster): CFBD lists some players before they enrolled (Burrow at Ohio State in 2014)
+- [x] [PR #117](https://github.com/ngiangre/cfb2nfl/pull/117) fix(outcomes): nickname pick links; model table on the roster population (F22, F17)
 <!-- /tasks -->
 
 ### F23 · NFL play, snap and roster-status data, 2022 on
@@ -390,7 +396,8 @@ acceptance criteria.
 - **Links:** VISION §5, §6; `R/model.R` is a placeholder
 - **Tasks:**
 <!-- tasks F17 -->
-- [ ] [#104](https://github.com/ngiangre/cfb2nfl/issues/104) Model population: roster player-seasons, matching outcomes
+- [x] [#104](https://github.com/ngiangre/cfb2nfl/issues/104) Model population: roster player-seasons, matching outcomes
+- [x] [PR #117](https://github.com/ngiangre/cfb2nfl/pull/117) fix(outcomes): nickname pick links; model table on the roster population (F22, F17)
 <!-- /tasks -->
 
 ## C1 · Every number is trustworthy and reproducible

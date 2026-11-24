@@ -1,10 +1,11 @@
-test_that("explorer_positions lists headline stats for every group but OL", {
+test_that("explorer_positions lists headline stats for every group", {
   defs <- explorer_positions()
   expect_setequal(
     unique(defs$pos),
-    c("QB", "RB", "WR", "TE", "DL", "LB", "DB", "ST")
+    c("QB", "RB", "WR", "TE", "OL", "DL", "LB", "DB", "ST")
   )
-  expect_false("Offensive line" %in% defs$group)
+  # The line has no box-score stat; it is ranked on roster weight and height.
+  expect_equal(defs$category[defs$pos == "OL"], c("roster", "roster"))
   expect_true(all(defs$group %in% position_group_levels()))
   # Keys are unique within a group; a key means the same stat everywhere.
   expect_equal(anyDuplicated(defs[c("pos", "key")]), 0L)
@@ -54,14 +55,31 @@ test_that("build_explorer_player_seasons ranks within group and season", {
   expect_equal(q26$passing_yds_pct, 100L)
 })
 
-test_that("build_explorer_player_seasons drops OL and keeps every stat line", {
+test_that("build_explorer_player_seasons keeps NFL linemen and every stat line", {
   ps <- explorer_player_seasons_fixture()
+  # A lineman who never reached the NFL is not listed; one who did is, ranked
+  # on roster weight among the NFL linemen of his season.
   expect_false("o1" %in% ps$player_id)
-  expect_equal(sort(unique(ps$pos)), c("QB", "WR"))
+  o2 <- ps[ps$player_id == "o2", ]
+  expect_equal(o2$season, c(2024L, 2025L))
+  expect_equal(o2$pos, c("OL", "OL"))
+  expect_equal(o2$name, c("Omar Tackle", "Omar Tackle"))
+  expect_equal(o2$roster_weight, c(315, 315))
+  expect_equal(o2$roster_weight_pct[o2$season == 2025L], 100L)
+  expect_equal(ps$roster_weight_pct[ps$player_id == "o3"], 0L)
+  expect_equal(o2$outcome, c("r1", "r1"))
+  expect_equal(sort(unique(ps$pos)), c("OL", "QB", "WR"))
   w <- dplyr::filter(ps, .data$player_id == "w1")
   expect_equal(w$season, c(2025L, 2026L))
   expect_true(all(is.na(w$passing_yds)))
   expect_equal(w$position, c("WR", "WR"))
+  # A drafted quarterback's roster season without a stat line is listed,
+  # with no stats and his roster name.
+  q3 <- ps[ps$player_id == "q3" & ps$season == 2024L, ]
+  expect_equal(nrow(q3), 1L)
+  expect_true(is.na(q3$passing_yds))
+  expect_equal(q3$name, "Quade Other")
+  expect_equal(q3$team, "Alabama")
 })
 
 test_that("build_explorer_player_seasons joins team id, tier and outcome", {
@@ -120,9 +138,9 @@ test_that("write_explorer_players writes one file per group with its stats", {
   expect_equal(wr$team[wr$player_id == "d2"], "Ferris State")
   expect_true(all(is.na(wr$team[!is.na(wr$team_id)])))
   # A stale file from an old build is removed.
-  writeLines("x", file.path(dir, "players", "OL.parquet"))
+  writeLines("x", file.path(dir, "players", "XX.parquet"))
   write_explorer_players(ps, dir)
-  expect_false(file.exists(file.path(dir, "players", "OL.parquet")))
+  expect_false(file.exists(file.path(dir, "players", "XX.parquet")))
 })
 
 test_that("contract_explorer_players passes the fixture and catches loss", {
@@ -133,14 +151,15 @@ test_that("contract_explorer_players passes the fixture and catches loss", {
   expect_true(pointblank::all_passed(
     contract_explorer_players(ps, stats, paths, stop_on_fail = FALSE)
   ))
+  # A lost stat row fails; the roster-only rows are extra, not required.
   expect_false(pointblank::all_passed(contract_explorer_players(
-    ps[-1, ],
+    ps[-which(ps$player_id == "q1")[1], ],
     stats,
     paths,
     stop_on_fail = FALSE
   )))
   bad <- ps
-  bad$passing_yds_pct[[1]] <- 101L
+  bad$passing_yds_pct[which(ps$player_id == "q1")[1]] <- 101L
   expect_false(pointblank::all_passed(
     contract_explorer_players(bad, stats, paths, stop_on_fail = FALSE)
   ))
