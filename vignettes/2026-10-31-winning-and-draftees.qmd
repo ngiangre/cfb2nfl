@@ -211,7 +211,7 @@ travis <- star("Jordan Travis")
 ```
 
 ::: {.callout-note appearance="minimal"}
-*Data as of the latest published release, retrieved 2026-10-31. Records
+*Data as of the latest published release, retrieved 2026-11-24. Records
 cover FBS seasons 2010 through 2025; players are counted in their final
 college season, 2013 through 2025, which covers approximately the draft
 classes of 2014 through 2026.*

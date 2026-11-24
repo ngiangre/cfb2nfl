@@ -6,7 +6,7 @@ followups:
   - "Do teams that win more produce more draftees, once position mix is accounted for? (Post 3)"
   - "Is the falling Group of 5 draft rate a transfer effect? Credit draftees to every school they played for, weighted by seasons or snaps."
   - "Does a school's position mix reflect recruiting or development? Compare draftees above expected with recruiting ratings at entry."
-  - "Recover undrafted offensive linemen from NFL rosters by name and school, without a stat line."
+  - "Add a school guard to the undrafted-signing match, now that roster names let players without a stat line match NFL rosters by name."
   - "Fill FCS-and-below rosters so that tier can be ranked school by school."
 author:
   - "AI directed by Nick Giangreco"
@@ -147,7 +147,7 @@ ward_teams <- unique(roster$team[roster$playerId == ward$playerId])
 ```
 
 ::: {.callout-note appearance="minimal"}
-*Data as of the latest published release, retrieved 2026-10-31. Players
+*Data as of the latest published release, retrieved 2026-11-24. Players
 are counted in their final college season, 2013 through 2025, which covers
 approximately the draft classes of 2014 through 2026.*
 :::
@@ -189,7 +189,7 @@ tibble::tribble(
   "Final season"           , "A player's last season on a college roster before the draft. Each player is counted once, for the school and conference of that season, so a transfer counts for the last stop."                                                                                                                                                                       ,
   "Eligible player"        , "A player whose college career has ended and who had a real shot at the NFL: at least three seasons on college rosters, or drafted, or signed with an NFL team undrafted. Players who left after one or two seasons without reaching the NFL are not counted, and neither are undrafted players still on a 2026 roster, whose outcome is not yet known." ,
   "Draft rate"             , "Drafted players divided by eligible players. A draft rate of 10% means 10 of every 100 eligible players were drafted."                                                                                                                                                                                                                          ,
-  "Undrafted free agent"   , "An eligible player who was not drafted but later appears on an NFL roster. Offensive linemen are undercounted, because an undrafted player is only matched to the NFL through a college stat line, which linemen rarely have."                                                                                                                   ,
+  "Undrafted free agent"   , "An eligible player who was not drafted but later appears on an NFL roster. Matched by name, and linemen are matched through their roster names when they have no stat line." ,
   "Undrafted rate"         , "Undrafted free agents divided by eligible players."                                                                                                                                                                                                                                                                                            ,
   "Tier"                   , "Power (the SEC, Big Ten, ACC, Big 12, the Pac-12 through 2023, and Notre Dame), Group of 5 (the other FBS conferences and independents), and FCS and below. FCS-and-below rosters are incomplete, so that tier appears only as one total. A school's tier is the one most of its eligible players finished in."                                                                                                         ,
   "2025 conference"        , "The conference a school played in during 2025, used only to group schools side by side in one figure (section 3.4). Conference and tier rates use the conference of each player's final season."                                                                                                                                                               ,
@@ -422,7 +422,7 @@ top_udfa <- school_rates |> arrange(desc(udfa), team) |> slice_head(n = 25)
 n_overlap <- length(intersect(top_drafted$team, top_udfa$team))
 ```
 
-### 3.2 Undrafted signings are spread far more evenly, with Power players signing at under twice the Group of 5 rate
+### 3.2 Undrafted signings are spread far more evenly, with Power players signing at about twice the Group of 5 rate
 
 Power schools had `r pct(power_share_eligible, 0)` of FBS eligible players
 and `r pct(power_share_drafted, 0)` of FBS draftees but only
@@ -1311,10 +1311,11 @@ top4 <- slice_head(school, n = 4)
 Each draftee is credited to the last college roster before the draft,
 eligibility is a roster-based stand-in for a real shot at the NFL, and
 final seasons 2013 to 2025 only approximately match the classes of 2014 to
-2026. Undrafted offensive linemen are undercounted (an undrafted rate of
-`r pct(ol_udfa$udfa_rate)`, against `r pct(other_udfa$udfa_rate)` at the
-other non-kicking positions) because the NFL match runs through college
-stat lines. FCS-and-below rosters are incomplete, so that tier enters only
+2026. The undrafted match runs by name, now through roster names for
+players with no stat line, so offensive linemen sign undrafted at
+`r pct(ol_udfa$udfa_rate)` against `r pct(other_udfa$udfa_rate)` at the
+other non-kicking positions; a name match without a school check can still
+link a namesake. FCS-and-below rosters are incomplete, so that tier enters only
 as one total.
 
 ```{r}
