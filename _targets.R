@@ -816,7 +816,7 @@ list(
         ps_pop,
         picks_nfl,
         nfl_draft_picks,
-        roster = roster,
+        roster = roster_enrolled,
         career = career,
         stop_on_fail = FALSE
       )
@@ -932,7 +932,7 @@ list(
     pointblank::all_passed(
       contract_model_table(
         model_table,
-        outcomes_backbone(ps_pop, roster, career),
+        outcomes_backbone(ps_pop, roster_enrolled, career),
         stop_on_fail = FALSE
       )
     )
@@ -953,6 +953,12 @@ list(
   # real people, decision 0022) from the model population.
   tar_target(reused, reused_ids(roster)),
   tar_target(ps_pop, dplyr::filter(ps_draft, !.data$playerId %in% reused)),
+  # Roster seasons before a name-matched recruiting class are CFBD copies of
+  # a later record (issue #114); the career and outcome grain start after them.
+  tar_target(
+    roster_enrolled,
+    drop_pre_enrollment(roster, recruiting, ps_pop, reused)
+  ),
   # HS recruiting ratings, name-guarded (decision 0013); kept off the model path.
   tar_target(ps_recruit, link_recruiting(player_season, recruiting)),
   # NFL outcomes bridged to CFBD picks by draft slot (decision 0014); an
@@ -984,12 +990,12 @@ list(
   # roster player-season, stat-line features NA where there is no stat line.
   tar_target(
     model_table,
-    build_model_table(ps_change, ps_pop, roster, career, team_season)
+    build_model_table(ps_change, ps_pop, roster_enrolled, career, team_season)
   ),
   # Career grain (Explore questions 4/5/12). A DERIVED table: bundled into the
   # DuckDB asset and documented in inst/dict like stat_taxonomy, but not
   # published as parquet; it rebuilds from roster in any mode (decision 0021).
-  tar_target(career, career_summary(roster)),
+  tar_target(career, career_summary(roster_enrolled)),
   # Player x game grain (decision 0035): one row per (playerId, gameId) with a
   # stat line; the shared base for per-game usage and opponent-adjusted
   # performance. Derived like career, not published parquet.
@@ -1003,12 +1009,12 @@ list(
   # roster team; derived like career, not published parquet.
   tar_target(
     team_season,
-    build_team_season(roster, games, tiers, player_season, coaches)
+    build_team_season(roster_enrolled, games, tiers, player_season, coaches)
   ),
   tar_target(
     exits,
     exit_cohort(
-      roster,
+      roster_enrolled,
       picks,
       udfa_ids = unique(outcomes$playerId[
         outcomes$outcome_signed_udfa_d %in% TRUE
@@ -1209,7 +1215,7 @@ list(
           nfl_rosters,
           nfl_player_stats,
           nfl_draft_picks,
-          roster = roster,
+          roster = roster_enrolled,
           team_season = team_season
         )
       }
@@ -1422,10 +1428,18 @@ list(
         contract_passed = ok_change
       ),
       audit_step(
+        roster_enrolled,
+        "drop_pre_enrollment",
+        "link",
+        roster,
+        keys = c("playerId", "season"),
+        contract_passed = ok_outcomes
+      ),
+      audit_step(
         career,
         "career_summary",
         "features",
-        roster,
+        roster_enrolled,
         keys = "playerId",
         contract_passed = ok_career
       ),
@@ -1561,7 +1575,7 @@ list(
         team_season,
         "build_team_season",
         "features",
-        roster,
+        roster_enrolled,
         keys = c("team", "season"),
         contract_passed = ok_team_season
       ),

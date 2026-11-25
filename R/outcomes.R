@@ -692,5 +692,72 @@ outcomes_backbone <- function(ps_pop, roster = NULL, career = NULL) {
   dplyr::arrange(stat, .data$playerId, .data$season)
 }
 
+#' Roster seasons listed before the player enrolled
+#'
+#' CFBD's `/roster` sometimes lists a player in seasons before he arrived,
+#' copying his static record backwards (issue #114). The copy is identical to
+#' his real rows, so it can only be detected against a known high-school
+#' class: a season earlier than the class on a name-matched recruiting record
+#' (the name guard of decision 0013). Unrecruited players' early seasons, such
+#' as Joe Burrow's 2014 at Ohio State, stay undetected. A player with a stat
+#' line before his class was in college then, so it is the class that is wrong
+#' (a transfer or junior-college record); none of his seasons are flagged.
+#'
+#' @param roster Cleaned roster ([clean_roster()]).
+#' @param recruiting Cleaned recruiting ([clean_recruiting()]).
+#' @param stat_seasons Optional `playerId`, `season` of stat lines (e.g.
+#'   `ps_pop`).
+#' @param reused Recycled athlete ids ([reused_ids()], decision 0022). Their
+#'   early seasons belong to an earlier person on the same id, so they are
+#'   never flagged; dropping them would shorten the id's span and let it past
+#'   the recycled-id exclusion.
+#'
+#' @return `pre_enrollment_seasons()`: a tibble of `playerId`, `season`,
+#'   `hs_class`, one row per flagged roster season. `drop_pre_enrollment()`:
+#'   `roster` without those seasons.
+#' @export
+pre_enrollment_seasons <- function(
+  roster,
+  recruiting,
+  stat_seasons = NULL,
+  reused = character()
+) {
+  classes <- dplyr::collect(recruiting) |>
+    dplyr::select("playerId", "recruit_name", "hs_class") |>
+    dplyr::filter(!is.na(.data$hs_class), !.data$playerId %in% reused)
+  if (!is.null(stat_seasons)) {
+    early_stat <- dplyr::collect(stat_seasons) |>
+      dplyr::distinct(.data$playerId, .data$season) |>
+      dplyr::inner_join(classes, by = "playerId") |>
+      dplyr::filter(.data$season < .data$hs_class)
+    classes <- dplyr::filter(classes, !.data$playerId %in% early_stat$playerId)
+  }
+  dplyr::collect(roster) |>
+    dplyr::inner_join(classes, by = "playerId") |>
+    dplyr::filter(
+      .data$season < .data$hs_class,
+      normalize_name(paste(.data$first_name, .data$last_name)) ==
+        normalize_name(.data$recruit_name)
+    ) |>
+    dplyr::distinct(.data$playerId, .data$season, .data$hs_class) |>
+    dplyr::arrange(.data$playerId, .data$season)
+}
+
+#' @rdname pre_enrollment_seasons
+#' @export
+drop_pre_enrollment <- function(
+  roster,
+  recruiting,
+  stat_seasons = NULL,
+  reused = character()
+) {
+  roster <- dplyr::collect(roster)
+  dplyr::anti_join(
+    roster,
+    pre_enrollment_seasons(roster, recruiting, stat_seasons, reused),
+    by = c("playerId", "season")
+  )
+}
+
 min_or_na <- function(x) if (length(x)) min(x) else NA_integer_
 max_or_na <- function(x) if (length(x)) max(x) else NA_integer_

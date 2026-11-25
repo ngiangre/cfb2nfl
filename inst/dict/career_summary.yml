@@ -1,12 +1,14 @@
 dataset: career_summary
-source: derived in-pipeline (career_summary(roster))
+source: derived in-pipeline (career_summary(roster_enrolled)); roster_enrolled = drop_pre_enrollment(roster, recruiting, ps_pop, reused)
 grain: one player's college career
 key: playerId (string)
 description: >
   Per-player career summary collapsed from the roster backbone: seasons on a
   roster, first/last season observed, gap seasons (years absent between first
   and last), and transfer count (distinct teams minus one). Built on `roster`,
-  so it includes players with no qualifying stat line. Players whose roster span
+  so it includes players with no qualifying stat line. Roster seasons before a
+  name-matched recruiting class are left out (`drop_pre_enrollment()`, issue
+  #114). Players whose roster span
   exceeds 7 seasons are excluded as CFBD id reuse across distinct individuals. A
   derived table: materialized into the DuckDB bundle, not published as a
   standalone parquet. Contract: contract_career_summary() (1-7 seasons,

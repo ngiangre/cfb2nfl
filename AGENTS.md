@@ -128,6 +128,14 @@ all of it. Years 2010–2026.
   `career_summary(max_span = 7L)` and the `ps_pop` target exclude them from
   the career/model populations. The id remains a stable key within a
   plausible career window.
+- **CFBD lists some players on a roster before they enrolled** (issue #114):
+  a static copy of the later record, identical in every field (Burrow at
+  Ohio State in 2014). It is detectable only against a name-matched
+  recruiting class, so `drop_pre_enrollment()` builds the `roster_enrolled`
+  target (~26 seasons dropped; recycled ids and players with a stat line
+  before their class are left alone), which feeds `career`, `model_table`
+  and `outcomes`. Unrecruited players' early seasons stay in and start an
+  estimated clock early; treat that as a known limit (decision 0052).
 - **Conference tiers are season-aware** (Pac-12 collapse, Big East → AAC, WAC
   dropping FBS football); use the lookup, don't hard-code. Built in-pipeline by
   `build_conference_tiers(player_stats)` (decision 0017) — a pure function of the

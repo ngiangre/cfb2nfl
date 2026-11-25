@@ -1,11 +1,13 @@
 dataset: outcomes
-source: derived in-pipeline (build_outcomes(ps_pop, career, recruiting, picks_nfl, nfl_rosters, nfl_player_stats, nfl_draft_picks, roster, team_season))
+source: derived in-pipeline (build_outcomes(ps_pop, career, recruiting, picks_nfl, nfl_rosters, nfl_player_stats, nfl_draft_picks, roster_enrolled, team_season)); roster_enrolled = drop_pre_enrollment(roster, recruiting, ps_pop, reused)
 grain: one roster or stat-line player-season (person-period)
 key: (playerId, season)
 description: >
   The modeling dependent variables, at the person-period grain: every season a
   player is on a college roster, plus any stat-line season without a roster row
-  (reused CFBD ids excluded; `outcomes_backbone()`). `has_stat_line` marks the
+  (reused CFBD ids excluded; `outcomes_backbone()`). Roster seasons before a
+  name-matched recruiting class are left out (`drop_pre_enrollment()`, issue
+  #114), so `first_roster_season` is the first season after them. `has_stat_line` marks the
   seasons with a stat line in `player_stats`, the population before decision
   0050. Season rows carry an eligibility clock anchored at
   high-school graduation; career-level labels (drafted, NFL entry, first-year
