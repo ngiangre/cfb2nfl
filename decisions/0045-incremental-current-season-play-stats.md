@@ -36,7 +36,9 @@ in the first days after a game were not observed either way.
    is **temporary**: after the 2026-11-15 and 2026-11-22 runs (weeks 10 and
    11, each re-pulled about a week after its first pull), the result is
    recorded below and the re-pull is either kept (if games do change) or
-   removed with its logging (if they do not). Tracked in issue #68.
+   removed with its logging (if they do not). Tracked in issue #68. The
+   two runs disagreed, so the measurement was extended through the
+   2026-11-29 and 2026-12-06 runs (weeks 12 and 13; see Outcome).
 4. **Past seasons** stay opt-in exactly as in 0031:
    `CFB2NFL_PLAYS_STATS=true` with an explicit season selection.
 5. The 2026 season to date (1,277 games) is caught up once, by a one-off run
@@ -73,5 +75,21 @@ occur; **no `Tackle` credits at all** in 2026 (the type exists in the
 dimension), so tackle features cannot come from `play_stats`; use the box
 scores (`game_player_stats` defensive TOT/SOLO) instead.
 
-_To fill in:_ the re-pull change counts from the 2026-11-15 and 2026-11-22
-run summaries, and whether the re-pull was kept or removed.
+Re-pull revisions, from the `data-current.yaml` run summaries:
+
+| Run | Week re-pulled (first pulled) | Games re-pulled | Games changed | Rows before | Rows changed | Changed by stat type |
+|---|---|---|---|---|---|---|
+| 2026-11-15 | 10 (2026-11-08) | 116 | 0 | 28,803 | 0 | none |
+| 2026-11-22 | 11 (2026-11-15) | 121 | 33 | 30,186 | 100 | Rush 29, Touchdown 71 |
+
+(The 2026-11-15 manual and scheduled runs reported the same row; it is
+counted once.) Week 10 did not change at all; in week 11 a quarter of the
+games were revised, but only 0.3% of rows, all rushing and touchdown
+credits. One week of each is not enough to set the rate, so the re-pull
+and its logging stay through two more runs:
+
+- 2026-11-29: re-pulls week 12 (first pulled 2026-11-22).
+- 2026-12-06: re-pulls week 13 (first pulled 2026-11-29).
+
+_To fill in:_ those two runs' counts, and whether the re-pull was kept
+(dropping only the logging) or removed with its logging.
