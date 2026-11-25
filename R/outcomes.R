@@ -42,7 +42,7 @@
 #'
 #' `hs_grad_year` comes from the name-guarded recruiting link (`hs_class`,
 #' decision 0013); when unavailable it is **imputed** as the first observed
-#' college season minus one (a direct HS enrollee's graduation year), taking
+#' college season (a direct HS enrollee's class, decision 0051), taking
 #' the earlier of the first roster season and the first stat season, and
 #' `hs_year_imputed` is set to 1, so models can filter or flag the mis-timed
 #' clock (redshirts, JUCO, late enrollees).
@@ -184,9 +184,12 @@ build_outcomes <- function(
         NA_integer_
       ),
       hs_year_imputed = is.na(.data$hs_class_matched),
+      # A recruiting class is the year a player enrolls (96% of matched
+      # recruits' first roster season), so a direct enrollee's class is his
+      # first college season (decision 0051).
       hs_grad_year = dplyr::coalesce(
         .data$hs_class_matched,
-        .data$first_season - 1L
+        .data$first_season
       )
     ) |>
     dplyr::select(

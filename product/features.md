@@ -288,7 +288,7 @@ acceptance criteria.
     enter the NFL right after their first roster season (transfers from
     programs the data does not cover).
   - [x] An imputed `hs_grad_year` is the earlier of the first roster and
-    first stat season minus one, flagged by `hs_year_imputed`.
+    first stat season (decision 0051), flagged by `hs_year_imputed`.
   - [x] A decision record replaces the stat-line population (decision 0032
     and the v1 rule in AGENTS.md) with the roster population for both
     `outcomes` and the model population, and reports before/after row,

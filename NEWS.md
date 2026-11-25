@@ -1,5 +1,20 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Fix (feature F22): **the eligibility clock follows the NFL's
+  three-years-out-of-high-school rule for players without a recruiting
+  record**. Their estimated high-school year is now their first college
+  season, as for a recruit who enrolled straight from high school, instead
+  of the year before, which made them eligible one season early
+  ([decision 0051](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0051-imputed-hs-year-is-first-season.md)).
+  Fewer players are draft-eligible, and more NFL entrants fall outside the
+  clock, since their earlier college years are not in the data. In the
+  outcome prevalence post the chance of NFL entry now climbs through the
+  third eligible season and then levels off, and its figure points at the
+  season each example was drafted in.
+- Posts (feature F24): **the career endings post is written about
+  players** and opens its data section with a flow chart from every roster
+  player down to the players its curves follow.
+
 - Explorer (feature F13): **players who reached the NFL are findable even
   without a stat line**. The Players tab adds an offensive-line group, ranked
   on roster weight and height among linemen who reached the NFL, and lists a

@@ -1,6 +1,6 @@
 # 0050 — The outcome and model population is every roster player-season
 
-- **Status:** Accepted
+- **Status:** Accepted; imputed high-school year superseded by 0051
 - **Date:** 2026-11-24
 - **Supersedes:** the population (grain) and the imputed high-school year of
   decision 0032; the v1 "denominator = players with a stat line" rule
