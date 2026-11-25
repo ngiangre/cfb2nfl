@@ -1,19 +1,19 @@
 ---
-title: "Most players' college careers end without going to the NFL, and from their third eligible season the players still in college more often sign undrafted than get drafted"
+title: "Most players' college careers end without going to the NFL, and from their second eligible season the players still in college more often sign undrafted than get drafted"
 date: "2026-11-22"
-description: "Followed season by season on college rosters, most draft-eligible players at every position run out of eligibility undrafted, from their third eligible season the players still in college more often sign undrafted than get drafted, and which players are counted (a stat line, a recruiting record) moves the drafted share."
+description: "Followed season by season on college rosters, most draft-eligible players at every position run out of eligibility undrafted, from their second eligible season the players still in college more often sign undrafted than get drafted, and which players are counted (a stat line, a recruiting record) moves the drafted share."
 followups:
   - "Fit cause-specific hazard models of the three endings with position, conference tier and recruiting rating, as the competing-risks baseline for the draft forecast (F17)."
   - "Check whether the timing of each ending is stable across draft classes before a forecast relies on it."
   - "Compare cause-specific and subdistribution views of position: does a group change how often an ending happens, or how soon?"
   - "Find the roster records CFBD lists before a player enrolled (Joe Burrow at Ohio State the season before he arrived), which start an estimated clock too early."
-  - "Fix the eligibility clock for single-season players: nearly every NFL entrant outside the risk set has one season on a roster and an estimated high-school year that makes it look too early."
+  - "Find the earlier college years of the NFL entrants outside the risk set (junior college, programs the data does not cover): about half have one season on a roster, and the first season they appear in dates their estimated clock too late."
   - "Add a school guard to the undrafted-signing match, since newly linked signings match the NFL roster's college less often than older links."
 author:
   - "AI directed by Nick Giangreco"
 freeze: auto
 vignette: >
-  %\VignetteIndexEntry{Most players' college careers end without going to the NFL, and from their third eligible season the players still in college more often sign undrafted than get drafted}
+  %\VignetteIndexEntry{Most players' college careers end without going to the NFL, and from their second eligible season the players still in college more often sign undrafted than get drafted}
   %\VignetteEngine{quarto::html}
   %\VignetteEncoding{UTF-8}
 ---
@@ -1346,8 +1346,8 @@ The drafted-only curve overstates the drafted share.
 ::: {.callout-important}
 The drafted share moves with which players are counted.
 
-- Counting only players with a stat line keeps the fifth of offensive
-  linemen who recorded one, so it describes a far more drafted group than
+- Counting only players with a stat line keeps the `r pct(ol_stat_share, 0)`
+  of offensive linemen who recorded one, so it describes a far more drafted group than
   the full line.
 - Players with a matched recruiting record are drafted far more often,
   partly as stronger prospects and partly because their clock is known; for
