@@ -1,8 +1,10 @@
 # Competing endings of a college career (feature F24): each draft-eligible
-# player's career ends once, in one of four ways, on an eligible-season clock.
+# player's career ends once, in one of three ways, on an eligible-season clock.
+# A final season off every roster resolves to exhausted_undrafted in
+# build_outcomes(), so the left_data label is kept only as a guard.
 # Built on the fly from `outcomes` (decision 0041); NFL labels stay outcomes.
 
-#' Reader-facing labels for the four career endings
+#' Reader-facing labels for the career endings
 #'
 #' @return A named character vector: ending code to label, in plot order.
 #' @export
@@ -147,28 +149,17 @@ never_eligible_entrants <- function(outcomes, roster_pos) {
 #'
 #' @param endings Output of [career_endings()].
 #' @param by Grouping column, or `NULL` for everyone together.
-#' @param left_data `"competing"` (an ending of its own) or `"censored"`
-#'   (the player's later outcome is treated as unknown).
 #' @return A tibble: the `by` column, `time` (0 to the last season with
 #'   players at risk), `state` (an [ending_labels()] code or `"playing"`),
 #'   `estimate`, `lower`, `upper` and `n_risk` (players still playing going
 #'   into that season, the same on every state's row).
 #' @export
-ending_incidence <- function(
-  endings,
-  by = "group",
-  left_data = c("competing", "censored")
-) {
+ending_incidence <- function(endings, by = "group") {
   rlang::check_installed(
     "survival",
     reason = "for the Aalen-Johansen estimate."
   )
-  left_data <- rlang::arg_match(left_data)
   states <- names(ending_labels())
-  if (left_data == "censored") {
-    endings$ending[endings$ending == "left_data"] <- "censored"
-    states <- setdiff(states, "left_data")
-  }
   endings <- dplyr::filter(endings, .data$time > 0L)
   groups <- if (is.null(by)) list(endings) else split(endings, endings[[by]])
   purrr::imap(groups, function(d, g) {
@@ -219,35 +210,6 @@ ending_incidence <- function(
     )
     out <- dplyr::bind_rows(start, est) |>
       dplyr::mutate(time = as.integer(.data$time))
-    if (!is.null(by)) {
-      out[[by]] <- g
-      out <- dplyr::relocate(out, dplyr::all_of(by))
-    }
-    out
-  }) |>
-    purrr::list_rbind()
-}
-
-#' The drafted share from a drafted-only survival curve
-#'
-#' One minus the Kaplan-Meier curve when being drafted is the only event and
-#' every other ending is treated as censoring. It overstates the drafted
-#' share whenever other endings compete, because it assumes a player who
-#' ended another way could still have been drafted later.
-#'
-#' @inheritParams ending_incidence
-#' @return A tibble: the `by` column, `time`, `estimate`.
-#' @export
-naive_drafted <- function(endings, by = "group") {
-  rlang::check_installed("survival", reason = "for the Kaplan-Meier estimate.")
-  endings <- dplyr::filter(endings, .data$time > 0L)
-  groups <- if (is.null(by)) list(endings) else split(endings, endings[[by]])
-  purrr::imap(groups, function(d, g) {
-    fit <- survival::survfit(
-      survival::Surv(d$time, d$ending == "drafted") ~ 1
-    )
-    s <- summary(fit, times = seq_len(max(d$time)), extend = TRUE)
-    out <- tibble::tibble(time = as.integer(s$time), estimate = 1 - s$surv)
     if (!is.null(by)) {
       out[[by]] <- g
       out <- dplyr::relocate(out, dplyr::all_of(by))
