@@ -80,7 +80,7 @@ expectations a fan might bring.
 ## 2. Data
 
 ::: {.callout-note appearance="minimal"}
-*Data as of the `data-latest` release, retrieved 2026-10-24. Draft classes
+*Data as of the `data-latest` release, retrieved 2026-11-24. Draft classes
 after the last complete draft are right-censored and carry no outcomes, so
 they are excluded from every rate below rather than counted as failures.
 Each season's position comes from the roster table, joined by athlete id
@@ -384,7 +384,7 @@ p_rate_class <- ggplot(rate_class, aes(draft_year, 100 * drafted, color = group)
     size = 2.2
   ) +
   scale_color_brewer(palette = "Paired") +
-  scale_x_continuous(breaks = seq(2012, 2025, 2)) +
+  scale_x_continuous(breaks = seq(min(risk$draft_year), max(risk$draft_year), 2)) +
   labs(
     title = "Each group's drafted rate, class by class",
     subtitle = "Share of eligible seasons ending in a draft pick, by position group and draft class",
@@ -665,7 +665,7 @@ p_pick <- ggplot(pick_trend, aes(draft_year, avg_pick)) +
   scale_shape_manual(values = c(`TRUE` = 21, `FALSE` = 1), guide = "none") +
   annotate(
     "text",
-    x = 2012.2,
+    x = min(qb_trend$draft_year) + 0.2,
     y = 22,
     label = sprintf(
       "Filled points: the %d of %d classes where\nquarterbacks had the earliest average pick",
@@ -677,7 +677,7 @@ p_pick <- ggplot(pick_trend, aes(draft_year, avg_pick)) +
   ) +
   annotate(
     "curve",
-    x = 2017.6,
+    x = min(qb_trend$draft_year) + 5.6,
     y = 26,
     xend = first_lowest$draft_year - 0.2,
     yend = first_lowest$avg_pick - 6,
@@ -685,7 +685,7 @@ p_pick <- ggplot(pick_trend, aes(draft_year, avg_pick)) +
     linewidth = 0.7,
     alpha = 0.6
   ) +
-  scale_x_continuous(breaks = seq(2012, max(qb_trend$draft_year), by = 2)) +
+  scale_x_continuous(breaks = seq(min(qb_trend$draft_year), max(qb_trend$draft_year), by = 2)) +
   scale_y_continuous(limits = c(0, NA)) +
   labs(
     title = "The quarterback average swings by dozens of picks from class to class",
@@ -884,7 +884,7 @@ p_udfa_class <- ggplot(udfa_class, aes(draft_year, 100 * share, color = group)) 
     size = 2.2
   ) +
   scale_color_brewer(palette = "Paired") +
-  scale_x_continuous(breaks = seq(2012, 2025, 2)) +
+  scale_x_continuous(breaks = seq(min(risk$draft_year), max(risk$draft_year), 2)) +
   labs(
     title = "Each group's undrafted share, class by class",
     subtitle = "Share of NFL entrants who arrived undrafted, by position group and draft class",
@@ -957,10 +957,12 @@ ranks.**
 
 Two caveats bound the figures. The not-recorded group holds
 `r fmt(n_nr)` seasons, `r pct(n_nr / n_risk)` of the risk set, mostly
-placeholder codes in the 2012 to 2018 classes and missing roster rows in
-the 2021 and 2022 classes; it is counted in the risk set but left out of
-the comparisons. And the eligibility-clock imputation noted in the
-previous post applies here: high-school graduation year is imputed for
-players without a recruiting record, shifting rows in and out of the risk
-set; the shifts are not position-specific, so the between-group
-comparisons are sturdier than the absolute levels.
+placeholder position codes in the `r min(risk$draft_year)` to 2018 classes and
+missing roster rows, most often in the earliest classes and in 2021 and
+2022; it is counted in the risk set but left out of
+the comparisons. And the eligibility-clock imputation noted in the previous post applies
+here: for players without a recruiting record, high-school graduation is
+dated to their first college season in the data, so their clock can start
+early or late and move seasons in or out of the risk set. These players
+are a similar share of every group except special teams, so the
+comparisons among the other groups are sturdier than the absolute levels.

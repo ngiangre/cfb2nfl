@@ -1,7 +1,7 @@
 ---
 title: "Combine invitees are drafted far more often than uninvited eligible players, while fewer of them run each drill"
 date: "2026-11-14"
-description: "Fewer than one in twenty draft-eligible players is invited to the NFL Scouting Combine and invitees are drafted more than a hundred times as often as everyone else, positions sort by size and speed, drill records have thinned since 2021, and quarterbacks who skip the 40-yard dash are drafted more often than those who run it."
+description: "Outside the 2021 campus workouts, fewer than one in twenty draft-eligible players is invited to the NFL Scouting Combine, invitees are drafted more than a hundred times as often as everyone else, positions sort by size and speed, drill records have thinned since 2021, and quarterbacks who skip the 40-yard dash are drafted more often than those who run it."
 followups:
   - "Add pro-day results for invitees who skip combine drills, to separate a skipped drill from an unmeasured player."
   - "Ask whether combine measurables add to in-career production in a draft-time model, kept apart from the in-career forecasts."
@@ -344,7 +344,7 @@ tibble::tribble(
   "Recorded", "The measurable has a value for the invitee. A missing value usually means the player chose not to do the drill.",
   "Middle half", "The range from the 25th to the 75th percentile: half of a position's invitees fall inside it.",
   "Drafted that year", "Selected in the draft held the spring of the combine.",
-  "Draft-eligible season", "A season on a college roster, after which the player is old enough for the next draft (three years past high school). Each such season is one chance to be drafted.",
+  "Draft-eligible season", "A season on a college roster, after which the player is old enough for the next draft (three years past high school). Each such season is one chance to be drafted. When a player has no recruiting record, his first college season stands in for his high-school graduation year.",
   "Invitation rate", "Invitees among a draft year's draft-eligible players.",
   "Player-season", "One player in one college season.",
   "Position group", sprintf("%s groups (quarterback through special teams) shared by every post; combine and college position codes map onto the same groups.", length(pos_levels))
@@ -368,7 +368,7 @@ placed |>
   kable(
     align = "lrrrr",
     caption = sprintf(
-      "Combine invitees %s to %s by position group and where they can be placed. Linked invitees fall outside the population when they are not on a college roster in their final season or their eligibility clock says not yet.",
+      "Combine invitees %s to %s by position group and where they can be placed. Linked invitees fall outside the population when they are not on a college roster in their final season, or when their first college season in the data is too recent for the three-year clock (often junior-college transfers, whose earlier seasons are not in the data).",
       combine_years[1],
       combine_years[2]
     )
@@ -831,11 +831,11 @@ p8 <- medians_season |>
 girafe(ggobj = p8, width_svg = 13, height_svg = 12)
 ```
 
-### 3.5 The combine invites `r pct(invite_lo)` to `r pct(invite_hi)` of a draft year's eligible players, and `r pct(pooled$drafted_were_invited, 0)` of the drafted are among them
+### 3.5 The combine invites `r pct(invite_lo)` to `r pct(invite_hi)` of a draft year's eligible players, the high in `r invite_hi_year`, and `r pct(pooled$drafted_were_invited, 0)` of the drafted are among them
 
 *Expectation: fewer than one in ten draft-eligible players is invited in every draft year.* `r if (e5_holds) "✅" else "❌"`
 
-The table follows each draft year from eligible seasons to invitees; the rate falls because the eligible count nearly doubles, from `r fmt(eligible_first)` to `r fmt(eligible_last)`, as players on a college roster grow from `r fmt(rostered(funnel_years[1] - 1L))` in the `r funnel_years[1] - 1L` season to `r fmt(rostered(funnel_years[2] - 1L))` in `r funnel_years[2] - 1L` (with a dip in the shortened 2020 season), while invitees placed among them go from `r fmt(invited_first)` to `r fmt(invited_last)`.
+The table follows each draft year from eligible seasons to invitees; the rate falls because the eligible count roughly doubles, from `r fmt(eligible_first)` to `r fmt(eligible_last)`, as players on a college roster grow from `r fmt(rostered(funnel_years[1] - 1L))` in the `r funnel_years[1] - 1L` season to `r fmt(rostered(funnel_years[2] - 1L))` in `r funnel_years[2] - 1L` (with a dip in the shortened 2020 season), while invitees placed among them go from `r fmt(invited_first)` to `r fmt(invited_last)`.
 
 ```{r}
 #| label: s35-table
@@ -874,8 +874,19 @@ p9 <- by_year |>
       pct(invite_rate)
     )
   ) |>
-  ggplot(aes(draft_year, invite_rate)) +
-  geom_col_interactive(aes(tooltip = tip, data_id = draft_year), fill = claim_fill, width = 0.75) +
+  ggplot(aes(draft_year, invite_rate, fill = draft_year == invite_hi_year)) +
+  geom_col_interactive(aes(tooltip = tip, data_id = draft_year), width = 0.75) +
+  annotate(
+    "text",
+    x = invite_hi_year,
+    y = invite_hi + 0.004,
+    label = sprintf("%d, the high", invite_hi_year),
+    vjust = 0,
+    fontface = "bold",
+    size = 4.5,
+    colour = claim_fill
+  ) +
+  scale_fill_manual(values = c(`FALSE` = context_fill, `TRUE` = claim_fill), guide = "none") +
   geom_hline(yintercept = 0.10, linetype = "dashed", colour = "#111827") +
   annotate(
     "text",

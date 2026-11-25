@@ -1,5 +1,12 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Posts (features F07, F10, F11): **the draft-eligibility, playing-time and
+  combine funnel posts follow the corrected eligibility clock**
+  ([decision 0051](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0051-imputed-hs-year-is-first-season.md)).
+  Their findings hold; the numbers change, the first draft class is now
+  2013, and the combine post's invitation rate tops one in twenty only in
+  2021, the year of campus workouts.
+
 - Fix (feature F22): **the eligibility clock follows the NFL's
   three-years-out-of-high-school rule for players without a recruiting
   record**. Their estimated high-school year is now their first college
