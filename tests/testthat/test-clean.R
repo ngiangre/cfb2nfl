@@ -83,6 +83,19 @@ test_that("clean_roster keys on a string playerId", {
   expect_true("weight" %in% names(out))
 })
 
+test_that("clean_roster keeps the CFBD first and last names", {
+  raw <- tibble::tibble(
+    id = 55L,
+    season = 2018L,
+    firstName = "Kenyon",
+    lastName = "Green",
+    team = "Texas A&M"
+  )
+  out <- clean_roster(raw)
+  expect_equal(out$first_name, "Kenyon")
+  expect_equal(out$last_name, "Green")
+})
+
 test_that("clean_roster coerces out-of-range class_year values to NA", {
   # Older CFBD seasons return the queried YEAR in the eligibility-class field
   # instead of a class (1-5); anything outside 1-5 is unmeasurable.

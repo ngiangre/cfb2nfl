@@ -178,10 +178,15 @@ normalize_name <- function(x) {
 #' alone, so [recruit_link_method()] only accepts it with a school + class year
 #' match (decision 0036).
 #'
+#' With `initials = FALSE` a shared first initial is not enough (Donovan and
+#' Devon Smith are two people); a common nickname then counts instead ("Mo" /
+#' "Maurice"). [build_outcomes()] uses that stricter form for draft picks.
+#'
 #' @param a,b Character vectors of names (recycled).
+#' @param initials Accept first names that only share an initial?
 #' @return A logical vector; `NA` where either name is missing.
 #' @keywords internal
-name_variant <- function(a, b) {
+name_variant <- function(a, b, initials = TRUE) {
   compatible <- function(x, y, max_dist) {
     x == y ||
       startsWith(x, y) ||
@@ -202,7 +207,8 @@ name_variant <- function(a, b) {
       lb <- tb[length(tb)]
       last_ok <- compatible(la, lb, 1L) || la %in% tb || lb %in% ta
       first_ok <- compatible(ta[1], tb[1], 2L) ||
-        substr(ta[1], 1, 1) == substr(tb[1], 1, 1) ||
+        (initials && substr(ta[1], 1, 1) == substr(tb[1], 1, 1)) ||
+        nickname_of(ta[1], tb[1]) ||
         any(utils::head(ta, -1) %in% tb) ||
         any(utils::head(tb, -1) %in% ta)
       last_ok && first_ok
@@ -211,6 +217,26 @@ name_variant <- function(a, b) {
     b,
     USE.NAMES = FALSE
   )
+}
+
+# Nicknames that are neither a prefix nor a small edit of the given name.
+nickname_pairs <- c(
+  mo = "maurice",
+  obo = "ogbonnia",
+  mike = "michael",
+  bill = "william",
+  bob = "robert",
+  bobby = "robert",
+  jim = "james",
+  jimmy = "james",
+  tony = "anthony",
+  ted = "edward",
+  dick = "richard",
+  jack = "john",
+  hank = "henry"
+)
+nickname_of <- function(x, y) {
+  any(nickname_pairs[x] %in% y, nickname_pairs[y] %in% x)
 }
 
 #' How a recruit record is linked to a college athlete id

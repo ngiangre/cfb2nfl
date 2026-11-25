@@ -18,6 +18,14 @@ columns:
     type: int32
     description: Season year, stamped from the queried year (authoritative).
     provenance: derived (ingest_roster stamps the query year)
+  - name: first_name
+    type: string
+    description: First name as CFBD lists it. Names the roster-only players (no stat line) for the recruiting and undrafted-signing name guards in `outcomes` (decision 0050).
+    provenance: CFBD /roster firstName
+  - name: last_name
+    type: string
+    description: Last name as CFBD lists it.
+    provenance: CFBD /roster lastName
   - name: class_year
     type: int32
     description: >

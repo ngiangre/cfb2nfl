@@ -4,10 +4,12 @@
 \alias{name_variant}
 \title{Are two names plausible variants of one person's name?}
 \usage{
-name_variant(a, b)
+name_variant(a, b, initials = TRUE)
 }
 \arguments{
 \item{a, b}{Character vectors of names (recycled).}
+
+\item{initials}{Accept first names that only share an initial?}
 }
 \value{
 A logical vector; \code{NA} where either name is missing.
@@ -21,5 +23,10 @@ compatible: equal, one a prefix of the other, a small edit distance, or a
 shared token; first names may also just share an initial. Too loose to trust
 alone, so \code{\link[=recruit_link_method]{recruit_link_method()}} only accepts it with a school + class year
 match (decision 0036).
+}
+\details{
+With \code{initials = FALSE} a shared first initial is not enough (Donovan and
+Devon Smith are two people); a common nickname then counts instead ("Mo" /
+"Maurice"). \code{\link[=build_outcomes]{build_outcomes()}} uses that stricter form for draft picks.
 }
 \keyword{internal}

@@ -1,5 +1,119 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Explorer (feature F13): **players who reached the NFL are findable even
+  without a stat line**. The Players tab adds an offensive-line group, ranked
+  on roster weight and height among linemen who reached the NFL, and lists a
+  drafted or signed player's college seasons with no stat line as "No stat
+  line" in his career table (Eric Fisher, Jadeveon Clowney)
+  ([#110](https://github.com/ngiangre/cfb2nfl/issues/110)).
+- Posts (features F07, F09, F10, F11): **the posts that read `outcomes` now
+  count every rostered player** (decision 0050). Every rate falls (drafted
+  2.3% of eligible seasons, from 3.6%); offensive linemen are no longer the
+  most drafted group (their 8.4% described only linemen with a stat line),
+  quarterbacks are the only group whose entrants are mostly drafted, and
+  undrafted linemen are matched through roster names. Each post states its
+  population, and its examples are keyed on athlete id
+  ([#105](https://github.com/ngiangre/cfb2nfl/issues/105),
+  [#106](https://github.com/ngiangre/cfb2nfl/issues/106),
+  [#107](https://github.com/ngiangre/cfb2nfl/issues/107),
+  [#108](https://github.com/ngiangre/cfb2nfl/issues/108)).
+- Model (feature F17): **the model table now has one row per roster
+  player-season**, the same keys as `outcomes` (decision 0050), instead of
+  stat-line seasons with a row per head coach. `build_model_table()` takes
+  stat-line features from `ps_change` (missing where a season has no stat
+  line, marked by `has_stat_line`) and team, position, tier and weight from
+  the roster for every season. `contract_model_table()` checks the grain
+  ([#104](https://github.com/ngiangre/cfb2nfl/issues/104)).
+- Fix (feature F22): **draft picks link through nicknames and spellings**.
+  When a pick sits on another CFBD id, the name + school fallback now runs a
+  second, stricter pass after exact names: the same surname, school and
+  entry window, first names that are a prefix, a small spelling edit or a
+  common nickname of each other (never just a shared initial), and one
+  candidate each way. 47 more players are labeled drafted, including
+  Mitchell / Mitch Trubisky (2017, second overall), Mo / Maurice Hurst and
+  Dawaune / Dawuane Smoot; Donovan and Devon Smith stay apart
+  ([#103](https://github.com/ngiangre/cfb2nfl/issues/103)).
+- Post (feature F24): **the career-endings post now counts every player on
+  a college roster**, following the new `outcomes` population. Careers end
+  in three ways (no career ends by leaving the data on rosters), signing
+  undrafted passes being drafted from the third eligible season, and a new
+  section shows that counting only players with a stat line nearly doubles
+  the offensive line's drafted share. Joe Burrow, Ke'Shawn Vaughn and Shane
+  Buechele leave the named players while their roster records are checked
+  ([#114](https://github.com/ngiangre/cfb2nfl/issues/114)); Jayden Daniels
+  and Grant Calcaterra join
+  ([#109](https://github.com/ngiangre/cfb2nfl/issues/109)).
+- Data (feature F22): **the roster now carries player names**
+  (`first_name`, `last_name` from CFBD `/roster`), so a roster-only player
+  with no stat line is named in `outcomes` and can be matched to a recruiting
+  record and to an NFL roster. Undrafted signings rise from 4,337 to 5,307
+  and drafted players from 3,803 to 3,835 (picks on another CFBD id now
+  link by name and school for roster-only players too, e.g. Jonah Williams,
+  Dante Fowler Jr.); draft-eligible rows fall from 181,010 to 174,131 as
+  more players get a recruited high-school year instead of an imputed one.
+  `data-raw/refresh-outcomes.R --roster` re-pulls the roster (17 CFBD
+  calls) and publishes it with `outcomes`
+  ([#111](https://github.com/ngiangre/cfb2nfl/issues/111)).
+- Data (feature F22): **`outcomes` now covers every roster player-season**,
+  not only seasons with a stat line
+  ([decision 0050](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0050-roster-outcome-population.md)).
+  Offensive linemen, every defender before 2016 (CFBD has no defensive stats
+  until then) and seasons without a stat line join the population: 336,241
+  rows (from 160,771), 134,985 players, and 3,803 drafted players (from
+  3,206). New columns `has_stat_line` (the old population is that filter),
+  the row's `team` and season `tier` / `tier_label`, `first_roster_season`
+  and `is_first_roster_season`. A drafted row's `draft_year` is now always
+  the draft it records, with the eligibility clock computed against it; an
+  entry after a skipped season lands on the latest row before it.
+  Undrafted signings are unchanged (4,337): roster-only players have no
+  name yet, so they cannot be matched to an NFL roster.
+  `contract_outcomes()` checks the roster grain, a tier on every row, and
+  that every in-window pick on a population id has its drafted row. New
+  `outcomes_backbone()`; `data-raw/refresh-outcomes.R` republishes the table
+  with no CFBD calls
+  ([#102](https://github.com/ngiangre/cfb2nfl/issues/102)).
+- Post (feature F24): **how college careers end, by position, as competing
+  outcomes**. It follows every draft-eligible player season by season to one
+  of four endings (drafted, signed undrafted, eligibility ended undrafted,
+  left the data), and reports cumulative shares by position, why a
+  drafted-only survival curve overstates the drafted share, the per-season
+  chance of each NFL route, and the gap between players with and without a
+  matched recruiting record. New helpers `career_endings()`,
+  `ending_incidence()`, `naive_drafted()`, `ending_hazards()`,
+  `never_eligible_entrants()` and `explorer_player_url()`; `survival` is now
+  a suggested package
+  ([#97](https://github.com/ngiangre/cfb2nfl/issues/97)).
+- Fix (feature F22): **an imputed high-school year now starts at the first
+  roster season**. For players without a matched recruiting record,
+  `outcomes$hs_grad_year` was the first *stat* season minus one, so a
+  lineman, redshirt or pre-2016 defender on the roster for years before a
+  first stat line got a clock that started too late. It now takes the
+  earlier of the first roster and first stat season. 15,603 players move
+  earlier (most by one or two years), draft-eligible player seasons rise
+  from 86,800 to 102,403, and drafted seasons labeled not yet eligible fall
+  from 382 to 229. No other column changes.
+- Process: new feature card **F24**, a planned post on how college careers
+  end, by position, as competing outcomes over eligible seasons (drafted,
+  signed undrafted, eligibility exhausted, left the data), tracked in
+  [#97](https://github.com/ngiangre/cfb2nfl/issues/97).
+- Fix (feature F22): **NFL outcome labels in `outcomes` are corrected**, so
+  drafted rates rise across every post that reads them. 254 more player
+  seasons are labeled drafted (2,718 to 2,972) and the undrafted signings are
+  cleaner:
+  - a draft or undrafted signing that follows final college seasons with no
+    stat line (linemen, injured seniors: Isaiah Wynn, Matt Bushman) now
+    lands on the player's last stat season instead of being lost;
+  - a pick whose CFBD id differs from the player's stat id now links by name
+    and school (Carson Wentz, Le'Veon Bell, Tyrann Mathieu, Zay Jones);
+  - the undrafted name match no longer links a drafted namesake, or an NFL
+    player who debuted while the college player was still playing.
+  `contract_outcomes()` now checks one entry row per player, that every
+  entrant has one, and that no undrafted entrant is a drafted player
+  ([#99](https://github.com/ngiangre/cfb2nfl/issues/99)).
+- Fix: `last_complete_nfl_draft()` was one year behind. It now returns the
+  current year from May 1, so the April 2026 draft class counts as observed
+  in `outcomes` (and in `_meta`) instead of censored. That class's rookie
+  roster and games labels stay partial until its first NFL season ends.
 - Data (feature F23): **NFL play, snap and roster-status data from 2022 on**,
   for following drafted and undrafted players into the NFL. Four new tables
   on `data-latest` and in the DuckDB: `nfl_pbp` (every nflverse

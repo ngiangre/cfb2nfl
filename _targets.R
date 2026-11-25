@@ -811,7 +811,15 @@ list(
   tar_target(
     ok_outcomes,
     pointblank::all_passed(
-      contract_outcomes(outcomes, ps_pop, stop_on_fail = FALSE)
+      contract_outcomes(
+        outcomes,
+        ps_pop,
+        picks_nfl,
+        nfl_draft_picks,
+        roster = roster,
+        career = career,
+        stop_on_fail = FALSE
+      )
     )
   ),
   tar_target(
@@ -922,7 +930,11 @@ list(
   tar_target(
     ok_weight,
     pointblank::all_passed(
-      contract_roster_weight(model_table, ps_change, stop_on_fail = FALSE)
+      contract_model_table(
+        model_table,
+        outcomes_backbone(ps_pop, roster, career),
+        stop_on_fail = FALSE
+      )
     )
   ),
   tar_target(
@@ -968,7 +980,12 @@ list(
 
   # ---- features -------------------------------------------------------------
   tar_target(ps_change, add_change_features(ps_pop)),
-  tar_target(model_table, add_roster_weight(ps_change, roster)),
+  # The model population is the outcome population (decision 0050): every
+  # roster player-season, stat-line features NA where there is no stat line.
+  tar_target(
+    model_table,
+    build_model_table(ps_change, ps_pop, roster, career, team_season)
+  ),
   # Career grain (Explore questions 4/5/12). A DERIVED table: bundled into the
   # DuckDB asset and documented in inst/dict like stat_taxonomy, but not
   # published as parquet; it rebuilds from roster in any mode (decision 0021).
@@ -1190,7 +1207,10 @@ list(
           recruiting,
           picks_nfl,
           nfl_rosters,
-          nfl_player_stats
+          nfl_player_stats,
+          nfl_draft_picks,
+          roster = roster,
+          team_season = team_season
         )
       }
     ),
@@ -1435,10 +1455,10 @@ list(
       ),
       audit_step(
         model_table,
-        "add_roster_weight",
+        "build_model_table",
         "features",
         ps_change,
-        keys = c("playerId", "season", "team"),
+        keys = c("playerId", "season"),
         contract_passed = ok_weight
       ),
       audit_step(

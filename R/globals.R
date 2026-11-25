@@ -92,9 +92,12 @@ utils::globalVariables(c(
   "hs_grad_year",
   "draft_eligible",
   "outcome_observed_d",
+  "has_stat_line",
+  "is_first_roster_season",
   "n",
   "outcome_draft_round_d",
   "outcome_draft_pick_d",
+  "entry_rows",
   # pointblank::vars() / expr targets in the team-table contracts
   "games_played",
   "n_roster",

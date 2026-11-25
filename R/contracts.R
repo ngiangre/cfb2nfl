@@ -522,6 +522,43 @@ contract_roster_weight <- function(
   enforce_contract(agent, "roster_weight", stop_on_fail)
 }
 
+#' Data contract for the roster-population model table
+#'
+#' Asserts [build_model_table()] keeps exactly the outcome grain: one row per
+#' `(playerId, season)` of `backbone` ([outcomes_backbone()]), so the model
+#' table and `outcomes` join one to one; every row says whether it has a stat
+#' line; the static roster weight stays in its plausible range.
+#'
+#' @param model_table The model table ([build_model_table()]).
+#' @param backbone The outcome population keys ([outcomes_backbone()]).
+#' @param stop_on_fail Abort on failure (default `TRUE`)?
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_model_table <- function(model_table, backbone, stop_on_fail = TRUE) {
+  rlang::check_installed("pointblank")
+  missing_keys <- nrow(dplyr::anti_join(
+    backbone,
+    model_table,
+    by = c("playerId", "season")
+  ))
+  agent <- pointblank::create_agent(model_table, label = "model_table") |>
+    pointblank::rows_distinct(pointblank::vars(playerId, season)) |>
+    pointblank::col_vals_not_null(pointblank::vars(has_stat_line)) |>
+    pointblank::col_vals_between("weight", 100, 500, na_pass = TRUE) |>
+    pointblank::col_vals_equal(
+      pointblank::vars(n),
+      nrow(backbone),
+      preconditions = function(x) tibble::tibble(n = nrow(x))
+    ) |>
+    pointblank::col_vals_equal(
+      pointblank::vars(n),
+      0L,
+      preconditions = function(x) tibble::tibble(n = missing_keys)
+    ) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "model_table", stop_on_fail)
+}
+
 #' Data contract for the recruiting link
 #'
 #' Asserts [link_recruiting()] is row-preserving, the HS rating columns stay
@@ -2168,19 +2205,117 @@ contract_player_usage <- function(
 #' population grain (no silent join loss), the drafted/UDFA events must stay
 #' mutually exclusive, `nfl_entry` must equal the union of its components, and
 #' administrative right-censoring must carry `NA` outcomes — never a fabricated
-#' 0.
+#' 0. Each player enters the NFL on at most one row, every entrant whose entry
+#' falls inside the observed window has that row, and (given `picks_nfl`) no
+#' undrafted entrant carries the `gsis_id` of a drafted player.
 #'
 #' @param outcomes Person-period outcome table (see [build_outcomes()]).
 #' @param ps_pop Model population the table was built from; its
 #'   `(playerId, season)` row count is the expected row count.
+#' @param picks_nfl,nfl_draft_picks Optional CFBD picks bridged to nflverse
+#'   ([link_nfl_draft()]) and nflverse draft picks; their `gsis_id`s are the
+#'   drafted players, and every drafted row's `draft_year` must be one of its
+#'   player's draft years.
+#' @param roster,career Optional cleaned roster and career summary. Given,
+#'   the expected grain is every roster player-season too
+#'   ([outcomes_backbone()]), every row must carry a tier, and every pick on a
+#'   population id inside its entry window must have its drafted row.
 #' @param stop_on_fail Abort on failure? `FALSE` records the result for the
 #'   audit log instead (the `ok_*` target pattern).
 #'
 #' @return The interrogated pointblank agent (invisible).
 #' @export
-contract_outcomes <- function(outcomes, ps_pop, stop_on_fail = TRUE) {
+contract_outcomes <- function(
+  outcomes,
+  ps_pop,
+  picks_nfl = NULL,
+  nfl_draft_picks = NULL,
+  roster = NULL,
+  career = NULL,
+  stop_on_fail = TRUE
+) {
   rlang::check_installed("pointblank")
-  expected <- nrow(dplyr::distinct(ps_pop, .data$playerId, .data$season))
+  expected <- nrow(outcomes_backbone(ps_pop, roster, career))
+  drafted_gsis <- unique(stats::na.omit(c(
+    picks_nfl$gsis_id,
+    if (!is.null(nfl_draft_picks)) dplyr::collect(nfl_draft_picks)$gsis_id
+  )))
+  observed_to <- max(outcomes$draft_year[outcomes$outcome_observed_d %in% TRUE])
+  # A drafted row must name a real pick, `(draft_year, overall)`, that is its
+  # player's: same CFBD id, same gsis, or same name (picks linked by name +
+  # school sit on another CFBD id and may lack a gsis).
+  wrong_pick_year <- function(x) {
+    d <- dplyr::filter(x, .data$outcome_drafted_d %in% TRUE)
+    picks <- dplyr::collect(picks_nfl) |>
+      dplyr::transmute(
+        draft_year = as.integer(.data$year),
+        outcome_draft_pick_d = as.integer(.data$overall),
+        pick_id = .data$playerId,
+        pick_gsis = .data$gsis_id,
+        pick_name = if ("name" %in% names(picks_nfl)) {
+          .data$name
+        } else {
+          NA_character_
+        }
+      )
+    ok <- dplyr::left_join(
+      d,
+      picks,
+      by = c("draft_year", "outcome_draft_pick_d"),
+      relationship = "many-to-many"
+    ) |>
+      dplyr::summarise(
+        ok = any(
+          .data$pick_id %in%
+            .data$playerId[1] |
+            (!is.na(.data$pick_gsis) & .data$pick_gsis %in% .data$gsis_id[1]) |
+            (!is.na(.data$pick_name) &
+              !is.na(.data$player[1]) &
+              # The same strict variant build_outcomes() links picks by.
+              as.logical(name_variant(
+                .data$pick_name,
+                .data$player[1],
+                initials = FALSE
+              )) %in%
+                TRUE)
+        ),
+        .by = c("playerId", "season")
+      )
+    tibble::tibble(n = sum(!ok$ok))
+  }
+  # A pick on a population id, inside the entry window and the observed
+  # years, that never became a drafted row (the no-stat-line lineman case).
+  lost_picks <- function(x) {
+    span <- x |>
+      dplyr::summarise(
+        first = min(.data$season),
+        last = max(.data$last_season),
+        drafted = any(.data$outcome_drafted_d %in% TRUE),
+        .by = "playerId"
+      )
+    latest <- dplyr::collect(picks_nfl) |>
+      dplyr::filter(!is.na(.data$playerId)) |>
+      dplyr::summarise(year = max(as.integer(.data$year)), .by = "playerId")
+    lost <- dplyr::inner_join(span, latest, by = "playerId") |>
+      dplyr::filter(
+        .data$year > .data$first,
+        .data$year <= .data$last + 2L,
+        .data$year <= .env$observed_to,
+        !.data$drafted
+      )
+    tibble::tibble(n = nrow(lost))
+  }
+  per_player <- function(x) {
+    x |>
+      dplyr::summarise(
+        entry_rows = sum(.data$outcome_nfl_entry_d %in% TRUE),
+        entrant = any(.data$nfl_entry_event),
+        entry_year = dplyr::first(
+          .data$years_to_nfl_entry + .data$hs_grad_year
+        ),
+        .by = "playerId"
+      )
+  }
   agent <- pointblank::create_agent(outcomes, label = "outcomes") |>
     pointblank::col_vals_not_null(
       pointblank::vars(
@@ -2240,7 +2375,58 @@ contract_outcomes <- function(outcomes, ps_pop, stop_on_fail = TRUE) {
         dplyr::transmute(x, t = .data$years_to_nfl_entry)
       }
     ) |>
-    pointblank::interrogate()
+    # One entry row per player, and an entrant inside the observed window
+    # always has it (a lost row reads as "never entered").
+    pointblank::col_vals_lte(
+      pointblank::vars(entry_rows),
+      1,
+      preconditions = per_player
+    ) |>
+    pointblank::col_vals_equal(
+      pointblank::vars(entry_rows),
+      1,
+      preconditions = function(x) {
+        dplyr::filter(
+          per_player(x),
+          .data$entrant,
+          .data$entry_year <= .env$observed_to
+        )
+      }
+    ) |>
+    # A drafted player's gsis on an undrafted entrant is a namesake link.
+    pointblank::col_vals_not_in_set(
+      pointblank::vars(gsis_id),
+      drafted_gsis,
+      preconditions = function(x) {
+        dplyr::filter(x, .data$outcome_signed_udfa_d %in% TRUE)
+      }
+    )
+  if (!is.null(picks_nfl)) {
+    agent <- agent |>
+      pointblank::col_vals_equal(
+        pointblank::vars(n),
+        0L,
+        preconditions = wrong_pick_year,
+        label = "drafted rows carry the pick's draft year"
+      )
+  }
+  if (!is.null(roster)) {
+    # A missing tier fails here; it is never defaulted.
+    agent <- agent |>
+      pointblank::col_vals_not_null(
+        pointblank::vars(has_stat_line, tier, is_first_roster_season)
+      )
+    if (!is.null(picks_nfl)) {
+      agent <- agent |>
+        pointblank::col_vals_equal(
+          pointblank::vars(n),
+          0L,
+          preconditions = lost_picks,
+          label = "every pick on a population id has its drafted row"
+        )
+    }
+  }
+  agent <- pointblank::interrogate(agent)
   enforce_contract(agent, "outcomes", stop_on_fail)
 }
 
@@ -2695,11 +2881,12 @@ contract_explorer_plays_files <- function(
 
 #' Data contract for the explorer player-season table
 #'
-#' Guards [build_explorer_player_seasons()] and its files: one row per
-#' player-season-team with a headline stat line in a stat position group (no
-#' silent loss against `player_stats`, no duplicates), no offensive linemen,
-#' every percentile in 0-100, every outcome a known code with a label, and
-#' one file per group under `max_bytes` (each is fetched whole).
+#' Guards [build_explorer_player_seasons()] and its files: every
+#' player-season-team with a headline stat line in a stat position group is
+#' kept (no silent loss against `player_stats`), NFL entrants' roster-only
+#' seasons and linemen come on top, no duplicates, every percentile in 0-100,
+#' every outcome a known code with a label, and one file per group under
+#' `max_bytes` (each is fetched whole).
 #'
 #' @param player_seasons Output of [build_explorer_player_seasons()].
 #' @param player_stats Cleaned long player stats.
@@ -2761,7 +2948,15 @@ contract_explorer_players <- function(
     pointblank::col_vals_in_set("pos", unique(defs$pos)) |>
     pointblank::col_vals_in_set("outcome", explorer_outcome_levels()$outcome) |>
     pointblank::col_vals_in_set("tier", 1:3) |>
-    check(nrow(player_seasons) == nrow(expected)) |>
+    # No stat row is lost; NFL entrants' roster-only seasons come on top.
+    check(
+      nrow(dplyr::anti_join(
+        expected,
+        player_seasons,
+        by = c(playerId = "player_id", "season", "team")
+      )) ==
+        0L
+    ) |>
     check(all(pct >= 0L & pct <= 100L)) |>
     check(setequal(
       basename(paths),

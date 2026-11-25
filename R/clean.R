@@ -136,6 +136,10 @@ clean_roster <- function(roster) {
       "playerId",
       "season",
       dplyr::any_of(c(
+        # Names give a roster-only player (no stat line) the name the
+        # recruiting and undrafted-signing guards match on (decision 0050).
+        first_name = "firstName",
+        last_name = "lastName",
         "team",
         "position",
         "height",

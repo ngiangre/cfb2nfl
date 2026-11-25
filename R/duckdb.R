@@ -221,10 +221,12 @@ last_complete_cfb_season <- function(as_of = Sys.Date()) {
   }
 }
 
-#' Last complete NFL draft class as of a date
+#' Last complete NFL draft as of a date
 #'
-#' The NFL draft for class year Y happens in April of Y+1, so a draft class is
-#' treated as complete once the refresh date is past May 1 of Y+1.
+#' The NFL draft is held in late April, so the draft of year Y (the one after
+#' college season Y - 1) is complete from May 1 of Y. Callers compare the
+#' result to a draft year. Entry-year NFL labels for that class (rookie
+#' roster, rookie games) are partial until its first NFL season ends.
 #'
 #' @param as_of Reference date.
 #'
@@ -233,8 +235,8 @@ last_complete_cfb_season <- function(as_of = Sys.Date()) {
 last_complete_nfl_draft <- function(as_of = Sys.Date()) {
   year <- as.integer(format(as_of, "%Y"))
   if (as_of >= as.Date(sprintf("%d-05-01", year))) {
-    year - 1L
+    year
   } else {
-    year - 2L
+    year - 1L
   }
 }

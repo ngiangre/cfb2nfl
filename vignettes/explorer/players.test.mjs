@@ -2,7 +2,8 @@ import {test} from "node:test";
 import assert from "node:assert/strict";
 import {
   positionGroups, resolvePlayersPos, positionStats, formatStat, ordinal, swarmRows,
-  beeswarm, careerRows, seasonForPlayer, careerPercentiles, searchPlayers, groupPlural
+  beeswarm, careerRows, seasonForPlayer, careerPercentiles, searchPlayers, groupPlural,
+  hasStatLine
 } from "./players.js";
 
 const meta = {
@@ -104,4 +105,11 @@ test("groupPlural reads naturally", () => {
   assert.equal(groupPlural("Quarterback"), "Quarterbacks");
   assert.equal(groupPlural("Defensive line"), "Defensive linemen");
   assert.equal(groupPlural("Special teams"), "Specialists");
+});
+
+test("hasStatLine tells a roster-only season from a stat season", () => {
+  const stats = positionStats(meta, "QB");
+  assert.equal(hasStatLine(rows[0], stats), true);
+  assert.equal(hasStatLine({player_id: "4", season: 2017, passing_yds: null, passing_ypa: null}, stats), false);
+  assert.equal(hasStatLine({player_id: "4", season: 2017}, stats), false);
 });

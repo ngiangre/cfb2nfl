@@ -35,8 +35,7 @@ Imports:
     tidyr,
     utils,
     visNetwork,
-    yaml,
-    patchwork
+    yaml
 Suggests: 
     altdoc,
     arrow,
@@ -51,12 +50,14 @@ Suggests:
     ggtext,
     httr2,
     nflreadr,
+    patchwork,
     pkgload,
     plotly,
     pointblank,
     piggyback,
     reactable,
     scales,
+    survival,
     targets,
     testthat (>= 3.0.0),
     thematic,

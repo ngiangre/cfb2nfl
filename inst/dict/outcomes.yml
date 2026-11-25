@@ -1,11 +1,13 @@
 dataset: outcomes
-source: derived in-pipeline (build_outcomes(ps_pop, career, recruiting, picks_nfl, nfl_rosters, nfl_player_stats))
-grain: one player-season in the model population (person-period)
+source: derived in-pipeline (build_outcomes(ps_pop, career, recruiting, picks_nfl, nfl_rosters, nfl_player_stats, nfl_draft_picks, roster, team_season))
+grain: one roster or stat-line player-season (person-period)
 key: (playerId, season)
 description: >
-  The modeling dependent variables, at the person-period grain: every observed
-  stat season for a player in the model population (stat line in `player_stats`,
-  reused CFBD ids excluded). Season rows carry an eligibility clock anchored at
+  The modeling dependent variables, at the person-period grain: every season a
+  player is on a college roster, plus any stat-line season without a roster row
+  (reused CFBD ids excluded; `outcomes_backbone()`). `has_stat_line` marks the
+  seasons with a stat line in `player_stats`, the population before decision
+  0050. Season rows carry an eligibility clock anchored at
   high-school graduation; career-level labels (drafted, NFL entry, first-year
   NFL success) are resolved once per player and stamped on the relevant rows, so
   models query the dependent variable directly with no further derivation.
@@ -15,8 +17,10 @@ description: >
   guess). Rows whose draft year is after `last_complete_draft` carry NA outcomes
   and `status_end_of_season = "censored"` (administrative right-censoring), never
   a fabricated 0. Published as parquet on data-latest and bundled into the DuckDB
-  asset. Contract: contract_outcomes() (population grain preserved, event mutual
-  exclusivity, censoring carries NAs, positive event times).
+  asset. Contract: contract_outcomes() (population grain preserved, every row
+  tiered, every in-window pick on a population id drafted on the row of its own
+  draft year, event mutual exclusivity, censoring carries NAs, positive event
+  times).
 columns:
   - name: playerId
     type: string
@@ -24,21 +28,60 @@ columns:
     provenance: derived (player_stats.playerId)
   - name: player
     type: string
-    description: Player name (first stat-season name; used for the name guards).
-    provenance: derived (player_stats.player)
+    description: >
+      Player name, used for the name guards: the stat-line name, else the name
+      on a draft pick with the same id. NA for a roster-only player who was
+      never drafted (the cleaned roster carries no names), so those players get
+      no recruiting or undrafted-signing match.
+    provenance: derived (player_stats.player, else picks.name)
   - name: season
     type: int32
     description: The college season being evaluated (s).
-    provenance: derived (player_stats.season)
+    provenance: derived (roster.season, player_stats.season)
+  - name: has_stat_line
+    type: logical
+    description: 1 if the player has a stat line in `player_stats` that season, else 0 (on a roster without one).
+    provenance: derived (player_stats)
+  - name: team
+    type: string
+    description: The row's college team, the stat-line team when there is one, else the roster team.
+    provenance: derived (player_stats.team, roster.team)
+  - name: tier
+    type: int32
+    description: >
+      Season-aware conference tier of the row's team (3 Power, 2 Group of 5,
+      1 FCS and below; decision 0003), from `team_season`: the (season,
+      conference) lookup, else the conference of the team's nearest season
+      with games (no games ingested that season), else tier 1 for a
+      conference outside the lookup (Division II/III). Never NA; the contract
+      fails on a missing tier.
+    provenance: derived (team_season.tier)
+  - name: tier_label
+    type: string
+    description: Reader-facing label of `tier`.
+    provenance: derived (team_season.tier_label)
+  - name: first_roster_season
+    type: int32
+    description: >
+      The player's first season on any college roster in the data. NA only for
+      the few stat-line players never on a roster. Earlier college years may be
+      missing (transfers from programs the data does not cover, or careers that
+      began before 2010).
+    provenance: derived (career_summary.first_season)
+  - name: is_first_roster_season
+    type: logical
+    description: 1 on the row of the player's first roster season, else 0. Never NA. Use it to check how much a result rests on players' first seasons in the data; flagged rows are kept.
+    provenance: derived
   - name: hs_grad_year
     type: int32
     description: >
       High-school graduation year (h), the time origin of the eligibility clock.
       Recruiting `hs_class` via the name-guarded link when available; otherwise
-      imputed as the first observed stat season minus one, with
+      imputed as the first observed college season minus one (the earlier of
+      the first roster season and the first stat season), with
       `hs_year_imputed = 1`. The imputation mis-times redshirts, JUCO and late
       enrollees; use the flag to filter or sensitivity-check.
-    provenance: derived (recruiting.hs_class, else imputed)
+    provenance: derived (recruiting.hs_class, else imputed from career_summary.first_season)
   - name: hs_year_imputed
     type: logical
     description: 1 if `hs_grad_year` was imputed from the first observed college season, else 0.
@@ -49,7 +92,12 @@ columns:
     provenance: derived (career_summary.last_season)
   - name: draft_year
     type: int32
-    description: The draft that follows the season (d = s + 1).
+    description: >
+      The draft this row's outcome is about: the draft after the season
+      (d = s + 1), except on the player's latest row before his NFL entry when
+      the entry comes later (a season off every roster, or a roster that skips
+      seasons), where it is that entry's draft. The eligibility clock is
+      computed against it.
     provenance: derived
   - name: years_since_hs
     type: int32
@@ -73,12 +121,19 @@ columns:
     provenance: derived (picks_nfl, nfl_rosters)
   - name: outcome_observed_d
     type: logical
-    description: 1 if draft_year <= the last draft year with complete data, else 0. Rows with 0 get NA outcomes, not 0 (administrative right-censoring).
+    description: 1 if the year this row's outcome is decided (draft_year, or the later NFL entry year on a player's last stat row) is <= the last draft year with complete data, else 0. Rows with 0 get NA outcomes, not 0 (administrative right-censoring).
     provenance: derived (last_complete_nfl_draft())
   - name: outcome_drafted_d
     type: logical
-    description: 1 if selected in draft d, else 0 (NA when censored). The event indicator for a draft-only analysis.
-    provenance: derived (picks via link_drafted)
+    description: >
+      1 if selected in draft d, else 0 (NA when censored). On a player's last
+      stat row, a pick in a later draft also counts (his final college
+      seasons had no stat line, e.g. a lineman or an injured senior), so the
+      event lands on the last row the population observes. The pick joins by
+      athlete id, or, when the pick's CFBD id is outside the population, by
+      normalized name + college team with exactly one candidate on each side.
+      The event indicator for a draft-only analysis.
+    provenance: derived (picks via athlete id, else name + school)
   - name: outcome_draft_round_d
     type: int32
     description: Round selected (1-7), NA if undrafted or censored. For ordinal models.
@@ -93,7 +148,14 @@ columns:
     provenance: derived (outcome_draft_round_d)
   - name: outcome_signed_udfa_d
     type: logical
-    description: 1 if not drafted in d but on an NFL roster in the window after that draft, else 0 (NA when censored). Mutually exclusive with `outcome_drafted_d`.
+    description: >
+      1 if not drafted but first on an NFL roster in the season after draft d
+      (or, on a player's last stat row, any later season in the entry window),
+      else 0 (NA when censored). The name guard never links a gsis_id that
+      belongs to a draft pick (CFBD or nflverse), never links a player who
+      holds a pick, and requires the first NFL season to follow the player's
+      last college stat season (an earlier one is a namesake). Mutually
+      exclusive with `outcome_drafted_d`.
     provenance: derived (nfl_rosters via name guard)
   - name: outcome_nfl_entry_d
     type: logical
@@ -113,7 +175,7 @@ columns:
     provenance: derived (nfl_rosters via gsis_id)
   - name: outcome_rookie_games_entry_year
     type: int32
-    description: Games played in the entry season, 0 if none; NA when the player did not enter (or is censored). A numeric outcome.
+    description: Games played in the entry season, 0 if none; NA when the player did not enter (or is censored). A numeric outcome. Partial for the latest draft class until its first NFL season ends.
     provenance: derived (nfl_player_stats.games via gsis_id)
   - name: outcome_source
     type: string

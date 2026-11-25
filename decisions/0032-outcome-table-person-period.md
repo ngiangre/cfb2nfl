@@ -1,6 +1,6 @@
 # 0032 — Person-period `outcomes` table as the published modeling label
 
-- **Status:** Accepted
+- **Status:** Accepted; population and imputed high-school year superseded by 0050
 - **Date:** 2026-10-24
 
 ## Context
@@ -76,3 +76,17 @@ Build a person-period `outcomes` table (`build_outcomes()`, decision 0032):
   entrants, imputed-HS one-season careers); event time is now simply
   `entry year - h` for entrants, and `contract_outcomes()` positivity is the
   guard against nonsense links.
+
+## Revised 2026-11-22 ([#99](https://github.com/ngiangre/cfb2nfl/issues/99))
+
+- A row's outcome is decided in `d = s + 1`, except on a player's **last stat
+  row**: an NFL entry after later seasons with no stat line (linemen, injured
+  seniors) lands there, and the row is censored when that entry year is past
+  `last_complete_draft`. Every entrant now has exactly one entry row.
+- Picks bound to the same entry window as UDFAs (`<= last_season + 2`); a
+  pick whose CFBD id is outside the population links by name + college team
+  when unique on both sides.
+- The UDFA name guard skips gsis ids held by any draft pick (CFBD or
+  nflverse), players who hold a pick, and NFL debuts before the last college
+  stat season (namesakes). `contract_outcomes()` enforces one entry row per
+  entrant and no drafted gsis on a UDFA.
