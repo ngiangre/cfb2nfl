@@ -32,7 +32,9 @@ acceptance criteria.
 - **Links:** posts 2026-10-24 (outcome prevalence, eligibility by position)
 - **Tasks:**
 <!-- tasks F07 -->
-- [ ] [#105](https://github.com/ngiangre/cfb2nfl/issues/105) Revise F07 posts for the roster population of outcomes
+- [x] [#105](https://github.com/ngiangre/cfb2nfl/issues/105) Revise F07 posts for the roster population of outcomes
+- [x] [PR #118](https://github.com/ngiangre/cfb2nfl/pull/118) docs(posts): revise outcome posts for the roster population; Explorer lists NFL entrants without a stat line
+- [x] [PR #120](https://github.com/ngiangre/cfb2nfl/pull/120) docs(posts): revise the clock-dependent posts for the corrected eligibility clock (F07, F10, F11)
 <!-- /tasks -->
 
 ### F08 · Posts: player movement
@@ -52,7 +54,8 @@ acceptance criteria.
   who produces draftees, winning and draftees)
 - **Tasks:**
 <!-- tasks F09 -->
-- [ ] [#106](https://github.com/ngiangre/cfb2nfl/issues/106) Revise F09 posts for the roster population of outcomes
+- [x] [#106](https://github.com/ngiangre/cfb2nfl/issues/106) Revise F09 posts for the roster population of outcomes
+- [x] [PR #118](https://github.com/ngiangre/cfb2nfl/pull/118) docs(posts): revise outcome posts for the roster population; Explorer lists NFL entrants without a stat line
 <!-- /tasks -->
 
 ### F10 · Posts: career shape
@@ -65,7 +68,9 @@ acceptance criteria.
 - [x] [#47](https://github.com/ngiangre/cfb2nfl/issues/47) feat(analysis): player performance arcs, adjusted for opponent strength
 - [x] [#50](https://github.com/ngiangre/cfb2nfl/issues/50) feat(analysis): playing time per game and per season from game_player_stats
 - [x] [#51](https://github.com/ngiangre/cfb2nfl/issues/51) feat(analysis): career-ending injury and injured-vs-benched proxies (data limits)
-- [ ] [#107](https://github.com/ngiangre/cfb2nfl/issues/107) Revise F10 posts for the roster population of outcomes
+- [x] [#107](https://github.com/ngiangre/cfb2nfl/issues/107) Revise F10 posts for the roster population of outcomes
+- [x] [PR #118](https://github.com/ngiangre/cfb2nfl/pull/118) docs(posts): revise outcome posts for the roster population; Explorer lists NFL entrants without a stat line
+- [x] [PR #120](https://github.com/ngiangre/cfb2nfl/pull/120) docs(posts): revise the clock-dependent posts for the corrected eligibility clock (F07, F10, F11)
 <!-- /tasks -->
 
 ### F11 · Post: combine invite-to-draft funnel
@@ -75,7 +80,9 @@ acceptance criteria.
 - **Tasks:**
 <!-- tasks F11 -->
 - [x] [#64](https://github.com/ngiangre/cfb2nfl/issues/64) Blog post: combine measurables by position, and the invite-to-draft funnel
-- [ ] [#108](https://github.com/ngiangre/cfb2nfl/issues/108) Revise the combine funnel post for the roster population of outcomes
+- [x] [#108](https://github.com/ngiangre/cfb2nfl/issues/108) Revise the combine funnel post for the roster population of outcomes
+- [x] [PR #118](https://github.com/ngiangre/cfb2nfl/pull/118) docs(posts): revise outcome posts for the roster population; Explorer lists NFL entrants without a stat line
+- [x] [PR #120](https://github.com/ngiangre/cfb2nfl/pull/120) docs(posts): revise the clock-dependent posts for the corrected eligibility clock (F07, F10, F11)
 <!-- /tasks -->
 
 ### F12 · Post: game flow by EPA with play-level attribution
@@ -95,8 +102,9 @@ acceptance criteria.
 - **Tasks:**
 <!-- tasks F04 -->
 - [x] [#44](https://github.com/ngiangre/cfb2nfl/issues/44) feat(data): ingest CFBD play-by-play into the pipeline, assets, and data model
-- [ ] [#68](https://github.com/ngiangre/cfb2nfl/issues/68) Measure play-stats revisions (Nov 15 + Nov 22 runs), record, then remove the measurement
+- [ ] [#68](https://github.com/ngiangre/cfb2nfl/issues/68) Measure play-stats revisions (Nov 15 to Dec 6 runs), record, then remove the measurement
 - [ ] [#95](https://github.com/ngiangre/cfb2nfl/issues/95) data(play_stats): backfill 2025 and 2024 in December, 2023 in January
+- [x] [PR #121](https://github.com/ngiangre/cfb2nfl/pull/121) docs(decisions): record the first play-stats re-pull counts, extend the measurement two weeks (F04)
 <!-- /tasks -->
 
 ### F05 · Combine measurables linked to college players
@@ -118,7 +126,7 @@ acceptance criteria.
 
 ### F24 · Post: how college careers end, by position, as competing outcomes over time
 
-- **Goals:** G1 · **Personas:** P1 (P2 for method) · **Status:** accepted
+- **Goals:** G1 · **Personas:** P1 (P2 for method) · **Status:** shipped
 - **Links:** posts 2026-10-24 (outcome prevalence, eligibility by
   position), extending F07; decision 0032 (`outcomes` survival bookkeeping)
 - **Why:** reading the 2026-10-24 posts, the user asked whether, by
@@ -126,44 +134,44 @@ acceptance criteria.
   exclusive events over time. Those posts report per-season rates, which
   answer "how often" but not "by when, and instead of what". Each eligible
   season a player is drafted, signs as an undrafted free agent, exhausts
-  eligibility undrafted, leaves the data, or plays on; the first four are
-  mutually exclusive and absorbing. P1 wants "of every 100 eligible
+  eligibility undrafted, or plays on; the first three are mutually
+  exclusive and absorbing (a season off every roster followed by a return
+  is a missed season, not an ending). P1 wants "of every 100 eligible
   linebackers, how many are drafted by their third eligible season, and
   what happened to the rest?". F17 later uses the hazards this post
   describes (the prevalence post's eligible-season-index followup).
-- **Acceptance criteria:**
-  - [ ] A dated post shows, for each position group, the cumulative
-    incidence of drafted, signed undrafted, exhausted eligibility
-    undrafted, and left the data, by eligible season, each curve with an
-    interval.
-  - [ ] At every eligible season, the four cumulative incidences plus the
-    share still playing sum to 100% (an `expect_equal` check in the
-    tests).
-  - [ ] The Data section states that `continuing` and `censored` (classes
-    not yet drafted) are treated as censored, that each player's ending is
-    his final eligible row (a mid-career `left_data` row is a missed
-    season, not an ending), and which season's position
-    defines a player's group (the first eligible season, using the
-    2026-10-24 eligibility post's nine groups so the two reconcile).
-  - [ ] The Data section reports, by position group, how many NFL entrants
-    never enter the risk set (drafted or signed before their first
-    eligible season by the clock) and says in plain language why they are
-    missing from the curves.
-  - [ ] The post states, in plain language before naming the method, why
-    one minus a drafted-only survival curve overstates the drafted share
-    when other endings compete, and shows the gap for at least one group.
-  - [ ] A table gives each group's drafted share at eligible season 3
-    under three treatments: left the data as a competing ending (the
-    primary), left the data as censored, and imputed high-school years
-    excluded.
-  - [ ] A fan can hover any curve point and read the group, season, share,
-    interval and players at risk; every number is an inline variable.
-  - [ ] Each ending is illustrated by named players whose path is
-    computed from the data and linked to their Explorer Players page
-    (`explorer.html#tab=players&pos=<group>&player=<id>`; offensive
-    linemen have no player page, so they are unlinked), and the post says the
-    curves describe groups, not any one player's chances.
-  - [ ] The functions that build the competing-risks frame and the curves
+- **Acceptance criteria** (revised 2026-11-25 to the post as written: three
+  endings, left the data folded into eligibility ended undrafted, the
+  recruiting-record comparison in place of the drafted-only curve and the
+  three-treatment table, and the ruled-out entrants counted overall rather
+  than by position group):
+  - [x] A dated post shows, for each position group with at least 30
+    players at risk (others named as omitted), the cumulative incidence of
+    drafted and signed undrafted by eligible season, each with an interval,
+    and every ending's share (eligibility ended undrafted included) at the
+    third eligible season.
+  - [x] At every eligible season, the cumulative incidences plus the share
+    still playing sum to 100% (an `expect_equal` check in the tests).
+  - [x] The post defines censoring (still playing, awaiting a first draft),
+    takes each player's ending from his final eligible season (a missed
+    season is not an ending), and fixes his group at his position in his
+    first eligible season, in the nine groups of the 2026-10-24 eligibility
+    post.
+  - [x] The post reports how many NFL entrants are ruled out because the
+    clock puts their entry before their first eligible season, and says in
+    plain language why they are missing from the curves.
+  - [x] The post shows, on one group, how each season's chance is computed
+    from the players still at risk, and explains in plain language before
+    naming Aalen-Johansen why that differs from a simple share.
+  - [x] The post compares every NFL route for players with and without a
+    matched recruiting record, the check on the estimated clock.
+  - [x] A fan can hover any curve point and read the group, season, share,
+    interval and players at risk; every number in the prose is an inline
+    variable (the title states the finding as of the last revision).
+  - [x] Named players show each ending, their paths computed from the data
+    and linked to their Explorer page (offensive linemen unlinked), and the
+    post says the curves describe groups, not any one player's chances.
+  - [x] The functions that build the competing-risks frame and the curves
     are tested (`testthat`), including a fixture where the estimate
     matches a hand-computed Aalen-Johansen value.
 - **Depends on:** the `outcomes` label fixes found 2026-11-22 (drafted
@@ -175,10 +183,11 @@ acceptance criteria.
   (decision 0041: build on the fly from `outcomes`).
 - **Cost:** 0 CFBD calls; no new tables; `survival::survfit()` multi-state
   (installed), optionally `tidycmprsk`/`ggsurvfit` in Suggests. Decision
-  record: one, if the primary `left_data` treatment is adopted as the
-  project convention for F17; otherwise none.
+  record: none (whether F17 treats a final season off every roster as an
+  ending is F17's call).
 - **Review:** feature-reviewer 2026-11-22: aligned after changes (8
-  findings, all applied)
+  findings, all applied); 2026-11-25: criteria revised to the post as
+  written, aligned after changes (all applied)
 - **Tasks:**
 <!-- tasks F24 -->
 - [ ] [#97](https://github.com/ngiangre/cfb2nfl/issues/97) Post: how college careers end, by position, as competing outcomes over time (F24)
@@ -186,6 +195,7 @@ acceptance criteria.
 - [x] [PR #101](https://github.com/ngiangre/cfb2nfl/pull/101) feat(post): how college careers end, by position, as competing outcomes (F24)
 - [x] [#109](https://github.com/ngiangre/cfb2nfl/issues/109) Revise the career-endings post for the roster population of outcomes
 - [x] [PR #115](https://github.com/ngiangre/cfb2nfl/pull/115) docs(post): career endings on the roster population; fix the site build (F24)
+- [x] [PR #122](https://github.com/ngiangre/cfb2nfl/pull/122) docs(posts): build the career endings post up to its probabilities (F24)
 <!-- /tasks -->
 
 ### F21 · Question status board
@@ -220,7 +230,8 @@ acceptance criteria.
 - [x] [#84](https://github.com/ngiangre/cfb2nfl/issues/84) Explorer Suggestions
 - [x] [#87](https://github.com/ngiangre/cfb2nfl/issues/87) Show college and NFL jersey numbers alongside position on Explore pages
 - [x] [#89](https://github.com/ngiangre/cfb2nfl/issues/89) Combine explorer: label UDFAs who made NFL rosters; clarify Draft pending
-- [ ] [#110](https://github.com/ngiangre/cfb2nfl/issues/110) Explorer: player outcomes rebuilt on the roster population of outcomes
+- [x] [#110](https://github.com/ngiangre/cfb2nfl/issues/110) Explorer: player outcomes rebuilt on the roster population of outcomes
+- [x] [PR #118](https://github.com/ngiangre/cfb2nfl/pull/118) docs(posts): revise outcome posts for the roster population; Explorer lists NFL entrants without a stat line
 <!-- /tasks -->
 
 ### F06 · Team and conference geography
@@ -319,8 +330,10 @@ acceptance criteria.
 - [x] [#111](https://github.com/ngiangre/cfb2nfl/issues/111) fix(roster): keep CFBD roster names so roster-only players can match undrafted signings
 - [x] [PR #112](https://github.com/ngiangre/cfb2nfl/pull/112) feat(outcomes): every roster player-season, with has_stat_line and tier (F22)
 - [x] [PR #113](https://github.com/ngiangre/cfb2nfl/pull/113) fix(roster): keep CFBD names so roster-only players can be matched (F22)
-- [ ] [#114](https://github.com/ngiangre/cfb2nfl/issues/114) fix(roster): CFBD lists some players before they enrolled (Burrow at Ohio State in 2014)
+- [x] [#114](https://github.com/ngiangre/cfb2nfl/issues/114) fix(roster): CFBD lists some players before they enrolled (Burrow at Ohio State in 2014)
 - [x] [PR #117](https://github.com/ngiangre/cfb2nfl/pull/117) fix(outcomes): nickname pick links; model table on the roster population (F22, F17)
+- [x] [PR #119](https://github.com/ngiangre/cfb2nfl/pull/119) fix(outcomes): the eligibility clock follows the NFL three-year rule for unrecruited players (F22)
+- [x] [PR #123](https://github.com/ngiangre/cfb2nfl/pull/123) fix(roster): drop roster seasons listed before a matched recruiting class (F22)
 <!-- /tasks -->
 
 ### F23 · NFL play, snap and roster-status data, 2022 on

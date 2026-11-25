@@ -2,7 +2,7 @@
 % Please edit documentation in R/competing_outcomes.R
 \name{ending_labels}
 \alias{ending_labels}
-\title{Reader-facing labels for the four career endings}
+\title{Reader-facing labels for the career endings}
 \usage{
 ending_labels()
 }
@@ -10,5 +10,5 @@ ending_labels()
 A named character vector: ending code to label, in plot order.
 }
 \description{
-Reader-facing labels for the four career endings
+Reader-facing labels for the career endings
 }

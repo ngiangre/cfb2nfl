@@ -1,5 +1,15 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Posts (feature F24): **the career endings post is finished**. It opens
+  with the fan's question and its expectations; the terms and the flow chart
+  from roster players to the study population now define the data in 2.1.
+  Four example players, one per ending plus a missed season, link to the
+  Explorer. Each result carries an explanatory figure that marks its claim
+  (a half line and the top group outlined; the recruiting-record gap labeled
+  at the third season) and an interactive view by position. The unused
+  drafted-only survival helper (`naive_drafted()`) and the option to treat
+  leaving the data as censoring are removed.
+
 - Fix (feature F22): **roster seasons CFBD lists before a player enrolled
   are dropped from the career and outcome tables** when a matched recruiting
   record shows the player had not finished high school yet: 26 seasons of 19

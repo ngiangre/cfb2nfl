@@ -4,15 +4,12 @@
 \alias{ending_incidence}
 \title{Cumulative incidence of each career ending, by eligible season}
 \usage{
-ending_incidence(endings, by = "group", left_data = c("competing", "censored"))
+ending_incidence(endings, by = "group")
 }
 \arguments{
 \item{endings}{Output of \code{\link[=career_endings]{career_endings()}}.}
 
 \item{by}{Grouping column, or \code{NULL} for everyone together.}
-
-\item{left_data}{\code{"competing"} (an ending of its own) or \code{"censored"}
-(the player's later outcome is treated as unknown).}
 }
 \value{
 A tibble: the \code{by} column, \code{time} (0 to the last season with

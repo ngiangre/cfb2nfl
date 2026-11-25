@@ -46,32 +46,6 @@ test_that("ending_incidence matches a hand-computed Aalen-Johansen estimate", {
   expect_true(all(ci$upper >= ci$estimate - 1e-12))
 })
 
-test_that("the drafted-only survival curve overstates the drafted share", {
-  skip_if_not_installed("survival")
-  naive <- naive_drafted(endings_fixture())
-  # KM: season 1, 1 of 5 drafted -> S = 0.8; season 2, 1 of 2 -> S = 0.4.
-  expect_equal(naive$estimate[naive$time == 2], 0.6)
-  ci <- ending_incidence(endings_fixture())
-  expect_gt(
-    naive$estimate[naive$time == 2],
-    ci$estimate[ci$time == 2 & ci$state == "drafted"]
-  )
-})
-
-test_that("treating left_data as censoring removes it as a state", {
-  skip_if_not_installed("survival")
-  e <- endings_fixture()
-  e$ending[2] <- "left_data"
-  competing <- ending_incidence(e)
-  censored <- ending_incidence(e, left_data = "censored")
-  expect_true("left_data" %in% competing$state)
-  expect_false("left_data" %in% censored$state)
-  # Censoring B instead of ending his career leaves more players at risk of
-  # being drafted later, so the drafted share can only rise.
-  d2 <- function(x) x$estimate[x$time == 2 & x$state == "drafted"]
-  expect_gte(d2(censored), d2(competing))
-})
-
 test_that("career_endings takes the final eligible row and censors the unknown", {
   outcomes <- tibble::tibble(
     playerId = c("V", "V", "V", "W", "W"),
