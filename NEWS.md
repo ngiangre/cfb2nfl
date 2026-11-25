@@ -1,5 +1,14 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Fix (feature F22): **roster seasons CFBD lists before a player enrolled
+  are dropped from the career and outcome tables** when a matched recruiting
+  record shows the player had not finished high school yet: 26 seasons of 19
+  players. The eligibility clock and the drafted and undrafted counts do not
+  change. The same copies for players without a recruiting record, such as
+  Joe Burrow at Ohio State in 2014, cannot be told apart from real seasons
+  and remain a known limit
+  ([decision 0052](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0052-drop-pre-enrollment-roster-seasons.md)).
+
 - Posts (feature F24): **the career endings post builds up to its
   probabilities**. The introduction explains the eligible-season clock and
   censoring, and opens with a flow chart that rules out the NFL entrants who

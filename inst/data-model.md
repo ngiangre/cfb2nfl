@@ -142,7 +142,7 @@ erDiagram
     nfl_pbp }o--o{ nfl_rosters_weekly : "*_player_id = gsis_id"
     combine }o..o| player_stats : "athlete_id = playerId (name-guarded)"
     combine |o..o| picks : "draft slot (draft_year, draft_round, draft_ovr), name-guarded"
-    roster |o--o{ career_summary : "playerId (collapsed)"
+    roster |o--o{ career_summary : "playerId (collapsed, pre-enrollment seasons dropped)"
     roster |o--o{ team_season : "team, season (aggregated)"
     games |o--o{ team_season : "team, season (aggregated)"
     team_season ||--o{ team_draft : "team, season"

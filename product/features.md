@@ -264,7 +264,8 @@ acceptance criteria.
   4,095 picks from 2011 to 2026 have no stat line at all. Rosters are
   complete every season, so they define who could have been drafted.
 - **Acceptance criteria:**
-  - [x] Every roster player-season (reused ids excluded) appears exactly
+  - [x] Every roster player-season (reused ids and pre-enrollment seasons
+    excluded, issue #114) appears exactly
     once in `outcomes`, each with `has_stat_line` and a season-aware tier;
     the contract fails on a missing tier rather than defaulting. Both
     columns and the tier source are defined in `inst/dict/outcomes.yml`
