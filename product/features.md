@@ -126,7 +126,7 @@ acceptance criteria.
 
 ### F24 · Post: how college careers end, by position, as competing outcomes over time
 
-- **Goals:** G1 · **Personas:** P1 (P2 for method) · **Status:** accepted
+- **Goals:** G1 · **Personas:** P1 (P2 for method) · **Status:** shipped
 - **Links:** posts 2026-10-24 (outcome prevalence, eligibility by
   position), extending F07; decision 0032 (`outcomes` survival bookkeeping)
 - **Why:** reading the 2026-10-24 posts, the user asked whether, by
