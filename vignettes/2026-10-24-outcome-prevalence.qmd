@@ -1,7 +1,7 @@
 ---
 title: "Most draft-eligible college seasons end without an NFL outcome"
 date: "2026-10-24"
-description: "Of every player-season on a college roster that is draft-eligible, only 2.3% end in a draft selection and 5.5% in NFL entry, more entrants arrive undrafted than drafted, the per-season entry chance rises from 2.3% to 12.8% by the fourth eligible season, and the drafted share fell from 2.9% (2012 class) to 1.7% (2026)."
+description: "Of every player-season on a college roster that is draft-eligible, only 3.0% end in a draft selection and 7.1% in NFL entry, more entrants arrive undrafted than drafted, the per-season entry chance rises from 3.1% to 15.9% by the third eligible season, and the drafted share fell from 3.7% (2013 class) to 2.1% (2026)."
 followups:
   - "Evaluate out-of-time models with calibration metrics, since the positive class is rarer in later draft classes than in training data."
   - "Include the eligible-season index as a model term; the entry hazard varies several-fold across it."
@@ -689,7 +689,7 @@ top_status <- status_idx |>
   ungroup()
 ```
 
-### 3.4 The chance of entry climbs steeply through the fourth eligible season
+### 3.4 The chance of entry climbs steeply through the third eligible season, then levels off
 
 ```{r}
 #| label: hazard
@@ -731,8 +731,8 @@ The **hazard** is the chance that a player still unentered and still
 playing at a given eligible season is drafted or signs as an undrafted free
 agent after the very next draft; the
 table and the first figure show it rising from `r pct(hz(1))` in the first
-eligible season to `r pct(hz(4))` in the fourth, and the second figure
-repeats it for three eras of draft classes.
+eligible season to `r pct(hz(3))` in the third, then holds near it
+(`r pct(hz(4))` in the fourth), and the second figure repeats it for three eras of draft classes.
 
 ```{r}
 #| label: hazard-table
@@ -761,6 +761,9 @@ hz_tip <- function(k, outcome, p, n) {
     fmt(n)
   )
 }
+# Point the arrows at the season each example was drafted in.
+ward_k <- examples$`Eligible season`[examples$Player == "Cam Ward"]
+travis_k <- examples$`Eligible season`[examples$Player == "Jordan Travis"]
 p_hazard <- ggplot(
   filter(hazard_long, outcome != "NFL entry"),
   aes(eligible_season_index, p, color = outcome)
@@ -789,28 +792,28 @@ p_hazard <- ggplot(
   ) +
   annotate(
     "text",
-    x = 2.2,
-    y = hz(4) + 0.035,
+    x = 1.2,
+    y = hz(3) + 0.035,
     label = sprintf(
-      "NFL entry (dashed) reaches %.1f%%\nby the fourth eligible season",
-      100 * hz(4)
+      "NFL entry (dashed) reaches %.1f%%\nby the third eligible season",
+      100 * hz(3)
     ),
     size = 4.4,
     hjust = 0
   ) +
   annotate(
     "curve",
-    x = 3.75,
-    y = hz(4) + 0.035,
-    xend = 3.95,
-    yend = hz(4) + 0.005,
+    x = 2.75,
+    y = hz(3) + 0.035,
+    xend = 2.95,
+    yend = hz(3) + 0.005,
     arrow = arrow(length = unit(0.25, "cm")),
     linewidth = 0.7,
     alpha = 0.6
   ) +
   annotate(
     "text",
-    x = 1.6,
+    x = ward_k + 0.2,
     y = 0.01,
     label = sprintf(
       "Ward drafted in his %s eligible season,\nTravis in his %s",
@@ -822,10 +825,10 @@ p_hazard <- ggplot(
   ) +
   annotate(
     "curve",
-    x = 3,
+    x = ward_k,
     y = 0.022,
-    xend = 3,
-    yend = hz(3, "outcome_drafted_d") + 0.003,
+    xend = ward_k,
+    yend = hz(ward_k, "outcome_drafted_d") + 0.003,
     curvature = 0,
     arrow = arrow(length = unit(0.25, "cm")),
     linewidth = 0.7,
@@ -833,10 +836,10 @@ p_hazard <- ggplot(
   ) +
   annotate(
     "curve",
-    x = 3.85,
+    x = travis_k - 0.15,
     y = 0.016,
-    xend = 3.97,
-    yend = hz(4, "outcome_drafted_d") + 0.002,
+    xend = travis_k - 0.03,
+    yend = hz(travis_k, "outcome_drafted_d") + 0.002,
     arrow = arrow(length = unit(0.25, "cm")),
     linewidth = 0.7,
     alpha = 0.6
@@ -1282,7 +1285,7 @@ tribble(
   "The draft is rare, under 5% of eligible seasons" , "✅"      , sprintf("%s drafted; %s NFL entry by either route.", pct(p_drafted), pct(p_entry))                                           ,
   "Undrafted entry rivals the draft"                , "✅"      , sprintf("%s of entrants arrive undrafted.", pct(udfa_share))                                                                 ,
   "Exhausted eligibility is the most common status" , "❌"      , sprintf("%s of seasons end with the player returning; %s exhausted.", pct(st("continuing")), pct(st("exhausted_undrafted"))) ,
-  "The entry chance rises with waiting"             , "✅"      , sprintf("From %s in the first eligible season to %s in the fourth.", pct(hz(1)), pct(hz(4)))                                 ,
+  "The entry chance rises with waiting"             , "✅"      , sprintf("From %s in the first eligible season to %s in the third.", pct(hz(1)), pct(hz(3)))                                 ,
   "Prevalence is stable across classes"             , "❌"      , sprintf("Drafted share %s (%d) to %s (%d).", pct(tr(y0, "drafted")), y0, pct(tr(y1, "drafted")), y1)                         ,
   "Most entrants make an entry-year roster"         , "✅"      , sprintf("%s on a roster, but %s play no game.", pct(made_roster), pct(zero_games))
 ) |>
@@ -1305,7 +1308,7 @@ The base rate is not fixed.
 Waiting time carries signal.
 
 - The chance of entry varies about
-  `r round(hz(4) / hz(1))`-fold over the eligible seasons, and the
+  `r round(hz(3) / hz(1))`-fold over the eligible seasons, and the
   undrafted chance climbs faster than the drafted chance.
 - Modeling drafted status alone discards that structure, and modeling entry
   without routes discards the competition between them.

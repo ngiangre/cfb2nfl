@@ -85,18 +85,20 @@ test_that("rows match the population and the eligibility clock is right", {
   expect_equal(ward$eligible_season_index[ward$season == 2024L], 2L)
   expect_true(all(is.na(ward$eligible_season_index[ward$season == 2022L])))
   expect_false(any(ward$hs_year_imputed))
-  # Imputed clock: first stat season (2020) minus 1 = 2019 -> draft 2021 is
-  # years_since_hs 2, so the single 2020 row is not yet eligible.
+  # Imputed clock: the first college season (2020) is the high-school class,
+  # as for a direct enrollee -> draft 2021 is years_since_hs 1, so the single
+  # 2020 row is not yet eligible.
   ann <- out[out$playerId == "30", ]
   expect_true(ann$hs_year_imputed)
-  expect_equal(ann$hs_grad_year, 2019L)
+  expect_equal(ann$hs_grad_year, 2020L)
   expect_false(ann$draft_eligible)
 })
 
 test_that("an imputed clock starts at the first roster season, not the first stat line", {
   d <- make_inputs()
   # Ann Ex was on the roster from 2018 but recorded her only stat line in 2020
-  # (a lineman's shape): the clock starts at 2018 - 1, so 2020 is eligible.
+  # (a lineman's shape): the clock starts at 2018, so 2020 (draft 2021, three
+  # years out of high school) is eligible.
   d$career$first_season[d$career$playerId == "30"] <- 2018L
   d$career$seasons[d$career$playerId == "30"] <- 3L
   out <- build_outcomes(
@@ -109,11 +111,36 @@ test_that("an imputed clock starts at the first roster season, not the first sta
   )
   ann <- out[out$playerId == "30", ]
   expect_true(ann$hs_year_imputed)
-  expect_equal(ann$hs_grad_year, 2017L)
+  expect_equal(ann$hs_grad_year, 2018L)
   expect_true(ann$draft_eligible)
   # A recruiting hs_class still wins over the roster.
   ward <- out[out$playerId == "10", ]
   expect_equal(unique(ward$hs_grad_year), 2021L)
+})
+
+test_that("an imputed clock makes a player eligible after his third season, like a direct enrollee", {
+  d <- make_inputs()
+  # Ann Ex: on the roster 2018-2020 with no recruiting row. The NFL rule is
+  # three years out of high school, so her second season (2019, draft 2020)
+  # is not eligible and her third (2020, draft 2021) is.
+  d$ps_pop <- dplyr::bind_rows(
+    d$ps_pop,
+    ps(playerId = "30", player = "Ann Ex", season = 2019L)
+  )
+  d$career$first_season[d$career$playerId == "30"] <- 2018L
+  d$career$seasons[d$career$playerId == "30"] <- 3L
+  out <- build_outcomes(
+    d$ps_pop,
+    d$career,
+    d$recruiting,
+    d$picks_nfl,
+    d$nfl_rosters,
+    d$nfl_player_stats
+  )
+  ann <- out[out$playerId == "30", ]
+  expect_false(ann$draft_eligible[ann$season == 2019L])
+  expect_true(ann$draft_eligible[ann$season == 2020L])
+  expect_equal(ann$eligible_season_index[ann$season == 2020L], 1L)
 })
 
 test_that("drafted labels land only on the draft-season row", {
@@ -685,8 +712,8 @@ test_that("a drafted row's draft_year is the draft it records", {
   late <- out[out$playerId == "50", ]
   expect_equal(late$outcome_drafted_d, c(FALSE, TRUE))
   expect_equal(late$draft_year, c(2019L, 2021L))
-  # Imputed clock: first roster season 2018 - 1 = 2017; 2021 - 2017 = 4.
-  expect_equal(late$years_since_hs[2], 4L)
+  # Imputed clock: first roster season 2018; 2021 - 2018 = 3.
+  expect_equal(late$years_since_hs[2], 3L)
   expect_true(late$draft_eligible[2])
 })
 

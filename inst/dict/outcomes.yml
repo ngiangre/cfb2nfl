@@ -77,10 +77,12 @@ columns:
     description: >
       High-school graduation year (h), the time origin of the eligibility clock.
       Recruiting `hs_class` via the name-guarded link when available; otherwise
-      imputed as the first observed college season minus one (the earlier of
-      the first roster season and the first stat season), with
-      `hs_year_imputed = 1`. The imputation mis-times redshirts, JUCO and late
-      enrollees; use the flag to filter or sensitivity-check.
+      imputed as the first observed college season (the earlier of the first
+      roster season and the first stat season), a direct enrollee's class
+      (decision 0051), with `hs_year_imputed = 1`. The imputation dates the
+      clock too late for players whose earlier college years the data does
+      not cover (JUCO, transfers from uncovered programs, prep years); use
+      the flag to filter or sensitivity-check.
     provenance: derived (recruiting.hs_class, else imputed from career_summary.first_season)
   - name: hs_year_imputed
     type: logical

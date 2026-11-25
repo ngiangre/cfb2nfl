@@ -99,7 +99,7 @@ fabricated 0.
 
 \code{hs_grad_year} comes from the name-guarded recruiting link (\code{hs_class},
 decision 0013); when unavailable it is \strong{imputed} as the first observed
-college season minus one (a direct HS enrollee's graduation year), taking
+college season (a direct HS enrollee's class, decision 0051), taking
 the earlier of the first roster season and the first stat season, and
 \code{hs_year_imputed} is set to 1, so models can filter or flag the mis-timed
 clock (redshirts, JUCO, late enrollees).
