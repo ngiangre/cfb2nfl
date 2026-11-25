@@ -1,5 +1,14 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Posts (feature F24): **the career endings post builds up to its
+  probabilities**. The introduction explains the eligible-season clock and
+  censoring, and opens with a flow chart that rules out the NFL entrants who
+  break the three-year rule and the players with no recorded position. An
+  alluvial chart follows the quarterbacks through the risk set season by
+  season, and the cumulative chance of each NFL route (drafted, signed
+  undrafted, either) is shown for every position and by recruiting record.
+  The stat-line comparison and the drafted-only curve are dropped.
+
 - Posts (features F07, F10, F11): **the draft-eligibility, playing-time and
   combine funnel posts follow the corrected eligibility clock**
   ([decision 0051](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0051-imputed-hs-year-is-first-season.md)).
