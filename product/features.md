@@ -190,12 +190,13 @@ acceptance criteria.
   written, aligned after changes (all applied)
 - **Tasks:**
 <!-- tasks F24 -->
-- [ ] [#97](https://github.com/ngiangre/cfb2nfl/issues/97) Post: how college careers end, by position, as competing outcomes over time (F24)
+- [x] [#97](https://github.com/ngiangre/cfb2nfl/issues/97) Post: how college careers end, by position, as competing outcomes over time (F24)
 - [x] [PR #98](https://github.com/ngiangre/cfb2nfl/pull/98) docs(product): F24 competing-outcomes post card
 - [x] [PR #101](https://github.com/ngiangre/cfb2nfl/pull/101) feat(post): how college careers end, by position, as competing outcomes (F24)
 - [x] [#109](https://github.com/ngiangre/cfb2nfl/issues/109) Revise the career-endings post for the roster population of outcomes
 - [x] [PR #115](https://github.com/ngiangre/cfb2nfl/pull/115) docs(post): career endings on the roster population; fix the site build (F24)
 - [x] [PR #122](https://github.com/ngiangre/cfb2nfl/pull/122) docs(posts): build the career endings post up to its probabilities (F24)
+- [x] [PR #124](https://github.com/ngiangre/cfb2nfl/pull/124) docs(posts): finish the career endings post and revise F24 to it (F24)
 <!-- /tasks -->
 
 ### F21 · Question status board
