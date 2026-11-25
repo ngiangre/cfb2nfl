@@ -156,7 +156,7 @@ kable(
 
 ## 3. Results
 
-### 3.1 Fewer than three in every hundred eligible seasons end in a draft selection
+### 3.1 About three in every hundred eligible seasons end in a draft selection
 
 ```{r}
 #| label: ledger-nums
@@ -396,13 +396,15 @@ imputed_examples <- risk |>
   distinct(playerId) |>
   mutate(short = sub(".* ", "", names(cast)[match(playerId, cast)])) |>
   pull(short)
+# Ward's record starts with his second college season, so his clock runs late.
+ward_first <- min(risk$first_roster_season[risk$playerId == cast[["Cam Ward"]]])
 and_join <- function(x) sub(", ([^,]*)$", " and \\1", paste(x, collapse = ", "))
 ordinal_word <- function(n) {
   c("first", "second", "third", "fourth", "fifth", "sixth")[n]
 }
 kable(
   examples,
-  caption = "The running examples at their NFL entry. Eligible season counts the player's draft-eligible college seasons from one; Burrow's count starts early (see the caveats)."
+  caption = "The running examples at their NFL entry. Eligible season counts the player's draft-eligible college seasons from one; Burrow's count starts early and Ward's late (see the caveats)."
 )
 ```
 
@@ -487,7 +489,7 @@ p_route_class <- ggplot(route_class, aes(draft_year, n, fill = route)) +
   scale_fill_manual(
     values = c(Drafted = "#1B9E77", `Undrafted free agent` = "#7570B3")
   ) +
-  scale_x_continuous(breaks = seq(2012, max(route_class$draft_year), 2)) +
+  scale_x_continuous(breaks = seq(min(route_class$draft_year), max(route_class$draft_year), 2)) +
   labs(
     title = "The undrafted route outnumbers the draft in every class from 2016 on except 2021",
     subtitle = "NFL entrants by entry route and draft class",
@@ -871,7 +873,7 @@ hazard_era <- risk |>
       draft_year,
       breaks = c(2011, 2016, 2021, max(draft_year)),
       labels = c(
-        "2012 to 2016 classes",
+        sprintf("%d to 2016 classes", min(draft_year)),
         "2017 to 2021 classes",
         sprintf("2022 to %d classes", max(draft_year))
       )
@@ -998,7 +1000,7 @@ p_trend <- ggplot(trend, aes(draft_year)) +
   ) +
   annotate(
     "text",
-    x = 2012.1,
+    x = y0 + 0.1,
     y = tr(2016, "entry") + 0.006,
     label = "Recorded undrafted signings\njump from the 2016 class on",
     size = 4.4,
@@ -1094,7 +1096,7 @@ p_counts <- ggplot(trend_counts, aes(draft_year, n)) +
     ),
     guide = "none"
   ) +
-  scale_x_continuous(breaks = c(2012, 2016, 2020, 2024)) +
+  scale_x_continuous(breaks = seq(y0, max(trend_counts$draft_year), 4)) +
   labs(
     title = "The pool grew far faster than the draft",
     subtitle = "Eligible seasons and NFL entries by draft class (each panel on its own scale)",
@@ -1329,7 +1331,8 @@ Several caveats bound these figures.
   including those of `r and_join(imputed_examples)`, and the imputation can mis-time redshirts
   and transfers, shifting rows in and out of the risk set. Burrow's roster
   record starts the season before he enrolled, so his estimated clock starts
-  early.
+  early; Ward's starts in `r ward_first`, his second college season, so his
+  starts a year late.
 - The "left the data early" status is informative censoring that the
   pipeline flags but does not resolve.
 - The entry-year roster rate is partly mechanical: the undrafted link is

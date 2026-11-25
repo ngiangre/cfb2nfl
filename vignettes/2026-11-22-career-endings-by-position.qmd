@@ -329,7 +329,7 @@ n_groups_cross <- hz_group_wide |>
 # ---- 3.4 Which players are counted ----------------------------------------
 # The earlier posts counted only players with a stat line.
 stat_ids <- unique(outcomes$playerId[outcomes$has_stat_line])
-share_with_stat <- mean(endings$playerId %in% stat_ids)
+share_with_stat <- mean(in_curves$playerId %in% stat_ids)
 treatments <- list(
   "All roster players (main view)" = ci,
   "Players with a stat line" = ending_incidence(
@@ -358,11 +358,11 @@ ol_cmp <- filter(sens_wide, group == "Offensive line")
 ol_all <- ol_cmp$`All roster players (main view)`
 ol_stat <- ol_cmp$`Players with a stat line`
 ol_stat_share <- mean(
-  endings$playerId[endings$group %in% "Offensive line"] %in% stat_ids
+  in_curves$playerId[in_curves$group %in% "Offensive line"] %in% stat_ids
 )
-max_other_shift <- max(sens_wide$stat_shift[
+max_other_shift <- max(abs(sens_wide$stat_shift[
   sens_wide$group != "Offensive line"
-])
+]))
 stat_curves <- bind_rows(
   mutate(comparable(ci), treatment = "All roster players"),
   mutate(
@@ -406,10 +406,9 @@ season, never as a career that ended.*
 
 ## 1. Introduction
 
-This post counts the `r fmt(n_players)` draft-eligible players on a
-college roster, with or without a stat line, and follows the
-`r fmt(n_known)` whose first eligible season has a known outcome season by
-season until his college career ends, in one of three ways that rule each
+This post follows the `r fmt(n_known)` draft-eligible roster players, with
+or without a stat line, whose first eligible outcome is known, season by
+season until their college careers end in one of three ways that rule each
 other out, and asks how those endings differ by position.
 
 + *Expecting at least one position group where most eligible players reach
@@ -439,7 +438,7 @@ tibble::tribble(
   "Still playing"                , "His career had not ended by the last season in the data, including players whose next draft has not happened yet; the curves count him only through the seasons observed."                                                                                     ,
   "Not yet known"                , "His first eligible season's outcome is not known yet (his draft has not happened), so his clock has not started and he is in no curve."                                                                                                                        ,
   "Missed season"                , "A season off every college roster in the data (a medical retirement, a transfer to a program the data does not cover) followed by a return; not an ending, since a career ends only in his final eligible season. A missed season does not advance the clock." ,
-  "Position group"               , "His roster position in his first eligible season, in the nine groups of the [earlier position post](2026-10-24-draft-eligibility-by-position.html)."                                                                                                           ,
+  "Position group"               , sprintf("His roster position in his first eligible season, in the %d groups of the [earlier position post](2026-10-24-draft-eligibility-by-position.html).", length(pos_levels))                                                                                                           ,
   "Cumulative share"             , "Of the group's eligible players, the share whose career has ended a given way by a given season. Each season's three shares plus the share still playing add to 100% (estimated with the Aalen-Johansen method, which counts every ending)."                   ,
   "At risk"                      , "Players still playing going into a season, the denominator for that season."                                                                                                                                                                                   ,
   "95% interval"                 , "The range the true share plausibly occupies given how many players are behind it; wider when fewer players are at risk."                                                                                                                                       ,
@@ -450,14 +449,12 @@ tibble::tribble(
 
 ### 2.2 `r fmt(n_known)` players have a known first eligible season, and `r fmt(n_never)` NFL entrants never become eligible by the clock
 
-The table reconciles the players behind the curves: those whose first
-eligible outcome is not yet known start no clock, and NFL entrants drafted
-or signed before their first eligible season by the clock (early entrants,
-or players whose estimated high-school year runs late) fall outside every
-risk set, the largest group with a recorded position being the
-`r fmt(never_top$n)` `r tolower(never_top$group)` players. Players with no
-recorded position (last row) are left out of the curves, and the flow chart
-traces every roster player down to the players the curves follow.
+The table counts each group's players by ending, plus those outside the
+curves: players whose first eligible outcome is not yet known, the
+`r fmt(n_never)` NFL entrants the clock never makes eligible (players whose
+earlier college years the data misses, so their estimated high-school year
+runs late), and players with no recorded position (last row). The flow
+chart traces every roster player down to the players the curves follow.
 
 ```{r}
 #| label: risk-set
@@ -492,7 +489,7 @@ risk_cols |>
 #| fig-height: 9
 h <- 0.5 # half a main box's height, in y units
 bar_y <- min(flow_main$y) - 1.1
-end_y <- bar_y - 1.15
+end_y <- bar_y - 1.25
 side_x <- 0.7
 p22 <- ggplot() +
   # main trunk, one arrow per step down
@@ -509,7 +506,7 @@ p22 <- ggplot() +
   # each side branch leaves the trunk halfway between two main boxes
   geom_segment(
     data = filter(flow_main, !is.na(side_label)),
-    aes(x = 0, xend = side_x - 0.05, y = y - 1.15, yend = y - 1.15),
+    aes(x = 0, xend = side_x - 0.05, y = y - 1.25, yend = y - 1.25),
     arrow = arrow(length = unit(0.25, "cm"), type = "closed"),
     color = "#4B5563",
     linewidth = 0.8
@@ -553,7 +550,7 @@ p22 <- ggplot() +
   ) +
   geom_label(
     data = filter(flow_main, !is.na(side_label)),
-    aes(side_x, y - 1.15, label = side_label),
+    aes(side_x, y - 1.25, label = side_label),
     hjust = 0,
     size = 5,
     fontface = "bold",
@@ -634,7 +631,7 @@ the NFL by their third eligible season.* ❌
 The first figure stacks each group's cumulative shares at season
 `r horizon`: `r tolower(nfl_share$group[1])` players go into the NFL most,
 `r per100(nfl_share$nfl[1])` in 100 by either route, while at least
-`r per100(exhausted_share$estimate[1])` in 100 players in every group shown
+`r floor(100 * exhausted_share$estimate[1])` in 100 players in every group shown
 have run out of eligibility undrafted; the second figure follows the players
 of every group season by season.
 
@@ -754,12 +751,12 @@ girafe(ggobj = p31b, width_svg = 13, height_svg = 10)
 
 ### 3.2 `r per100(qb_gap$aj)` in 100 quarterbacks are drafted by their `r ordinal(horizon)` eligible season, not the `r per100(qb_gap$naive)` a count of the draft as the only ending reads
 
-A survival curve with the draft as its only event treats a player whose
-career ended another way as if he could still be drafted, handing the
-careers that already ended to those still playing (statisticians call this
-ignoring competing risks; the result is one minus a Kaplan-Meier curve), so it overstates the drafted share; the second
-figure shows the gap in every group, widest in the
-`r tolower(widest_gap$group)` group.
+Counting the draft as the only ending treats a player who signed undrafted
+or ran out of eligibility as if he could still be drafted later, so it
+overstates the drafted share (statisticians call this ignoring competing
+risks; the result is one minus a Kaplan-Meier curve); the second figure
+shows the gap in every group, widest in points for
+`r tolower(widest_gap$group)` players.
 
 ```{r}
 #| label: s32-explain
@@ -935,8 +932,8 @@ extra eligible season.* ❌
 
 Of every 100 players still playing, `r per100_1(hz_at("drafted", 1))` are
 drafted after their first eligible season, a share that rises through
-season `r draft_peak` to `r per100_1(hz_at("drafted", draft_peak))` and then
-levels off, while the undrafted share climbs from
+season `r draft_peak` to `r per100_1(hz_at("drafted", draft_peak))` and falls to
+`r per100_1(hz_at("drafted", last_hz))` in season `r last_hz`, while the undrafted share climbs from
 `r per100_1(hz_at("signed_udfa", 1))` to `r per100_1(hz_at("signed_udfa", last_hz))`
 by season `r last_hz`; the second figure repeats it for each group, and in
 `r if (n_groups_cross$n == n_groups_cross$of) "every one" else paste(n_groups_cross$n, "of")`
@@ -980,7 +977,7 @@ p33 <- ggplot(hz_all, aes(time, 100 * hazard, color = hz_lab[ending])) +
   scale_color_manual(values = state_fill[c("Drafted", "Signed undrafted")]) +
   scale_x_continuous(breaks = hz_wide$time) +
   labs(
-    title = "Players who stay in college sign undrafted more often each season, while their drafted rate levels off",
+    title = sprintf("Players who stay in college sign undrafted more often each season, while their drafted rate peaks in season %d", draft_peak),
     subtitle = "Of players still playing going into each eligible season, all positions, the share drafted or signed undrafted that season",
     x = "Eligible season",
     y = "Share that season (%)",
@@ -1339,8 +1336,8 @@ The NFL routes compete with each other and with the end of eligibility.
 The drafted-only curve overstates the drafted share.
 
 - Treating every other ending as censoring keeps counting players whose
-  careers already ended, so the overstatement is largest where other endings are
-  most common.
+  careers already ended, so relative to the true share, the overstatement is
+  largest where the other endings are most common.
 :::
 
 ::: {.callout-important}
@@ -1350,8 +1347,8 @@ The drafted share moves with which players are counted.
   of offensive linemen who recorded one, so it describes a far more drafted group than
   the full line.
 - Players with a matched recruiting record are drafted far more often,
-  partly as stronger prospects and partly because their clock is known; for
-  the rest the data says how a career ended more reliably than when.
+  likely partly as stronger prospects and partly because an estimated clock
+  can start early or late.
 :::
 
 Several caveats bound these figures. The population is every player on a
