@@ -1,0 +1,13 @@
+{
+  "id": "offensive-line-stat-lines",
+  "release": "2026-11-25",
+  "code_hash": "2bea3c56380a07b143900d3799461010",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "fmt": "d4c89f195c447af907ba425a860522de",
+    "pct": "3413c026fc8c907293b2fb1d96080440",
+    "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

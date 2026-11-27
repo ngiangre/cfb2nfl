@@ -1,0 +1,207 @@
+---
+title: "Do schools outside FBS send players to the draft?"
+image: card-thumbs/fcs-school-draft-picks.png
+image-alt: "Stacked bar chart of NFL draft picks from schools that played FCS or below, for the eight schools with the most picks: North Dakota State leads with 15, its traced picks in dark grey and the rest in pale grey; some schools have every pick traced to a roster and others none."
+categories: ["Topic: Programs and conferences", "Position: All positions", "Unit: Schools", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [draft-day-school, credited-pick, stat-line, division, fcs-and-below, team-season, conference]
+followups:
+  - text: "Fill the FCS and Division II and below rosters, especially 2020, from another source so every school's players are covered."
+    link: "F09"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+last_season <- 2025L # the 2026 season is still being played
+first_class <- 2014L
+tier_order <- c("Power", "Group of 5", "FCS and below")
+team_season <- tbl(con, "team_season") |>
+  filter(season <= last_season, games_played > 0) |>
+  collect() |>
+  mutate(tier_label = factor(tier_label, levels = tier_order))
+teams <- tbl(con, "teams") |> collect()
+roster <- tbl(con, "roster") |> collect()
+picks <- tbl(con, "picks") |>
+  filter(year >= first_class, year <= last_season + 1L) |>
+  collect()
+school_tier <- team_season |>
+  filter(!is.na(tier_label)) |>
+  transmute(
+    collegeTeam = team,
+    tier_season = season,
+    tier = as.character(tier_label),
+    conference
+  )
+# A credited pick: the player is on a roster before his draft year.
+reused <- reused_ids(roster)
+traced_ids <- picks |>
+  filter(!is.na(playerId), !playerId %in% reused) |>
+  inner_join(
+    distinct(roster, playerId, season),
+    by = "playerId",
+    relationship = "many-to-many"
+  ) |>
+  filter(season < year) |>
+  distinct(playerId) |>
+  pull()
+window_picks <- picks |>
+  left_join(
+    school_tier,
+    by = join_by(collegeTeam, closest(year > tier_season))
+  ) |>
+  mutate(
+    traced = playerId %in% traced_ids,
+    tier = coalesce(tier, "School not in the data")
+  )
+# Named players, keyed on athlete id.
+wentz <- filter(picks, playerId == "2573079") # Carson Wentz
+lance <- filter(picks, playerId == "4383351") # Trey Lance
+hill <- filter(picks, playerId == "3116406") # Tyreek Hill
+```
+
+```{r}
+#| label: compute
+small <- filter(window_picks, tier == "FCS and below")
+small_traced <- mean(small$traced)
+fbs_traced <- mean(window_picks$traced[
+  window_picks$tier %in% c("Power", "Group of 5")
+])
+small_schools <- small |>
+  group_by(collegeTeam) |>
+  summarise(
+    picks = n(),
+    traced = sum(traced),
+    conference = last(conference),
+    .groups = "drop"
+  ) |>
+  arrange(desc(picks), collegeTeam)
+top_small <- slice_head(small_schools, n = 8)
+ndsu <- filter(small, collegeTeam == "North Dakota State")
+```
+
+```{r}
+#| label: figure
+bars <- bind_rows(
+  transmute(top_small, collegeTeam, picks, part = "Traced to a roster", n = traced),
+  transmute(top_small, collegeTeam, picks, part = "Not on any roster", n = picks - traced)
+) |>
+  mutate(part = factor(part, levels = c("Not on any roster", "Traced to a roster")))
+p <- ggplot(
+  bars,
+  aes(n, reorder(collegeTeam, picks), fill = part)
+) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(
+        collegeTeam, ": ", n, " of ", picks, " picks ", tolower(part)
+      ),
+      data_id = paste(collegeTeam, part)
+    ),
+    width = 0.75
+  ) +
+  scale_fill_manual(
+    values = c("Traced to a roster" = "#374151", "Not on any roster" = "grey80"),
+    guide = "none"
+  ) +
+  labs(
+    title = "FCS-and-below draft picks by school",
+    subtitle = "Schools with the most picks; dark is traced to a roster",
+    x = "Draft picks",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "fcs-school-draft-picks", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: table
+small |>
+  group_by(year) |>
+  summarise(
+    picks = n(),
+    schools = n_distinct(collegeTeam),
+    traced = sum(traced),
+    .groups = "drop"
+  ) |>
+  transmute(
+    `Draft class` = year,
+    `Draft picks` = fmt(picks),
+    `Schools with a pick` = schools,
+    `Traced to a roster` = fmt(traced),
+    `Share traced` = pct(traced / picks)
+  ) |>
+  knitr::kable(
+    col.names = c("Draft class", "Draft picks", "Schools with a pick", "Traced to a roster", "Share traced"),
+    caption = sprintf(
+      "Draft picks whose draft-day school played FCS or below in its latest recorded season before the draft, by draft class, and how many the rosters trace to a college roster. Across the window %s of these picks trace, against %s for FBS schools. Tyreek Hill, a round %d pick in %d, came from Division II West Alabama.",
+      pct(small_traced, 0),
+      pct(fbs_traced, 0),
+      hill$round,
+      hill$year
+    )
+  )
+```
+
+```{r}
+#| label: scatter
+p_all <- ggplot(small, aes(year, overall, color = traced)) +
+  geom_point_interactive(
+    aes(
+      tooltip = paste0(
+        name, ", ", collegeTeam, " (", conference, ")\n",
+        year, " draft, round ", round, ", pick ", overall,
+        if_else(traced, "\nTraced to a roster", "\nNot on any roster")
+      ),
+      data_id = paste(year, overall)
+    ),
+    size = 3.2,
+    alpha = 0.85,
+    position = position_jitter(width = 0.15, height = 0, seed = 1)
+  ) +
+  scale_y_reverse() +
+  scale_color_manual(
+    values = c(`TRUE` = "#374151", `FALSE` = "#f59e0b"),
+    labels = c(`TRUE` = "Traced to a roster", `FALSE` = "Not on any roster"),
+    name = NULL
+  ) +
+  labs(
+    x = "Draft class",
+    y = "Overall pick (earlier picks at the top)",
+    title = "Every draft pick from an FCS-and-below school",
+    subtitle = "Hover a point for the player, school, and pick",
+    caption = card_caption(release)
+  ) +
+  theme_cfb2nfl()
+card_interactive(p_all)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
