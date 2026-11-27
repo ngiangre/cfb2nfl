@@ -1,0 +1,146 @@
+---
+title: "How much do new NFL players play in their rookie season?"
+image: card-thumbs/rookie-games.png
+image-alt: "Bar chart of NFL entrants from draft-eligible college seasons by regular-season games played as rookies, in bins from none to 13 to 17, with the running example players placed in their bins; the none bar is the longest, about half of entrants."
+categories: ["Topic: NFL careers", "Topic: Draft outcomes", "Position: All positions", "Population: Draft-eligible seasons", "Figure: Bar chart", "Question: NFL careers"]
+status: investigation
+graduated_to: null
+terms: [eligible-season, known-outcome, nfl-entry, drafted, signed-undrafted, rookie-games]
+followups:
+  - text: "Treat making an NFL roster and rookie games as a second prediction problem after entry."
+    link: "F19"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+# A rookie season still being played would undercount games.
+last_rookie_class <- DBI::dbGetQuery(con, "SELECT last_complete_cfb_season FROM _meta")[[1]]
+risk <- eligible_risk_set(collect(tbl(con, "outcomes")))
+```
+
+```{r}
+#| label: figure
+cast <- running_cast()
+bin_breaks <- c(-1, 0, 4, 8, 12, 17)
+bin_names <- c("None", "1 to 4", "5 to 8", "9 to 12", "13 to 17")
+ex_games <- risk |>
+  filter(playerId %in% cast, outcome_nfl_entry_d, draft_year <= .env$last_rookie_class) |>
+  transmute(
+    short = names(cast)[match(playerId, cast)],
+    games = outcome_rookie_games_entry_year,
+    bin = cut(games, bin_breaks, labels = bin_names)
+  )
+bin_labels <- vapply(
+  bin_names,
+  \(b) {
+    who <- ex_games$short[ex_games$bin == b]
+    if (length(who)) sprintf("%s (%s)", b, paste(who, collapse = ", ")) else b
+  },
+  character(1)
+)
+entrants <- risk |>
+  filter(outcome_nfl_entry_d, draft_year <= .env$last_rookie_class) |>
+  mutate(
+    games = outcome_rookie_games_entry_year,
+    bin = cut(games, breaks = bin_breaks, labels = bin_labels)
+  )
+games_tab <- entrants |>
+  count(bin, name = "n") |>
+  mutate(
+    share = n / sum(n),
+    none = bin == bin_labels[1],
+    bin = factor(bin, levels = rev(levels(bin)))
+  )
+
+p <- ggplot(games_tab, aes(x = 100 * share, y = bin)) +
+  geom_col_interactive(
+    aes(
+      fill = none,
+      tooltip = sprintf("%s games: %s entrants (%.1f%%)", bin, fmt(n), 100 * share),
+      data_id = bin
+    ),
+    width = 0.7
+  ) +
+  geom_text(aes(label = sprintf("%.1f%%", 100 * share)), hjust = -0.1, size = 5.5) +
+  scale_fill_manual(values = c(`TRUE` = "#374151", `FALSE` = "grey65"), guide = "none") +
+  expand_limits(x = 100 * max(games_tab$share) + 18) +
+  scale_x_continuous(labels = \(x) sprintf("%.0f%%", x)) +
+  labs(
+    title = "Rookie-season games played by NFL entrants",
+    subtitle = sprintf(
+      "Share of entrants by regular-season games in their entry year, draft classes through %d; running examples in parentheses",
+      last_rookie_class
+    ),
+    x = "Share of NFL entrants",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "rookie-games", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: by-route
+games_route <- entrants |>
+  mutate(route = if_else(outcome_drafted_d, "Drafted", "Undrafted free agent")) |>
+  count(route, games, name = "n") |>
+  group_by(route) |>
+  mutate(share = n / sum(n)) |>
+  ungroup()
+p_route <- ggplot(games_route, aes(games, 100 * share, fill = route)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf(
+        "%s, %d rookie games: %s entrants (%.1f%% of the route)",
+        route,
+        games,
+        fmt(n),
+        100 * share
+      ),
+      data_id = paste(route, games)
+    ),
+    position = position_dodge(preserve = "single"),
+    width = 0.85
+  ) +
+  scale_fill_manual(values = c(Drafted = "#1B9E77", `Undrafted free agent` = "#7570B3")) +
+  scale_x_continuous(breaks = seq(0, 17, 2)) +
+  labs(
+    title = "Rookie games played, by entry route",
+    subtitle = "Share of each route's entrants by regular-season games in the entry year",
+    x = "Rookie games played",
+    y = "Share of the route's entrants (%)",
+    fill = NULL,
+    caption = "Hover a bar for the count."
+  ) +
+  theme_cfb2nfl()
+card_interactive(p_route)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

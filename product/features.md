@@ -231,7 +231,8 @@ acceptance criteria.
     reviewer on the thumbnail alone; the card page carries no narrative
     prose beyond the question and its follow-ups.
   - [ ] Every term and method a card uses is defined on the card (in the
-    figure's subtitle or caption, or a definitions table under it), with
+    figure's subtitle or caption, a definitions table under it, or the
+    card's glossary footer from `inst/cards/terms.yml`), with
     reader-facing labels and no column names, and every card page passes
     the `site-personas` P1 walkthrough.
   - [ ] Every number in a card's title, subtitle, annotation or table is

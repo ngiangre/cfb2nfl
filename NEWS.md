@@ -1,6 +1,28 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
 - Investigations (feature F25,
+  [#133](https://github.com/ngiangre/cfb2nfl/issues/133)): **the first 14
+  figure cards are up**, every figure from the three draft-outcome posts
+  (outcome prevalence, drafted rate by position, how careers end), Data
+  sections included. Each card asks one question, carries its figure as a
+  thumbnail on the wall and as interactive figures on its page, and defines
+  its terms from a shared glossary (`inst/cards/terms.yml`) printed in its
+  footer. The outcome-ledger card **graduated** to a new "What we know"
+  section of the Analysis page, drawn by the tested `plot_outcome_ledger()`
+  and linking back. `inst/cards/migration.yml` records where every section
+  of those posts went; the posts stay up until the card rules are adopted.
+  Shared builders behind the cards: `eligible_risk_set()`,
+  `add_position_group()`, `outcome_ledger()`, `running_cast()`,
+  `label_endings()`, `ending_palette()`, `route_incidence()`,
+  `thin_position_groups()`; `card_thumbnail()` now wraps long figure titles
+  to the tile, and `position_palette()` / `scale_colour_position()` give
+  every position group one colour across cards (drafted green, undrafted
+  purple and quarterback orange are reserved). Two cards correct their
+  post: rookie games count only completed rookie seasons, and the era
+  split of the NFL-entry chance separates the classes before undrafted
+  signings were recorded.
+
+- Investigations (feature F25,
   [#132](https://github.com/ngiangre/cfb2nfl/issues/132)): **the
   Investigations page now opens with a wall of figure cards**, a grid of
   tiles (question, thumbnail, status, tags) that a fan can search, including

@@ -1,0 +1,131 @@
+---
+title: "At which positions do NFL entrants mostly arrive undrafted?"
+image: card-thumbs/undrafted-share-by-position.png
+image-alt: "Bar chart of the share of each position group's NFL entrants who arrived as undrafted free agents, with a dashed line at half; quarterbacks, highlighted orange, are the only group below half, and every other group is mostly undrafted."
+categories: ["Topic: Draft outcomes", "Position: By position group", "Position: Quarterback", "Population: Draft-eligible seasons", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [eligible-season, known-outcome, position-group, nfl-entry, signed-undrafted, drafted, draft-class]
+followups:
+  - text: "How do undrafted entrants' NFL careers compare with drafted ones at the same position?"
+    link: "F19"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+risk <- eligible_risk_set(collect(tbl(con, "outcomes"))) |>
+  add_position_group(collect(select(tbl(con, "roster"), playerId, season, position))) |>
+  filter(group != "Position not recorded")
+```
+
+```{r}
+#| label: figure
+udfa <- risk |>
+  filter(outcome_nfl_entry_d) |>
+  group_by(group) |>
+  summarise(entrants = n(), udfa = sum(outcome_signed_udfa_d), .groups = "drop") |>
+  mutate(share = udfa / entrants) |>
+  arrange(desc(share)) |>
+  mutate(
+    group_f = factor(group, levels = rev(group)),
+    route = if_else(share < 0.5, "Mostly drafted", "Mostly undrafted")
+  )
+
+p <- ggplot(udfa, aes(100 * share, group_f)) +
+  geom_vline(xintercept = 50, linetype = "dashed", colour = "grey60") +
+  geom_col_interactive(
+    aes(
+      fill = route,
+      tooltip = sprintf(
+        "%s: %s of %s entrants arrived undrafted (%.1f%%)",
+        group, fmt(udfa), fmt(entrants), 100 * share
+      ),
+      data_id = group
+    ),
+    width = 0.7
+  ) +
+  geom_text(aes(x = 100 * share - 1, label = pct(share)), hjust = 1, colour = "white", size = 5.5) +
+  scale_x_continuous(
+    labels = \(x) sprintf("%.0f%%", x),
+    limits = c(0, 100),
+    expand = expansion(mult = c(0, 0.04))
+  ) +
+  scale_fill_manual(
+    values = c("Mostly drafted" = "#D95F02", "Mostly undrafted" = "#7570B3"),
+    guide = "none"
+  ) +
+  labs(
+    title = "Undrafted share of NFL entrants by position group",
+    subtitle = "Share of each group's entrants who arrived undrafted; quarterbacks in orange, the only group under half",
+    x = "NFL entrants who arrived undrafted",
+    y = NULL,
+    fill = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "undrafted-share-by-position", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: by-class
+udfa_class <- risk |>
+  filter(outcome_nfl_entry_d) |>
+  group_by(group, draft_year) |>
+  summarise(entrants = n(), udfa = sum(outcome_signed_udfa_d), .groups = "drop") |>
+  mutate(share = udfa / entrants)
+p_class <- ggplot(udfa_class, aes(draft_year, 100 * share, colour = group)) +
+  geom_hline(yintercept = 50, linetype = "dashed", colour = "grey50") +
+  geom_line_interactive(aes(data_id = group, tooltip = group), linewidth = 1.1) +
+  geom_point_interactive(
+    aes(
+      data_id = group,
+      tooltip = sprintf(
+        "%s, %d class: %d of %d entrants undrafted (%.0f%%)",
+        group, draft_year, udfa, entrants, 100 * share
+      )
+    ),
+    size = 2.2
+  ) +
+  scale_colour_position() +
+  scale_x_continuous(breaks = seq(min(risk$draft_year), max(risk$draft_year), 2)) +
+  labs(
+    title = "Undrafted share by position group and draft class",
+    subtitle = "Share of NFL entrants who arrived undrafted",
+    x = "Draft class",
+    y = "Entrants undrafted (%)",
+    colour = NULL,
+    caption = "Dashed line: half of entrants. Small groups swing widely; hover a point for the counts."
+  ) +
+  theme_cfb2nfl() +
+  theme(legend.position = "right")
+card_interactive(p_class)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

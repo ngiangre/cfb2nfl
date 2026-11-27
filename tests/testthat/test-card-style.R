@@ -11,6 +11,7 @@ good_card_lines <- function(id = "demo") {
     'categories: ["Topic: Draft outcomes", "Position: All positions", "Question: Draft chance by position"]',
     "status: sketch",
     "graduated_to: null",
+    "terms: [eligible-season]",
     "followups:",
     '  - text: "Does the order change by tier?"',
     '    link: "Question: Draft chance by position"',
@@ -65,6 +66,14 @@ local_card_root <- function(env = parent.frame()) {
       '  reason: "CFBD lists head coaches only."'
     ),
     file.path(root, "inst", "cards", "questions.yml")
+  )
+  writeLines(
+    c(
+      "eligible-season:",
+      "  label: Eligible season",
+      '  definition: "A college season after which the player could be drafted."'
+    ),
+    file.path(root, "inst", "cards", "terms.yml")
   )
   writeLines(
     c("### F17 · Per-position draft forecast", "### F25 · Cards"),
@@ -185,6 +194,20 @@ test_that("tags must be approved and question tags registered", {
     )
   )
   expect_true("question_tag" %in% card_rules(root, p))
+})
+
+test_that("terms must come from the glossary", {
+  skip_if_not_installed("ggplot2")
+  root <- local_card_root()
+  p <- write_good_card(
+    root,
+    edit_lines(
+      good_card_lines(),
+      "terms: \\[eligible-season\\]",
+      "terms: [hazard]"
+    )
+  )
+  expect_true("terms" %in% card_rules(root, p))
 })
 
 test_that("every follow-up links to a registered question or a feature", {
@@ -424,6 +447,12 @@ test_that("card_footer shows the release date, question status and linked follow
   expect_match(out, "CFBD lists head coaches only.", fixed = TRUE, all = FALSE)
   expect_match(out, "#category=", fixed = TRUE, all = FALSE)
   expect_match(out, "features.md", fixed = TRUE, all = FALSE)
+  expect_match(
+    out,
+    "A college season after which the player could be drafted.",
+    fixed = TRUE,
+    all = FALSE
+  )
 })
 
 test_that("every card in vignettes/ follows the style", {

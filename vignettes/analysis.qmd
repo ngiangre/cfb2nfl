@@ -9,6 +9,50 @@ vignette: >
 Write-ups and notes. We start by **describing** who gets drafted, then explore
 associations, then build and honestly evaluate forecasts.
 
+## What we know {#what-we-know}
+
+Figures that started as an Investigations card and became a standing answer.
+Each links back to the card it came from, where its code and terms are.
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+risk <- eligible_risk_set(dplyr::collect(dplyr::tbl(con, "outcomes")))
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
+
+### How often eligible seasons end in the NFL {#how-often-eligible-seasons-end-in-the-nfl}
+
+Out of every hundred draft-eligible college seasons, about
+`r round(100 * mean(risk$outcome_drafted_d))` end in a draft pick and about
+`r round(100 * mean(risk$outcome_nfl_entry_d))` in the NFL by either route.
+From the card [How often does an eligible college season end in the draft or
+the NFL?](card-outcome-ledger.html).
+
+```{r}
+#| label: outcome-ledger
+p <- plot_outcome_ledger(outcome_ledger(risk)) +
+  ggplot2::labs(
+    title = "Share of eligible seasons ending in each NFL outcome",
+    subtitle = "Eligible player-seasons with a known outcome",
+    x = "Share of eligible seasons",
+    y = NULL
+  ) +
+  theme_cfb2nfl()
+card_interactive(p, height_svg = 5)
+```
+
 ## Building the foundation first
 
 Before fitting a single model, we built the scaffolding that makes results

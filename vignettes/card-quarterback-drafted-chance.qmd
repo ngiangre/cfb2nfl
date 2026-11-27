@@ -1,0 +1,198 @@
+---
+title: "What are a quarterback's odds of being drafted each year he stays in school?"
+image: card-thumbs/quarterback-drafted-chance.png
+image-alt: "Bar chart of quarterbacks' per-season chance of being drafted in each eligible season, each bar labelled with the quarterbacks drafted out of those still in college going in; the chance rises from the first eligible season to the third, and the last season rests on too few quarterbacks to read alone."
+categories: ["Topic: Draft outcomes", "Topic: Career shape", "Position: Quarterback", "Population: Draft-eligible players", "Figure: Bar chart", "Question: Draft chance by position"]
+status: investigation
+graduated_to: null
+terms: [career-eligible-season, at-risk, per-season-chance, career-drafted, career-signed-undrafted, eligibility-ended, career-still-playing, first-eligible-position]
+followups:
+  - text: "Forecast every quarterback still playing before the next draft, then score it once the draft is known."
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+outcomes <- DBI::dbReadTable(con, "outcomes")
+roster_pos <- DBI::dbGetQuery(
+  con,
+  "SELECT playerId, season, any_value(position) AS position FROM roster GROUP BY playerId, season"
+)
+endings <- career_endings(outcomes, roster_pos) |> label_endings()
+state_fill <- ending_palette()
+min_curve <- 30
+# Seasons resting on fewer players are drawn grey: too few to read alone.
+min_solid <- 100
+```
+
+```{r}
+#| label: figure
+qb_steps <- ending_hazards(endings) |>
+  filter(group == "Quarterback", ending == "drafted", at_risk >= min_curve) |>
+  transmute(time, at_risk, drafted = events, chance = hazard, solid = at_risk >= min_solid)
+
+p <- ggplot(qb_steps, aes(factor(time), 100 * chance)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf(
+        "Season %d: %s of %s quarterbacks at risk drafted (%s)",
+        time, fmt(drafted), fmt(at_risk), pct(chance)
+      ),
+      data_id = time,
+      fill = solid
+    ),
+    width = 0.65
+  ) +
+  scale_fill_manual(values = c(`TRUE` = state_fill[["Drafted"]], `FALSE` = "grey75"), guide = "none") +
+  geom_text(
+    aes(label = sprintf("%s / %s\n= %s", fmt(drafted), fmt(at_risk), pct(chance))),
+    vjust = -0.2,
+    size = 5,
+    lineheight = 0.95
+  ) +
+  scale_y_continuous(labels = \(x) paste0(x, "%"), expand = expansion(mult = c(0, 0.3))) +
+  labs(
+    title = "Quarterbacks' per-season chance of being drafted",
+    subtitle = sprintf(
+      "Drafted that season out of the quarterbacks still in college going in; grey where fewer than %d",
+      min_solid
+    ),
+    x = "Eligible season",
+    y = "Chance that season",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "quarterback-drafted-chance", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: risk-set-flow
+# Each quarterback's state going into every eligible season: still playing
+# (at risk) while his clock has not passed his last season, then the way his
+# career ended, carried forward.
+qb_last <- max(qb_steps$time)
+flow_lab <- c(
+  playing = "Playing",
+  drafted = "Drafted",
+  signed_udfa = "Signed undrafted",
+  left_data = "Left the data",
+  censored = "Still playing (censored)",
+  exhausted_undrafted = "Eligibility ended, undrafted"
+)
+flow_colour <- c(
+  playing = "#374151",
+  drafted = state_fill[["Drafted"]],
+  signed_udfa = state_fill[["Signed undrafted"]],
+  exhausted_undrafted = state_fill[["Eligibility ended, undrafted"]],
+  left_data = state_fill[["Left the data"]],
+  censored = "#C4C8CE"
+)
+qb_states <- endings |>
+  filter(group == "Quarterback", time > 0) |>
+  select(playerId, time, ending) |>
+  tidyr::expand_grid(axis = seq_len(qb_last + 1)) |>
+  mutate(state = if_else(time >= axis, "playing", ending))
+qb_links <- qb_states |>
+  mutate(to = lead(state), .by = "playerId") |>
+  filter(axis <= qb_last) |>
+  count(axis, from = state, to) |>
+  mutate(at_risk = sum(n[from == "playing"]), .by = "axis")
+qb_nodes <- qb_states |>
+  count(axis, state) |>
+  mutate(state = factor(state, names(flow_lab))) |>
+  arrange(axis, state) |>
+  mutate(id = row_number() - 1L) |>
+  mutate(y = (cumsum(n) - n / 2) / sum(n) * 0.9 + 0.05, .by = "axis") |>
+  mutate(
+    x = (axis - 1) / qb_last * 0.98 + 0.01,
+    hover = sprintf(
+      "%s %s, %s",
+      fmt(n),
+      tolower(flow_lab[state]),
+      if_else(axis > qb_last, sprintf("after season %d", qb_last), sprintf("going into season %d", axis))
+    )
+  )
+node_id <- function(axis, state) {
+  qb_nodes$id[match(paste(axis, state), paste(qb_nodes$axis, qb_nodes$state))]
+}
+qb_links <- qb_links |>
+  mutate(
+    source = node_id(axis, from),
+    target = node_id(axis + 1L, to),
+    hover = case_when(
+      from == "playing" & to == "playing" ~ sprintf("Season %d: %s of %s at risk played again the next season", axis, fmt(n), fmt(at_risk)),
+      from == "playing" ~ sprintf("Season %d: %s of %s at risk (%s): %s", axis, fmt(n), fmt(at_risk), pct(n / at_risk), tolower(flow_lab[to])),
+      TRUE ~ sprintf("%s %s before season %d", fmt(n), tolower(flow_lab[from]), axis + 1L)
+    ),
+    colour = paste0(
+      flow_colour[if_else(from == "playing", to, from)],
+      case_when(to == "playing" ~ "B3", to == "exhausted_undrafted" ~ "4D", TRUE ~ "99")
+    )
+  )
+plotly::plot_ly(
+  type = "sankey",
+  arrangement = "fixed",
+  node = list(
+    label = if_else(qb_nodes$axis > qb_last, unname(flow_lab[as.character(qb_nodes$state)]), ""),
+    x = qb_nodes$x,
+    y = qb_nodes$y,
+    color = unname(flow_colour[as.character(qb_nodes$state)]),
+    customdata = qb_nodes$hover,
+    hovertemplate = "%{customdata}<extra></extra>",
+    pad = 12,
+    thickness = 18,
+    line = list(width = 0)
+  ),
+  link = list(
+    source = qb_links$source,
+    target = qb_links$target,
+    value = qb_links$n,
+    color = qb_links$colour,
+    customdata = qb_links$hover,
+    hovertemplate = "%{customdata}<extra></extra>"
+  ),
+  height = 560
+) |>
+  plotly::layout(
+    title = list(
+      text = paste0(
+        "<b>How quarterbacks' college careers end, season by season</b><br>",
+        "<span style='font-size:15px;color:#4B5563'>Quarterbacks still playing ",
+        "(dark) flow into the next season or out to an ending; hover a flow for its count</span>"
+      ),
+      x = 0.01,
+      font = list(size = 20)
+    ),
+    font = list(size = 15),
+    margin = list(t = 110, b = 30, l = 30, r = 30)
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

@@ -31,7 +31,7 @@ whole-file rules), \code{rule}, \code{severity} and \code{message}.
 Reads a \verb{vignettes/card-<id>.qmd} and reports every rule it breaks: the
 front matter (a question as the title, the thumbnail path for its id,
 searchable alt text, a status, \code{graduated_to} once graduated), approved
-and registered tags, follow-ups linked to a question or a feature, a
+and registered tags, glossary terms, follow-ups linked to a question or a feature, a
 thumbnail that is present and fresh, an interactive figure, the release
 date drawn in, data read from \code{cfb2nfl.duckdb}, figure text with no typed
 numbers or column names, captioned tables with reader-facing headers, no

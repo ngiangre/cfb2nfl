@@ -1,0 +1,133 @@
+---
+title: "Which positions are drafted most often?"
+image: card-thumbs/drafted-rate-by-position.png
+image-alt: "Bar chart of the share of draft-eligible college seasons ending in a draft pick for each of nine position groups, with confidence intervals; the three leading groups are highlighted dark grey and quarterbacks orange in the middle of the table, and the leaders' intervals overlap."
+categories: ["Topic: Draft outcomes", "Position: By position group", "Position: Quarterback", "Population: Draft-eligible seasons", "Figure: Bar chart", "Question: Draft chance by position"]
+status: investigation
+graduated_to: null
+terms: [eligible-season, known-outcome, position-group, drafted, confidence-interval, draft-class]
+followups:
+  - text: "After each season, what is a player's chance of being drafted at his position, from what is known by then?"
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+risk <- eligible_risk_set(collect(tbl(con, "outcomes"))) |>
+  add_position_group(collect(select(tbl(con, "roster"), playerId, season, position))) |>
+  filter(group != "Position not recorded")
+```
+
+```{r}
+#| label: figure
+rates <- risk |>
+  group_by(group) |>
+  summarise(seasons = n(), drafted_ev = sum(outcome_drafted_d), .groups = "drop") |>
+  mutate(
+    drafted = drafted_ev / seasons,
+    lo = 100 * vapply(seq_along(seasons), \(i) wilson(drafted_ev[i], seasons[i])[["lo"]], numeric(1)),
+    hi = 100 * vapply(seq_along(seasons), \(i) wilson(drafted_ev[i], seasons[i])[["hi"]], numeric(1))
+  ) |>
+  arrange(desc(drafted)) |>
+  mutate(
+    group_f = factor(group, levels = rev(group)),
+    role = case_when(
+      row_number() <= 3 ~ "Leading three",
+      group == "Quarterback" ~ "Quarterback",
+      TRUE ~ "Other groups"
+    )
+  )
+
+p <- ggplot(rates, aes(100 * drafted, group_f)) +
+  geom_col_interactive(
+    aes(
+      fill = role,
+      tooltip = sprintf(
+        "%s: %.1f%% drafted (%s of %s eligible seasons; 95%% CI %.1f%% to %.1f%%)",
+        group, 100 * drafted, fmt(drafted_ev), fmt(seasons), lo, hi
+      ),
+      data_id = group
+    ),
+    width = 0.7
+  ) +
+  geom_linerange(aes(xmin = lo, xmax = hi), linewidth = 0.8) +
+  geom_text(aes(x = hi + 0.1, label = pct(drafted)), hjust = 0, size = 5.5) +
+  expand_limits(x = max(rates$hi) + 1.2) +
+  scale_x_continuous(labels = \(x) sprintf("%.0f%%", x), expand = expansion(mult = c(0, 0.02))) +
+  scale_fill_manual(
+    values = c("Leading three" = "#374151", Quarterback = "#D95F02", "Other groups" = "grey65"),
+    guide = "none"
+  ) +
+  labs(
+    title = "Drafted rate by position group",
+    subtitle = "Leading three in dark grey, quarterbacks in orange; lines are confidence intervals, which overlap at the top",
+    x = "Eligible seasons drafted",
+    y = NULL,
+    fill = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "drafted-rate-by-position", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: by-class
+rate_class <- risk |>
+  group_by(group, draft_year) |>
+  summarise(seasons = n(), drafted_ev = sum(outcome_drafted_d), .groups = "drop") |>
+  mutate(drafted = drafted_ev / seasons)
+p_class <- ggplot(rate_class, aes(draft_year, 100 * drafted, colour = group)) +
+  geom_line_interactive(aes(data_id = group, tooltip = group), linewidth = 1.1) +
+  geom_point_interactive(
+    aes(
+      data_id = group,
+      tooltip = sprintf(
+        "%s, %d class: %.1f%% drafted (%s of %s eligible seasons)",
+        group, draft_year, 100 * drafted, fmt(drafted_ev), fmt(seasons)
+      )
+    ),
+    size = 2.2
+  ) +
+  scale_colour_position() +
+  scale_x_continuous(breaks = seq(min(risk$draft_year), max(risk$draft_year), 2)) +
+  labs(
+    title = "Drafted rate by position group and draft class",
+    subtitle = "Share of eligible seasons ending in a draft pick",
+    x = "Draft class",
+    y = "Eligible seasons drafted (%)",
+    colour = NULL,
+    caption = "Hover a line to isolate a group; hover a point for the counts."
+  ) +
+  theme_cfb2nfl() +
+  theme(legend.position = "right")
+card_interactive(p_class)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

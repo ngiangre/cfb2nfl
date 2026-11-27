@@ -1,0 +1,126 @@
+---
+title: "Which positions' draft picks go in the first round most often?"
+image: card-thumbs/first-round-share-by-position.png
+image-alt: "Bar chart of the share of each position group's drafted seasons that were first-round picks; quarterbacks, highlighted orange, have the longest bar, well ahead of the other groups."
+categories: ["Topic: Draft outcomes", "Position: By position group", "Position: Quarterback", "Population: Draft picks", "Figure: Bar chart", "Question: Draft chance by position"]
+status: investigation
+graduated_to: null
+terms: [eligible-season, known-outcome, position-group, drafted]
+followups:
+  - text: "Do first-round quarterbacks last longer in the NFL than later picks?"
+    link: "F19"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+risk <- eligible_risk_set(collect(tbl(con, "outcomes"))) |>
+  add_position_group(collect(select(tbl(con, "roster"), playerId, season, position))) |>
+  filter(group != "Position not recorded")
+```
+
+```{r}
+#| label: figure
+round_mix <- risk |>
+  filter(outcome_drafted_d) |>
+  group_by(group) |>
+  summarise(drafted_seasons = n(), round1 = sum(outcome_draft_round_d == 1L), .groups = "drop") |>
+  mutate(round1_share = round1 / drafted_seasons) |>
+  arrange(desc(round1_share)) |>
+  mutate(group_f = factor(group, levels = rev(group)))
+
+p <- ggplot(round_mix, aes(100 * round1_share, group_f)) +
+  geom_col_interactive(
+    aes(
+      fill = group == "Quarterback",
+      tooltip = sprintf(
+        "%s: %d of %d drafted seasons in round 1 (%.1f%%)",
+        group, round1, drafted_seasons, 100 * round1_share
+      ),
+      data_id = group
+    ),
+    width = 0.7
+  ) +
+  geom_text(
+    aes(label = sprintf("%.1f%% (%d of %d)", 100 * round1_share, round1, drafted_seasons)),
+    hjust = -0.08,
+    size = 5.5
+  ) +
+  expand_limits(x = 100 * max(round_mix$round1_share) + 16) +
+  scale_x_continuous(labels = \(x) sprintf("%.0f%%", x), expand = expansion(mult = c(0, 0.02))) +
+  scale_fill_manual(values = c(`TRUE` = "#D95F02", `FALSE` = "grey65"), guide = "none") +
+  labs(
+    title = "First-round share by position group",
+    subtitle = "Share of each group's draft picks taken in the first round; quarterbacks in orange",
+    x = "Draft picks taken in the first round",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "first-round-share-by-position", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: round-mix
+round_dist <- risk |>
+  filter(outcome_drafted_d) |>
+  count(group, round = outcome_draft_round_d, name = "n") |>
+  group_by(group) |>
+  mutate(share = n / sum(n)) |>
+  ungroup() |>
+  mutate(
+    group = factor(group, levels = levels(round_mix$group_f)),
+    round = factor(round, levels = 7:1)
+  )
+p_dist <- ggplot(round_dist, aes(100 * share, group, fill = round)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf(
+        "%s, round %s: %d of the group's drafted seasons (%.1f%%)",
+        group, round, n, 100 * share
+      ),
+      data_id = paste(group, round)
+    ),
+    width = 0.7
+  ) +
+  scale_fill_brewer(palette = "YlGnBu", direction = -1, breaks = as.character(1:7)) +
+  scale_x_continuous(labels = \(x) sprintf("%.0f%%", x)) +
+  labs(
+    title = "Every position group's round mix",
+    subtitle = "Share of each group's drafted seasons by draft round",
+    x = "Share of drafted seasons",
+    y = NULL,
+    fill = "Round",
+    caption = "Hover a segment for the count."
+  ) +
+  theme_cfb2nfl()
+card_interactive(p_dist)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

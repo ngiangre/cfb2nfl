@@ -211,6 +211,29 @@ card_hashes <- function(
   )
 }
 
+#' Wrap a card figure's title and subtitle to the thumbnail's width
+#'
+#' At [theme_card()] sizes an 8-inch thumbnail fits about 40 title and 55
+#' subtitle characters per line; longer ones would run off the edge.
+#'
+#' @param p A ggplot.
+#' @param title_width,subtitle_width Characters per line.
+#' @return `p` with wrapped labels.
+#' @export
+card_label_wrap <- function(p, title_width = 40, subtitle_width = 55) {
+  wrap <- function(x, width) {
+    if (is.null(x) || !is.character(x)) {
+      return(x)
+    }
+    paste(strwrap(x, width), collapse = "\n")
+  }
+  p +
+    ggplot2::labs(
+      title = wrap(p$labels$title, title_width),
+      subtitle = wrap(p$labels$subtitle, subtitle_width)
+    )
+}
+
 #' Save a card's thumbnail and its freshness sidecar
 #'
 #' Writes `<dir>/<id>.png` and `<dir>/<id>.json`; the sidecar records a hash
@@ -244,7 +267,7 @@ card_thumbnail <- function(
   png <- file.path(dir, paste0(id, ".png"))
   ggplot2::ggsave(
     png,
-    p,
+    card_label_wrap(p),
     width = width,
     height = height,
     dpi = dpi,
@@ -321,10 +344,30 @@ card_freshness <- function(
 #' The interactive version of a card's figure
 #'
 #' @param p The card's ggplot, with `ggiraph` interactive layers for hover.
+#' @param width_svg,height_svg Figure size in inches.
 #' @param ... Passed to [ggiraph::girafe()].
 #' @return A `girafe` htmlwidget.
 #' @export
-card_interactive <- function(p, ...) {
+card_interactive <- function(p, width_svg = 11, height_svg = 6, ...) {
   rlang::check_installed("ggiraph")
-  ggiraph::girafe(ggobj = p, width_svg = 9, height_svg = 6, ...)
+  # The hover and tooltip styling the posts used.
+  options <- list(
+    ggiraph::opts_hover(
+      css = "stroke:#111827;stroke-width:2.5px;filter:brightness(1.12);"
+    ),
+    ggiraph::opts_hover_inv(css = "opacity:0.45;"),
+    ggiraph::opts_tooltip(
+      css = "background:#111827;color:#fff;padding:6px 9px;border-radius:5px;font-weight:bold;font-size:15px;"
+    ),
+    ggiraph::opts_zoom(min = 1, max = 5),
+    ggiraph::opts_toolbar(saveaspng = TRUE, position = "topright"),
+    ggiraph::opts_sizing(rescale = TRUE)
+  )
+  ggiraph::girafe(
+    ggobj = p,
+    width_svg = width_svg,
+    height_svg = height_svg,
+    options = options,
+    ...
+  )
 }

@@ -13,7 +13,9 @@ Topic:
   - NFL careers
 # The position groups the posts use (harmonized_position_levels()).
 Position:
+  # All positions: pooled; By position group: split into the groups below.
   - All positions
+  - By position group
   - Quarterback
   - Running back
   - Receiver
@@ -25,6 +27,7 @@ Position:
   - Special teams
 Population:
   - Draft-eligible seasons
+  - Draft-eligible players
   - Roster seasons
   - Stat-line seasons
   - Draft picks

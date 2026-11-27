@@ -16,7 +16,8 @@ One markdown string.
 }
 \description{
 Markdown for the bottom of a card: the data release it was rendered from,
-the status of each question it serves (with the reason when a question is
+the definitions of the terms it uses (\verb{terms:}, from the glossary), the
+status of each question it serves (with the reason when a question is
 not answerable), its follow-ups linked to the question's cards on the
 Investigations wall or to the feature that tracks them, and where the card
 graduated to. Print it from an \code{output: asis} chunk with \code{cat()}.
