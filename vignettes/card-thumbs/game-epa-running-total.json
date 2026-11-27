@@ -1,0 +1,17 @@
+{
+  "id": "game-epa-running-total",
+  "release": "2026-11-25",
+  "code_hash": "8542cf6cad133a3e7f5ad323aab29756",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "game_kick_types": "a20f17cac9e4ae865e69ca4ced7ae266",
+    "game_minutes": "53f610dc604220f20918fa672c199537",
+    "game_plays": "ded2e5472c7df05073b9ec585f3692fd",
+    "game_running": "55b6ef303eff6d557c6f84d729ba0f0d",
+    "game_scrimmage": "fc3707d831129c2f60fd6140cb0f7f3d",
+    "scale_color_team": "7766f9c98970a17917c0f47d119eb014",
+    "team_color_values": "81a321483d63e897ef3195d95350a746",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

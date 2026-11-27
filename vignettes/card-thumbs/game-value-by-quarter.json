@@ -1,0 +1,21 @@
+{
+  "id": "game-value-by-quarter",
+  "release": "2026-11-25",
+  "code_hash": "ec02d6ed701cef53c56ccada71282e7d",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "game_bands": "5c82b738232bfd5bc58ff4156c979085",
+    "game_def_td": "7945fa4317259d2603ba3bceb8882aa0",
+    "game_ep_at": "c7fbac8ea1f882dbc182e44896b37ce3",
+    "game_ep_fit": "274def657515f492e2b68a9550b6806c",
+    "game_epa_model": "8b912eea55b2b2cd513d912f2403a3c1",
+    "game_kick_types": "a20f17cac9e4ae865e69ca4ced7ae266",
+    "game_off_td": "b6a8764935770f6f45d11a6b8a7198b7",
+    "game_plays": "ded2e5472c7df05073b9ec585f3692fd",
+    "game_scrimmage": "fc3707d831129c2f60fd6140cb0f7f3d",
+    "scale_fill_team": "66b7b508d770d63fe22e556eefbdf323",
+    "team_color_values": "81a321483d63e897ef3195d95350a746",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

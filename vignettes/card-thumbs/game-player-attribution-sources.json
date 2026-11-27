@@ -1,0 +1,29 @@
+{
+  "id": "game-player-attribution-sources",
+  "release": "2026-11-25",
+  "code_hash": "8f4713e60fad5bd7c0077b7ea24ec04d",
+  "functions": {
+    "build_play_involvement": "d09387e1430e13c5018ce4e0be4e56b6",
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "game_def_td": "7945fa4317259d2603ba3bceb8882aa0",
+    "game_ep_at": "c7fbac8ea1f882dbc182e44896b37ce3",
+    "game_ep_fit": "274def657515f492e2b68a9550b6806c",
+    "game_epa_model": "8b912eea55b2b2cd513d912f2403a3c1",
+    "game_involvement": "b6cac9e5aac244e1e619523cfb28297b",
+    "game_kick_types": "a20f17cac9e4ae865e69ca4ced7ae266",
+    "game_off_td": "b6a8764935770f6f45d11a6b8a7198b7",
+    "game_plays": "ded2e5472c7df05073b9ec585f3692fd",
+    "game_scrimmage": "fc3707d831129c2f60fd6140cb0f7f3d",
+    "harmonize_position": "931d9b7daa25b80c9cd17abd32e7b3fd",
+    "log_role": "62b7388ecbed5c1764f6b9268ad53a73",
+    "match_play_mentions": "fa71a61f49fff925d29abd9679e13f6d",
+    "name_surname": "3d8228ef9f3a848df080add8d7433c26",
+    "play_text_mentions": "e55518f1e895be6ae046f97e701af7e2",
+    "position_code_map": "23e4bba7fd7da54066373fb8a9761c45",
+    "position_sources": "9adac2d8c4dfebfd2fbb956dee1f3a42",
+    "scale_color_team": "7766f9c98970a17917c0f47d119eb014",
+    "team_color_values": "81a321483d63e897ef3195d95350a746",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}
