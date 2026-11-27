@@ -45,8 +45,8 @@ library(purrr)
 library(htmltools)
 library(reactable)
 
-# Blog posts are dated vignettes (decision 0015); the table is built from the
-# files themselves so a new post appears just by adding YYYY-MM-DD-slug.qmd.
+# The dated posts still awaiting migration to cards (decision 0054); the table
+# is built from the files, so a post drops off once its batch retires it.
 post_files <- sort(
   list.files(
     file.path(root, "vignettes"),

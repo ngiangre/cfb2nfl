@@ -46,8 +46,8 @@ Phrase criteria as what the persona can do or see:
 
 ## Boundaries
 
-- Edits to fan-facing pages go through `fan-experience-improver`; dated posts
-  through the `vignette-reviewer` agent. This skill tells them who they are
+- Edits to fan-facing pages go through `fan-experience-improver`; figure
+  cards through the `vignette-reviewer` agent. This skill tells them who they are
   writing for.
 - A surface that serves neither persona, or a reader the personas do not
   describe: say so and ask the user whether `personas.md` should change.

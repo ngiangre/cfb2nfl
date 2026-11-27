@@ -1,5 +1,0 @@
-dependencies:
-  - name: girafe-css
-    version: 0.9.7
-    src: htmlwidgets
-    stylesheet: girafe.css

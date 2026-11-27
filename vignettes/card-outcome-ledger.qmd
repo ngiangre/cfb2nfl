@@ -1,5 +1,6 @@
 ---
 title: "How often does an eligible college season end in the draft or the NFL?"
+aliases: [2026-10-24-outcome-prevalence.html]
 image: card-thumbs/outcome-ledger.png
 image-alt: "Bar chart of the share of draft-eligible college seasons that end drafted, signed as an undrafted free agent, or in NFL entry by either route, each with a confidence interval; the highlighted draft bar is about three in every hundred seasons, and NFL entry by either route about seven."
 categories: ["Topic: Draft outcomes", "Position: All positions", "Population: Draft-eligible seasons", "Figure: Bar chart"]

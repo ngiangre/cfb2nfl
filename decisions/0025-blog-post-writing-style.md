@@ -1,6 +1,6 @@
 # 0025 — Blog post writing style: research-article register
 
-- **Status:** Accepted
+- **Status:** Superseded by 0054 (figure cards)
 - **Date:** 2026-10-16
 
 ## Context

@@ -1,7 +1,7 @@
 # Mechanical checks of figure cards (feature F25), the card scaffold and the
-# footer every card page shows. Like R/post_style.R, the checks run without
-# loading the package (the post-style CI job sources the files), so they read
-# the registries and R/ straight from the checkout.
+# footer every card page shows. The checks run without loading the package
+# (the post-style CI job sources the files), so they read the registries and
+# R/ straight from the checkout.
 
 card_status_values <- c("sketch", "investigation", "graduated")
 
