@@ -1,7 +1,7 @@
 {
   "id": "coach-draftees-by-school",
   "release": "2026-11-25",
-  "code_hash": "133c2a17df5c2cbd29800f175be84e07",
+  "code_hash": "18ddc2bfe3dbaa4f8de91259fe130e52",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
     "coach_draftee_links": "91e35d1a1b5e00c154f0a8c96e6fb94b",

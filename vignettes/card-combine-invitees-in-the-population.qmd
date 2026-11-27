@@ -1,12 +1,12 @@
 ---
-title: "Which combine invitees can be placed among draft-eligible players?"
+title: "How many combine invitees can we follow back to their college seasons?"
 image: card-thumbs/combine-invitees-in-the-population.png
-image-alt: "Horizontal stacked bars, one per position group, of combine invitees split by where they can be placed; the share in the draft-eligible population is shaded dark and the rest is grey, with the offensive line bar showing the largest grey share."
+image-alt: "Horizontal stacked bars, one per position group, of combine invitees split into draft-eligible population, linked outside the population, and no college id; the draft-eligible share is dark, the largest unlinked share is in the offensive line bar."
 categories: ["Topic: Combine", "Position: By position group", "Population: Combine invitees", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
 aliases: [2026-11-14-combine-measurables-funnel.html]
-terms: [combine, invitee]
+terms: [combine, invitee, draft-eligible-population, linked-outside-population, no-college-id, eligible-season]
 followups:
   - text: "Link more unmatched invitees, mostly offensive linemen without a stat line, through roster names and schools."
     link: "Question: What matters for going pro"
@@ -50,6 +50,12 @@ status_key <- c(
   outside_population = "Linked, outside the population",
   unmatched = "No college id"
 )
+combine_span <- paste0(
+  min(combine$season),
+  " to ",
+  max(combine$season),
+  " combines"
+)
 placed <- combine_funnel_status(combine, outcomes) |>
   count(position_group, funnel_status) |>
   mutate(status = factor(status_key[as.character(funnel_status)], status_levels))
@@ -67,21 +73,27 @@ p <- ggplot(placed, aes(n, forcats::fct_rev(position_group), fill = status)) +
   ) +
   scale_fill_manual(
     values = c(
-      `Draft-eligible population` = "#B45309",
+      `Draft-eligible population` = "#374151",
       `Linked, outside the population` = "#9CA3AF",
       `No college id` = "#D1D5DB"
     ),
+    labels = c("Draft-eligible", "Linked, outside", "Unlinked"),
     name = NULL
   ) +
   labs(
-    title = "Which combine invitees can be placed among draft-eligible players?",
-    subtitle = "Invitees by position group and where they can be placed",
+    title = "Invitees by position group and how they link to college seasons",
+    subtitle = paste0(
+      "Combines ",
+      combine_span,
+      "; invitees placed in the draft-eligible population, outside it, or unlinked"
+    ),
     x = "Invitees",
     y = NULL,
     caption = card_caption(release)
   ) +
   theme_card() +
-  theme(legend.position = "bottom")
+  theme(legend.position = "bottom") +
+  guides(fill = guide_legend(nrow = 1))
 
 card_thumbnail(p, "combine-invitees-in-the-population", release = release)
 card_interactive(p, width_svg = 13, height_svg = 7)
@@ -109,7 +121,10 @@ p_share <- ggplot(share_placed, aes(100 * share, position_group)) +
   scale_x_continuous(labels = function(x) sprintf("%.0f%%", x), limits = c(0, 100)) +
   labs(
     title = "How much of each position group can be placed in the population?",
-    subtitle = "Share of invitees placed among draft-eligible players",
+    subtitle = paste0(
+      "Share of invitees placed among draft-eligible players, ",
+      combine_span
+    ),
     x = "Share of invitees",
     y = NULL,
     caption = card_caption(release)

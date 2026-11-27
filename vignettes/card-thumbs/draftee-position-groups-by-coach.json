@@ -1,7 +1,7 @@
 {
   "id": "draftee-position-groups-by-coach",
   "release": "2026-11-25",
-  "code_hash": "cef6eb88dba70754642eeeb11e49fd03",
+  "code_hash": "194a83479ce7d1b3aa2508ae27cc21ae",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
     "coach_draftee_links": "91e35d1a1b5e00c154f0a8c96e6fb94b",

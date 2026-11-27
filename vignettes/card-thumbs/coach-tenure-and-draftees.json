@@ -1,7 +1,7 @@
 {
   "id": "coach-tenure-and-draftees",
   "release": "2026-11-25",
-  "code_hash": "8e45c0b46cd3d0d5ac7301edb7b0136e",
+  "code_hash": "b5def7e3cfc876939cf46e9cd0023c32",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
     "coach_draftee_links": "91e35d1a1b5e00c154f0a8c96e6fb94b",

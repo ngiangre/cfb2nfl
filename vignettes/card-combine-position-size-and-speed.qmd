@@ -1,8 +1,8 @@
 ---
 title: "Do any two position groups share a middle half on weight and the forty-yard dash?"
 image: card-thumbs/combine-position-size-and-speed.png
-image-alt: "Rectangles on a weight and forty-yard-dash plane, one per position group, each spanning that group's middle half; most rectangles sit apart, and the groups whose rectangles overlap are outlined in the highlight colour."
-categories: ["Topic: Combine", "Position: By position group", "Population: Combine invitees", "Figure: Distribution", "Question: What matters for going pro"]
+image-alt: "Rectangles on a weight and forty-yard-dash plane, one per position group and labelled with its name, each spanning that group's middle half; most rectangles sit apart, and the groups whose rectangles overlap are outlined in dark grey."
+categories: ["Topic: Combine", "Position: By position group", "Population: Combine invitees", "Figure: Distribution"]
 status: investigation
 graduated_to: null
 terms: [combine, invitee, middle-half]
@@ -35,10 +35,12 @@ release <- data_release_date()
 pos_levels <- position_group_levels()
 combine <- DBI::dbReadTable(con, "combine") |>
   mutate(position_group = factor(combine_position_group(pos), pos_levels))
+combine_years <- range(combine$season)
+combine_span <- paste0(combine_years[1], " to ", combine_years[2], " combines")
 measures <- explorer_combine_measures()
 # Special teams invitees rarely run the 40, so separation compares the other eight.
 sep_levels <- setdiff(pos_levels, "Special teams")
-claim_fill <- "#B45309"
+claim_fill <- "#374151"
 context_fill <- "#9CA3AF"
 q <- function(x, p) unname(stats::quantile(x, p, na.rm = TRUE))
 
@@ -97,11 +99,26 @@ p <- boxes |>
     alpha = 0.35,
     linewidth = 1.3
   ) +
-  scale_fill_viridis_d(option = "D", end = 0.9, guide = "none") +
-  scale_colour_manual(values = c(`FALSE` = "#6B7280", `TRUE` = claim_fill), guide = "none") +
+  geom_text(
+    aes(
+      x = (lo_weight + hi_weight) / 2,
+      y = (lo_forty + hi_forty) / 2,
+      label = position_group
+    ),
+    colour = "#111827",
+    fontface = "bold",
+    size = 4,
+    check_overlap = TRUE
+  ) +
+  scale_fill_manual(values = position_palette(), guide = "none") +
+  scale_colour_manual(values = c(`FALSE` = context_fill, `TRUE` = claim_fill), guide = "none") +
   labs(
     title = "Do any two position groups share a middle half on weight and the forty-yard dash?",
-    subtitle = "Each box spans a position group's middle half; overlapping groups are outlined",
+    subtitle = paste0(
+      "Boxes span each group's middle half, ",
+      combine_span,
+      "; overlapping groups in dark grey"
+    ),
     x = "Weight (lb)",
     y = "Forty-yard dash (s)",
     caption = card_caption(release)
@@ -133,7 +150,7 @@ p_points <- ggplot(points, aes(weight, forty, colour = position_group)) +
     size = 1.8,
     alpha = 0.6
   ) +
-  scale_colour_viridis_d(option = "D", end = 0.9) +
+  scale_colour_position() +
   labs(
     title = "Every invitee's weight and forty-yard dash",
     subtitle = "Each point is one invitee with both measurables recorded",

@@ -41,12 +41,21 @@ coaches <- DBI::dbReadTable(con, "coaches")
 teams <- DBI::dbReadTable(con, "teams")
 team_colors <- distinct(teams, team, color)
 # Last-school rule, 2014 classes on; a draftee counts once per coach and school.
+window_label <- "2014 classes on"
 pairs <- coach_draftee_links(picks, roster, coaches, "last", 2014L) |>
   distinct(year, overall, coach_id, coach_name, team)
 producers <- distinct(pairs, coach_id, coach_name)
-# Programs each producing coach ran in the coaches table.
+# Programs count only over the seasons that can feed a 2014-on class: from 2009
+# (a 2014 draftee's college seasons start about five years earlier) up to 2025,
+# since the season in progress cannot yet feed a draft.
+feed_from <- 2009L
+feed_to <- 2025L
 programs <- coaches |>
-  filter(coach_id %in% producers$coach_id) |>
+  filter(
+    coach_id %in% producers$coach_id,
+    season >= feed_from,
+    season <= feed_to
+  ) |>
   distinct(coach_id, school) |>
   count(coach_id, name = "n_programs")
 programs_table <- producers |>
@@ -96,7 +105,12 @@ p <- ggplot(mover_plot, aes(draftees, coach_name, group = team)) +
   scale_fill_identity() +
   labs(
     title = "Do multi-program head coaches' draftees split across schools or pile up at one?",
-    subtitle = "Draftees by school for head coaches who ran more than one program",
+    subtitle = paste0(
+      "Draftees by school for head coaches who ran more than one program, ",
+      "counted over the seasons that feed a ",
+      window_label,
+      " class"
+    ),
     x = "Draftees",
     y = NULL,
     caption = card_caption(release)

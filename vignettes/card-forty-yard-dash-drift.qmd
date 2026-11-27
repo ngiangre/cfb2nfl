@@ -1,8 +1,8 @@
 ---
 title: "Did the median forty-yard dash get faster at every position?"
 image: card-thumbs/forty-yard-dash-drift.png
-image-alt: "Arrows, one per position group, running from each position's median forty-yard-dash time in the first five combines to its median in the last five; the arrows point left, showing faster medians, and the position whose share running the drill fell most is highlighted."
-categories: ["Topic: Combine", "Position: By position group", "Population: Combine invitees", "Figure: Line chart", "Question: What matters for going pro"]
+image-alt: "Arrows, one per position group, running from each position's median forty-yard-dash time in the first five combines to its median in the last five; the arrows point left, showing faster medians, and the position whose median fell most is in dark grey."
+categories: ["Topic: Combine", "Position: By position group", "Population: Combine invitees", "Figure: Line chart"]
 status: investigation
 graduated_to: null
 terms: [combine, invitee, recorded-measurable]
@@ -36,12 +36,18 @@ pos_levels <- position_group_levels()
 combine <- DBI::dbReadTable(con, "combine") |>
   mutate(position_group = factor(combine_position_group(pos), pos_levels))
 combine_years <- range(combine$season)
+combine_span <- paste0(combine_years[1], " to ", combine_years[2], " combines")
 sep_levels <- setdiff(pos_levels, "Special teams")
-claim_fill <- "#B45309"
+claim_fill <- "#374151"
 context_fill <- "#9CA3AF"
-# The first five combines against the last five (the cancelled year is skipped).
-early_window <- combine_years[1]:(combine_years[1] + 4L)
-late_window <- (combine_years[2] - 4L):combine_years[2]
+# 2021 was cancelled, and its records are campus pro-day workouts (pro-day-year).
+pro_day_year <- 2021L
+# The first five combines against the last five, skipping the cancelled year.
+combine_seasons <- setdiff(sort(unique(combine$season)), pro_day_year)
+early_window <- head(combine_seasons, 5L)
+late_window <- tail(combine_seasons, 5L)
+early_label <- paste0(min(early_window), " to ", max(early_window))
+late_label <- paste0(min(late_window), " to ", max(late_window))
 
 drift <- combine |>
   filter(season %in% c(early_window, late_window), position_group %in% sep_levels) |>
@@ -54,8 +60,8 @@ drift <- combine |>
   ) |>
   tidyr::pivot_wider(names_from = window, values_from = c(forty, ran)) |>
   mutate(forty_change = forty_last - forty_first)
-# The position whose share running the forty fell the most is the highlight.
-fewest_ran <- drift |> slice_min(ran_last - ran_first, n = 1)
+# The position whose median time fell the most is the highlight.
+biggest_drop <- drift |> slice_min(forty_change, n = 1)
 medians_season <- combine |>
   filter(!is.na(forty), position_group %in% sep_levels) |>
   group_by(position_group, season) |>
@@ -66,7 +72,7 @@ medians_season <- combine |>
 #| label: figure
 p <- drift |>
   mutate(
-    is_claim = position_group == fewest_ran$position_group,
+    is_claim = position_group == biggest_drop$position_group,
     tip = sprintf(
       "%s: median %.2f s to %.2f s; ran the drill, %.0f%% to %.0f%%",
       position_group,
@@ -90,8 +96,14 @@ p <- drift |>
   scale_colour_manual(values = c(`FALSE` = context_fill, `TRUE` = claim_fill), guide = "none") +
   labs(
     title = "Did the median forty-yard dash get faster at every position?",
-    subtitle = "Arrows run from the first five combines' median to the last five's; the largest fall in running is highlighted",
-    x = "Median forty-yard dash (s)",
+    subtitle = paste0(
+      "Median in ",
+      early_label,
+      " to median in ",
+      late_label,
+      "; largest drop in dark grey"
+    ),
+    x = "Median forty (s); 2021 left out",
     y = NULL,
     caption = card_caption(release)
   ) +
@@ -108,14 +120,26 @@ p_season <- medians_season |>
     tip = sprintf("%s, %s: median %.2f s (%d invitees)", position_group, season, med, n)
   ) |>
   ggplot(aes(season, med, colour = position_group, group = position_group)) +
+  annotate(
+    "rect",
+    xmin = pro_day_year - 0.5,
+    xmax = pro_day_year + 0.5,
+    ymin = -Inf,
+    ymax = Inf,
+    fill = "grey90"
+  ) +
   geom_line(linewidth = 0.6) +
   geom_point_interactive(aes(tooltip = tip, data_id = paste(position_group, season)), size = 1.8) +
-  scale_colour_viridis_d(option = "D", end = 0.9) +
+  scale_colour_position() +
   scale_x_continuous(breaks = seq(combine_years[1], combine_years[2], 4)) +
   labs(
     title = "The median forty-yard dash, combine by combine",
-    subtitle = "One line per position group; a shorter time is faster",
-    x = "Combine year",
+    subtitle = paste0(
+      "One line per position group, ",
+      combine_span,
+      "; a shorter time is faster"
+    ),
+    x = "Combine year (shaded 2021: pro-day data)",
     y = "Median forty-yard dash (s)",
     colour = NULL,
     caption = card_caption(release)

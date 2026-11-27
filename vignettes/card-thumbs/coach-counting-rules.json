@@ -1,7 +1,7 @@
 {
   "id": "coach-counting-rules",
   "release": "2026-11-25",
-  "code_hash": "031fb9af448c106dcef5fb3d5972c634",
+  "code_hash": "26ff3091cb46e486756d45669d70b201",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
     "coach_draftee_links": "91e35d1a1b5e00c154f0a8c96e6fb94b",

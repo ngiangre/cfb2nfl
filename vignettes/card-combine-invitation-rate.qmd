@@ -1,10 +1,11 @@
 ---
 title: "What share of draft-eligible players does the combine invite each year?"
 image: card-thumbs/combine-invitation-rate.png
-image-alt: "Vertical bars of the share of draft-eligible seasons that were invited to the combine, one per draft year; every bar sits well under a dashed one-in-ten line, and the highest bar is highlighted."
-categories: ["Topic: Combine", "Position: All positions", "Population: Draft-eligible seasons", "Figure: Bar chart", "Question: What matters for going pro"]
+image-alt: "Vertical bars of the share of draft-eligible seasons that were invited to the combine, one per draft year; every bar sits well under a dashed one-in-ten line, and the highest bar is in dark grey."
+categories: ["Topic: Combine", "Position: All positions", "Population: Draft-eligible seasons", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
+aliases: [2026-11-14-combine-measurables-funnel.html]
 terms: [combine, invitee, invitation-rate, eligible-season]
 followups:
   - text: "Link more unmatched invitees, mostly offensive linemen without a stat line, through roster names and schools."
@@ -35,13 +36,21 @@ con <- DBI::dbConnect(
 )
 release <- data_release_date()
 pos_levels <- position_group_levels()
-claim_fill <- "#B45309"
+claim_fill <- "#374151"
 context_fill <- "#9CA3AF"
+# 2021 was cancelled, and its records are campus pro-day workouts (pro-day-year).
+pro_day_year <- 2021L
 combine <- DBI::dbReadTable(con, "combine") |>
   mutate(
     position_group = factor(combine_position_group(pos), pos_levels),
     drafted = !is.na(draft_round)
   )
+combine_span <- paste0(
+  min(combine$season),
+  " to ",
+  max(combine$season),
+  " combines"
+)
 outcomes <- DBI::dbReadTable(con, "outcomes")
 # One position per player-season (a handful of ids repeat within a season).
 roster_pos <- DBI::dbGetQuery(
@@ -86,16 +95,41 @@ p <- by_year |>
     )
   ) |>
   ggplot(aes(draft_year, 100 * invite_rate, fill = draft_year == invite_hi_year)) +
+  annotate(
+    "rect",
+    xmin = pro_day_year - 0.5,
+    xmax = pro_day_year + 0.5,
+    ymin = -Inf,
+    ymax = Inf,
+    fill = "grey90"
+  ) +
   geom_col_interactive(aes(tooltip = tip, data_id = draft_year), width = 0.75) +
   geom_hline(yintercept = 10, linetype = "dashed", colour = "#111827") +
+  annotate(
+    "text",
+    x = max(by_year$draft_year),
+    y = 10.4,
+    label = "One in ten",
+    hjust = 1,
+    colour = "#111827",
+    size = 4
+  ) +
   scale_fill_manual(values = c(`FALSE` = context_fill, `TRUE` = claim_fill), guide = "none") +
-  scale_y_continuous(labels = function(x) sprintf("%.0f%%", x), limits = c(0, 12)) +
+  scale_y_continuous(
+    labels = function(x) sprintf("%.0f%%", x),
+    breaks = seq(0, 12, 2),
+    limits = c(0, 12)
+  ) +
   scale_x_continuous(breaks = seq(min(by_year$draft_year), max(by_year$draft_year), 2)) +
   labs(
     title = "What share of draft-eligible players does the combine invite each year?",
-    subtitle = "Invitees among each draft year's draft-eligible seasons; the highest year is highlighted",
-    x = "Draft year",
-    y = "Eligible seasons invited",
+    subtitle = paste0(
+      "Invitees among draft-eligible seasons, ",
+      combine_span,
+      "; highest year in dark grey"
+    ),
+    x = "Draft year (shaded 2021: pro-day data)",
+    y = "Share invited",
     caption = card_caption(release)
   ) +
   theme_card()
@@ -118,16 +152,27 @@ p_pos <- by_pos_year |>
     )
   ) |>
   ggplot(aes(draft_year, invite_rate, colour = position_group, group = position_group)) +
+  annotate(
+    "rect",
+    xmin = pro_day_year - 0.5,
+    xmax = pro_day_year + 0.5,
+    ymin = -Inf,
+    ymax = Inf,
+    fill = "grey90"
+  ) +
   geom_line(linewidth = 0.6) +
   geom_point_interactive(aes(tooltip = tip, data_id = paste(position_group, draft_year)), size = 3) +
-  scale_colour_viridis_d(option = "D", end = 0.9) +
+  scale_colour_position() +
   scale_y_continuous(labels = scales::percent) +
   scale_x_continuous(breaks = seq(min(by_year$draft_year), max(by_year$draft_year), 2)) +
   labs(
     title = "Which position groups see the highest invitation rates?",
-    subtitle = "One line per position group, by the roster position in the eligible season",
-    x = "Draft year",
-    y = "Eligible seasons invited",
+    subtitle = paste0(
+      "One line per position group, by the roster position in the eligible season, ",
+      combine_span
+    ),
+    x = "Draft year (shaded 2021: pro-day data)",
+    y = "Share invited",
     colour = NULL,
     caption = card_caption(release)
   ) +

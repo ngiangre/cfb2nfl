@@ -1,7 +1,7 @@
 ---
-title: "Do head coaches who held the job longer produce more draftees?"
+title: "Are head coaches who held the job longer likelier to produce a draftee?"
 image: card-thumbs/coach-tenure-and-draftees.png
-image-alt: "Bar chart of the share of head coaches who produced a draftee in the 2014 and later classes, by how many seasons they coached from 2013 through 2025; the share rises from the one-season group to the seven-or-more group, with the one-season bar highlighted as the lowest."
+image-alt: "Bar chart of the share of head coaches who produced a draftee from the 2014 classes on, grouped by how many seasons they coached in the window; the share rises with tenure, from the shortest group to the longest."
 categories: ["Topic: Coaches", "Position: All positions", "Population: Head coaches", "Figure: Bar chart", "Question: Head coach effect"]
 status: investigation
 graduated_to: null
@@ -39,6 +39,8 @@ roster <- DBI::dbReadTable(con, "roster")
 coaches <- DBI::dbReadTable(con, "coaches")
 # Coaches are counted over 2013 to 2025 seasons, and a producer is a coach whose
 # draftee (last-school rule) is in a 2014 or later class.
+window_label <- "2014 classes on"
+tenure_window <- "2013 to 2025 seasons"
 links <- coach_draftee_links(picks, roster, coaches, "last", 2014L)
 producers <- unique(links$coach_id)
 ten <- coach_tenure(coaches, producers, from = 2013L, to = 2025L)
@@ -53,7 +55,6 @@ tab <- ten |>
 p <- ggplot(tab, aes(100 * share, tenure_bin)) +
   geom_col_interactive(
     aes(
-      fill = tenure_bin == "1 season",
       tooltip = sprintf(
         "%s: %d of %d coaches produced a draftee (%.0f%%)",
         tenure_bin, producers, coaches, 100 * share
@@ -67,17 +68,22 @@ p <- ggplot(tab, aes(100 * share, tenure_bin)) +
     hjust = -0.15,
     size = 4.4
   ) +
-  scale_fill_manual(values = c(`TRUE` = "#374151", `FALSE` = "#9CA3AF"), guide = "none") +
+  scale_fill_manual(values = c(`TRUE` = "#374151", `FALSE` = "#374151"), guide = "none") +
   scale_x_continuous(
     labels = function(x) sprintf("%.0f%%", x),
     breaks = seq(0, 100, 25),
     limits = c(0, 115)
   ) +
   labs(
-    title = "Longer-tenured coaches were likelier to produce a draftee",
-    subtitle = "Share of head coaches who produced a draftee, by seasons coached",
+    title = "Share of head coaches who produced a draftee, by seasons coached",
+    subtitle = paste0(
+      "Head coaches in the window ",
+      tenure_window,
+      "; draftees from the ",
+      window_label
+    ),
     x = "Coaches with at least one draftee",
-    y = NULL,
+    y = "Seasons coached",
     caption = card_caption(release)
   ) +
   theme_card()

@@ -1,7 +1,7 @@
 ---
 title: "Do the head coaches with the most draftees send the same position groups to the draft?"
 image: card-thumbs/top-coaches-position-mix.png
-image-alt: "Horizontal stacked bars of the position mix of the twelve head coaches with the most draftees, each bar a share of that coach's draftees, colored by position group; the mixes differ, with some bars mostly defensive backs and others mostly offensive linemen."
+image-alt: "Horizontal stacked bars of the position mix of the eight head coaches with the most draftees, with a pooled bar for all head coaches on top; each bar is a share of that coach's draftees, colored by position group, and the mixes differ from the pooled bar."
 categories: ["Topic: Coaches", "Position: By position group", "Population: Draft picks", "Figure: Bar chart", "Question: Head coach effect"]
 status: investigation
 graduated_to: null
@@ -37,27 +37,53 @@ release <- data_release_date()
 picks <- DBI::dbReadTable(con, "picks")
 roster <- DBI::dbReadTable(con, "roster")
 coaches <- DBI::dbReadTable(con, "coaches")
+window_label <- "2014 classes on"
 # Last-school rule, 2014 classes on; a draftee counts once per coach.
 pairs <- coach_draftee_links(picks, roster, coaches, "last", 2014L) |>
   filter(group %in% position_group_levels()) |>
   distinct(year, overall, coach_id, coach_name, group)
 totals <- pairs |>
   count(coach_id, coach_name, name = "n_total", sort = TRUE)
-top12 <- slice_head(totals, n = 12)
+top_n <- 8L
+top8 <- slice_head(totals, n = top_n)
+# Pooled mix over every head coach, the baseline the coaches are read against.
+baseline <- pairs |>
+  count(group, name = "n") |>
+  mutate(share = n / sum(n), coach_name = "All head coaches")
+group_order <- baseline |>
+  arrange(desc(share)) |>
+  pull(group)
 mix <- pairs |>
-  inner_join(select(top12, coach_id), by = "coach_id") |>
+  inner_join(select(top8, coach_id), by = "coach_id") |>
   count(coach_id, coach_name, group, name = "n") |>
-  left_join(top12, by = c("coach_id", "coach_name")) |>
+  left_join(top8, by = c("coach_id", "coach_name")) |>
+  mutate(share = n / n_total) |>
+  select(coach_id, coach_name, group, n, n_total, share)
+# The pooled bar sits on top; coaches follow in count order.
+bars <- bind_rows(
+  mix,
+  baseline |>
+    transmute(
+      coach_id = NA_integer_,
+      coach_name,
+      group,
+      n,
+      n_total = sum(n),
+      share
+    )
+) |>
   mutate(
-    share = n / n_total,
-    coach_name = reorder(coach_name, n_total),
-    group = factor(group, position_group_levels())
+    coach_name = factor(
+      coach_name,
+      c(rev(top8$coach_name), "All head coaches")
+    ),
+    group = factor(group, group_order)
   )
 ```
 
 ```{r}
 #| label: figure
-p <- ggplot(mix, aes(share, coach_name, fill = group)) +
+p <- ggplot(bars, aes(share, coach_name, fill = group)) +
   geom_col_interactive(
     aes(
       tooltip = sprintf(
@@ -72,17 +98,24 @@ p <- ggplot(mix, aes(share, coach_name, fill = group)) +
   scale_x_continuous(labels = function(x) sprintf("%.0f%%", 100 * x), expand = expansion(mult = c(0, 0.02))) +
   labs(
     title = "Which position groups do the top coaches' draftees come from?",
-    subtitle = "Share of each coach's draftees by position group",
+    subtitle = paste0(
+      "Share of each coach's draftees by position group, ",
+      window_label,
+      "; top ",
+      top_n,
+      " coaches against all head coaches"
+    ),
     x = "Share of the coach's draftees",
     y = NULL,
     fill = NULL,
     caption = card_caption(release)
   ) +
   theme_card() +
-  theme(legend.position = "bottom", legend.text = element_text(size = 10))
+  theme(legend.text = element_text(size = 11)) +
+  guides(fill = guide_legend(nrow = 3, byrow = TRUE))
 
 card_thumbnail(p, "top-coaches-position-mix", release = release)
-card_interactive(p, width_svg = 13, height_svg = 7)
+card_interactive(p, width_svg = 13, height_svg = 9)
 ```
 
 ```{r}
@@ -97,8 +130,8 @@ p_count <- ggplot(mix, aes(n, coach_name, fill = group)) +
   ) +
   scale_fill_manual(values = position_palette()) +
   labs(
-    title = "The same twelve coaches' draftee counts by position group",
-    subtitle = "Draftee-coach pairs, the twelve coaches with the most",
+    title = "The same top coaches' draftee counts by position group",
+    subtitle = paste0("Draftee-coach pairs, the top ", top_n, " coaches with the most"),
     x = "Draftee-coach pairs",
     y = NULL,
     fill = NULL,

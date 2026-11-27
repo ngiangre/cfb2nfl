@@ -1,7 +1,7 @@
 ---
-title: "Which position groups supply the most draftees to head coaches?"
+title: "Which position groups make up most of the draftees credited to head coaches?"
 image: card-thumbs/draftee-position-groups-by-coach.png
-image-alt: "Bar chart of the share of head-coach draftees from the 2014 and later classes in each of nine position groups, the two largest groups highlighted dark and the rest grey; the largest groups are receivers and defensive backs and the smallest is quarterbacks."
+image-alt: "Bar chart of the share of head-coach draftee-coach pairs in each of nine position groups, the two largest groups, defensive back and defensive line, highlighted dark and the rest grey; the smallest group is special teams."
 categories: ["Topic: Coaches", "Position: By position group", "Population: Draft picks", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
@@ -38,6 +38,7 @@ picks <- DBI::dbReadTable(con, "picks")
 roster <- DBI::dbReadTable(con, "roster")
 coaches <- DBI::dbReadTable(con, "coaches")
 # Last-school rule, 2014 classes on. One row per draftee-coach pair.
+window_label <- "2014 classes on"
 links <- coach_draftee_links(picks, roster, coaches, "last", 2014L) |>
   filter(group %in% position_group_levels())
 # A draftee counts once per coach, so pairs are the unit of the shares.
@@ -73,8 +74,12 @@ p <- ggplot(by_group, aes(100 * share, group)) +
   expand_limits(x = 100 * max(by_group$share) * 1.2) +
   scale_x_continuous(labels = function(x) sprintf("%.0f%%", x), expand = expansion(mult = c(0, 0.02))) +
   labs(
-    title = "Which position groups supply the most draftees to head coaches?",
-    subtitle = "Share of draftee-coach pairs by position group, the two largest in dark grey",
+    title = "Share of draftee-coach pairs by position group",
+    subtitle = paste0(
+      "Draftees of head coaches, ",
+      window_label,
+      "; the two largest groups in dark grey"
+    ),
     x = "Share of draftee-coach pairs",
     y = NULL,
     caption = card_caption(release)

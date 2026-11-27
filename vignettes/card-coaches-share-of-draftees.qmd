@@ -38,6 +38,7 @@ picks <- DBI::dbReadTable(con, "picks")
 roster <- DBI::dbReadTable(con, "roster")
 coaches <- DBI::dbReadTable(con, "coaches")
 # Last-school rule, 2014 classes on; a draftee counts once per coach.
+window_label <- "2014 classes on"
 pairs <- coach_draftee_links(picks, roster, coaches, "last", 2014L) |>
   distinct(year, overall, coach_id, coach_name)
 curve <- pairs |>
@@ -78,7 +79,11 @@ p <- ggplot(curve, aes(rank, 100 * cum_share)) +
   scale_y_continuous(labels = function(x) sprintf("%.0f%%", x), limits = c(0, 100)) +
   labs(
     title = "How much of recent draft output do the top head coaches account for?",
-    subtitle = "Cumulative share of draftees, coaches ranked by count",
+    subtitle = paste0(
+      "Recent means the ",
+      window_label,
+      "; cumulative share of draftee-coach pairs, coaches ranked by count"
+    ),
     x = "Coach rank (1 is the most draftees)",
     y = "Cumulative share",
     caption = card_caption(release)

@@ -1,7 +1,7 @@
 {
   "id": "invited-players-drafted-rate",
   "release": "2026-11-25",
-  "code_hash": "69a08b2aa3973d626055afd9649db2b5",
+  "code_hash": "fdea96e12c46c031639ae2122eb9ad8c",
   "functions": {
     "build_combine_funnel": "4fc51e5ffbdbf07026afa573ffb68113",
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",

@@ -2,8 +2,8 @@
 title: "Do the two ways of counting a draftee's coaches name the same coaches?"
 aliases: [2026-10-30-counting-coaches.html]
 image: card-thumbs/coach-counting-rules.png
-image-alt: "Line chart of the share of each draft class's picks that name the same coaches under the last-school rule and the every-season rule; the share falls from the first class shown, stays between roughly 40 and 65 percent from 2014 on, and is lowest in the newest class."
-categories: ["Topic: Coaches", "Position: All positions", "Population: Draft picks", "Figure: Line chart"]
+image-alt: "Line chart of the share of each draft class's picks whose coaches match under the last-school and every-season rules; the earlier classes are pale grey points near the top, and the 2014 and later line is dark, starting near half of picks and ending below 40%."
+categories: ["Topic: Coaches", "Position: All positions", "Population: Draft picks", "Figure: Line chart", "Question: Head coach effect"]
 status: investigation
 graduated_to: null
 terms: [last-school-rule, every-season-rule, coach-set, draftee-coach-pair, draft-class, head-coach]
@@ -38,9 +38,11 @@ release <- data_release_date()
 picks <- DBI::dbReadTable(con, "picks")
 roster <- DBI::dbReadTable(con, "roster")
 coaches <- DBI::dbReadTable(con, "coaches")
-# Both rules name the same coaches only when the sets match exactly.
+# Both rules name the same coaches only when the sets match exactly. Classes
+# before the window are kept, in grey, to show they agree by construction.
 first_class <- 2011L
 window_from <- 2014L
+window_label <- paste0(window_from, " classes on")
 links_last <- coach_draftee_links(picks, roster, coaches, "last", first_class)
 links_any <- coach_draftee_links(picks, roster, coaches, "any", first_class)
 ```
@@ -78,26 +80,35 @@ by_class <- overlap |>
     multi_school = mean(transferred, na.rm = TRUE),
     picks = n(),
     .groups = "drop"
-  )
-window_mean <- mean(by_class$same_set[by_class$year >= window_from])
+  ) |>
+  mutate(in_window = year >= window_from)
+window_mean <- mean(by_class$same_set[by_class$in_window])
 
 p <- ggplot(by_class, aes(year, same_set)) +
   geom_hline(yintercept = window_mean, linetype = "dashed", colour = "#374151", alpha = 0.6) +
-  geom_line_interactive(
-    aes(tooltip = sprintf("Draft class %d: %.0f%% of %s picks", year, 100 * same_set, fmt(picks)), data_id = "same", group = 1),
-    linewidth = 1.6,
-    colour = "#374151"
+  geom_line(
+    data = filter(by_class, in_window),
+    colour = "#374151",
+    linewidth = 1.6
   ) +
   geom_point_interactive(
-    aes(tooltip = sprintf("Draft class %d: %.0f%% of %s picks", year, 100 * same_set, fmt(picks)), data_id = year),
-    size = 3,
-    colour = "#374151"
+    aes(
+      colour = in_window,
+      tooltip = sprintf("Draft class %d: %.0f%% of %s picks", year, 100 * same_set, fmt(picks)),
+      data_id = year
+    ),
+    size = 3
   ) +
+  scale_colour_manual(values = c(`FALSE` = "#D1D5DB", `TRUE` = "#374151"), guide = "none") +
   scale_y_continuous(labels = \(x) sprintf("%.0f%%", 100 * x), limits = c(0, 1)) +
   scale_x_continuous(breaks = seq(min(by_class$year), max(by_class$year), 3)) +
   labs(
-    title = "Same coaches under both counting rules",
-    subtitle = "Each draft class; dashed line is the average",
+    title = "Picks whose coaches match under both rules",
+    subtitle = paste0(
+      "Last-school and every-season rules name the same coaches; ",
+      window_label,
+      ", dashed line is the window average"
+    ),
     x = "Draft class",
     y = "Share of picks",
     caption = card_caption(release)

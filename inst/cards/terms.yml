@@ -156,3 +156,15 @@ middle-half:
 invitation-rate:
   label: Invitation rate
   definition: "Invitees among a draft year's draft-eligible seasons, the share of eligible players the combine invites."
+pro-day-year:
+  label: 2021 pro-day year
+  definition: "The 2021 combine was cancelled, so that year's records are campus pro-day workouts, not a combine. The cards shade it, and its invitee counts are not comparable."
+draft-eligible-population:
+  label: Draft-eligible population
+  definition: "Invitees linked to a college player id who were draft-eligible in their draft year, so their college seasons and draft result are on record."
+linked-outside-population:
+  label: Linked, outside the population
+  definition: "Invitees linked to a college player id who were not draft-eligible in their draft year, such as a player whose eligible seasons are not in the roster data."
+no-college-id:
+  label: No college id
+  definition: "Invitees the link could not match to a college player id, mostly offensive linemen, who rarely have a stat line."

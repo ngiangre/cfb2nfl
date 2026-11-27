@@ -1,13 +1,15 @@
 {
   "id": "combine-position-size-and-speed",
   "release": "2026-11-25",
-  "code_hash": "bc559f3dfe97b606642776fe8ea6f541",
+  "code_hash": "1d49f55508d974ef482e7173fc1461de",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
     "combine_position_group": "fa922621b568095810c7a114803e9ccb",
     "explorer_combine_measures": "e333cc941172c44f2cedacb440d1c971",
     "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
     "position_group_levels": "20e3516fb9bf8abbe12f3fd702d9d55f",
+    "position_palette": "11141b2b531ab5b7f31d6c196fcc46be",
+    "scale_colour_position": "4cafb87d0ef9e51cdf13934043361fe6",
     "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
     "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
   }
