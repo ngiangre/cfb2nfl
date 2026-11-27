@@ -1,11 +1,11 @@
 ---
-title: "Did the play text name most of the defensive involvements in one game?"
+title: "Where do the defenders' names on these game cards come from?"
 image: card-thumbs/game-player-attribution-sources.png
-image-alt: "Stacked bar chart of one game's player involvements on the offense and on the defense, each bar split into involvements named by the play-stats log and those added from the play text; the defense bar's play-text share is larger than the log share."
+image-alt: "Stacked bar chart of one game's player involvements on the offense and on the defense, each bar split into involvements named by the play-stats log and those named only by the play text; the defense bar's play-text share is larger than its log share."
 categories: ["Topic: Games", "Position: All positions", "Population: Games", "Figure: Bar chart"]
-status: investigation
+status: sketch
 graduated_to: null
-terms: [involvement, scrimmage-play]
+terms: [involvement, scrimmage-play, play-text, play-stats-log]
 followups:
   - text: "Would the defensive credit change if the play text named tacklers the way a play-by-play feed would, rather than the way this game's text does?"
     link: "F12"
@@ -33,6 +33,15 @@ con <- DBI::dbConnect(
 )
 release <- data_release_date()
 game_id <- 401856883
+# The game's kickoff date from the games table (plays carry no date).
+game_date <- DBI::dbGetQuery(
+  con,
+  "SELECT startDate FROM games WHERE id = ?",
+  params = list(as.integer(game_id))
+)$startDate |>
+  substr(1, 10) |>
+  as.Date() |>
+  format("%B %d, %Y")
 teams <- collect(tbl(con, "teams"))
 ```
 
@@ -43,6 +52,8 @@ teams <- collect(tbl(con, "teams"))
 plays <- game_plays(con, game_id)
 home <- plays$home[1]
 away <- plays$away[1]
+team_levels <- c(home, away)
+matchup <- paste0(home, " vs ", away, ", ", game_date)
 season <- DBI::dbGetQuery(
   con,
   paste0(
@@ -89,12 +100,15 @@ p <- ggplot(
     width = 0.6
   ) +
   scale_fill_manual(
-    values = c("Play-stats log" = "#374151", "Play text" = "#0ea5e9"),
+    values = c("Play-stats log" = "#d1d5db", "Play text" = "#374151"),
     name = "Named by"
   ) +
   labs(
     title = "Involvements by side and source",
-    subtitle = "The play text adds most of the defensive names",
+    subtitle = paste0(
+      matchup,
+      "; player involvements on each side, by where the name came from"
+    ),
     x = NULL,
     y = "Player involvements",
     caption = card_caption(release)
@@ -108,13 +122,15 @@ card_interactive(p)
 ```{r}
 #| label: players
 # Per player: involvements named by the log and by the text, for the dot plot.
+# Georgia first in the team legend.
 by_player <- involvement |>
   summarise(
     log = sum(source == "Play-stats log"),
     text = sum(source == "Play text"),
     team = first(team),
     .by = c(playerId, player)
-  )
+  ) |>
+  mutate(team = factor(team, team_levels))
 p_players <- ggplot(by_player, aes(log, text, color = team)) +
   geom_abline(slope = 1, intercept = 0, linetype = "22") +
   geom_point_interactive(
@@ -138,7 +154,10 @@ p_players <- ggplot(by_player, aes(log, text, color = team)) +
   scale_color_team(teams, name = NULL) +
   labs(
     title = "Each player's involvements, by source",
-    subtitle = "Points above the dashed line were named more by the play text",
+    subtitle = paste0(
+      matchup,
+      "; each dot is one player, placed by how often each source named them"
+    ),
     x = "Named by the play-stats log",
     y = "Named by the play text",
     caption = card_caption(release)
@@ -170,6 +189,9 @@ sources |>
 ```
 
 ```{r}
-#| label: footer
+#| label: card-footer
+#| echo: false
+#| output: asis
 cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
 ```

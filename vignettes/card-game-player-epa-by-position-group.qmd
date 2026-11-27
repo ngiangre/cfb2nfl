@@ -2,10 +2,10 @@
 title: "Did Georgia's players average more EPA per involvement than Missouri's in every position group?"
 image: card-thumbs/game-player-epa-by-position-group.png
 image-alt: "Dot plot of each team's average EPA per player involvement for each position group, quarterback through defensive back, with a tick marking the group's typical play; Georgia's dots sit to the right of Missouri's in every group."
-categories: ["Topic: Games", "Position: By position group", "Population: Games", "Figure: Distribution"]
+categories: ["Topic: Games", "Position: By position group", "Population: Games", "Figure: Scatter plot"]
 status: investigation
 graduated_to: null
-terms: [involvement, epa-per-involvement, typical-play]
+terms: [involvement, epa-per-involvement, typical-play, epa-ppa]
 followups:
   - text: "Do position-group averages hold across other games, or is one game's sample too small to separate the groups?"
     link: "F12"
@@ -33,6 +33,15 @@ con <- DBI::dbConnect(
 )
 release <- data_release_date()
 game_id <- 401856883
+# The game's kickoff date from the games table (plays carry no date).
+game_date <- DBI::dbGetQuery(
+  con,
+  "SELECT startDate FROM games WHERE id = ?",
+  params = list(as.integer(game_id))
+)$startDate |>
+  substr(1, 10) |>
+  as.Date() |>
+  format("%B %d, %Y")
 teams <- collect(tbl(con, "teams"))
 ```
 
@@ -44,6 +53,8 @@ teams <- collect(tbl(con, "teams"))
 plays <- game_plays(con, game_id)
 home <- plays$home[1]
 away <- plays$away[1]
+team_levels <- c(home, away)
+matchup <- paste0(home, " vs ", away, ", ", game_date)
 season <- DBI::dbGetQuery(
   con,
   paste0(
@@ -57,8 +68,9 @@ fit <- game_ep_fit(season)
 epa <- game_epa_model(game_scrimmage(plays), fit)
 rated <- dplyr::filter(epa, !is.na(ppa))
 inv <- game_involvement(con, game_id, 2026, rated, c(home, away))
+# Georgia first in every legend; defenders are scored from the defense's side.
 involvement <- game_group_typical(inv$involvement) |>
-  mutate(team = factor(team, c(away, home)))
+  mutate(team = factor(team, team_levels))
 groups <- involvement |>
   distinct(group, typical)
 groups_team <- involvement |>
@@ -106,7 +118,10 @@ p <- ggplot(groups_team, aes(per_inv, factor(group, rev(levels(groups$group)))))
   scale_color_team(teams, name = NULL) +
   labs(
     title = "EPA per involvement by position group",
-    subtitle = "Dots: team averages. Ticks: typical play",
+    subtitle = paste0(
+      matchup,
+      "; dots are team averages, ticks the typical play; defenders are scored from the defense's side"
+    ),
     x = "EPA per involvement",
     y = NULL,
     caption = card_caption(release)
@@ -159,7 +174,8 @@ card_interactive(
     labs(
       x = "Play EPA for the player's side; dashed line is the group's typical play",
       y = NULL,
-      title = "Every involvement, by position group"
+      title = "Every involvement, by position group",
+      subtitle = paste0(matchup, "; defenders are scored from the defense's side")
     ) +
     theme_card(base_size = 14)
   ,
@@ -186,6 +202,9 @@ groups_team |>
 ```
 
 ```{r}
-#| label: footer
+#| label: card-footer
+#| echo: false
+#| output: asis
 cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
 ```

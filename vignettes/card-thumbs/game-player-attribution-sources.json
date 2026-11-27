@@ -1,7 +1,7 @@
 {
   "id": "game-player-attribution-sources",
   "release": "2026-11-25",
-  "code_hash": "96291ba800fb7a75fb56d3623b2eeb87",
+  "code_hash": "8f4713e60fad5bd7c0077b7ea24ec04d",
   "functions": {
     "build_play_involvement": "d09387e1430e13c5018ce4e0be4e56b6",
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",

@@ -1,7 +1,7 @@
 ---
-title: "Did Missouri's first quarter run net negative with no explosive plays, while its fourth quarter leaned on them?"
+title: "Did Missouri lose ground in the first quarter with no explosive plays, then lean on them in the fourth?"
 image: card-thumbs/game-value-by-quarter.png
-image-alt: "Bar chart of each team's EPA in each quarter of the game, split into three panels by play size: explosive plays, ordinary plays and negative plays; Missouri's first-quarter bar is deep and negative with no explosive bar, and its fourth quarter carries a large explosive bar."
+image-alt: "Bar chart of each team's EPA in each quarter of the game, split into three panels by play size: negative, ordinary and explosive plays; Missouri's first-quarter bar is deep and negative with no explosive bar, and its fourth quarter carries a large explosive bar."
 categories: ["Topic: Games", "Position: All positions", "Population: Games", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
@@ -33,16 +33,28 @@ con <- DBI::dbConnect(
 )
 release <- data_release_date()
 game_id <- 401856883
+# The game's kickoff date from the games table (plays carry no date).
+game_date <- DBI::dbGetQuery(
+  con,
+  "SELECT startDate FROM games WHERE id = ?",
+  params = list(as.integer(game_id))
+)$startDate |>
+  substr(1, 10) |>
+  as.Date() |>
+  format("%B %d, %Y")
 teams <- collect(tbl(con, "teams"))
 ```
 
 ```{r}
 #| label: game-epa
 # The game's rated scrimmage plays with each play's EPA (the same model as
-# the running-total card), then each rated play's band and quarter.
+# the running-total card), then each rated play's band and quarter. Play-size
+# bands use the EPA thresholds named in the panel labels.
 plays <- game_plays(con, game_id)
 home <- plays$home[1]
 away <- plays$away[1]
+team_levels <- c(home, away)
+matchup <- paste0(home, " vs ", away, ", ", game_date)
 season <- DBI::dbGetQuery(
   con,
   paste0(
@@ -54,26 +66,34 @@ season <- DBI::dbGetQuery(
 )
 fit <- game_ep_fit(season)
 epa <- game_epa_model(game_scrimmage(plays), fit)
-bands <- game_bands(epa, threshold = 1.5)
+bands <- game_bands(epa, threshold = 1.5) |>
+  mutate(offense = factor(offense, team_levels))
 band_levels <- c(
   "Negative play (EPA below 0)",
   "Ordinary play (EPA 0 to 1.5)",
   "Explosive play (EPA 1.5+)"
 )
+panel_levels <- c(
+  "Negative\nEPA below 0",
+  "Ordinary\nEPA 0 to 1.5",
+  "Explosive\nEPA 1.5 or more"
+)
+# Empty slots are kept (0 plays, 0 EPA) so a missing explosive bar reads as none.
 qtr <- bands |>
+  mutate(band = factor(band, band_levels)) |>
   summarise(epa = sum(ppa), plays = n(), .by = c(offense, quarter, band)) |>
-  mutate(
-    band = factor(band, band_levels),
-    band_short = factor(
-      sub(" play.*", "", band),
-      c("Negative", "Ordinary", "Explosive")
-    )
-  )
+  tidyr::complete(
+    offense = factor(team_levels, team_levels),
+    quarter = paste0("Q", 1:4),
+    band = factor(band_levels, band_levels),
+    fill = list(epa = 0, plays = 0)
+  ) |>
+  mutate(panel = factor(band, band_levels, panel_levels))
 ```
 
 ```{r}
 #| label: figure
-p <- ggplot(qtr, aes(quarter, epa, fill = offense)) +
+p <- ggplot(qtr, aes(quarter, epa, fill = offense, alpha = offense)) +
   geom_col_interactive(
     aes(
       tooltip = paste0(
@@ -94,12 +114,27 @@ p <- ggplot(qtr, aes(quarter, epa, fill = offense)) +
     position = "dodge2",
     width = 0.8
   ) +
+  geom_text(
+    data = filter(qtr, plays == 0),
+    aes(quarter, 0, label = "0 plays", group = offense),
+    position = position_dodge2(width = 0.8),
+    vjust = -0.6,
+    size = 4.5,
+    color = "#374151"
+  ) +
   geom_hline(yintercept = 0, linewidth = 0.4) +
-  facet_wrap(~band_short) +
-  scale_fill_team(teams, name = NULL) +
+  facet_wrap(~panel) +
+  scale_fill_team(teams, name = "Offense") +
+  scale_alpha_manual(
+    values = setNames(c(0.45, 1), c(home, away)),
+    guide = "none"
+  ) +
   labs(
     title = "EPA by quarter, split by play size",
-    subtitle = "Each panel is one kind of play; teams sit side by side",
+    subtitle = paste0(
+      matchup,
+      "; EPA in each quarter by play size; an empty slot marks no plays"
+    ),
     x = NULL,
     y = "EPA in the quarter",
     caption = card_caption(release)
@@ -142,7 +177,7 @@ band_steps <- bands |>
 band_ends <- band_steps |>
   summarise(end = last(cum), .by = c(offense, quarter, band)) |>
   tidyr::complete(
-    offense = c(home, away),
+    offense = factor(team_levels, team_levels),
     quarter = paste0("Q", 1:4),
     band = factor(band_levels, band_levels),
     fill = list(end = 0)
@@ -164,9 +199,9 @@ p_stack <- ggplot(band_lines, aes(minute, cum, color = band)) +
   facet_grid(quarter ~ offense) +
   scale_color_manual(
     values = c(
-      "Negative play (EPA below 0)" = "#b91c1c",
-      "Ordinary play (EPA 0 to 1.5)" = "#6b7280",
-      "Explosive play (EPA 1.5+)" = "#15803d"
+      "Negative play (EPA below 0)" = "#2563eb",
+      "Ordinary play (EPA 0 to 1.5)" = "#9ca3af",
+      "Explosive play (EPA 1.5+)" = "#374151"
     ),
     name = NULL,
     guide = guide_legend(nrow = 1)
@@ -175,7 +210,8 @@ p_stack <- ggplot(band_lines, aes(minute, cum, color = band)) +
   labs(
     y = "Running EPA within the quarter",
     x = "Minutes into the quarter",
-    title = "How each quarter's EPA built up, by play size"
+    title = "How each quarter's EPA built up, by play size",
+    subtitle = paste0(matchup, "; one panel per team and quarter")
   ) +
   theme_card()
 card_interactive(p_stack, width_svg = 11, height_svg = 9)
@@ -186,9 +222,9 @@ card_interactive(p_stack, width_svg = 11, height_svg = 9)
 bands |>
   count(offense, quarter, band) |>
   tidyr::pivot_wider(names_from = band, values_from = n, values_fill = 0) |>
-  arrange(match(offense, c(home, away)), quarter) |>
+  arrange(offense, quarter) |>
   transmute(
-    Offense = offense,
+    Offense = as.character(offense),
     Quarter = quarter,
     Negative = `Negative play (EPA below 0)`,
     Ordinary = `Ordinary play (EPA 0 to 1.5)`,
@@ -201,6 +237,9 @@ bands |>
 ```
 
 ```{r}
-#| label: footer
+#| label: card-footer
+#| echo: false
+#| output: asis
 cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
 ```

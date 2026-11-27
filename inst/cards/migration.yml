@@ -547,7 +547,7 @@
   section: "3.1 Georgia's cumulative EPA rose in every quarter while Missouri never closed its first-quarter gap"
   fate: card
   card: game-epa-running-total
-  reason: "The cumulative running total is the thumbnail; the PPA agreement scatter is the page's second figure and the total table is kept. The per-play stems and per-drive averages panels are not carried: they show the same plays at finer grain and would crowd the thumbnail. Numbers that differ: the correlation between the expected-points curve and CFBD PPA is 0.84 in the post and 0.90 on the card (the post's helper collapsed yards-to-goal to one value, so its curve ignored field position); the largest-gap play changes from a pass interception return (PPA -5.1, curve -9.7) to a pass reception (PPA -0.6, curve -3.2). Missouri's running low (-8.5) and the team totals are unchanged."
+  reason: "The cumulative running total is the thumbnail; the page shows the same running total with one point per play (its text, EPA and running total in the tooltip). The curve-versus-PPA scatter is dropped, and the table keeps play counts and EPA per play only. The per-play stems and per-drive averages panels are not carried: they show the same plays at finer grain and would crowd the thumbnail. Numbers that differ: the correlation between the expected-points curve and CFBD PPA is 0.84 in the post and 0.90 with the fixed curve (the post's helper collapsed yards-to-goal to one value, so its curve ignored field position), and no card shows it now; the largest-gap play changes from a pass interception return (PPA -5.1, curve -9.7) to a pass reception (PPA -0.6, curve -3.2). Missouri's running low (-8.5) and the team totals are unchanged."
 - post: 2026-11-18-game-flow-epa
   section: "3.2 Missouri's first quarter was a EPA hole with explosive plays, and its fourth quarter leaned on them"
   fate: card
@@ -557,7 +557,7 @@
   section: "3.3 Georgia's drives more often ended in touchdowns while Missouri's more often ended in nothing"
   fate: card
   card: game-drive-outcomes
-  reason: "The drive field chart is the thumbnail; the drives-by-outcome table is kept because the prose counts it. Drive counts are unchanged (Georgia 12 drives, 6 touchdowns; Missouri 13, 3 touchdowns, 10 without points)."
+  reason: "The drive field chart is the thumbnail, with arrows in each team's color and the outcome as the arrow's end marker (the outcome colors and the connectors are dropped); the tallies move to the subtitle. The drives-by-outcome table is kept because the prose counts it. Drive counts are unchanged (Georgia 12 drives, 6 touchdowns; Missouri 13, 3 touchdowns, 10 without points)."
 - post: 2026-11-18-game-flow-epa
   section: "3.4 Georgia's players out-averaged Missouri's in every position group, defensive backs included"
   fate: card
@@ -567,7 +567,7 @@
   section: "3.5 Among players named at least 4 times, the leading player averaged the most EPA per involvement"
   fate: card
   card: game-players-named-on-valuable-plays
-  reason: "The highest and lowest eight averages are the thumbnail; the game-order timeline is the page's exploratory figure, without the post's team logos and per-player boxes. The leader (Olugbode, 1.65 EPA per involvement) is unchanged; the title is a question, not the verdict."
+  reason: "The highest and lowest five averages are the thumbnail, labelled by surname and position; the game-order timeline is the page's exploratory figure, without the post's team logos and per-player boxes. The leader (Olugbode, 1.65 EPA per involvement) is unchanged; the title is a question, not the verdict."
 - post: 2026-11-18-game-flow-epa
   section: "4. Summary"
   fate: dropped

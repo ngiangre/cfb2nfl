@@ -1,7 +1,7 @@
 {
   "id": "game-drive-outcomes",
   "release": "2026-11-25",
-  "code_hash": "1716d527fb356be5a5e0da0b435c1a1d",
+  "code_hash": "06146cbbeee7ce54332b226dea064d63",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
     "game_def_td": "7945fa4317259d2603ba3bceb8882aa0",
@@ -17,6 +17,8 @@
     "game_scrimmage": "fc3707d831129c2f60fd6140cb0f7f3d",
     "game_spot_at_snap": "3f4b94cf2d59b1ad7ea3b21dab8528b1",
     "last_known": "faae36b4867ebfacfcff1754926ae97f",
+    "scale_color_team": "7766f9c98970a17917c0f47d119eb014",
+    "team_color_values": "81a321483d63e897ef3195d95350a746",
     "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
     "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
   }

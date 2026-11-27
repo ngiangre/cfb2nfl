@@ -1,7 +1,7 @@
 {
   "id": "game-players-named-on-valuable-plays",
   "release": "2026-11-25",
-  "code_hash": "00cf3745abf0fb019b281183b2ce4eb8",
+  "code_hash": "b5f3a7e4220cede5446416ea14f59de9",
   "functions": {
     "build_play_involvement": "d09387e1430e13c5018ce4e0be4e56b6",
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",

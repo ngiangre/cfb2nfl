@@ -1,7 +1,7 @@
 {
   "id": "game-value-by-quarter",
   "release": "2026-11-25",
-  "code_hash": "7077d5e0a1c6589a1442ff826c64942a",
+  "code_hash": "ec02d6ed701cef53c56ccada71282e7d",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
     "game_bands": "5c82b738232bfd5bc58ff4156c979085",

@@ -1,16 +1,11 @@
 {
   "id": "game-epa-running-total",
   "release": "2026-11-25",
-  "code_hash": "edd3b2b192fd0cb5f827aab21bfc382b",
+  "code_hash": "8542cf6cad133a3e7f5ad323aab29756",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
-    "game_def_td": "7945fa4317259d2603ba3bceb8882aa0",
-    "game_ep_at": "c7fbac8ea1f882dbc182e44896b37ce3",
-    "game_ep_fit": "274def657515f492e2b68a9550b6806c",
-    "game_epa_model": "8b912eea55b2b2cd513d912f2403a3c1",
     "game_kick_types": "a20f17cac9e4ae865e69ca4ced7ae266",
     "game_minutes": "53f610dc604220f20918fa672c199537",
-    "game_off_td": "b6a8764935770f6f45d11a6b8a7198b7",
     "game_plays": "ded2e5472c7df05073b9ec585f3692fd",
     "game_running": "55b6ef303eff6d557c6f84d729ba0f0d",
     "game_scrimmage": "fc3707d831129c2f60fd6140cb0f7f3d",

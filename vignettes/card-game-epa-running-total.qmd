@@ -1,12 +1,12 @@
 ---
-title: "Did Georgia's running EPA rise in every quarter while Missouri's stayed below zero until the third quarter?"
+title: "Did Georgia's running EPA rise in every quarter while Missouri's started below zero and stayed there until the end of the third quarter?"
 aliases: [2026-11-18-game-flow-epa.html]
 image: card-thumbs/game-epa-running-total.png
-image-alt: "Step line chart of each team's running total of expected points added across the game's four quarters, one line per team in its colors; Georgia's line climbs in every quarter while Missouri's dips below zero in the first quarter and crosses zero only in the third."
+image-alt: "Step line chart of each team's running total of expected points added across the game's four quarters, one line per team in its colors; Georgia's line climbs in every quarter, while Missouri's starts below zero, dips further in the first quarter and stays below zero until the end of the third quarter."
 categories: ["Topic: Games", "Position: All positions", "Population: Games", "Figure: Line chart"]
 status: investigation
 graduated_to: null
-terms: [scrimmage-play, expected-points, epa-ppa, running-epa]
+terms: [scrimmage-play, epa-ppa, running-epa]
 followups:
   - text: "Which players drove each team's EPA, and does the leaderboard change when credit is split by involvement?"
     link: "F12"
@@ -36,35 +36,46 @@ con <- DBI::dbConnect(
 )
 release <- data_release_date()
 game_id <- 401856883
+# The game's kickoff date from the games table (plays carry no date).
+game_date <- DBI::dbGetQuery(
+  con,
+  "SELECT startDate FROM games WHERE id = ?",
+  params = list(as.integer(game_id))
+)$startDate |>
+  substr(1, 10) |>
+  as.Date() |>
+  format("%B %d, %Y")
 teams <- collect(tbl(con, "teams"))
 ```
 
 ```{r}
 #| label: game-epa
-# The game's scrimmage plays, with each play's EPA from the expected points
-# curve fit on every 2026 scrimmage play, then the running total per offense.
+# The game's scrimmage plays, each with its CFBD PPA (the EPA on these cards),
+# then the running total per offense in game order. Georgia is listed first.
 plays <- game_plays(con, game_id)
 home <- plays$home[1]
 away <- plays$away[1]
-season <- DBI::dbGetQuery(
-  con,
-  paste0(
-    "SELECT gameId, driveId, driveNumber, playNumber, period, offense, ",
-    "defense, home, away, offenseScore, defenseScore, yardline, yardsToGoal, ",
-    "down, distance, yardsGained, playType, playText, ppa ",
-    "FROM plays WHERE season = 2026"
+team_levels <- c(home, away)
+matchup <- paste0(home, " vs ", away, ", ", game_date)
+run <- game_running(game_scrimmage(plays)) |>
+  mutate(
+    offense = factor(offense, team_levels),
+    tip = paste0(
+      "<b>",
+      offense,
+      "</b><br>",
+      playText,
+      "<br>Play EPA: ",
+      round(ppa, 2),
+      "<br>Running total: ",
+      round(cum_ppa, 1)
+    )
   )
-)
-fit <- game_ep_fit(season)
-epa <- game_epa_model(game_scrimmage(plays), fit)
-run <- game_running(epa)
 tot <- run |>
-  summarise(total = sum(ppa), plays = n(), per_play = mean(ppa), .by = offense)
+  summarise(plays = n(), per_play = mean(ppa), .by = offense)
 mz_low <- run |>
   filter(offense == away) |>
   slice_min(cum_ppa, n = 1, with_ties = FALSE)
-ga_end <- tot$total[tot$offense == home]
-mz_end <- tot$total[tot$offense == away]
 ```
 
 ```{r}
@@ -82,19 +93,22 @@ p <- ggplot(run, aes(game_min, cum_ppa, color = offense)) +
     stroke = 1.2
   ) +
   annotate(
-    "text",
-    x = mz_low$game_min + 1,
-    y = mz_low$cum_ppa - 4,
+    "label",
+    x = mz_low$game_min + 2,
+    y = mz_low$cum_ppa - 3,
     label = paste0(away, " low: ", round(mz_low$cum_ppa, 1)),
     hjust = 0,
-    size = 6
+    size = 6,
+    fill = "white",
+    label.size = 0
   ) +
   scale_color_team(teams, name = "Offense") +
   scale_x_continuous(breaks = c(0, 15, 30, 45, 60), limits = c(0, 60)) +
   labs(
     title = "Running total of EPA by offense",
     subtitle = paste0(
-      "Scrimmage plays with an EPA, game minutes; dashed lines mark quarter breaks"
+      matchup,
+      "; scrimmage plays with an EPA, by game minute; dashed lines mark quarter breaks"
     ),
     x = "Game minutes elapsed",
     y = "Cumulative EPA",
@@ -103,89 +117,38 @@ p <- ggplot(run, aes(game_min, cum_ppa, color = offense)) +
   theme_card()
 
 card_thumbnail(p, "game-epa-running-total", release = release)
-card_interactive(p)
-```
-
-```{r}
-#| label: agreement
-# What CFBD's PPA measures: the change in expected points across each play,
-# read off the curve (the model above), against the published PPA. Every
-# other exhibit on this card runs on PPA itself.
-rated <- dplyr::filter(epa, !is.na(ppa))
-epa_cor <- cor(rated$epa_mine, rated$ppa, use = "complete.obs")
-gap_play <- rated |>
-  slice_max(abs(epa_mine - ppa), n = 1, with_ties = FALSE)
-p_agree <- rated |>
-  ggplot(aes(ppa, epa_mine, color = offense)) +
-  geom_abline(slope = 1, intercept = 0, linetype = "22") +
-  geom_hline(yintercept = 0, linewidth = 0.3) +
-  geom_vline(xintercept = 0, linewidth = 0.3) +
-  geom_point_interactive(
-    aes(
-      tooltip = paste0(
-        "<b>",
-        offense,
-        "</b><br>",
-        playText,
-        "<br>CFBD PPA: ",
-        round(ppa, 2),
-        "<br>Expected points before: ",
-        round(ep_before, 2),
-        ", after: ",
-        round(ep_after, 2),
-        "<br>Change in expected points: ",
-        round(epa_mine, 2)
-      )
-    ),
-    size = 2,
-    alpha = 0.75
-  ) +
-  scale_color_team(teams, name = "Offense") +
-  coord_fixed(xlim = c(-10, 5), ylim = c(-10, 5)) +
-  annotate(
-    "segment",
-    x = gap_play$ppa + 3.6,
-    y = gap_play$epa_mine + 1.6,
-    xend = gap_play$ppa + 0.25,
-    yend = gap_play$epa_mine + 0.1,
-    arrow = arrow(length = unit(0.12, "inches"), type = "closed"),
-    linewidth = 0.6
-  ) +
-  labs(
-    title = "Change in expected points against CFBD's PPA, play by play",
-    subtitle = paste0(
-      "Correlation ",
-      round(epa_cor, 2),
-      "; the diagonal is where the two agree"
-    ),
-    x = "CFBD PPA for the play",
-    y = "Change in expected points across the play",
-    caption = card_caption(release)
-  ) +
-  theme_card(base_size = 16)
-card_interactive(p_agree, width_svg = 9, height_svg = 6.5)
+card_interactive(
+  p +
+    geom_point_interactive(
+      data = run,
+      aes(game_min, cum_ppa, color = offense, tooltip = tip, data_id = id),
+      size = 2
+    )
+)
 ```
 
 ```{r}
 #| label: table
 tot |>
   transmute(
-    Offense = offense,
+    Offense = as.character(offense),
     Plays = plays,
-    `Total EPA` = round(total, 1),
     `EPA per play` = round(per_play, 2)
   ) |>
   knitr::kable(
-    col.names = c("Offense", "Plays", "Total EPA", "EPA per play"),
+    col.names = c("Offense", "Plays", "EPA per play"),
     caption = paste0(
-      "Total and per-play EPA by offense over the ",
+      "Plays and average EPA per play for each offense over the ",
       sum(tot$plays),
-      " scrimmage plays of the game that carry an EPA."
+      " scrimmage plays that carry an EPA."
     )
   )
 ```
 
 ```{r}
-#| label: footer
+#| label: card-footer
+#| echo: false
+#| output: asis
 cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
 ```

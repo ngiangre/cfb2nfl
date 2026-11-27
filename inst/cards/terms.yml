@@ -272,3 +272,12 @@ epa-per-involvement:
 typical-play:
   label: Typical play
   definition: "A position group's average EPA per involvement over both teams, the baseline each team's players in that group are measured against."
+drive-total-epa:
+  label: Total EPA on the drive
+  definition: "The sum of the EPA of a drive's rated plays, so it totals what the drive added to its offense, whatever the drive's outcome."
+play-text:
+  label: Play text
+  definition: "The description CFBD writes for each play. The cards read the player names in it, which can name a defender the play-stats log leaves out."
+play-stats-log:
+  label: Play-stats log
+  definition: "The stat records CFBD keeps for each play, naming the players who passed, rushed, caught, made a tackle or were credited with another stat on it."
