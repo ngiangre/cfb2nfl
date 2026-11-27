@@ -204,7 +204,7 @@ acceptance criteria.
 ### F25 · Investigations as a figure wall of cards that graduate to the rest of the site
 
 - **Goals:** G1, G3, C1 · **Personas:** P1 (P2 via each card's code) ·
-  **Status:** accepted
+  **Status:** in progress
 - **Links:** issue #127; supersedes F16 once decision 0053 lands (F16 →
   superseded by F25); replaces F14's Blog index page and its navbar entry;
   lays the ground for F21
@@ -281,11 +281,12 @@ acceptance criteria.
 - **Tasks:**
 <!-- tasks F25 -->
 - [ ] [#127](https://github.com/ngiangre/cfb2nfl/issues/127) Rework Investigations into a figure wall of cards that graduates ideas to the rest of the site
-- [ ] [#131](https://github.com/ngiangre/cfb2nfl/issues/131) Shared post helpers, the card theme, card_thumbnail() and new_card() in R/ (F25)
+- [x] [#131](https://github.com/ngiangre/cfb2nfl/issues/131) Shared post helpers, the card theme and card_thumbnail() in R/ (F25)
 - [ ] [#132](https://github.com/ngiangre/cfb2nfl/issues/132) Card template, approved tags, questions registry, check_card_style() and the figure wall page (F25)
 - [ ] [#133](https://github.com/ngiangre/cfb2nfl/issues/133) Pilot: migrate the draft-outcomes posts to cards and graduate one card (F25)
 - [ ] [#134](https://github.com/ngiangre/cfb2nfl/issues/134) Decision 0053, goals.md signals and AGENTS.md for the figure wall (F25)
-- [ ] [PR #135](https://github.com/ngiangre/cfb2nfl/pull/135) docs(product): add the F25 figure wall card and sync task links (F25)
+- [x] [PR #135](https://github.com/ngiangre/cfb2nfl/pull/135) docs(product): add the F25 figure wall card and sync task links (F25)
+- [x] [PR #136](https://github.com/ngiangre/cfb2nfl/pull/136) feat(cards): shared number helpers and card thumbnail helpers (F25)
 <!-- /tasks -->
 
 ### F21 · Question status board
