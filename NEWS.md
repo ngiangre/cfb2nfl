@@ -1,5 +1,10 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Investigations (feature F25): **the card wall's tag buttons render as
+  buttons again** instead of lines of code. The wall template indented them
+  four spaces, which Quarto's markdown pass read as code blocks; a test now
+  catches indented markup in the template.
+
 - Site: **the site builds again**. Eight cards use `forcats`, which was not
   declared, so the site build could not install it; it is now in Suggests,
   and a test fails when a card calls a package DESCRIPTION does not declare.
