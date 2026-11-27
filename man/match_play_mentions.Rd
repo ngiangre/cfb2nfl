@@ -4,13 +4,18 @@
 \alias{match_play_mentions}
 \title{Resolve text mentions to athlete ids}
 \usage{
-match_play_mentions(mentions, directory)
+match_play_mentions(mentions, directory, by = character())
 }
 \arguments{
 \item{mentions}{Output of \code{\link[=play_text_mentions]{play_text_mentions()}}.}
 
 \item{directory}{Data frame with one row per player: \code{playerId}, \code{team},
-\code{jersey}, \code{player} (full name).}
+\code{jersey}, \code{player} (full name), plus any \code{by} columns.}
+
+\item{by}{Extra columns, in both \code{mentions} and \code{directory}, that narrow
+the search, e.g. \code{"gameId"} with a directory of each game's two rosters
+from \code{\link[=play_mention_directory]{play_mention_directory()}}. The default searches the whole
+directory, so it should hold only the game's two teams.}
 }
 \value{
 \code{mentions} with \code{playerId} and \code{team} added (both \code{NA} when the

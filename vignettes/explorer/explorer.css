@@ -46,6 +46,7 @@
 /* Teams tab (step 3). */
 /* The header's team menu, styled like the Inputs season select beside it. */
 .explorer-team { display: flex; align-items: center; gap: 0.5rem; margin: 0; }
+.explorer-team[hidden] { display: none; }
 .explorer-team label { font-size: 1rem; }
 .explorer-team select { max-width: min(24rem, 100%); }
 /* Two charts side by side on wide screens; the cell sets one column under 820px. */
@@ -119,6 +120,8 @@ h3[tabindex="-1"]:focus { outline-offset: 4px; }
 .explorer-3d-plot { touch-action: none; } /* drags rotate the scene */
 .explorer-combine-card h4 { margin-top: 0; }
 .explorer-chip-static { cursor: default; }
+/* A player read from the play text, not the play-stats log (#128). */
+.explorer-chip-text { border-style: dashed; border-color: #6b7280; }
 /* Combine region filters (#84): one row of four buttons per axis. */
 .explorer-region { margin: 0.5rem 0; }
 .explorer-region-axis { margin: 0.4rem 0; }

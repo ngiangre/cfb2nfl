@@ -16,7 +16,7 @@ toc: false
 
 ```{ojs}
 //| echo: false
-import {TABS, parseHash, toHash, resolveTeam} from "./explorer/state.js"
+import {TABS, parseHash, toHash, resolveTeam, tabUsesTeam} from "./explorer/state.js"
 import {sourceLine, errorCard, loadOnce, escapeHtml, axisRoom, playerLabel, jerseyPos} from "./explorer/ui.js"
 import {
   formatRecord, teamGames, effectiveGame, landscapePanels, timelineFor, parsePlayers,
@@ -284,12 +284,13 @@ function fillTeamMenu(sel, groups, selected) {
 ```{ojs}
 //| echo: false
 //| output: false
-// Show one tab's section at a time.
+// Show one tab's section at a time, and the Team menu only where it is read.
 {
   for (const t of TABS) {
     const el = document.getElementById(`tab-${t.key}`);
     if (el) el.hidden = t.key !== tab;
   }
+  viewof team.hidden = !tabUsesTeam(tab);
 }
 ```
 
@@ -394,19 +395,22 @@ conferenceView = {
   const value = d => metric === "elo_end" ? `Elo ${d.elo_end}` : `${Math.round(d.win_pct * 100)}% wins`;
   const color = id => ready.teamById.get(id)?.color ?? "#6b7280";
   const name = id => ready.teamById.get(id)?.team ?? String(id);
-  // Tap near a line (or a chip) to open that team.
+  // The chosen team is drawn last, thick and on a white halo, so it stays on
+  // top where the lines cross; the rest are thin and faded. Tap near a line
+  // (or a chip) to open that team.
+  const mine = panel.rows.filter(d => d.team_id === team);
   const fig = Plot.plot(axisRoom({
     width, height: 360, marginLeft: 56, style: {fontSize: "16px"},
     x: {label: "Season", tickFormat: String},
     y: {label: yLabel, grid: true},
     marks: [
       Plot.ruleX([season], {stroke: "#9ca3af", strokeDasharray: "4,4"}),
-      Plot.line(panel.rows, {
+      Plot.line(panel.rows.filter(d => d.team_id !== team), {
         x: "season", y: metric, z: "team_id",
-        stroke: d => color(d.team_id),
-        strokeWidth: d => d.team_id === team ? 4 : 1.5,
-        strokeOpacity: d => d.team_id === team ? 1 : 0.6
+        stroke: d => color(d.team_id), strokeWidth: 1.25, strokeOpacity: 0.35
       }),
+      Plot.line(mine, {x: "season", y: metric, stroke: "white", strokeWidth: 9}),
+      Plot.line(mine, {x: "season", y: metric, stroke: color(team), strokeWidth: 5}),
       Plot.dot(panel.rows, Plot.pointer({
         x: "season", y: metric, fill: d => color(d.team_id), r: 6,
         title: d => `${name(d.team_id)} ${d.season}: ${value(d)}, ${formatRecord(d)}`,
@@ -756,11 +760,23 @@ playCard = {
   if (players.length) {
     const chips = html`<div class="explorer-chips"></div>`;
     for (const a of players) {
-      const chip = html`<button type="button" class="explorer-chip">${playerLabel(a.name, a.position)} <span>${a.stat}</span></button>`;
+      // Players read from the play text (mostly tacklers) are dashed and
+      // labeled, so they are never mistaken for the play-stats log. One with
+      // no Players page that season (no position group) is not a link.
+      if (a.text && !a.pos) {
+        chips.append(html`<span class="explorer-chip explorer-chip-text explorer-chip-static">${a.name} <span>${a.stat} · from play text</span></span>`);
+        continue;
+      }
+      const chip = a.text
+        ? html`<button type="button" class="explorer-chip explorer-chip-text">${playerLabel(a.name, a.position)} <span>${a.stat} · from play text</span></button>`
+        : html`<button type="button" class="explorer-chip">${playerLabel(a.name, a.position)} <span>${a.stat}</span></button>`;
       chip.onclick = () => pick.player(a.id, a.pos);
       chips.append(chip);
     }
     card.append(chips);
+    if (players.some(a => a.text)) {
+      card.append(html`<p class="explorer-note">Dashed players are named in the play text but not in the play-stats log, matched by jersey number and surname to either team's roster.</p>`);
+    }
   }
   // Prev/Next for keyboard and screen-reader readers; they step from the
   // play shown, and stop at either end.
@@ -1196,31 +1212,50 @@ combinePlot = {
   for (const t of traces.filter(t => t.showlegend !== false)) {
     legend.append(html`<span><i style=${`background:${t.marker.color};opacity:${Math.max(t.marker.opacity, 0.6)}`}></i>${t.name}</span>`);
   }
-  Plotly.newPlot(el, traces, {
-    width, height: Math.min(560, Math.max(420, width)),
-    margin: {l: 0, r: 0, t: 0, b: 0},
-    font: {size: 14},
-    showlegend: false,
-    scene: {
-      camera: combineCamera,
-      xaxis: {title: title(combineAxes[0])},
-      yaxis: {title: title(combineAxes[1])},
-      zaxis: {title: title(combineAxes[2])}
-    }
-  }, {displaylogo: false, responsive: true, modeBarButtonsToRemove: ["toImage"]});
-  el.on("plotly_click", e => {
-    const p = e.points?.[0];
-    if (p && p.customdata !== undefined) mutable combinePick = combineShown[p.customdata];
+  // Plot only once the element is on the page and has its width: built while
+  // detached or inside a hidden tab, plotly fell back to a stale width and
+  // the WebGL scene drew no points (#128). The observer then keeps the scene
+  // sized to its container as the window or layout changes.
+  const heightFor = w => Math.min(560, Math.max(420, w));
+  let drawn = false;
+  const draw = w => {
+    drawn = true;
+    Plotly.newPlot(el, traces, {
+      autosize: true, height: heightFor(w),
+      margin: {l: 0, r: 0, t: 0, b: 0},
+      font: {size: 14},
+      showlegend: false,
+      scene: {
+        camera: combineCamera,
+        xaxis: {title: title(combineAxes[0])},
+        yaxis: {title: title(combineAxes[1])},
+        zaxis: {title: title(combineAxes[2])}
+      }
+    }, {displaylogo: false, responsive: true, modeBarButtonsToRemove: ["toImage"]});
+    el.on("plotly_click", e => {
+      const p = e.points?.[0];
+      if (p && p.customdata !== undefined) mutable combinePick = combineShown[p.customdata];
+    });
+    el.on("plotly_relayout", e => {
+      const cam = e["scene.camera"];
+      if (cam) Object.assign(combineCamera, cam);
+    });
+  };
+  let lastWidth = 0;
+  const sizer = new ResizeObserver(([entry]) => {
+    const w = Math.round(entry.contentRect.width);
+    if (!w || w === lastWidth) return;
+    lastWidth = w;
+    if (!drawn) draw(w);
+    else Plotly.relayout(el, {width: w, height: heightFor(w)});
   });
-  el.on("plotly_relayout", e => {
-    const cam = e["scene.camera"];
-    if (cam) Object.assign(combineCamera, cam);
-  });
+  sizer.observe(el);
+  invalidation.then(() => { sizer.disconnect(); if (drawn) Plotly.purge(el); });
   const reset = html`<button type="button" class="explorer-chip">Reset view</button>`;
   reset.onclick = () => {
     for (const k of Object.keys(combineCamera)) delete combineCamera[k];
     Object.assign(combineCamera, camera);
-    Plotly.relayout(el, {"scene.camera": camera});
+    if (drawn) Plotly.relayout(el, {"scene.camera": camera});
   };
   const skipped = missingCount(combineData.rows, combineFilter);
   return html`<div class="explorer-3d">

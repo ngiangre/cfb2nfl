@@ -3,12 +3,18 @@
 // written to the hash so a shared link pins the season instead of following
 // the in-progress one.
 
+// `team`: whether the tab reads the Team menu. Players and Combine do not, so
+// the header hides the menu there (the hash keeps the team for the way back).
 export const TABS = [
-  {key: "teams", label: "Teams"},
-  {key: "players", label: "Players"},
-  {key: "combine", label: "Combine"},
-  {key: "careers", label: "Draft & careers"}
+  {key: "teams", label: "Teams", team: true},
+  {key: "players", label: "Players", team: false},
+  {key: "combine", label: "Combine", team: false},
+  {key: "careers", label: "Draft & careers", team: true}
 ];
+
+export function tabUsesTeam(tab) {
+  return TABS.find(t => t.key === tab)?.team ?? true;
+}
 
 const KEYS = ["tab", "season", "team", "game", "pos", "player"];
 const INTEGER_KEYS = new Set(["season", "team", "game"]);
