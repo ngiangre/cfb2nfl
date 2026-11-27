@@ -2823,6 +2823,51 @@ contract_explorer_plays <- function(
   enforce_contract(agent, "explorer_plays", stop_on_fail)
 }
 
+#' Data contract for the Explorer's text-only play chips
+#'
+#' Guards [play_text_players()] output: one row per play and player, every
+#' row resolved to a named player on a real play, and none the play-stats log
+#' already names on that play (those would be shown twice).
+#'
+#' @param text_players Output of [play_text_players()].
+#' @param plays Cleaned plays.
+#' @param play_stats Cleaned play stats.
+#' @param stop_on_fail Abort on failure (default) or return the agent.
+#' @return The interrogated pointblank agent, invisibly.
+#' @export
+contract_explorer_text_players <- function(
+  text_players,
+  plays,
+  play_stats,
+  stop_on_fail = TRUE
+) {
+  rlang::check_installed("pointblank")
+  check <- function(agent, ok) {
+    pointblank::col_vals_equal(
+      agent,
+      "ok",
+      TRUE,
+      preconditions = function(x) tibble::tibble(ok = ok)
+    )
+  }
+  logged <- paste(play_stats$playId, play_stats$athleteId)
+  agent <- pointblank::create_agent(
+    text_players,
+    label = "explorer_text_players"
+  ) |>
+    pointblank::col_vals_not_null(pointblank::vars(
+      id,
+      playerId,
+      player,
+      roles
+    )) |>
+    pointblank::rows_distinct(pointblank::vars(id, playerId)) |>
+    check(all(text_players$id %in% plays$id)) |>
+    check(!any(paste(text_players$id, text_players$playerId) %in% logged)) |>
+    pointblank::interrogate()
+  enforce_contract(agent, "explorer_text_players", stop_on_fail)
+}
+
 #' Data contract for the explorer plays shard files
 #'
 #' Guards the directory [write_explorer_plays()] writes: exactly one

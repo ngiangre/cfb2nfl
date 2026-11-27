@@ -13,7 +13,8 @@ play_text_mentions(plays)
 One row per mention: \code{id}, \code{jersey} (integer), \code{text_name},
 \code{role} (\code{"Ball carrier or passer"}, \code{"Target"}, \code{"Tackle"},
 \code{"Pass breakup"}, \code{"Interception"}, \code{"Fumble"}, \code{"Fumble forced"},
-\code{"Fumble recovered"}, \code{"Penalty"} or \code{"Other"}).
+\code{"Fumble recovered"}, \code{"Penalty"}, \code{"Kicker or punter"}, \code{"Holder"},
+\code{"Long snapper"}, \code{"Kick blocked"} or \code{"Other"}).
 }
 \description{
 Extracts every \verb{#<jersey> <I.Surname>} mention from each play's text and

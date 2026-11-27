@@ -224,6 +224,33 @@ test_that("build_explorer_plays tags each player chip with its position group", 
   expect_equal(pl$position, c("QB", NA))
 })
 
+test_that("build_explorer_plays appends text-only players, marked as text", {
+  plays <- explorer_plays_fixture()
+  p <- build_explorer_plays(
+    plays,
+    explorer_games_fixture(),
+    explorer_teams_fixture(),
+    explorer_play_stats_fixture(),
+    text_players = tibble::tibble(
+      id = c("12", "13"),
+      playerId = c("d9", "d4"),
+      team = c("Alabama", "Texas"),
+      player = c("Def Nine", "Def Four"),
+      roles = c("Tackle", "Other")
+    )
+  )
+  expect_equal(nrow(p), nrow(plays))
+  pl <- jsonlite::fromJSON(p$players[p$play_id == "12"])
+  # log players first, then the text-only tackler
+  expect_equal(pl$id, c("p1", "p2", "d9"))
+  expect_equal(pl$text, c(FALSE, FALSE, TRUE))
+  expect_equal(pl$stat[[3]], "Tackle")
+  # a play with no log entries still gets its text chip; "Other" reads plainly
+  pl13 <- jsonlite::fromJSON(p$players[p$play_id == "13"])
+  expect_equal(pl13$name, "Def Four")
+  expect_equal(pl13$stat, "Named in play")
+})
+
 test_that("write_explorer_team_games writes one JSON file per season", {
   dir <- withr::local_tempdir()
   g <- explorer_games_fixture()

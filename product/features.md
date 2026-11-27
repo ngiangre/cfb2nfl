@@ -197,6 +197,7 @@ acceptance criteria.
 - [x] [PR #115](https://github.com/ngiangre/cfb2nfl/pull/115) docs(post): career endings on the roster population; fix the site build (F24)
 - [x] [PR #122](https://github.com/ngiangre/cfb2nfl/pull/122) docs(posts): build the career endings post up to its probabilities (F24)
 - [x] [PR #124](https://github.com/ngiangre/cfb2nfl/pull/124) docs(posts): finish the career endings post and revise F24 to it (F24)
+- [x] [PR #125](https://github.com/ngiangre/cfb2nfl/pull/125) docs(product): sync feature task links after F24 ships (F24)
 <!-- /tasks -->
 
 ### F21 · Question status board
@@ -222,7 +223,8 @@ acceptance criteria.
 
 ### F13 · Interactive Explorer
 
-- **Goals:** G3 · **Personas:** P1 · **Status:** shipped
+- **Goals:** G3 · **Personas:** P1 · **Status:** in progress (reopened
+  2026-11-26 for the #128 revisions)
 - **Links:** decision 0046; `plans/explorer.md`
 - **Tasks:**
 <!-- tasks F13 -->
@@ -233,6 +235,7 @@ acceptance criteria.
 - [x] [#89](https://github.com/ngiangre/cfb2nfl/issues/89) Combine explorer: label UDFAs who made NFL rosters; clarify Draft pending
 - [x] [#110](https://github.com/ngiangre/cfb2nfl/issues/110) Explorer: player outcomes rebuilt on the roster population of outcomes
 - [x] [PR #118](https://github.com/ngiangre/cfb2nfl/pull/118) docs(posts): revise outcome posts for the roster population; Explorer lists NFL entrants without a stat line
+- [ ] [#128](https://github.com/ngiangre/cfb2nfl/issues/128) Explorer revisions: bolder team line, play-text players in game view, drop Team dropdown on Players/Combine, fix Combine 3D plot
 <!-- /tasks -->
 
 ### F06 · Team and conference geography
@@ -432,6 +435,7 @@ acceptance criteria.
 - **Links:** decisions 0005, 0023
 - **Tasks:**
 <!-- tasks F02 -->
+- [ ] [#126](https://github.com/ngiangre/cfb2nfl/issues/126) perf(pipeline): keep large data-frame targets lazy with an Arrow-backed custom format
 <!-- /tasks -->
 
 ### F15 · Technical pages: Data, Pipeline, Reference
