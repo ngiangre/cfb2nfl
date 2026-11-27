@@ -1,0 +1,66 @@
+---
+title: "{{question}}"
+image: card-thumbs/{{id}}.png
+image-alt: "Describe what the figure shows in words: the chart type, what is measured, over whom and when, and what stands out."
+categories: ["Topic: Draft outcomes", "Position: All positions", "Population: Draft-eligible seasons", "Figure: Bar chart"]
+status: sketch
+graduated_to: null
+followups:
+  - text: "An open question the figure raises?"
+    link: "Question: Draft chance by position"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+```
+
+```{r}
+#| label: figure
+# Title and subtitle say what is shown; highlighting carries the takeaway.
+# Use ggiraph's *_interactive geoms with a tooltip so the page can be probed.
+d <- tbl(con, "picks") |>
+  count(position) |>
+  collect() |>
+  slice_max(n, n = 10)
+
+p <- ggplot(d, aes(n, reorder(position, n))) +
+  geom_col_interactive(aes(tooltip = paste0(position, ": ", fmt(n)))) +
+  labs(
+    title = "What the figure shows",
+    subtitle = paste("Who and when; the", nrow(d), "largest groups"),
+    x = "Reader-facing axis label",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "{{id}}", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

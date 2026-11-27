@@ -54,6 +54,13 @@ jobs:
           Rscript -e 'dir.create("data", showWarnings = FALSE); piggyback::pb_download(repo = Sys.getenv("GITHUB_REPOSITORY"), tag = "data-latest", dest = "data")'
           Rscript -e 'pkgload::load_all(quiet = TRUE); record_release_date("data", repo = Sys.getenv("GITHUB_REPOSITORY"))'
 
+      # Card thumbnails are committed and rendered locally (feature F25); list
+      # any drawn from an older data release than this one. A note, not a
+      # failure: re-render those cards locally to refresh them.
+      - name: Report card thumbnails behind the data release
+        run: |
+          Rscript -e 'pkgload::load_all(quiet = TRUE); bad <- check_cards_style(root = ".", release = data_release_date("data")); old <- bad[bad$severity == "note", ]; if (nrow(old)) cat(sprintf("::notice file=vignettes/%s::%s", old$file, old$message), sep = "\n")'
+
       - name: Run pipeline
         run: Rscript -e 'targets::tar_make()'
 

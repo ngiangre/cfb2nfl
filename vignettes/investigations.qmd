@@ -1,5 +1,14 @@
 ---
 title: "Investigations"
+listing:
+  id: card-wall
+  contents: "card-*.qmd"
+  template: card-wall.ejs
+  categories: true
+  filter-ui: true
+  sort-ui: false
+  page-size: 500
+  fields: [title, image, image-alt, categories, status]
 vignette: >
   %\VignetteIndexEntry{Investigations}
   %\VignetteEngine{quarto::html}
@@ -7,6 +16,17 @@ vignette: >
 ---
 
 Vignettes for data investigations and challenging beliefs and expectations. These are not 'blogs' - they do not represent original human thought. Rather, these vignettes are meant to probe the data to generate additional questions. AI may be indicated in generating these investigations. However, all code and data used originate from the validated audited pipeline so no findings are fabricated. The purpose of these vignettes is to explore, investigate, and question the data.
+
+## Figure cards
+
+Each card asks one question and answers it with one figure. Search, or click a tag to see every card that carries it; open a card to explore its figure.
+
+::: {#card-wall}
+:::
+
+## Posts
+
+The dated posts below are moving to cards; each stays here until its cards are up.
 
 ```{r}
 #| label: setup

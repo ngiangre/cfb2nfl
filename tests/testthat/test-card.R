@@ -14,6 +14,14 @@ write_card <- function(
   path
 }
 
+# Hashing reads the R/ sources, which only a checkout has (R CMD check runs
+# the tests against the installed package); point card_root() at it.
+local_checkout_root <- function(env = parent.frame()) {
+  root <- normalizePath(test_path("..", ".."), mustWork = FALSE)
+  skip_if_not(dir.exists(file.path(root, "R")), "R/ sources not in this build")
+  withr::local_envvar(CFB2NFL_ROOT = root, .local_envir = env)
+}
+
 test_that("data_release_date reads the stamp written when the release was downloaded", {
   dir <- withr::local_tempdir()
   write_release_stamp(as.POSIXct("2026-11-25 20:59:20", tz = "UTC"), dir)
@@ -30,6 +38,11 @@ test_that("card paths resolve to vignettes/ in the checkout, not the render copy
   expect_equal(card_root(), "/repo")
   expect_equal(
     card_source("/repo/_quarto/vignettes/card-x.qmd"),
+    file.path("/repo", "vignettes", "card-x.qmd")
+  )
+  # Quarto knits an intermediate .rmarkdown copy of the .qmd.
+  expect_equal(
+    card_source("card-x.rmarkdown"),
     file.path("/repo", "vignettes", "card-x.qmd")
   )
   expect_equal(card_thumb_dir(), file.path("/repo", "vignettes", "card-thumbs"))
@@ -56,6 +69,7 @@ test_that("card_code keeps only the R chunks of a card", {
 })
 
 test_that("card_functions finds the package functions a card calls, transitively", {
+  local_checkout_root()
   dir <- withr::local_tempdir()
   # scale_fill_team() calls team_color_values(), which the card never names.
   path <- write_card(
@@ -67,7 +81,37 @@ test_that("card_functions finds the package functions a card calls, transitively
   expect_false("ggplot" %in% fns)
 })
 
+test_that("card_functions leaves out the card machinery, which does not shape the figure", {
+  local_checkout_root()
+  dir <- withr::local_tempdir()
+  path <- write_card(
+    dir,
+    code = c(
+      "p <- p + theme_card()",
+      "card_thumbnail(p, 'x', release = data_release_date())",
+      "card_interactive(p)",
+      "cat(card_footer())"
+    )
+  )
+  fns <- card_functions(path)
+  expect_true(all(c("theme_card", "theme_cfb2nfl") %in% fns))
+  expect_length(
+    intersect(
+      fns,
+      c(
+        "card_thumbnail",
+        "card_hashes",
+        "card_footer",
+        "data_release_date",
+        "card_interactive"
+      )
+    ),
+    0
+  )
+})
+
 test_that("card_thumbnail saves the PNG and a sidecar of hashes", {
+  local_checkout_root()
   skip_if_not_installed("ggplot2")
   skip_if_not_installed("ragg")
   dir <- withr::local_tempdir()
@@ -89,6 +133,7 @@ test_that("card_thumbnail saves the PNG and a sidecar of hashes", {
 })
 
 test_that("card_freshness reports fresh, then stale code, R and data changes", {
+  local_checkout_root()
   skip_if_not_installed("ggplot2")
   skip_if_not_installed("ragg")
   dir <- withr::local_tempdir()
@@ -116,6 +161,7 @@ test_that("card_freshness reports fresh, then stale code, R and data changes", {
 })
 
 test_that("card_freshness flags a changed R function and a missing thumbnail", {
+  local_checkout_root()
   skip_if_not_installed("ggplot2")
   skip_if_not_installed("ragg")
   dir <- withr::local_tempdir()

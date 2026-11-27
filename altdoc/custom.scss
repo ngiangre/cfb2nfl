@@ -130,3 +130,62 @@ $navbar-light-toggler-border-color: rgba(250, 251, 252, 0.4);
     }
   }
 }
+
+// Investigations figure wall (feature F25, vignettes/card-wall.ejs): a grid
+// of card tiles that collapses to one column on a phone.
+.card-wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+.card-wall-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.card-wall-image img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 8 / 5.5;
+  object-fit: contain;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+}
+.card-wall-title {
+  font-size: 1.15rem;
+  margin: 0;
+}
+.card-wall-status {
+  align-self: flex-start;
+  border-radius: 999px;
+  padding: 0 0.6em;
+  font-size: 0.8rem;
+  color: #fff;
+}
+.card-wall-status-sketch {
+  background: #6b7280;
+}
+.card-wall-status-investigation {
+  background: #1d4ed8;
+}
+.card-wall-status-graduated {
+  background: #15803d;
+}
+.card-wall-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.card-wall-tag {
+  border: 1px solid #ced4da;
+  background: #f8f9fa;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  padding: 0 0.4em;
+  cursor: pointer;
+}
+@media (max-width: 420px) {
+  .card-wall {
+    grid-template-columns: 1fr;
+  }
+}

@@ -8,12 +8,14 @@
 \usage{
 card_root()
 
-card_source(input = knitr::current_input())
+card_source(input = knitr::current_input(), root = card_root())
 
-card_thumb_dir()
+card_thumb_dir(root = card_root())
 }
 \arguments{
 \item{input}{The file being rendered.}
+
+\item{root}{The checkout root.}
 }
 \value{
 \code{card_root()}: the checkout root. \code{card_source()}: the card's

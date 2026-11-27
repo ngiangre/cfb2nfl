@@ -1,0 +1,41 @@
+# Approved card tags (feature F25). A card's `categories:` are "Facet: value"
+# pairs from this list, plus "Question: <tag>" from questions.yml. The style
+# check fails on any other tag, so a new tag is proposed here, in the PR that
+# first uses it, and approved with the PR.
+Topic:
+  - Draft outcomes
+  - Programs and conferences
+  - Coaches
+  - Movement
+  - Career shape
+  - Combine
+  - Games
+  - NFL careers
+# The position groups the posts use (harmonized_position_levels()).
+Position:
+  - All positions
+  - Quarterback
+  - Running back
+  - Receiver
+  - Tight end
+  - Offensive line
+  - Defensive line
+  - Linebacker
+  - Defensive back
+  - Special teams
+Population:
+  - Draft-eligible seasons
+  - Roster seasons
+  - Stat-line seasons
+  - Draft picks
+  - Combine invitees
+  - Games
+  - Recruits
+Figure:
+  - Bar chart
+  - Line chart
+  - Scatter plot
+  - Heatmap
+  - Map
+  - Distribution
+  - Flow chart
