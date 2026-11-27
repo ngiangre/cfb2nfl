@@ -111,3 +111,35 @@ scale_color_team <- function(teams, na.value = "#6b7280", ...) {
     ...
   )
 }
+
+#' Caption line for a card figure
+#'
+#' @param release The data release date ([data_release_date()]).
+#' @param source Who the data comes from.
+#' @return One string for `labs(caption = )`.
+#' @export
+card_caption <- function(release, source = "CFBD, nflverse") {
+  paste0("Data: ", source, " | data release ", format(release, "%Y-%m-%d"))
+}
+
+#' Theme for card figures
+#'
+#' [theme_cfb2nfl()] at a larger base size, so a thumbnail about 400 px wide
+#' on the Investigations wall stays legible, with the caption (source and
+#' release date) set small and left.
+#'
+#' @param base_size Base font size in points.
+#' @return A ggplot2 theme object.
+#' @export
+theme_card <- function(base_size = 20) {
+  theme_cfb2nfl(base_size = base_size) +
+    ggplot2::theme(
+      plot.caption.position = "plot",
+      plot.caption = ggplot2::element_text(
+        hjust = 0,
+        face = "plain",
+        colour = "grey40",
+        size = ggplot2::rel(0.7)
+      )
+    )
+}

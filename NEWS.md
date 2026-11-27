@@ -5,11 +5,13 @@
   helpers every post copied inline are now shared, tested functions**
   (`fmt()`, `pct()`, `wilson()`, `and_join()`). New card helpers turn one
   ggplot into a static thumbnail for the wall (`theme_card()`,
-  `card_caption()` with the data release date from `data_release_date()`,
-  `card_thumbnail()`) and an interactive figure for the card's page
-  (`card_interactive()`). Each thumbnail carries a record of the card's code
-  and the package functions it calls, so `card_freshness()` can tell when a
-  thumbnail no longer matches its card or the data has moved on.
+  `card_caption()`, `card_thumbnail()`) and an interactive figure for the
+  card's page (`card_interactive()`). The caption carries the data release
+  date (`data_release_date()`), from a stamp that `data-raw/pull-data.R` and
+  the site build now write on download. Each thumbnail carries a record of
+  the card's code and the package functions it calls, so `card_freshness()`
+  can tell when a thumbnail no longer matches its card or the data has moved
+  on.
 
 - Explorer (feature F13): **the game view's play card names the players the
   play text lists but the play-stats log leaves out**, mostly tacklers, plus

@@ -4,12 +4,7 @@
 \alias{card_freshness}
 \title{Is a card's thumbnail still in step with its card?}
 \usage{
-card_freshness(
-  card,
-  id,
-  dir = file.path(dirname(card), "card-thumbs"),
-  release = NULL
-)
+card_freshness(card, id, dir = card_thumb_dir(), release = NULL)
 }
 \arguments{
 \item{card}{Path to the card file.}

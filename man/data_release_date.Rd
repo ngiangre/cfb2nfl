@@ -2,17 +2,17 @@
 % Please edit documentation in R/card.R
 \name{data_release_date}
 \alias{data_release_date}
-\title{The data release date of the DuckDB bundle}
+\title{The data release date}
 \usage{
-data_release_date(con)
+data_release_date(dir = file.path(card_root(), "data"))
 }
 \arguments{
-\item{con}{A DBI connection to \code{cfb2nfl.duckdb}.}
+\item{dir}{The data directory.}
 }
 \value{
 A \code{Date}.
 }
 \description{
-Read from the bundle's \verb{_meta} table (\code{\link[=build_meta]{build_meta()}}), so it is the date
-of the \code{data-latest} refresh in track mode too, with no API call.
+The date of the \code{data-latest} release the local data came from, read from
+the stamp \code{\link[=record_release_date]{record_release_date()}} writes on download.
 }

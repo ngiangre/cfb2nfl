@@ -9,3 +9,7 @@ piggyback::pb_download(
   tag = "data-latest",
   dest = "data"
 )
+# Stamp the release date for card captions (data_release_date()); the
+# DuckDB's own _meta timestamp dates each rebuild, not the release.
+pkgload::load_all(quiet = TRUE)
+record_release_date("data")

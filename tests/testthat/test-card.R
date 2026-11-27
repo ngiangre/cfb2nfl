@@ -1,17 +1,6 @@
 # Card helpers (feature F25): the release date, the card theme, thumbnails
 # and their freshness sidecar.
 
-meta_con <- function(refreshed_at = "2026-11-25 15:58:50") {
-  skip_if_not_installed("duckdb")
-  con <- DBI::dbConnect(duckdb::duckdb())
-  DBI::dbWriteTable(
-    con,
-    "_meta",
-    data.frame(refreshed_at = as.POSIXct(refreshed_at, tz = "UTC"))
-  )
-  con
-}
-
 write_card <- function(
   dir,
   code = "p <- ggplot2::ggplot()",
@@ -25,10 +14,25 @@ write_card <- function(
   path
 }
 
-test_that("data_release_date reads the refresh date from the bundle's _meta table", {
-  con <- meta_con()
-  on.exit(DBI::dbDisconnect(con, shutdown = TRUE))
-  expect_equal(data_release_date(con), as.Date("2026-11-25"))
+test_that("data_release_date reads the stamp written when the release was downloaded", {
+  dir <- withr::local_tempdir()
+  write_release_stamp(as.POSIXct("2026-11-25 20:59:20", tz = "UTC"), dir)
+  expect_equal(data_release_date(dir), as.Date("2026-11-25"))
+})
+
+test_that("data_release_date errors with a pointer when no release was downloaded", {
+  dir <- withr::local_tempdir()
+  expect_error(data_release_date(dir), "pull-data")
+})
+
+test_that("card paths resolve to vignettes/ in the checkout, not the render copy", {
+  withr::local_envvar(CFB2NFL_ROOT = "/repo")
+  expect_equal(card_root(), "/repo")
+  expect_equal(
+    card_source("/repo/_quarto/vignettes/card-x.qmd"),
+    file.path("/repo", "vignettes", "card-x.qmd")
+  )
+  expect_equal(card_thumb_dir(), file.path("/repo", "vignettes", "card-thumbs"))
 })
 
 test_that("card_caption names the source and the release date", {

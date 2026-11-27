@@ -5,49 +5,80 @@
 # when a thumbnail no longer matches its card's code or the R/ functions it
 # calls (file times are useless: a fresh checkout resets them).
 
-#' The data release date of the DuckDB bundle
+#' Record the date of the downloaded data release
 #'
-#' Read from the bundle's `_meta` table ([build_meta()]), so it is the date
-#' of the `data-latest` refresh in track mode too, with no API call.
+#' Run after downloading `data-latest` (`data-raw/pull-data.R`, the
+#' `site.yaml` download step). The DuckDB's own `_meta` timestamp cannot be
+#' used: every fresh `tar_make()` rebuilds the bundle and restamps it, so it
+#' would date the build, not the release.
 #'
-#' @param con A DBI connection to `cfb2nfl.duckdb`.
+#' @param dest The data directory the release was downloaded into.
+#' @param repo,tag The release to read the asset timestamp from.
+#' @return The stamp path, invisibly.
+#' @export
+record_release_date <- function(
+  dest = "data",
+  repo = "ngiangre/cfb2nfl",
+  tag = "data-latest"
+) {
+  assets <- piggyback::pb_list(repo = repo, tag = tag)
+  ts <- assets$timestamp[assets$file_name == "cfb2nfl.duckdb"]
+  write_release_stamp(ts[[1]], dest)
+}
+
+#' @rdname record_release_date
+#' @param time The release asset's upload time.
+#' @export
+write_release_stamp <- function(time, dest = "data") {
+  path <- file.path(dest, ".release-date")
+  writeLines(format(as.Date(time, tz = "UTC"), "%Y-%m-%d"), path)
+  invisible(path)
+}
+
+#' The data release date
+#'
+#' The date of the `data-latest` release the local data came from, read from
+#' the stamp [record_release_date()] writes on download.
+#'
+#' @param dir The data directory.
 #' @return A `Date`.
 #' @export
-data_release_date <- function(con) {
-  meta <- DBI::dbGetQuery(con, "SELECT refreshed_at FROM _meta LIMIT 1")
-  as.Date(meta$refreshed_at[[1]])
+data_release_date <- function(dir = file.path(card_root(), "data")) {
+  path <- file.path(dir, ".release-date")
+  if (!file.exists(path)) {
+    cli::cli_abort(c(
+      "No data release stamp at {.path {path}}.",
+      "i" = "Download the release with {.file data-raw/pull-data.R}, which records its date."
+    ))
+  }
+  as.Date(readLines(path, n = 1, warn = FALSE))
 }
 
-#' Caption line for a card figure
+#' Where a card lives in the checkout
 #'
-#' @param release The data release date ([data_release_date()]).
-#' @param source Who the data comes from.
-#' @return One string for `labs(caption = )`.
+#' altdoc renders a copy of each vignette under `_quarto/`, which git
+#' ignores, so card paths resolve against the checkout (`CFB2NFL_ROOT`, else
+#' the package root) to keep thumbnails where they are committed.
+#'
+#' @param input The file being rendered.
+#' @return `card_root()`: the checkout root. `card_source()`: the card's
+#'   path under `vignettes/`. `card_thumb_dir()`: the thumbnail directory.
 #' @export
-card_caption <- function(release, source = "CFBD, nflverse") {
-  paste0("Data: ", source, " | data release ", format(release, "%Y-%m-%d"))
+card_root <- function() {
+  root <- Sys.getenv("CFB2NFL_ROOT")
+  if (nzchar(root)) root else pkgload::pkg_path()
 }
 
-#' Theme for card figures
-#'
-#' [theme_cfb2nfl()] at a larger base size, so a thumbnail about 400 px wide
-#' on the Investigations wall stays legible, with the caption (source and
-#' release date) set small and left.
-#'
-#' @param base_size Base font size in points.
-#' @return A ggplot2 theme object.
+#' @rdname card_root
 #' @export
-theme_card <- function(base_size = 20) {
-  theme_cfb2nfl(base_size = base_size) +
-    ggplot2::theme(
-      plot.caption.position = "plot",
-      plot.caption = ggplot2::element_text(
-        hjust = 0,
-        face = "plain",
-        colour = "grey40",
-        size = ggplot2::rel(0.7)
-      )
-    )
+card_source <- function(input = knitr::current_input()) {
+  file.path(card_root(), "vignettes", basename(input))
+}
+
+#' @rdname card_root
+#' @export
+card_thumb_dir <- function() {
+  file.path(card_root(), "vignettes", "card-thumbs")
 }
 
 #' The R code of a card
@@ -128,7 +159,7 @@ card_hashes <- function(card) {
 #' of the card's R code, a hash of every package function it calls
 #' ([card_functions()]) and the data release, for [card_freshness()].
 #' Called inside the card while it renders, so `card` defaults to the file
-#' being knit.
+#' being knit, resolved to its source under `vignettes/` ([card_source()]).
 #'
 #' @param p A ggplot (styled with [theme_card()]).
 #' @param id The card id (`card-<id>.qmd`).
@@ -142,9 +173,9 @@ card_hashes <- function(card) {
 card_thumbnail <- function(
   p,
   id,
-  card = knitr::current_input(dir = TRUE),
+  card = card_source(),
   release = NULL,
-  dir = file.path(dirname(card), "card-thumbs"),
+  dir = card_thumb_dir(),
   width = 8,
   height = 5.5,
   dpi = 120
@@ -194,7 +225,7 @@ card_thumbnail <- function(
 card_freshness <- function(
   card,
   id,
-  dir = file.path(dirname(card), "card-thumbs"),
+  dir = card_thumb_dir(),
   release = NULL
 ) {
   png <- file.path(dir, paste0(id, ".png"))

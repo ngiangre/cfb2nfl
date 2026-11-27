@@ -7,9 +7,9 @@
 card_thumbnail(
   p,
   id,
-  card = knitr::current_input(dir = TRUE),
+  card = card_source(),
   release = NULL,
-  dir = file.path(dirname(card), "card-thumbs"),
+  dir = card_thumb_dir(),
   width = 8,
   height = 5.5,
   dpi = 120
@@ -38,5 +38,5 @@ Writes \verb{<dir>/<id>.png} and \verb{<dir>/<id>.json}; the sidecar records a h
 of the card's R code, a hash of every package function it calls
 (\code{\link[=card_functions]{card_functions()}}) and the data release, for \code{\link[=card_freshness]{card_freshness()}}.
 Called inside the card while it renders, so \code{card} defaults to the file
-being knit.
+being knit, resolved to its source under \verb{vignettes/} (\code{\link[=card_source]{card_source()}}).
 }
