@@ -1,0 +1,13 @@
+{
+  "id": "allen-buechele-college-to-nfl",
+  "release": "2026-11-25",
+  "code_hash": "528f0b182199d56f1069ecf4c8f0a202",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "contract_player_trajectory": "12762bd3b04820e182f6d90157fa1635",
+    "enforce_contract": "3311fcef4f5352c774bcd4492d3f05b0",
+    "player_trajectory": "65b6bd5c9a2b1bdcc88bc2aed795922b",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

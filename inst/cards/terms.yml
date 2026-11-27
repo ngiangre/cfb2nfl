@@ -92,3 +92,32 @@ matched-recruiting-record:
 seasons-and-players:
   label: Seasons and players
   definition: "Some cards count eligible seasons, others players. A player has several eligible seasons but his NFL entry falls on one of them, so drafted and undrafted totals nearly match; the career-ending cards also leave out players ruled out or with no recorded position, so their totals run slightly lower."
+
+# ---- batch movement ----
+stat-line-season:
+  label: Player-season with a stat line
+  definition: "One season on a college roster in which the player has a recorded stat line. Seasons without one are not counted, so a move between two such seasons is the only kind of transfer the transfer cards can see."
+transfer-event:
+  label: Transfer
+  definition: "A season at a school different from the player's previous observed season. A gap season between the two, such as a redshirt year, does not hide the move."
+competition-tier:
+  label: Competition tier
+  definition: "The conference tier of a school in that season: Power for the Power conferences, Group of Five for the other Football Bowl Subdivision conferences, and FCS and below for the Football Championship Subdivision and lower divisions. Conferences are placed season by season, so realignment is followed."
+transfer-direction:
+  label: Direction of a transfer
+  definition: "Whether the new school sits in a higher tier, the same tier, or a lower tier than the old one. A move between two programs in the same tier is 'same tier' even when one program is far stronger."
+harmonized-position-group:
+  label: Position group (across sources)
+  definition: "One of eleven shared groups that map the position codes of the recruiting, college roster and NFL draft records onto each other. Athlete means the player is listed only as ATH, with no group to carry; Position not recorded covers blank or unknown codes."
+linked-recruit:
+  label: Linked recruit
+  definition: "A high-school recruiting record joined to a college athlete by name, or, when the college name is not on file, by the school he committed to and his class year. A link can join two different people, so the linking rule is checked by hand against a sample."
+recruiting-profile:
+  label: Recruiting profile
+  definition: "The star grade (two to five), the composite rating and the national rank that a recruiting service gave a high-school prospect for his class."
+roster-season:
+  label: Roster season
+  definition: "A season in which the player appears on a college or NFL team's roster, whatever his role. It shows presence on a roster, not playing time or statistics."
+nfl-draft-link:
+  label: NFL draft record
+  definition: "The nflverse draft pick matched to a college athlete by draft slot and checked by name. A player with no draft record went undrafted, whether or not an NFL club later signed him."

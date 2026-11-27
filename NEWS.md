@@ -5,6 +5,13 @@
   markdown, and stock palettes (viridis, the qualitative ColorBrewer sets)
   that reuse the drafted, undrafted or quarterback colours.
 
+- Investigations (feature F25,
+  [#145](https://github.com/ngiangre/cfb2nfl/issues/145)): **the transfers,
+  position-stability and Buechele and Allen posts are figure cards**
+  ([decision 0054](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0054-figure-cards-replace-dated-posts.md)).
+  Their pages redirect to the main card, and every section's fate is in
+  `inst/cards/migration.yml`. Rates stop at the last complete college season.
+
 - Investigations (feature F25): **the figure wall's tiles resize with the
   screen** instead of holding a fixed width, so on a phone they fit one
   column without overflowing; thumbnails keep their own proportions, and

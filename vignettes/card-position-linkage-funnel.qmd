@@ -1,0 +1,113 @@
+---
+title: "How many college athletes can be placed in a position group at each stage?"
+image: card-thumbs/position-linkage-funnel.png
+image-alt: "Horizontal bar chart of the share of college athlete ids placed at each stage, from every roster athlete down to the NFL position. Only a minority of athletes link to a high school recruit record, and fewer still link to an NFL draft record; the linked stages are dark and the rest pale."
+categories: ["Topic: Movement", "Position: All positions", "Population: College athletes", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [linked-recruit, harmonized-position-group, recruiting-profile, roster-season, nfl-draft-link]
+followups:
+  - text: "Add the recruit's hometown to the school and class year check, to cut the estimated share of those links that join two different people."
+    link: "F22"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# position table, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+DBI::dbDisconnect(con, shutdown = TRUE)
+# The position path is a contract-checked pipeline target, read from the
+# targets store rather than the DuckDB (decision 0041).
+pp <- targets::tar_read(position_path, store = file.path(root, "_targets"))
+```
+
+```{r}
+#| label: stages
+# Each stage counts the college athlete ids that can be placed at it; a stage is
+# a subset of the one above except the three link methods, which split the
+# linked recruits.
+n_all <- nrow(pp)
+method_count <- function(m) sum(pp$hs_linked & pp$hs_link_method %in% m, na.rm = TRUE)
+stages <- tibble::tribble(
+  ~stage,                                    ~players,                                ~linked,
+  "All college athletes",                    n_all,                                   FALSE,
+  "Linked to a high school recruit",         sum(pp$hs_linked),                       TRUE,
+  "   by the same name",                     method_count("name"),                    TRUE,
+  "   by a name variant",                    method_count("name_variant"),            TRUE,
+  "   by school and class year",             method_count("school_year"),             TRUE,
+  "High school position recorded",           sum(pp$hs_linked & !is.na(pp$hs_group) & pp$hs_group != "Position not recorded"), FALSE,
+  "College position recorded",               sum(pp$college_groups > 0),              FALSE,
+  "Drafted",                                 sum(pp$drafted),                         FALSE,
+  "Linked to an NFL draft record",           sum(pp$nfl_linked),                      FALSE,
+  "NFL position recorded",                   sum(!is.na(pp$nfl_group)),               FALSE
+) |>
+  mutate(
+    stage = factor(stage, levels = rev(stage)),
+    share = players / n_all,
+    tip = sprintf(
+      "%s: %s athlete ids (%.1f%% of the roster ids)",
+      stage,
+      formatC(players, big.mark = ",", format = "d"),
+      100 * share
+    ),
+    label = sprintf(
+      "%.1f%% (%s)",
+      100 * share,
+      formatC(players, big.mark = ",", format = "d")
+    )
+  )
+```
+
+```{r}
+#| label: figure
+# How far each stage reaches into the roster: the link stages are the ones
+# that let a position be compared across sources.
+p <- ggplot(stages, aes(100 * share, stage)) +
+  geom_col_interactive(
+    aes(fill = linked, tooltip = tip, data_id = as.character(stage)),
+    width = 0.7
+  ) +
+  geom_text(aes(label = label), hjust = -0.05, size = 4.2) +
+  scale_fill_manual(values = c(`TRUE` = "#374151", `FALSE` = "gray70")) +
+  guides(fill = "none") +
+  scale_x_continuous(
+    labels = function(x) sprintf("%.0f%%", x),
+    limits = c(0, 175),
+    breaks = c(0, 50, 100)
+  ) +
+  labs(
+    title = "Athletes placed at each linkage stage",
+    subtitle = "Share of all college athletes; dark: linked to a recruit",
+    x = "Share of all college athletes",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "position-linkage-funnel", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+```

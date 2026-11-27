@@ -1,0 +1,16 @@
+{
+  "id": "transfer-direction",
+  "release": "2026-11-25",
+  "code_hash": "c93ce0819a3cef57313e1b35e5ddf639",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "last_complete_cfb_season": "f279fba0ac2a12d60dd7965db5dd1f30",
+    "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
+    "running_cast": "d7bf7a57f65209a6ee8b3250af8c3461",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b",
+    "transfer_direction_levels": "8a564b60a63a731b00831c7e0a722701",
+    "transfer_events": "909013dec0e8684af416347375fc4160",
+    "transfer_tier_levels": "6d8438139bdab2139e1eb5571615f99a"
+  }
+}

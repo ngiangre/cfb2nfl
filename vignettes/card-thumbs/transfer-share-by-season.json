@@ -1,0 +1,17 @@
+{
+  "id": "transfer-share-by-season",
+  "release": "2026-11-25",
+  "code_hash": "6411b01efc54c27628ae983d706208da",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "fmt": "d4c89f195c447af907ba425a860522de",
+    "last_complete_cfb_season": "f279fba0ac2a12d60dd7965db5dd1f30",
+    "pct": "3413c026fc8c907293b2fb1d96080440",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b",
+    "transfer_rate": "d2d235730e0adcacc08f80c71992fffa",
+    "transfer_share_by_season": "0cc87baac353b3181c03ef7e2b54a715",
+    "transfer_tier_levels": "6d8438139bdab2139e1eb5571615f99a",
+    "wilson": "65af8ccc8d3f2b6cdd25b54bc520f7d4"
+  }
+}

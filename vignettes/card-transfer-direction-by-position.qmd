@@ -1,0 +1,156 @@
+---
+title: "Which positions move down a competition tier most often?"
+image: card-thumbs/transfer-direction-by-position.png
+image-alt: "Horizontal bar chart of the share of each position group's transfers that went to a lower competition tier, ordered from highest to lowest. Quarterback and running back are the two highest, highlighted orange, and the other groups fall below them."
+categories: ["Topic: Movement", "Position: By position group", "Population: Stat-line seasons", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [stat-line-season, transfer-event, competition-tier, transfer-direction, position-group]
+followups:
+  - text: "Check whether the position pattern holds once playing time at the old school is controlled."
+    link: "F08"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+ps <- collect(tbl(con, "ps_change"))
+DBI::dbDisconnect(con, shutdown = TRUE)
+# The current college season is still being played, so its partial stat lines
+# are left out of the shares (decision 0053 and the card rules).
+through <- last_complete_cfb_season()
+ev <- transfer_events(ps) |>
+  filter(season <= through, group != "Position not recorded")
+```
+
+```{r}
+#| label: figure
+# Each position group's transfers that moved to a lower tier. Quarterbacks and
+# running backs are highlighted because they are the question's answer.
+down_tab <- ev |>
+  group_by(group) |>
+  summarise(
+    transfers = n(),
+    down = sum(direction == "To a lower tier"),
+    .groups = "drop"
+  ) |>
+  mutate(
+    down_share = down / transfers,
+    tip = sprintf(
+      "%s: %.1f%% of %s transfers moved to a lower tier",
+      group,
+      100 * down_share,
+      formatC(transfers, big.mark = ",", format = "d")
+    ),
+    label = sprintf(
+      "%.1f%% of %s",
+      100 * down_share,
+      formatC(transfers, big.mark = ",", format = "d")
+    ),
+    highlight = case_when(
+      group == "Quarterback" ~ "quarterback",
+      group == "Running back" ~ "running back",
+      TRUE ~ "other"
+    )
+  )
+
+p <- ggplot(down_tab, aes(100 * down_share, reorder(group, down_share))) +
+  geom_col_interactive(
+    aes(fill = highlight, tooltip = tip, data_id = as.character(group)),
+    width = 0.7
+  ) +
+  geom_text(aes(label = label), hjust = -0.05, size = 4.2) +
+  scale_fill_manual(
+    values = c(quarterback = "#D95F02", `running back` = "#374151", other = "gray65")
+  ) +
+  guides(fill = "none") +
+  expand_limits(x = 60) +
+  scale_x_continuous(labels = function(x) sprintf("%.0f%%", x)) +
+  labs(
+    title = "Transfers to a lower tier by position",
+    subtitle = "Share of each position group's transfers; orange: quarterback, dark: running back",
+    x = "Transfers to a lower tier",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "transfer-direction-by-position", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: full-mix
+# Each group's full direction mix, so the reader can see what the down share
+# replaces: the rest of a group's moves were up or sideways.
+mix <- ev |>
+  count(group, direction, name = "moves") |>
+  group_by(group) |>
+  mutate(
+    mix_share = moves / sum(moves),
+    group = factor(group, levels = levels(reorder(down_tab$group, down_tab$down_share)))
+  ) |>
+  ungroup() |>
+  mutate(
+    move = case_when(
+      direction == "To a higher tier" ~ "up",
+      direction == "Same tier" ~ "same",
+      TRUE ~ "down"
+    ),
+    move = factor(move, levels = c("down", "same", "up")),
+    tip = sprintf(
+      "%s, %s: %.1f%% (%s transfers)",
+      group,
+      tolower(as.character(direction)),
+      100 * mix_share,
+      formatC(moves, big.mark = ",", format = "d")
+    )
+  )
+
+p_mix <- ggplot(mix, aes(100 * mix_share, group, fill = move)) +
+  geom_col_interactive(
+    aes(tooltip = tip, data_id = paste(group, move)),
+    width = 0.7
+  ) +
+  scale_fill_manual(
+    values = c(up = "#1D4ED8", same = "#374151", down = "#9CA3AF"),
+    labels = c(up = "To a higher tier", same = "Same tier", down = "To a lower tier"),
+    breaks = c("down", "same", "up")
+  ) +
+  scale_x_continuous(labels = function(x) sprintf("%.0f%%", x)) +
+  labs(
+    title = "Every position's full direction mix",
+    subtitle = "Share of each position group's transfers by direction",
+    x = "Share of the group's transfers",
+    y = NULL,
+    fill = NULL,
+    caption = "Hover a segment for the count."
+  ) +
+  theme_card()
+card_interactive(p_mix)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+```
