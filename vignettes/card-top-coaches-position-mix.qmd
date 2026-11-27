@@ -114,7 +114,7 @@ p <- ggplot(bars, aes(share, coach_name, fill = group)) +
   theme(legend.text = element_text(size = 11)) +
   guides(fill = guide_legend(nrow = 3, byrow = TRUE))
 
-card_thumbnail(p, "top-coaches-position-mix", release = release)
+card_thumbnail(p, "top-coaches-position-mix", release = release, height = 7.5)
 card_interactive(p, width_svg = 13, height_svg = 9)
 ```
 
