@@ -1,7 +1,7 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
 - Investigations (feature F25,
-  [#133](https://github.com/ngiangre/cfb2nfl/issues/133)): **the first 15
+  [#133](https://github.com/ngiangre/cfb2nfl/issues/133)): **the first 14
   figure cards are up**, every figure from the three draft-outcome posts
   (outcome prevalence, drafted rate by position, how careers end), Data
   sections included. Each card asks one question, carries its figure as a

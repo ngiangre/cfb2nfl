@@ -1,10 +1,11 @@
 {
   "id": "nfl-route-chance-by-season",
   "release": "2026-11-25",
-  "code_hash": "fb1a9e30a8cf605ee51c546a15cc05f6",
+  "code_hash": "7f0f36ced937ef7f578c2b5a5a41b734",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
     "career_endings": "4fa3d0c4500176cd13cd4e8d68487bed",
+    "eligible_risk_set": "454454253743138b58529b8ff72e9fa8",
     "ending_hazards": "f06b09bdd66132059312b0ae7f0b4a2e",
     "ending_incidence": "0ff847f04597913c0df54952a0b6a33c",
     "ending_labels": "d7e87df8d8263aa1b5193e5033cc1268",

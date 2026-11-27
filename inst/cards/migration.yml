@@ -37,9 +37,9 @@
   reason: "Figures moved; the status table restated the figure and was dropped."
 - post: 2026-10-24-outcome-prevalence
   section: "3.4 The chance of entry climbs steeply through the third eligible season, then levels off"
-  fate: card
-  card: entry-chance-by-eligible-season
-  reason: "Figures moved; the per-season table restated the figure's points (hover carries each value) and was dropped. The arrows to Ward's and Travis's draft seasons were dropped from the thumbnail."
+  fate: merged
+  card: nfl-route-chance-by-season
+  reason: "Its per-season curves repeated the career-endings card's (counting seasons rather than players), so the two cards merged: the era split moved to that card's page. The per-season table and the arrows to Ward's and Travis's draft seasons were dropped."
 - post: 2026-10-24-outcome-prevalence
   section: "3.5 The drafted share of eligible seasons has fallen across draft classes"
   fate: card
