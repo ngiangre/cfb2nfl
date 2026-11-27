@@ -1,0 +1,173 @@
+---
+title: "Do any two position groups share a middle half on weight and the forty-yard dash?"
+image: card-thumbs/combine-position-size-and-speed.png
+image-alt: "Rectangles on a weight and forty-yard-dash plane, one per position group and labelled with its name, each spanning that group's middle half; most rectangles sit apart, and the groups whose rectangles overlap are outlined in dark grey."
+categories: ["Topic: Combine", "Position: By position group", "Population: Combine invitees", "Figure: Distribution"]
+status: investigation
+graduated_to: null
+terms: [combine, invitee, middle-half]
+followups:
+  - text: "Ask whether combine measurables add to in-career production in a draft-time model, kept apart from the in-career forecasts."
+    link: "Question: What matters for going pro"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+pos_levels <- position_group_levels()
+combine <- DBI::dbReadTable(con, "combine") |>
+  mutate(position_group = factor(combine_position_group(pos), pos_levels))
+combine_years <- range(combine$season)
+combine_span <- paste0(combine_years[1], " to ", combine_years[2], " combines")
+measures <- explorer_combine_measures()
+# Special teams invitees rarely run the 40, so separation compares the other eight.
+sep_levels <- setdiff(pos_levels, "Special teams")
+claim_fill <- "#374151"
+context_fill <- "#9CA3AF"
+q <- function(x, p) unname(stats::quantile(x, p, na.rm = TRUE))
+
+long <- combine |>
+  select(season, player_name, school, pos, position_group, all_of(measures$key)) |>
+  tidyr::pivot_longer(all_of(measures$key), names_to = "key", values_to = "value") |>
+  left_join(select(measures, key, label, unit), by = "key")
+spread <- long |>
+  filter(!is.na(value)) |>
+  group_by(position_group, key, label, unit) |>
+  summarise(lo = q(value, 0.25), med = stats::median(value), hi = q(value, 0.75), .groups = "drop")
+boxes <- spread |>
+  filter(key %in% c("weight", "forty"), position_group %in% sep_levels) |>
+  select(position_group, key, lo, hi) |>
+  tidyr::pivot_wider(names_from = key, values_from = c(lo, hi))
+overlaps <- function(a_lo, a_hi, b_lo, b_hi) a_lo <= b_hi & b_lo <= a_hi
+pairs <- tidyr::expand_grid(a = seq_len(nrow(boxes)), b = seq_len(nrow(boxes))) |>
+  filter(a < b) |>
+  mutate(
+    pair = paste(boxes$position_group[a], "and", tolower(boxes$position_group[b])),
+    overlap = overlaps(boxes$lo_weight[a], boxes$hi_weight[a], boxes$lo_weight[b], boxes$hi_weight[b]) &
+      overlaps(boxes$lo_forty[a], boxes$hi_forty[a], boxes$lo_forty[b], boxes$hi_forty[b])
+  )
+overlap_groups <- unique(c(
+  as.character(boxes$position_group[pairs$a[pairs$overlap]]),
+  as.character(boxes$position_group[pairs$b[pairs$overlap]])
+))
+```
+
+```{r}
+#| label: figure
+p <- boxes |>
+  mutate(
+    in_overlap = position_group %in% overlap_groups,
+    tip = sprintf(
+      "%s: weight %.0f to %.0f lb, forty-yard dash %.2f to %.2f s",
+      position_group,
+      lo_weight,
+      hi_weight,
+      lo_forty,
+      hi_forty
+    )
+  ) |>
+  ggplot() +
+  geom_rect_interactive(
+    aes(
+      xmin = lo_weight,
+      xmax = hi_weight,
+      ymin = lo_forty,
+      ymax = hi_forty,
+      fill = position_group,
+      colour = in_overlap,
+      tooltip = tip,
+      data_id = position_group
+    ),
+    alpha = 0.35,
+    linewidth = 1.3
+  ) +
+  geom_text(
+    aes(
+      x = (lo_weight + hi_weight) / 2,
+      y = (lo_forty + hi_forty) / 2,
+      label = position_group
+    ),
+    colour = "#111827",
+    fontface = "bold",
+    size = 4,
+    check_overlap = TRUE
+  ) +
+  scale_fill_manual(values = position_palette(), guide = "none") +
+  scale_colour_manual(values = c(`FALSE` = context_fill, `TRUE` = claim_fill), guide = "none") +
+  labs(
+    title = "Do any two position groups share a middle half on weight and the forty-yard dash?",
+    subtitle = paste0(
+      "Boxes span each group's middle half, ",
+      combine_span,
+      "; overlapping groups in dark grey"
+    ),
+    x = "Weight (lb)",
+    y = "Forty-yard dash (s)",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "combine-position-size-and-speed", release = release)
+card_interactive(p, width_svg = 13, height_svg = 8)
+```
+
+```{r}
+#| label: invitees
+points <- combine |>
+  filter(!is.na(forty), !is.na(weight), position_group %in% sep_levels) |>
+  mutate(
+    tip = sprintf(
+      "%s (%s, %s), %s: %s lb, forty in %.2f s",
+      player_name,
+      pos,
+      school,
+      season,
+      weight,
+      forty
+    )
+  )
+p_points <- ggplot(points, aes(weight, forty, colour = position_group)) +
+  geom_point_interactive(
+    aes(tooltip = tip, data_id = paste(player_name, season)),
+    size = 1.8,
+    alpha = 0.6
+  ) +
+  scale_colour_position() +
+  labs(
+    title = "Every invitee's weight and forty-yard dash",
+    subtitle = "Each point is one invitee with both measurables recorded",
+    x = "Weight (lb)",
+    y = "Forty-yard dash (s)",
+    colour = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card() +
+  guides(colour = guide_legend(override.aes = list(size = 4, alpha = 1)))
+card_interactive(p_points, width_svg = 13, height_svg = 8)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

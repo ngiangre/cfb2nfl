@@ -1,0 +1,129 @@
+---
+title: "Are head coaches who held the job longer likelier to produce a draftee?"
+image: card-thumbs/coach-tenure-and-draftees.png
+image-alt: "Bar chart of the share of head coaches who produced a draftee from the 2014 classes on, grouped by how many seasons they coached in the window; the share rises with tenure, from the shortest group to the longest."
+categories: ["Topic: Coaches", "Position: All positions", "Population: Head coaches", "Figure: Bar chart", "Question: Head coach effect"]
+status: investigation
+graduated_to: null
+terms: [head-coach, head-coach-tenure, draft-class]
+followups:
+  - text: "Separate the coach from the program with a recruiting control or a same-coach-different-school comparison."
+    link: "Question: Head coach effect"
+  - text: "Output per coach-season, to separate exposure from survivorship: a long-tenured coach has more seasons in which to produce."
+    link: "Question: Head coach effect"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+picks <- DBI::dbReadTable(con, "picks")
+roster <- DBI::dbReadTable(con, "roster")
+coaches <- DBI::dbReadTable(con, "coaches")
+# Coaches are counted over 2013 to 2025 seasons, and a producer is a coach whose
+# draftee (last-school rule) is in a 2014 or later class.
+window_label <- "2014 classes on"
+tenure_window <- "2013 to 2025 seasons"
+links <- coach_draftee_links(picks, roster, coaches, "last", 2014L)
+producers <- unique(links$coach_id)
+ten <- coach_tenure(coaches, producers, from = 2013L, to = 2025L)
+tab <- ten |>
+  group_by(tenure_bin) |>
+  summarise(coaches = n(), producers = sum(produced), .groups = "drop") |>
+  mutate(share = producers / coaches)
+```
+
+```{r}
+#| label: figure
+p <- ggplot(tab, aes(100 * share, tenure_bin)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf(
+        "%s: %d of %d coaches produced a draftee (%.0f%%)",
+        tenure_bin, producers, coaches, 100 * share
+      ),
+      data_id = tenure_bin
+    ),
+    width = 0.65
+  ) +
+  geom_text(
+    aes(label = sprintf("%.0f%%", 100 * share)),
+    hjust = -0.15,
+    size = 4.4
+  ) +
+  scale_fill_manual(values = c(`TRUE` = "#374151", `FALSE` = "#374151"), guide = "none") +
+  scale_x_continuous(
+    labels = function(x) sprintf("%.0f%%", x),
+    breaks = seq(0, 100, 25),
+    limits = c(0, 115)
+  ) +
+  labs(
+    title = "Share of head coaches who produced a draftee, by seasons coached",
+    subtitle = paste0(
+      "Head coaches in the window ",
+      tenure_window,
+      "; draftees from the ",
+      window_label
+    ),
+    x = "Coaches with at least one draftee",
+    y = "Seasons coached",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "coach-tenure-and-draftees", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: by-coach
+ten_named <- ten |>
+  left_join(distinct(coaches, coach_id, coach_name), by = "coach_id") |>
+  mutate(
+    tip =sprintf("%s: %d seasons, %s", coach_name, seasons, ifelse(produced, "produced a draftee", "no draftee"))
+  )
+p_coach <- ggplot(ten_named, aes(seasons, produced)) +
+  geom_point_interactive(
+    aes(tooltip = tip, data_id = coach_id, colour = produced),
+    position = position_jitter(height = 0.12, width = 0, seed = 1),
+    size = 2.2,
+    alpha = 0.7
+  ) +
+  scale_colour_manual(values = c(`TRUE` = "#374151", `FALSE` = "#9CA3AF"), guide = "none") +
+  scale_y_continuous(breaks = c(FALSE, TRUE), labels = c("No draftee", "Produced a draftee")) +
+  scale_x_continuous(breaks = seq(1, 13, 2)) +
+  labs(
+    title = "Every head coach, by seasons coached",
+    subtitle = "One point per coach, spread vertically to show overlap",
+    x = "Seasons coached",
+    y = NULL,
+    caption = "Hover a point for the coach. Draftees are the last-school rule, 2014 classes on."
+  ) +
+  theme_card()
+card_interactive(p_coach, width_svg = 13, height_svg = 6)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

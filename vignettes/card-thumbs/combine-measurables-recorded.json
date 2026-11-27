@@ -1,0 +1,15 @@
+{
+  "id": "combine-measurables-recorded",
+  "release": "2026-11-25",
+  "code_hash": "13c10fdd246a7ca00e9063144c0030fe",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "combine_position_group": "fa922621b568095810c7a114803e9ccb",
+    "explorer_combine_measures": "e333cc941172c44f2cedacb440d1c971",
+    "pct": "3413c026fc8c907293b2fb1d96080440",
+    "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
+    "position_group_levels": "20e3516fb9bf8abbe12f3fd702d9d55f",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

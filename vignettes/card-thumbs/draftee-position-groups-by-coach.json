@@ -1,0 +1,19 @@
+{
+  "id": "draftee-position-groups-by-coach",
+  "release": "2026-11-25",
+  "code_hash": "194a83479ce7d1b3aa2508ae27cc21ae",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "coach_draftee_links": "91e35d1a1b5e00c154f0a8c96e6fb94b",
+    "harmonize_position": "931d9b7daa25b80c9cd17abd32e7b3fd",
+    "link_coaches_picks": "83be9584fc9412908dde09233fa198f7",
+    "position_code_map": "23e4bba7fd7da54066373fb8a9761c45",
+    "position_group_levels": "20e3516fb9bf8abbe12f3fd702d9d55f",
+    "position_palette": "11141b2b531ab5b7f31d6c196fcc46be",
+    "position_sources": "9adac2d8c4dfebfd2fbb956dee1f3a42",
+    "reused_ids": "e252d83597b42db7c6a93169d6ada271",
+    "scale_colour_position": "4cafb87d0ef9e51cdf13934043361fe6",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

@@ -1,0 +1,142 @@
+---
+title: "How many combine invitees can we follow back to their college seasons?"
+image: card-thumbs/combine-invitees-in-the-population.png
+image-alt: "Horizontal stacked bars, one per position group, of combine invitees split into draft-eligible population, linked outside the population, and no college id; the draft-eligible share is dark, the largest unlinked share is in the offensive line bar."
+categories: ["Topic: Combine", "Position: By position group", "Population: Combine invitees", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+aliases: [2026-11-14-combine-measurables-funnel.html]
+terms: [combine, invitee, draft-eligible-population, linked-outside-population, no-college-id, eligible-season]
+followups:
+  - text: "Link more unmatched invitees, mostly offensive linemen without a stat line, through roster names and schools."
+    link: "Question: What matters for going pro"
+  - text: "Add pro-day results for invitees who skip combine drills, to separate a skipped drill from an unmeasured player."
+    link: "Question: What matters for going pro"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+pos_levels <- position_group_levels()
+# Pre-draft inputs (decision 0043): the invitee list, placed by its college id.
+combine <- DBI::dbReadTable(con, "combine") |>
+  mutate(position_group = factor(combine_position_group(pos), pos_levels))
+outcomes <- DBI::dbReadTable(con, "outcomes")
+status_levels <- c(
+  "Draft-eligible population",
+  "Linked, outside the population",
+  "No college id"
+)
+status_key <- c(
+  eligible = "Draft-eligible population",
+  outside_population = "Linked, outside the population",
+  unmatched = "No college id"
+)
+combine_span <- paste0(
+  min(combine$season),
+  " to ",
+  max(combine$season),
+  " combines"
+)
+placed <- combine_funnel_status(combine, outcomes) |>
+  count(position_group, funnel_status) |>
+  mutate(status = factor(status_key[as.character(funnel_status)], status_levels))
+```
+
+```{r}
+#| label: figure
+p <- ggplot(placed, aes(n, forcats::fct_rev(position_group), fill = status)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf("%s, %s: %d invitees", position_group, status, n),
+      data_id = paste(position_group, status)
+    ),
+    width = 0.7
+  ) +
+  scale_fill_manual(
+    values = c(
+      `Draft-eligible population` = "#374151",
+      `Linked, outside the population` = "#9CA3AF",
+      `No college id` = "#D1D5DB"
+    ),
+    labels = c("Draft-eligible", "Linked, outside", "Unlinked"),
+    name = NULL
+  ) +
+  labs(
+    title = "Invitees by position group and how they link to college seasons",
+    subtitle = paste0(
+      "Combines ",
+      combine_span,
+      "; invitees placed in the draft-eligible population, outside it, or unlinked"
+    ),
+    x = "Invitees",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card() +
+  theme(legend.position = "bottom") +
+  guides(fill = guide_legend(nrow = 1))
+
+card_thumbnail(p, "combine-invitees-in-the-population", release = release)
+card_interactive(p, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: by-position
+share_placed <- placed |>
+  group_by(position_group) |>
+  summarise(
+    invitees = sum(n),
+    share = sum(n[status == "Draft-eligible population"]) / sum(n),
+    .groups = "drop"
+  ) |>
+  mutate(position_group = reorder(position_group, share))
+p_share <- ggplot(share_placed, aes(100 * share, position_group)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf("%s: %.0f%% in the population (%d invitees)", position_group, 100 * share, invitees),
+      data_id = as.character(position_group)
+    ),
+    fill = "#374151",
+    width = 0.7
+  ) +
+  scale_x_continuous(labels = function(x) sprintf("%.0f%%", x), limits = c(0, 100)) +
+  labs(
+    title = "How much of each position group can be placed in the population?",
+    subtitle = paste0(
+      "Share of invitees placed among draft-eligible players, ",
+      combine_span
+    ),
+    x = "Share of invitees",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+card_interactive(p_share, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

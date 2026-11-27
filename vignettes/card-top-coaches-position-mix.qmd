@@ -1,0 +1,150 @@
+---
+title: "Do the head coaches with the most draftees send the same position groups to the draft?"
+image: card-thumbs/top-coaches-position-mix.png
+image-alt: "Horizontal stacked bars of the position mix of the eight head coaches with the most draftees, with a pooled bar for all head coaches on top; each bar is a share of that coach's draftees, colored by position group, and the mixes differ from the pooled bar."
+categories: ["Topic: Coaches", "Position: By position group", "Population: Draft picks", "Figure: Bar chart", "Question: Head coach effect"]
+status: investigation
+graduated_to: null
+terms: [draftee-coach-pair, position-group, last-school-rule, draft-class]
+followups:
+  - text: "Position-developer archetypes: does a coach's draftee mix lean offense or defense beyond the program's baseline?"
+    link: "Question: Head coach effect"
+  - text: "Separate the coach from the program: a coach's mix at one school against the same coach's mix at another."
+    link: "Question: Head coach effect"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+picks <- DBI::dbReadTable(con, "picks")
+roster <- DBI::dbReadTable(con, "roster")
+coaches <- DBI::dbReadTable(con, "coaches")
+window_label <- "2014 classes on"
+# Last-school rule, 2014 classes on; a draftee counts once per coach.
+pairs <- coach_draftee_links(picks, roster, coaches, "last", 2014L) |>
+  filter(group %in% position_group_levels()) |>
+  distinct(year, overall, coach_id, coach_name, group)
+totals <- pairs |>
+  count(coach_id, coach_name, name = "n_total", sort = TRUE)
+top_n <- 8L
+top8 <- slice_head(totals, n = top_n)
+# Pooled mix over every head coach, the baseline the coaches are read against.
+baseline <- pairs |>
+  count(group, name = "n") |>
+  mutate(share = n / sum(n), coach_name = "All head coaches")
+group_order <- baseline |>
+  arrange(desc(share)) |>
+  pull(group)
+mix <- pairs |>
+  inner_join(select(top8, coach_id), by = "coach_id") |>
+  count(coach_id, coach_name, group, name = "n") |>
+  left_join(top8, by = c("coach_id", "coach_name")) |>
+  mutate(share = n / n_total) |>
+  select(coach_id, coach_name, group, n, n_total, share)
+# The pooled bar sits on top; coaches follow in count order.
+bars <- bind_rows(
+  mix,
+  baseline |>
+    transmute(
+      coach_id = NA_integer_,
+      coach_name,
+      group,
+      n,
+      n_total = sum(n),
+      share
+    )
+) |>
+  mutate(
+    coach_name = factor(
+      coach_name,
+      c(rev(top8$coach_name), "All head coaches")
+    ),
+    group = factor(group, group_order)
+  )
+```
+
+```{r}
+#| label: figure
+p <- ggplot(bars, aes(share, coach_name, fill = group)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf(
+        "%s: %d of %d draftees are %s (%.0f%%)",
+        coach_name, n, n_total, tolower(as.character(group)), 100 * share
+      ),
+      data_id = paste(coach_name, group)
+    ),
+    width = 0.75
+  ) +
+  scale_fill_manual(values = position_palette()) +
+  scale_x_continuous(labels = function(x) sprintf("%.0f%%", 100 * x), expand = expansion(mult = c(0, 0.02))) +
+  labs(
+    title = "Which position groups do the top coaches' draftees come from?",
+    subtitle = paste0(
+      "Share of each coach's draftees by position group, ",
+      window_label,
+      "; top ",
+      top_n,
+      " coaches against all head coaches"
+    ),
+    x = "Share of the coach's draftees",
+    y = NULL,
+    fill = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card() +
+  theme(legend.text = element_text(size = 11)) +
+  guides(fill = guide_legend(nrow = 3, byrow = TRUE))
+
+card_thumbnail(p, "top-coaches-position-mix", release = release, height = 7.5)
+card_interactive(p, width_svg = 13, height_svg = 9)
+```
+
+```{r}
+#| label: by-count
+p_count <- ggplot(mix, aes(n, coach_name, fill = group)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf("%s: %d %s draftees", coach_name, n, tolower(as.character(group))),
+      data_id = paste(coach_name, group)
+    ),
+    width = 0.75
+  ) +
+  scale_fill_manual(values = position_palette()) +
+  labs(
+    title = "The same top coaches' draftee counts by position group",
+    subtitle = paste0("Draftee-coach pairs, the top ", top_n, " coaches with the most"),
+    x = "Draftee-coach pairs",
+    y = NULL,
+    fill = NULL,
+    caption = "Last-school rule, 2014 classes on. Hover a segment for the coach and group."
+  ) +
+  theme_card()
+card_interactive(p_count, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

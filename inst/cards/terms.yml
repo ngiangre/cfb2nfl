@@ -121,3 +121,50 @@ roster-season:
 nfl-draft-link:
   label: NFL draft record
   definition: "The nflverse draft pick matched to a college athlete by draft slot and checked by name. A player with no draft record went undrafted, whether or not an NFL club later signed him."
+# ---- coaches-combine batch (F25, #147) ----
+last-school-rule:
+  label: Last-school rule
+  definition: "Credits a draftee to the head coach of his final college season, the program he played for last."
+every-season-rule:
+  label: Every-season rule
+  definition: "Credits a draftee to every head coach he played under, so a player who changed programs counts under each."
+coach-set:
+  label: Coach set
+  definition: "The head coaches a draftee is credited to under one rule; two rules name the same coaches when their sets match exactly."
+draftee-coach-pair:
+  label: Draftee and coach pair
+  definition: "One draftee linked to one head coach; a draftee with two coaches under a rule gives two pairs."
+head-coach:
+  label: Head coach
+  definition: "The head coach of a program in a season, from the coaches table; assistant coaches and coordinators are not included."
+head-coach-tenure:
+  label: Head-coach tenure
+  definition: "How many seasons a head coach held the job in the window, counted from the coaches table; a season counts once however many games it had."
+# ---- combine batch (F25, #147) ----
+combine:
+  label: NFL Scouting Combine
+  definition: "A week of measurements and drills each February before the spring draft. The 2021 combine was cancelled, so that year's records come from campus workouts."
+invitee:
+  label: Combine invitee
+  definition: "A player on the combine's list for a year, whether or not he took part in every drill."
+recorded-measurable:
+  label: Recorded measurable
+  definition: "A combine measurable with a value for the invitee. A missing value usually means he chose not to do the drill."
+middle-half:
+  label: Middle half
+  definition: "The range from the 25th to the 75th percentile: half of a position group's invitees fall inside it."
+invitation-rate:
+  label: Invitation rate
+  definition: "Invitees among a draft year's draft-eligible seasons, the share of eligible players the combine invites."
+pro-day-year:
+  label: 2021 pro-day year
+  definition: "The 2021 combine was cancelled, so that year's records are campus pro-day workouts, not a combine. The cards shade it, and its invitee counts are not comparable."
+draft-eligible-population:
+  label: Draft-eligible population
+  definition: "Invitees linked to a college player id who were draft-eligible in their draft year, so their college seasons and draft result are on record."
+linked-outside-population:
+  label: Linked, outside the population
+  definition: "Invitees linked to a college player id who were not draft-eligible in their draft year, such as a player whose eligible seasons are not in the roster data."
+no-college-id:
+  label: No college id
+  definition: "Invitees the link could not match to a college player id, mostly offensive linemen, who rarely have a stat line."

@@ -1,0 +1,157 @@
+---
+title: "Do the two ways of counting a draftee's coaches name the same coaches?"
+aliases: [2026-10-30-counting-coaches.html]
+image: card-thumbs/coach-counting-rules.png
+image-alt: "Line chart of the share of each draft class's picks whose coaches match under the last-school and every-season rules; the earlier classes are pale grey points near the top, and the 2014 and later line is dark, starting near half of picks and ending below 40%."
+categories: ["Topic: Coaches", "Position: All positions", "Population: Draft picks", "Figure: Line chart", "Question: Head coach effect"]
+status: investigation
+graduated_to: null
+terms: [last-school-rule, every-season-rule, coach-set, draftee-coach-pair, draft-class, head-coach]
+followups:
+  - text: "Position-developer archetypes: does a coach's draftee mix lean offense or defense beyond the program's baseline?"
+    link: "Question: Head coach effect"
+  - text: "Separate the coach from the program with a recruiting control or a same-coach-different-school comparison."
+    link: "Question: Head coach effect"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+picks <- DBI::dbReadTable(con, "picks")
+roster <- DBI::dbReadTable(con, "roster")
+coaches <- DBI::dbReadTable(con, "coaches")
+# Both rules name the same coaches only when the sets match exactly. Classes
+# before the window are kept, in grey, to show they agree by construction.
+first_class <- 2011L
+window_from <- 2014L
+window_label <- paste0(window_from, " classes on")
+links_last <- coach_draftee_links(picks, roster, coaches, "last", first_class)
+links_any <- coach_draftee_links(picks, roster, coaches, "any", first_class)
+```
+
+```{r}
+#| label: figure
+# Each pick is one draftee; the two rules are compared as exact coach sets.
+keys <- distinct(links_last, year, overall)
+sets_last <- split(links_last$coach_id, paste(links_last$year, links_last$overall))
+sets_any <- split(links_any$coach_id, paste(links_any$year, links_any$overall))
+jaccard <- function(a, b) length(intersect(a, b)) / length(union(a, b))
+overlap <- keys |>
+  mutate(
+    jacc = vapply(
+      paste(year, overall),
+      \(k) jaccard(sets_last[[k]], sets_any[[k]]),
+      numeric(1)
+    )
+  )
+# Share of draftees whose seasons span more than one school.
+reused <- reused_ids(roster)
+multi_school <- picks |>
+  filter(!is.na(playerId), year >= first_class, !playerId %in% reused) |>
+  distinct(playerId, year, overall) |>
+  inner_join(distinct(roster, playerId, season, team), by = "playerId", relationship = "many-to-many") |>
+  filter(season < year) |>
+  group_by(year, overall) |>
+  summarise(teams_played = n_distinct(team), .groups = "drop")
+by_class <- overlap |>
+  left_join(multi_school, by = c("year", "overall")) |>
+  mutate(transferred = teams_played > 1) |>
+  group_by(year) |>
+  summarise(
+    same_set = mean(jacc == 1),
+    multi_school = mean(transferred, na.rm = TRUE),
+    picks = n(),
+    .groups = "drop"
+  ) |>
+  mutate(in_window = year >= window_from)
+window_mean <- mean(by_class$same_set[by_class$in_window])
+
+p <- ggplot(by_class, aes(year, same_set)) +
+  geom_hline(yintercept = window_mean, linetype = "dashed", colour = "#374151", alpha = 0.6) +
+  geom_line(
+    data = filter(by_class, in_window),
+    colour = "#374151",
+    linewidth = 1.6
+  ) +
+  geom_point_interactive(
+    aes(
+      colour = in_window,
+      tooltip = sprintf("Draft class %d: %.0f%% of %s picks", year, 100 * same_set, fmt(picks)),
+      data_id = year
+    ),
+    size = 3
+  ) +
+  scale_colour_manual(values = c(`FALSE` = "#D1D5DB", `TRUE` = "#374151"), guide = "none") +
+  scale_y_continuous(labels = \(x) sprintf("%.0f%%", 100 * x), limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(min(by_class$year), max(by_class$year), 3)) +
+  labs(
+    title = "Picks whose coaches match under both rules",
+    subtitle = paste0(
+      "Last-school and every-season rules name the same coaches; ",
+      window_label,
+      ", dashed line is the window average"
+    ),
+    x = "Draft class",
+    y = "Share of picks",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "coach-counting-rules", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: by-transfer
+p_tr <- ggplot(by_class, aes(100 * multi_school, 100 * same_set)) +
+  geom_path(colour = "grey70", linewidth = 0.8) +
+  geom_point_interactive(
+    aes(
+      colour = year,
+      tooltip = sprintf(
+        "Draft class %d: %.0f%% of draftees played for more than one school; %.0f%% of %s picks name the same coaches",
+        year, 100 * multi_school, 100 * same_set, fmt(picks)
+      ),
+      data_id = year
+    ),
+    size = 4
+  ) +
+  scale_colour_gradient(low = "#9CA3AF", high = "#374151", guide = "none") +
+  scale_x_continuous(labels = \(x) sprintf("%.0f%%", x)) +
+  scale_y_continuous(labels = \(x) sprintf("%.0f%%", x), limits = c(0, 100)) +
+  labs(
+    title = "More multi-school draftees, less agreement between the rules",
+    subtitle = "Each point is a draft class; darker points are later classes",
+    x = "Draftees who played for more than one school",
+    y = "Picks naming the same coaches",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+card_interactive(p_tr, width_svg = 11, height_svg = 6)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

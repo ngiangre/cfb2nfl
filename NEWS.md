@@ -12,6 +12,17 @@
   Their pages redirect to the main card, and every section's fate is in
   `inst/cards/migration.yml`. Rates stop at the last complete college season.
 
+- Investigations (feature F25,
+  [#147](https://github.com/ngiangre/cfb2nfl/issues/147)): **the coaches and
+  combine posts are now figure cards.** The counting-coaches post becomes
+  six cards on head-coach counting, tenure, draftee positions, the share of
+  draftees, top-coach position mix and draftees by school, and the
+  combine-measurables post becomes seven cards on invitees, recorded
+  measurables, the quarterback skip, position size and speed, forty-yard
+  drift, invitation rate and the drafted rate. Both posts' URLs redirect to
+  their cards, and `inst/cards/migration.yml` records every section's fate.
+  Numbers now come from the 2026-11-25 data release.
+
 - Investigations (feature F25): **the figure wall's tiles resize with the
   screen** instead of holding a fixed width, so on a phone they fit one
   column without overflowing; thumbnails keep their own proportions, and

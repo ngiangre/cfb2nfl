@@ -1,0 +1,184 @@
+---
+title: "Which combine measurable thinned the most across seasons?"
+image: card-thumbs/combine-measurables-recorded.png
+image-alt: "Line chart of the share of combine invitees with each measurable recorded, one line per measurable from the first combine to the last; most lines stay near the top, the bench press line falls furthest and is highlighted, and a grey band marks 2021, which was pro-day data rather than a combine."
+categories: ["Topic: Combine", "Position: All positions", "Population: Combine invitees", "Figure: Line chart"]
+status: investigation
+graduated_to: null
+terms: [combine, invitee, recorded-measurable]
+followups:
+  - text: "Check whether the faster 40-yard dash medians since 2022 come from faster players or from slower players choosing not to run."
+    link: "Question: What matters for going pro"
+  - text: "Add pro-day results for invitees who skip combine drills, to separate a skipped drill from an unmeasured player."
+    link: "Question: What matters for going pro"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+pos_levels <- position_group_levels()
+combine <- DBI::dbReadTable(con, "combine") |>
+  mutate(position_group = factor(combine_position_group(pos), pos_levels))
+combine_years <- range(combine$season)
+measures <- explorer_combine_measures()
+drills <- setdiff(measures$key, c("height", "weight"))
+# 2021 was cancelled, and its records are campus pro-day workouts (pro-day-year).
+pro_day_year <- 2021L
+combine_span <- paste0(combine_years[1], " to ", combine_years[2], " combines")
+
+long <- combine |>
+  select(season, player_name, school, position_group, all_of(measures$key)) |>
+  tidyr::pivot_longer(all_of(measures$key), names_to = "key", values_to = "value") |>
+  left_join(select(measures, key, label), by = "key") |>
+  mutate(label = factor(label, measures$label))
+recorded_season <- long |>
+  group_by(season, key, label) |>
+  summarise(n = n(), recorded = mean(!is.na(value)), .groups = "drop")
+# The first five combines against the last five, as the drop is measured.
+early_window <- combine_years[1]:(combine_years[1] + 4L)
+late_window <- (combine_years[2] - 4L):combine_years[2]
+recorded_change <- recorded_season |>
+  mutate(
+    window = case_when(
+      season %in% early_window ~ "early",
+      season %in% late_window ~ "late"
+    )
+  ) |>
+  filter(!is.na(window)) |>
+  group_by(key, label, window) |>
+  summarise(recorded = mean(recorded), .groups = "drop") |>
+  tidyr::pivot_wider(names_from = window, values_from = recorded) |>
+  mutate(change = late - early)
+biggest_drop <- recorded_change |>
+  filter(key %in% drills) |>
+  slice_min(change, n = 1)
+second_drop <- recorded_change |>
+  filter(key %in% drills, key != biggest_drop$key) |>
+  slice_min(change, n = 1)
+```
+
+```{r}
+#| label: figure
+p <- recorded_season |>
+  mutate(
+    is_claim = key == biggest_drop$key,
+    tip = sprintf("%s, %s: %s of %s invitees recorded", label, season, pct(recorded), n)
+  ) |>
+  ggplot(aes(season, recorded, group = label, colour = is_claim)) +
+  annotate(
+    "rect",
+    xmin = pro_day_year - 0.5,
+    xmax = pro_day_year + 0.5,
+    ymin = -Inf,
+    ymax = Inf,
+    fill = "grey90"
+  ) +
+  geom_line(aes(linewidth = is_claim)) +
+  geom_point_interactive(aes(tooltip = tip, data_id = paste(key, season)), size = 2.6) +
+  annotate(
+    "text",
+    x = combine_years[2],
+    y = biggest_drop$late - 0.12,
+    label = as.character(biggest_drop$label),
+    colour = "#374151",
+    hjust = 1,
+    fontface = "bold",
+    size = 5
+  ) +
+  annotate(
+    "text",
+    x = combine_years[2],
+    y = second_drop$late - 0.07,
+    label = as.character(second_drop$label),
+    colour = "#6B7280",
+    hjust = 1,
+    size = 4.5
+  ) +
+  scale_colour_manual(values = c(`FALSE` = "#9CA3AF", `TRUE` = "#374151"), guide = "none") +
+  scale_linewidth_manual(values = c(`FALSE` = 0.6, `TRUE` = 1.6), guide = "none") +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  scale_x_continuous(breaks = seq(combine_years[1], combine_years[2], 2)) +
+  labs(
+    title = "Which combine measurable thinned the most across seasons?",
+    subtitle = paste0(
+      "Share of invitees with each measurable recorded, ",
+      combine_span,
+      "; the largest drop is in dark grey"
+    ),
+    x = "Combine year (shaded 2021: pro-day data)",
+    y = "Share recorded",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "combine-measurables-recorded", release = release)
+card_interactive(p, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: by-position
+grid <- long |>
+  filter(key %in% drills) |>
+  group_by(position_group, season, label) |>
+  summarise(n = n(), recorded = mean(!is.na(value)), .groups = "drop") |>
+  mutate(
+    tip = sprintf(
+      "%s, %s, %s: %s of %s invitees recorded",
+      position_group,
+      label,
+      season,
+      pct(recorded, 0),
+      n
+    )
+  )
+p_grid <- ggplot(grid, aes(season, forcats::fct_rev(position_group), fill = recorded)) +
+  geom_tile_interactive(
+    aes(tooltip = tip, data_id = paste(position_group, label, season)),
+    colour = "white"
+  ) +
+  facet_wrap(~label, ncol = 2) +
+  scale_fill_gradient(
+    low = "#F3F4F6",
+    high = "#374151",
+    labels = scales::percent,
+    limits = c(0, 1)
+  ) +
+  scale_x_continuous(breaks = seq(combine_years[1], combine_years[2], 4)) +
+  labs(
+    title = "Which position groups recorded each drill, year by year?",
+    subtitle = "Share of invitees with the drill recorded, by position group",
+    x = "Combine year",
+    y = NULL,
+    fill = "Recorded",
+    caption = card_caption(release)
+  ) +
+  theme_card() +
+  theme(legend.key.width = grid::unit(2.5, "cm"))
+card_interactive(p_grid, width_svg = 13, height_svg = 10)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
