@@ -47,11 +47,11 @@ n_all <- nrow(pp)
 method_count <- function(m) sum(pp$hs_linked & pp$hs_link_method %in% m, na.rm = TRUE)
 stages <- tibble::tribble(
   ~stage,                                    ~players,                                ~linked,
-  "Roster athlete ids",                      n_all,                                   FALSE,
+  "All college athletes",                    n_all,                                   FALSE,
   "Linked to a high school recruit",         sum(pp$hs_linked),                       TRUE,
-  "Linked by the same name",                 method_count("name"),                    TRUE,
-  "Linked by a name variant",                method_count("name_variant"),            TRUE,
-  "Linked by school and class year",         method_count("school_year"),             TRUE,
+  "   by the same name",                     method_count("name"),                    TRUE,
+  "   by a name variant",                    method_count("name_variant"),            TRUE,
+  "   by school and class year",             method_count("school_year"),             TRUE,
   "High school position recorded",           sum(pp$hs_linked & !is.na(pp$hs_group) & pp$hs_group != "Position not recorded"), FALSE,
   "College position recorded",               sum(pp$college_groups > 0),              FALSE,
   "Drafted",                                 sum(pp$drafted),                         FALSE,
@@ -94,8 +94,8 @@ p <- ggplot(stages, aes(100 * share, stage)) +
   ) +
   labs(
     title = "Athletes placed at each linkage stage",
-    subtitle = "Share of roster athlete ids; dark: linked to a recruit",
-    x = "Share of roster athlete ids",
+    subtitle = "Share of all college athletes; dark: linked to a recruit",
+    x = "Share of all college athletes",
     y = NULL,
     caption = card_caption(release)
   ) +

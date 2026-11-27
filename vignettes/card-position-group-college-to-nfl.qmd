@@ -1,8 +1,8 @@
 ---
 title: "Do drafted players keep their college position in the NFL?"
 image: card-thumbs/position-group-college-to-nfl.png
-image-alt: "Horizontal bar chart of the share of linked draftees who played the same position group in the NFL as in college, one bar per college position group, with a dashed line at the overall share. Most groups sit near the overall share; the shortest bars are the groups whose draftees most often changed position."
-categories: ["Topic: Movement", "Position: By position group", "Population: Draft picks", "Figure: Bar chart"]
+image-alt: "Horizontal dot plot of the share of linked draftees who played the same position group in the NFL as in college, one dot per college position group, with a dashed line at the overall share. Most groups sit near the overall share; the dots furthest left are the groups whose draftees most often changed position."
+categories: ["Topic: Movement", "Position: By position group", "Population: Draft picks", "Figure: Scatter plot"]
 status: investigation
 graduated_to: null
 terms: [nfl-draft-link, position-group, drafted, stat-line-season]

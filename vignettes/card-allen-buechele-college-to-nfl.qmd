@@ -149,12 +149,16 @@ runs <- spine |>
   mutate(run = cumsum(team != lag(team, default = ""))) |>
   group_by(who, run, team, color) |>
   summarise(start = min(season), end = max(season), .groups = "drop") |>
-  mutate(mid = (start + end) / 2)
+  mutate(
+    mid = (start + end) / 2,
+    # The long college name overflows a two-season tile; the abbreviation fits.
+    short = if_else(team == "Texas A&M", "TAMU", team)
+  )
 p <- ggplot(spine, aes(season, who)) +
   geom_tile(aes(fill = color), colour = "white", height = 0.7) +
   geom_text(
     data = runs,
-    aes(x = mid, label = team),
+    aes(x = mid, label = short),
     colour = "white",
     size = 3.6,
     fontface = "bold"
@@ -181,7 +185,7 @@ p_int <- ggplot(spine, aes(season, who)) +
   ) +
   geom_text(
     data = runs,
-    aes(x = mid, label = team),
+    aes(x = mid, label = short),
     colour = "white",
     size = 3.6,
     fontface = "bold"

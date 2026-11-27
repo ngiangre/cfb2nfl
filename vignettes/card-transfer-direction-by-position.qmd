@@ -65,7 +65,11 @@ down_tab <- ev |>
       100 * down_share,
       formatC(transfers, big.mark = ",", format = "d")
     ),
-    highlight = group %in% c("Quarterback", "Running back")
+    highlight = case_when(
+      group == "Quarterback" ~ "quarterback",
+      group == "Running back" ~ "running back",
+      TRUE ~ "other"
+    )
   )
 
 p <- ggplot(down_tab, aes(100 * down_share, reorder(group, down_share))) +
@@ -74,13 +78,15 @@ p <- ggplot(down_tab, aes(100 * down_share, reorder(group, down_share))) +
     width = 0.7
   ) +
   geom_text(aes(label = label), hjust = -0.05, size = 4.2) +
-  scale_fill_manual(values = c(`TRUE` = "#D95F02", `FALSE` = "gray65")) +
+  scale_fill_manual(
+    values = c(quarterback = "#D95F02", `running back` = "#374151", other = "gray65")
+  ) +
   guides(fill = "none") +
   expand_limits(x = 60) +
   scale_x_continuous(labels = function(x) sprintf("%.0f%%", x)) +
   labs(
     title = "Transfers to a lower tier by position",
-    subtitle = "Share of each position group's transfers; orange: quarterback and running back",
+    subtitle = "Share of each position group's transfers; orange: quarterback, dark: running back",
     x = "Transfers to a lower tier",
     y = NULL,
     caption = card_caption(release)

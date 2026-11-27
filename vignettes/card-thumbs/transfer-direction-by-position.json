@@ -1,7 +1,7 @@
 {
   "id": "transfer-direction-by-position",
   "release": "2026-11-25",
-  "code_hash": "60130f9c4e0114e639efca08d53c170a",
+  "code_hash": "cf6849e5cd575d3dd851216bf5826d34",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
     "last_complete_cfb_season": "f279fba0ac2a12d60dd7965db5dd1f30",
