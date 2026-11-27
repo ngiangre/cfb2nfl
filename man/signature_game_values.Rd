@@ -13,7 +13,7 @@ signature_game_values(gp, positions)
 }
 \value{
 One row per player-game with the group, opponent band (a factor in
-\link{opponent_band_levels}), yards and opponent-adjusted residual.
+\code{opponent_band_levels}), yards and opponent-adjusted residual.
 }
 \description{
 Game-level signature yards, banded by opponent strength

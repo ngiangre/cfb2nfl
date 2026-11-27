@@ -80,7 +80,7 @@ signature_season_values <- function(sa, positions) {
 #' @param gp Game production from [build_game_production()].
 #' @param positions Output of [signature_positions()].
 #' @return One row per player-game with the group, opponent band (a factor in
-#'   [opponent_band_levels]), yards and opponent-adjusted residual.
+#'   `opponent_band_levels`), yards and opponent-adjusted residual.
 #' @export
 signature_game_values <- function(gp, positions) {
   gp |>
