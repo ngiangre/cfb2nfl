@@ -132,3 +132,18 @@ expected_draftees <- function(d, x) {
   d$above <- d$drafted - d$expected
   d
 }
+
+#' Colours for the three school tiers
+#'
+#' One palette for every card that plots by tier, so Power, Group of 5 and
+#' FCS-and-below read the same wherever they appear.
+#'
+#' @return A named character vector of hex colours, one per tier label.
+#' @export
+tier_palette <- function() {
+  c(
+    "Power" = "#1d4ed8",
+    "Group of 5" = "#f59e0b",
+    "FCS and below" = "#6b7280"
+  )
+}

@@ -1,0 +1,219 @@
+---
+title: "Which conferences draft the most players at each position?"
+image: card-thumbs/conference-draft-rate-by-position.png
+image-alt: "Horizontal bar chart of the highest conference draft rate at each position group, each bar named with its conference: the SEC leads eight of the nine groups, with bars from about 6 percent for special teams to 25 percent for defensive line, and the Big Ten leads tight end at 16 percent."
+categories: ["Topic: Programs and conferences", "Position: By position group", "Population: Draft-eligible players", "Figure: Bar chart", "Question: Draft chance by position"]
+status: investigation
+graduated_to: null
+terms: [eligible-player, draft-rate, position-group, final-season, tier, power-tier, group-of-5-tier, conference]
+followups:
+  - text: "Forecast each position's draft chance before the draft, then score it once the draft is known."
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+first_season <- 2013L
+last_season <- 2025L # the 2026 season is still being played
+tier_order <- c("Power", "Group of 5", "FCS and below")
+tier_colors <- tier_palette()
+credited <- tbl(con, "team_draft") |>
+  filter(season >= first_season, season <= last_season) |>
+  collect() |>
+  mutate(tier_label = factor(tier_label, levels = tier_order))
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
+
+```{r}
+#| label: compute
+# Notre Dame, a conference of one, is left to the school rankings; FBS
+# players with no recorded position are left out.
+fbs_pos <- credited |>
+  filter(tier_label != "FCS and below", position_group != "Position not recorded") |>
+  mutate(
+    league = case_when(
+      conference == "FBS Independents" & team == "Notre Dame" ~ "Notre Dame",
+      conference == "FBS Independents" ~ "Other FBS independents",
+      .default = conference
+    ),
+    position_group = factor(position_group, levels = position_group_levels())
+  )
+conf_rates <- draft_rates(group_by(fbs_pos, league)) |>
+  arrange(draft_rate)
+league_levels <- conf_rates$league[conf_rates$league != "Notre Dame"]
+conf_pos <- draft_rates(
+  group_by(filter(fbs_pos, league != "Notre Dame"), league, position_group)
+) |>
+  mutate(league = factor(league, levels = league_levels)) |>
+  group_by(position_group) |>
+  mutate(leader = draft_rate == max(draft_rate)) |>
+  ungroup()
+```
+
+```{r}
+#| label: figure
+leaders <- conf_pos |>
+  group_by(position_group) |>
+  slice_max(draft_rate, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  arrange(draft_rate) |>
+  mutate(position_group = factor(position_group, levels = position_group))
+p <- ggplot(leaders, aes(draft_rate, position_group)) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(
+        league, " drafted ", pct(draft_rate), " of its ", tolower(position_group),
+        " eligible players (", drafted, " of ", fmt(eligible), ")"
+      ),
+      data_id = position_group
+    ),
+    fill = "#1B9E77",
+    width = 0.75
+  ) +
+  geom_text(
+    aes(label = paste0(league, ", ", pct(draft_rate, 0))),
+    hjust = -0.05,
+    size = 5,
+    fontface = "bold"
+  ) +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 0.5)) +
+  labs(
+    title = "Highest conference draft rate at each position",
+    subtitle = "Each bar is the leading conference's draft rate, named beside it",
+    x = "Draft rate",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "conference-draft-rate-by-position", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: heatmap
+p_heat <- ggplot(conf_pos, aes(position_group, league, fill = draft_rate)) +
+  geom_tile_interactive(
+    aes(
+      tooltip = paste0(
+        league, ", ", tolower(position_group), ": ", drafted, " drafted of ",
+        fmt(eligible), " eligible (", pct(draft_rate), ")"
+      ),
+      data_id = paste(league, position_group)
+    ),
+    color = "white",
+    linewidth = 1
+  ) +
+  geom_tile(
+    data = filter(conf_pos, leader),
+    fill = NA,
+    color = "#111827",
+    linewidth = 1.6
+  ) +
+  scale_fill_gradient(
+    low = "#f8fafc",
+    high = "#1B9E77",
+    labels = scales::percent,
+    name = "Draft rate"
+  ) +
+  scale_x_discrete(labels = function(x) sub(" ", "\n", x), position = "top") +
+  labs(
+    title = "Draft rate by conference and position group",
+    subtitle = "Outlined: the conference with the highest draft rate at each position",
+    x = NULL,
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_cfb2nfl(base_size = 13) +
+  theme(panel.grid = element_blank())
+card_interactive(p_heat)
+```
+
+```{r}
+#| label: table
+tier_pos <- draft_rates(group_by(fbs_pos, position_group, tier_label)) |>
+  select(position_group, tier_label, eligible, draft_rate) |>
+  tidyr::pivot_wider(
+    names_from = tier_label,
+    values_from = c(eligible, draft_rate)
+  ) |>
+  mutate(ratio = draft_rate_Power / `draft_rate_Group of 5`)
+tier_pos |>
+  transmute(
+    position = as.character(position_group),
+    power_n = fmt(eligible_Power),
+    power_rate = pct(draft_rate_Power),
+    g5_n = fmt(`eligible_Group of 5`),
+    g5_rate = pct(`draft_rate_Group of 5`),
+    ratio = sprintf("%.1f", ratio)
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Position group", "Power eligible", "Power draft rate",
+      "Group of 5 eligible", "Group of 5 draft rate", "Power rate divided by Group of 5 rate"
+    ),
+    caption = sprintf(
+      "Draft rates by position group and tier, final seasons %s to %s. The last column divides the Power draft rate by the Group of 5 draft rate.",
+      first_season,
+      last_season
+    )
+  )
+```
+
+```{r}
+#| label: seasons
+pos_season <- draft_rates(group_by(fbs_pos, position_group, tier_label, season))
+p_seasons <- ggplot(
+  pos_season,
+  aes(season, draft_rate, color = tier_label, group = tier_label)
+) +
+  geom_line(linewidth = 1) +
+  geom_point_interactive(
+    aes(
+      tooltip = paste0(
+        position_group, ", ", tier_label, ", ", season, ": ", drafted,
+        " drafted of ", eligible, " eligible (", pct(draft_rate), ")"
+      ),
+      data_id = paste(position_group, tier_label, season)
+    ),
+    size = 2.2
+  ) +
+  facet_wrap(~position_group, ncol = 3) +
+  scale_color_manual(values = tier_colors, name = NULL) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_continuous(breaks = c(first_season, 2019L, last_season)) +
+  labs(
+    x = "Final college season",
+    y = "Draft rate",
+    title = "Draft rate by position, tier and season",
+    subtitle = "Hover a point for counts",
+    caption = card_caption(release)
+  ) +
+  theme_cfb2nfl(base_size = 14)
+card_interactive(p_seasons)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())

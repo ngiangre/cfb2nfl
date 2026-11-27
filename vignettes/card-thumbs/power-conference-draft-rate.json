@@ -1,13 +1,14 @@
 {
   "id": "power-conference-draft-rate",
   "release": "2026-11-25",
-  "code_hash": "d760ec989c20abb53e9f4f9ede5935b1",
+  "code_hash": "cf4a7ab7e5b253633248b28e7748b01d",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
     "draft_rates": "bc770817a67e1e7635702a29636c50dd",
     "fmt": "d4c89f195c447af907ba425a860522de",
     "pct": "3413c026fc8c907293b2fb1d96080440",
     "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
-    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b",
+    "tier_palette": "f3c0b15b51bf41d5a71c379c73b0c269"
   }
 }

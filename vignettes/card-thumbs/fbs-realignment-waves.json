@@ -1,12 +1,13 @@
 {
   "id": "fbs-realignment-waves",
   "release": "2026-11-25",
-  "code_hash": "1265a482538b73d58149cee6829f9e88",
+  "code_hash": "76ae40abbc8dcfef4d0d229d3cc03c9b",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
     "fmt": "d4c89f195c447af907ba425a860522de",
     "realignment_moves": "8316e9490aded8cd132c925ee6ed8e29",
     "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
-    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b",
+    "tier_palette": "f3c0b15b51bf41d5a71c379c73b0c269"
   }
 }

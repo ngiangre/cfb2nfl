@@ -80,3 +80,10 @@ test_that("expected_draftees fits each tier and matches its total drafted", {
   expect_true(all(out$expected_rate > 0 & out$expected_rate < 1))
   expect_equal(out$above, out$drafted - out$expected)
 })
+
+test_that("tier_palette names the three tiers and gives each a distinct colour", {
+  pal <- tier_palette()
+  expect_equal(names(pal), c("Power", "Group of 5", "FCS and below"))
+  expect_equal(length(unique(pal)), 3L)
+  expect_true(all(grepl("^#[0-9a-f]{6}$", pal)))
+})

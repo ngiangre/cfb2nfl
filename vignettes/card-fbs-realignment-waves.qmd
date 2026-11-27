@@ -33,11 +33,7 @@ con <- DBI::dbConnect(
 )
 release <- data_release_date()
 tier_order <- c("Power", "Group of 5", "FCS and below")
-tier_colors <- c(
-  "Power" = "#1d4ed8",
-  "Group of 5" = "#f59e0b",
-  "FCS and below" = "#6b7280"
-)
+tier_colors <- tier_palette()
 # The last complete season; the 2026 season is still being played.
 last_season <- 2025L
 played <- tbl(con, "team_season") |>

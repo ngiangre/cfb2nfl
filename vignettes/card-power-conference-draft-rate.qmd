@@ -37,11 +37,7 @@ release <- data_release_date()
 first_season <- 2013L # final college seasons, approximately the 2014 draft
 last_season <- 2025L # the 2026 season is still being played
 tier_order <- c("Power", "Group of 5", "FCS and below")
-tier_colors <- c(
-  "Power" = "#1d4ed8",
-  "Group of 5" = "#f59e0b",
-  "FCS and below" = "#6b7280"
-)
+tier_colors <- tier_palette()
 credited <- tbl(con, "team_draft") |>
   filter(season >= first_season, season <= last_season) |>
   collect() |>
