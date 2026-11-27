@@ -1,0 +1,117 @@
+---
+title: "Do the head coaches with the most draftees send the same position groups to the draft?"
+image: card-thumbs/top-coaches-position-mix.png
+image-alt: "Horizontal stacked bars of the position mix of the twelve head coaches with the most draftees, each bar a share of that coach's draftees, colored by position group; the mixes differ, with some bars mostly defensive backs and others mostly offensive linemen."
+categories: ["Topic: Coaches", "Position: By position group", "Population: Draft picks", "Figure: Bar chart", "Question: Head coach effect"]
+status: investigation
+graduated_to: null
+terms: [draftee-coach-pair, position-group, last-school-rule, draft-class]
+followups:
+  - text: "Position-developer archetypes: does a coach's draftee mix lean offense or defense beyond the program's baseline?"
+    link: "Question: Head coach effect"
+  - text: "Separate the coach from the program: a coach's mix at one school against the same coach's mix at another."
+    link: "Question: Head coach effect"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+picks <- DBI::dbReadTable(con, "picks")
+roster <- DBI::dbReadTable(con, "roster")
+coaches <- DBI::dbReadTable(con, "coaches")
+# Last-school rule, 2014 classes on; a draftee counts once per coach.
+pairs <- coach_draftee_links(picks, roster, coaches, "last", 2014L) |>
+  filter(group %in% position_group_levels()) |>
+  distinct(year, overall, coach_id, coach_name, group)
+totals <- pairs |>
+  count(coach_id, coach_name, name = "n_total", sort = TRUE)
+top12 <- slice_head(totals, n = 12)
+mix <- pairs |>
+  inner_join(select(top12, coach_id), by = "coach_id") |>
+  count(coach_id, coach_name, group, name = "n") |>
+  left_join(top12, by = c("coach_id", "coach_name")) |>
+  mutate(
+    share = n / n_total,
+    coach_name = reorder(coach_name, n_total),
+    group = factor(group, position_group_levels())
+  )
+```
+
+```{r}
+#| label: figure
+p <- ggplot(mix, aes(share, coach_name, fill = group)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf(
+        "%s: %d of %d draftees are %s (%.0f%%)",
+        coach_name, n, n_total, tolower(as.character(group)), 100 * share
+      ),
+      data_id = paste(coach_name, group)
+    ),
+    width = 0.75
+  ) +
+  scale_fill_manual(values = position_palette()) +
+  scale_x_continuous(labels = function(x) sprintf("%.0f%%", 100 * x), expand = expansion(mult = c(0, 0.02))) +
+  labs(
+    title = "Which position groups do the top coaches' draftees come from?",
+    subtitle = "Share of each coach's draftees by position group",
+    x = "Share of the coach's draftees",
+    y = NULL,
+    fill = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card() +
+  theme(legend.position = "bottom", legend.text = element_text(size = 10))
+
+card_thumbnail(p, "top-coaches-position-mix", release = release)
+card_interactive(p, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: by-count
+p_count <- ggplot(mix, aes(n, coach_name, fill = group)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf("%s: %d %s draftees", coach_name, n, tolower(as.character(group))),
+      data_id = paste(coach_name, group)
+    ),
+    width = 0.75
+  ) +
+  scale_fill_manual(values = position_palette()) +
+  labs(
+    title = "The same twelve coaches' draftee counts by position group",
+    subtitle = "Draftee-coach pairs, the twelve coaches with the most",
+    x = "Draftee-coach pairs",
+    y = NULL,
+    fill = NULL,
+    caption = "Last-school rule, 2014 classes on. Hover a segment for the coach and group."
+  ) +
+  theme_card()
+card_interactive(p_count, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

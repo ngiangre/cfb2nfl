@@ -1,0 +1,124 @@
+---
+title: "How much of recent draft output do the top head coaches account for?"
+image: card-thumbs/coaches-share-of-draftees.png
+image-alt: "Line chart of the cumulative share of draftee-coach pairs held by head coaches ranked from most to fewest draftees; the first ten coaches, highlighted, hold a large share of the total, and the curve flattens across the long tail of coaches with a few draftees each."
+categories: ["Topic: Coaches", "Position: All positions", "Population: Draft picks", "Figure: Line chart", "Question: Head coach effect"]
+status: investigation
+graduated_to: null
+terms: [head-coach, draftee-coach-pair, last-school-rule, draft-class]
+followups:
+  - text: "Output per coach-season, to separate exposure from survivorship: a long-tenured coach has more seasons in which to produce."
+    link: "Question: Head coach effect"
+  - text: "Succession tree: when a seat changes hands, do draftee outcomes change with the next coach?"
+    link: "Question: Head coach effect"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+picks <- DBI::dbReadTable(con, "picks")
+roster <- DBI::dbReadTable(con, "roster")
+coaches <- DBI::dbReadTable(con, "coaches")
+# Last-school rule, 2014 classes on; a draftee counts once per coach.
+pairs <- coach_draftee_links(picks, roster, coaches, "last", 2014L) |>
+  distinct(year, overall, coach_id, coach_name)
+curve <- pairs |>
+  count(coach_id, coach_name, name = "draftees", sort = TRUE) |>
+  mutate(
+    rank = row_number(),
+    cum_share = cumsum(draftees) / sum(draftees),
+    top = rank <= 10
+  )
+top10_share <- curve$cum_share[curve$rank == 10]
+```
+
+```{r}
+#| label: figure
+p <- ggplot(curve, aes(rank, 100 * cum_share)) +
+  geom_line(colour = "#9CA3AF", linewidth = 1) +
+  geom_point_interactive(
+    aes(
+      colour = top,
+      tooltip = sprintf(
+        "#%d %s: %d draftees; the top %d coaches hold %.0f%% of all pairs",
+        rank, coach_name, draftees, rank, 100 * cum_share
+      ),
+      data_id = coach_id
+    ),
+    size = 2.4
+  ) +
+  scale_colour_manual(values = c(`TRUE` = "#374151", `FALSE` = "#9CA3AF"), guide = "none") +
+  annotate(
+    "text",
+    x = 12,
+    y = 100 * top10_share - 10,
+    label = sprintf("Top ten: %.0f%%", 100 * top10_share),
+    hjust = 0,
+    fontface = "bold",
+    size = 5.5
+  ) +
+  scale_y_continuous(labels = function(x) sprintf("%.0f%%", x), limits = c(0, 100)) +
+  labs(
+    title = "How much of recent draft output do the top head coaches account for?",
+    subtitle = "Cumulative share of draftees, coaches ranked by count",
+    x = "Coach rank (1 is the most draftees)",
+    y = "Cumulative share",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "coaches-share-of-draftees", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: by-coach
+top12 <- slice_head(curve, n = 12) |>
+  mutate(coach_name = reorder(coach_name, draftees))
+p_top <- ggplot(top12, aes(draftees, coach_name)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf("%s: %d draftees", coach_name, draftees),
+      data_id = coach_id
+    ),
+    fill = "#374151",
+    width = 0.7
+  ) +
+  geom_text(aes(label = draftees), hjust = -0.2, size = 4.4) +
+  expand_limits(x = max(top12$draftees) * 1.15) +
+  labs(
+    title = "Which head coaches have the most draftees?",
+    subtitle = "The twelve coaches with the most draftee-coach pairs",
+    x = "Draftee-coach pairs",
+    y = NULL,
+    caption = "A coach's total spans schools, so the count describes the coach, not one school."
+  ) +
+  theme_card()
+card_interactive(p_top, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

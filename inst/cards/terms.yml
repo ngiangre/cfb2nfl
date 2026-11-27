@@ -137,3 +137,6 @@ draftee-coach-pair:
 head-coach:
   label: Head coach
   definition: "The head coach of a program in a season, from the coaches table; assistant coaches and coordinators are not included."
+head-coach-tenure:
+  label: Head-coach tenure
+  definition: "How many seasons a head coach held the job in the window, counted from the coaches table; a season counts once however many games it had."

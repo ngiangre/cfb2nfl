@@ -1,0 +1,126 @@
+---
+title: "Do multi-program head coaches' draftees split across schools or pile up at one?"
+image: card-thumbs/coach-draftees-by-school.png
+image-alt: "Horizontal stacked bars of the draftees of several head coaches who ran more than one program, each segment a school in its team color; some coaches' draftees divide evenly between schools and others come mostly from a single school."
+categories: ["Topic: Coaches", "Position: All positions", "Population: Draft picks", "Figure: Bar chart", "Question: Head coach effect"]
+status: investigation
+graduated_to: null
+terms: [head-coach, draftee-coach-pair, last-school-rule, draft-class]
+followups:
+  - text: "Separate the coach from the program: a coach's draftees at one school against the same coach's draftees at another."
+    link: "Question: Head coach effect"
+  - text: "Output per coach-season, to separate exposure from survivorship: a long-tenured coach has more seasons in which to produce."
+    link: "Question: Head coach effect"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+library(knitr)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+picks <- DBI::dbReadTable(con, "picks")
+roster <- DBI::dbReadTable(con, "roster")
+coaches <- DBI::dbReadTable(con, "coaches")
+teams <- DBI::dbReadTable(con, "teams")
+team_colors <- distinct(teams, team, color)
+# Last-school rule, 2014 classes on; a draftee counts once per coach and school.
+pairs <- coach_draftee_links(picks, roster, coaches, "last", 2014L) |>
+  distinct(year, overall, coach_id, coach_name, team)
+producers <- distinct(pairs, coach_id, coach_name)
+# Programs each producing coach ran in the coaches table.
+programs <- coaches |>
+  filter(coach_id %in% producers$coach_id) |>
+  distinct(coach_id, school) |>
+  count(coach_id, name = "n_programs")
+programs_table <- producers |>
+  left_join(programs, by = "coach_id") |>
+  count(n_programs, name = "coaches")
+multi <- filter(programs, n_programs > 1)
+mover_detail <- pairs |>
+  filter(coach_id %in% multi$coach_id) |>
+  count(coach_id, coach_name, team, name = "draftees") |>
+  group_by(coach_id, coach_name) |>
+  mutate(total = sum(draftees)) |>
+  ungroup()
+```
+
+```{r}
+#| label: figure
+# The twelve multi-program coaches with the most draftees; the rest are in the table.
+top_movers <- mover_detail |>
+  distinct(coach_id, total) |>
+  slice_max(total, n = 12, with_ties = FALSE)
+mover_plot <- mover_detail |>
+  semi_join(top_movers, by = "coach_id") |>
+  left_join(team_colors, by = "team") |>
+  mutate(
+    color = coalesce(color, "#9CA3AF"),
+    coach_name = reorder(coach_name, total)
+  )
+p <- ggplot(mover_plot, aes(draftees, coach_name, group = team)) +
+  geom_col_interactive(
+    aes(
+      fill = color,
+      tooltip = sprintf("%s at %s: %d draftees", coach_name, team, draftees),
+      data_id = paste(coach_name, team)
+    ),
+    position = position_stack(reverse = TRUE),
+    colour = "white",
+    width = 0.7
+  ) +
+  geom_text(
+    data = filter(mover_plot, draftees >= 10),
+    aes(label = team),
+    position = position_stack(vjust = 0.5, reverse = TRUE),
+    colour = "white",
+    size = 4,
+    fontface = "bold"
+  ) +
+  scale_fill_identity() +
+  labs(
+    title = "Do multi-program head coaches' draftees split across schools or pile up at one?",
+    subtitle = "Draftees by school for head coaches who ran more than one program",
+    x = "Draftees",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "coach-draftees-by-school", release = release)
+card_interactive(p, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: programs-table
+programs_table |>
+  arrange(n_programs) |>
+  kable(
+    col.names = c("Programs coached", "Draftee-producing coaches"),
+    caption = "Programs coached by each draftee-producing head coach, 2014 classes on, from the coaches table."
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

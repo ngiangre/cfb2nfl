@@ -1,0 +1,120 @@
+---
+title: "Which position groups supply the most draftees to head coaches?"
+image: card-thumbs/draftee-position-groups-by-coach.png
+image-alt: "Bar chart of the share of head-coach draftees from the 2014 and later classes in each of nine position groups, the two largest groups highlighted dark and the rest grey; the largest groups are receivers and defensive backs and the smallest is quarterbacks."
+categories: ["Topic: Coaches", "Position: By position group", "Population: Draft picks", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [draftee-coach-pair, position-group, last-school-rule, draft-class]
+followups:
+  - text: "Position-developer archetypes: does a coach's draftee mix lean offense or defense beyond the program's baseline?"
+    link: "Question: Head coach effect"
+  - text: "Separate the coach from the program with a recruiting control or a same-coach-different-school comparison."
+    link: "Question: Head coach effect"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+picks <- DBI::dbReadTable(con, "picks")
+roster <- DBI::dbReadTable(con, "roster")
+coaches <- DBI::dbReadTable(con, "coaches")
+# Last-school rule, 2014 classes on. One row per draftee-coach pair.
+links <- coach_draftee_links(picks, roster, coaches, "last", 2014L) |>
+  filter(group %in% position_group_levels())
+# A draftee counts once per coach, so pairs are the unit of the shares.
+pairs <- distinct(links, year, overall, coach_id, coach_name, group)
+by_group <- pairs |>
+  count(group, name = "draftees") |>
+  mutate(share = draftees / sum(draftees))
+coach_group <- pairs |>
+  count(coach_name, group, name = "draftees") |>
+  mutate(group = factor(group, position_group_levels()))
+```
+
+```{r}
+#| label: figure
+# The two largest groups are the claim; the rest are context.
+top_two <- by_group |> arrange(desc(draftees)) |> slice_head(n = 2) |> pull(group)
+by_group <- by_group |>
+  mutate(
+    group = factor(group, rev(position_group_levels())),
+    claim = as.character(group) %in% as.character(top_two)
+  )
+p <- ggplot(by_group, aes(100 * share, group)) +
+  geom_col_interactive(
+    aes(
+      fill = claim,
+      tooltip = sprintf("%s: %d draftee-coach pairs (%.1f%%)", group, draftees, 100 * share),
+      data_id = as.character(group)
+    ),
+    width = 0.7
+  ) +
+  geom_text(aes(label = sprintf("%.1f%%", 100 * share)), hjust = -0.1, size = 4.4) +
+  scale_fill_manual(values = c(`TRUE` = "#374151", `FALSE` = "#9CA3AF"), guide = "none") +
+  expand_limits(x = 100 * max(by_group$share) * 1.2) +
+  scale_x_continuous(labels = function(x) sprintf("%.0f%%", x), expand = expansion(mult = c(0, 0.02))) +
+  labs(
+    title = "Which position groups supply the most draftees to head coaches?",
+    subtitle = "Share of draftee-coach pairs by position group, the two largest in dark grey",
+    x = "Share of draftee-coach pairs",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "draftee-position-groups-by-coach", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: by-coach
+p_coach <- ggplot(coach_group, aes(draftees, group, colour = group)) +
+  geom_point_interactive(
+    aes(
+      tooltip = sprintf("%s: %d %s draftees", coach_name, draftees, tolower(as.character(group))),
+      data_id = coach_name
+    ),
+    position = position_jitter(height = 0.2, width = 0.1, seed = 1),
+    size = 2.2,
+    alpha = 0.75
+  ) +
+  scale_colour_position() +
+  labs(
+    title = "Each head coach's draftees, by position group",
+    subtitle = "One point per coach and position group",
+    x = "Draftee-coach pairs",
+    y = NULL,
+    colour = NULL,
+    caption = "Last-school rule, 2014 classes on. Hover a point for the coach."
+  ) +
+  theme_card() +
+  theme(legend.position = "none")
+card_interactive(p_coach, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
