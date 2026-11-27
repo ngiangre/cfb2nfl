@@ -281,11 +281,13 @@ acceptance criteria.
 - **Tasks:**
 <!-- tasks F25 -->
 - [ ] [#127](https://github.com/ngiangre/cfb2nfl/issues/127) Rework Investigations into a figure wall of cards that graduates ideas to the rest of the site
-- [ ] [#131](https://github.com/ngiangre/cfb2nfl/issues/131) Shared post helpers, the card theme, card_thumbnail() and new_card() in R/ (F25)
+- [x] [#131](https://github.com/ngiangre/cfb2nfl/issues/131) Shared post helpers, the card theme and card_thumbnail() in R/ (F25)
 - [ ] [#132](https://github.com/ngiangre/cfb2nfl/issues/132) Card template, approved tags, questions registry, check_card_style() and the figure wall page (F25)
 - [ ] [#133](https://github.com/ngiangre/cfb2nfl/issues/133) Pilot: migrate the draft-outcomes posts to cards and graduate one card (F25)
 - [ ] [#134](https://github.com/ngiangre/cfb2nfl/issues/134) Decision 0053, goals.md signals and AGENTS.md for the figure wall (F25)
-- [ ] [PR #135](https://github.com/ngiangre/cfb2nfl/pull/135) docs(product): add the F25 figure wall card and sync task links (F25)
+- [x] [PR #135](https://github.com/ngiangre/cfb2nfl/pull/135) docs(product): add the F25 figure wall card and sync task links (F25)
+- [x] [PR #136](https://github.com/ngiangre/cfb2nfl/pull/136) feat(cards): shared number helpers and card thumbnail helpers (F25)
+- [ ] [PR #137](https://github.com/ngiangre/cfb2nfl/pull/137) docs(product): mark F25 in progress and sync task links (F25)
 <!-- /tasks -->
 
 ### F21 · Question status board
@@ -543,7 +545,8 @@ acceptance criteria.
 - **Review:** feature-reviewer 2026-11-26: aligned after changes (applied).
 - **Tasks:**
 <!-- tasks F02 -->
-- [ ] [#126](https://github.com/ngiangre/cfb2nfl/issues/126) perf(pipeline): keep large data-frame targets lazy with an Arrow-backed custom format
+- [x] [#126](https://github.com/ngiangre/cfb2nfl/issues/126) perf(pipeline): keep large data-frame targets lazy with an Arrow-backed custom format
+- [x] [PR #138](https://github.com/ngiangre/cfb2nfl/pull/138) perf(pipeline): keep the largest tables lazy with an Arrow-backed format (F02)
 <!-- /tasks -->
 
 ### F15 · Technical pages: Data, Pipeline, Reference
