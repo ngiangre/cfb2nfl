@@ -36,6 +36,9 @@ Population:
   - Recruits
   # batch movement (F25)
   - College athletes
+  # coaches-combine batch (F25, #147)
+  - Head coaches
+  - NFL rookies
 Figure:
   - Bar chart
   - Line chart
