@@ -1,0 +1,12 @@
+{
+  "id": "position-group-hs-to-college",
+  "release": "2026-11-25",
+  "code_hash": "c226cdc370758ea981f93df9893684fb",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "harmonized_position_levels": "aefe6b78c6d8766f44b35e70824df851",
+    "position_palette": "11141b2b531ab5b7f31d6c196fcc46be",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

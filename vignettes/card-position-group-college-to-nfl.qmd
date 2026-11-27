@@ -1,0 +1,180 @@
+---
+title: "Do drafted players keep their college position in the NFL?"
+image: card-thumbs/position-group-college-to-nfl.png
+image-alt: "Horizontal bar chart of the share of linked draftees who played the same position group in the NFL as in college, one bar per college position group, with a dashed line at the overall share. Most groups sit near the overall share; the shortest bars are the groups whose draftees most often changed position."
+categories: ["Topic: Movement", "Position: By position group", "Population: Draft picks", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [nfl-draft-link, position-group, drafted, stat-line-season]
+followups:
+  - text: "Recover undrafted players' NFL positions by name and school, so the comparison covers players who never heard their name called."
+    link: "F22"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# position table, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+DBI::dbDisconnect(con, shutdown = TRUE)
+# The position path is a contract-checked pipeline target, read from the
+# targets store rather than the DuckDB (decision 0041).
+pp <- targets::tar_read(position_path, store = file.path(root, "_targets"))
+rec_levels <- setdiff(harmonized_position_levels(), "Position not recorded")
+```
+
+```{r}
+#| label: stay-by-group
+# A draftee counts when the draft record links him to an NFL position and he
+# has a recorded college group; the overall share is every such draftee together.
+dr <- pp |>
+  filter(
+    nfl_linked,
+    !is.na(nfl_group), nfl_group != "Position not recorded",
+    college_groups > 0, !is.na(college_modal_group)
+  )
+nfl_overall <- mean(dr$nfl_group == dr$college_modal_group)
+nfl_stay <- dr |>
+  group_by(college_modal_group) |>
+  summarise(
+    draftees = n(),
+    stayed = sum(nfl_group == college_modal_group),
+    stay_share = stayed / draftees,
+    .groups = "drop"
+  ) |>
+  mutate(
+    college_modal_group = factor(
+      college_modal_group,
+      levels = college_modal_group[order(stay_share)]
+    ),
+    tip = sprintf(
+      "%s: %s of %s kept their group in the NFL (%.1f%%)",
+      college_modal_group,
+      formatC(stayed, big.mark = ",", format = "d"),
+      formatC(draftees, big.mark = ",", format = "d"),
+      100 * stay_share
+    )
+  )
+```
+
+```{r}
+#| label: figure
+# Each college group's share of draftees who played the same group in the NFL,
+# against the overall share (dashed line).
+p <- ggplot(nfl_stay, aes(100 * stay_share, college_modal_group)) +
+  geom_segment(
+    aes(x = 88, xend = 100 * stay_share, yend = college_modal_group),
+    colour = "gray75",
+    linewidth = 1
+  ) +
+  geom_vline(xintercept = 100 * nfl_overall, linetype = "dashed", colour = "#111827") +
+  geom_point_interactive(
+    aes(
+      colour = college_modal_group,
+      tooltip = tip,
+      data_id = as.character(college_modal_group)
+    ),
+    size = 5
+  ) +
+  geom_text(
+    aes(label = sprintf("%.1f%%", 100 * stay_share)),
+    hjust = -0.3,
+    size = 4.2
+  ) +
+  scale_colour_manual(values = position_palette(), guide = "none") +
+  scale_x_continuous(
+    labels = function(x) sprintf("%.0f%%", x),
+    limits = c(88, 103),
+    breaks = c(90, 95, 100)
+  ) +
+  labs(
+    title = "Draftees who kept their college position",
+    subtitle = "Share keeping their group; axis starts at 88%",
+    x = "Share who kept their group (%)",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "position-group-college-to-nfl", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: flow
+# Where each college group's draftees played in the NFL: every row sums to one
+# hundred percent of that group's draftees.
+flow <- dr |>
+  count(college_modal_group, nfl_group, name = "moves") |>
+  tidyr::complete(
+    college_modal_group = rec_levels,
+    nfl_group = rec_levels,
+    fill = list(moves = 0L)
+  ) |>
+  group_by(college_modal_group) |>
+  mutate(row_share = moves / pmax(sum(moves), 1L)) |>
+  ungroup() |>
+  mutate(
+    college_modal_group = factor(college_modal_group, levels = rev(rec_levels)),
+    nfl_group = factor(nfl_group, levels = rec_levels)
+  )
+
+p_flow <- ggplot(flow, aes(nfl_group, college_modal_group, fill = row_share)) +
+  geom_tile_interactive(
+    aes(
+      tooltip = sprintf(
+        "College %s, NFL %s: %s draftees (%.0f%% of the %s group)",
+        as.character(college_modal_group),
+        as.character(nfl_group),
+        formatC(moves, big.mark = ",", format = "d"),
+        100 * row_share,
+        as.character(college_modal_group)
+      ),
+      data_id = paste(college_modal_group, nfl_group)
+    ),
+    colour = "white"
+  ) +
+  scale_fill_gradient(
+    low = "#F3F4F6",
+    high = "#374151",
+    limits = c(0, 1),
+    labels = function(x) sprintf("%.0f%%", 100 * x),
+    name = "Share of the college group"
+  ) +
+  labs(
+    title = "Where each college group's draftees played",
+    subtitle = "Share of each college group by NFL position group",
+    x = "NFL position group",
+    y = "College position group",
+    caption = card_caption(release)
+  ) +
+  theme_card() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank()
+  )
+card_interactive(p_flow)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+```

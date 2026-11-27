@@ -34,6 +34,8 @@ Population:
   - Combine invitees
   - Games
   - Recruits
+  # batch movement (F25)
+  - College athletes
 Figure:
   - Bar chart
   - Line chart

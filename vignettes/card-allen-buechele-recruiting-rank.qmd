@@ -1,0 +1,197 @@
+---
+title: "How highly were Kyle Allen and Shane Buechele rated as recruits?"
+image: card-thumbs/allen-buechele-recruiting-rank.png
+image-alt: "Dot plot of the composite recruiting rating of every rated quarterback recruit in the high school classes of Kyle Allen and Shane Buechele, one row per class. Allen, a five-star, sits near the top of his class; Buechele, a four-star, sits in the upper middle of his. Other quarterback recruits are pale grey dots."
+categories: ["Topic: Movement", "Position: Quarterback", "Population: Recruits", "Figure: Scatter plot"]
+status: investigation
+graduated_to: null
+terms: [recruiting-profile, linked-recruit, position-group]
+followups:
+  - text: "Add more backup-quarterback career case studies to build a recurring cast for later cards."
+    link: "F10"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+# Named players are keyed on the CFBD athlete id (decision 0013 on recruiting ids).
+subjects <- running_cast()[c("Kyle Allen", "Shane Buechele")]
+recruits <- tbl(con, "recruiting") |>
+  filter(playerId %in% !!unname(subjects)) |>
+  select(
+    playerId,
+    recruit_name,
+    hs_class,
+    committed_to,
+    recruit_position,
+    stars,
+    rating,
+    national_rank
+  ) |>
+  collect()
+# Every quarterback recruit in the two players' classes, ranked within each
+# class by composite rating, so each profile sits among its peers.
+qb_pool <- tbl(con, "recruiting") |>
+  filter(
+    hs_class %in% !!recruits$hs_class,
+    recruit_position %in% c("PRO", "DUAL"),
+    !is.na(rating)
+  ) |>
+  select(recruit_name, hs_class, committed_to, stars, rating, national_rank) |>
+  collect() |>
+  group_by(hs_class) |>
+  mutate(qb_rank = rank(desc(rating), ties.method = "min")) |>
+  ungroup() |>
+  mutate(named = recruit_name %in% names(subjects))
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
+
+```{r}
+#| label: profiles-table
+# The two profiles side by side: the recruiting record itself, which the dot
+# plot below does not show (star grade, national rank and commitment).
+recruits |>
+  arrange(desc(stars)) |>
+  transmute(
+    player = recruit_name,
+    hs_class = hs_class,
+    committed = committed_to,
+    stars = stars,
+    rating = sprintf("%.4f", rating),
+    national = national_rank,
+    qb_rank = vapply(
+      recruit_name,
+      \(who) qb_pool$qb_rank[qb_pool$recruit_name == who][1],
+      numeric(1)
+    ),
+    qb_n = vapply(
+      hs_class,
+      \(cl) sum(qb_pool$hs_class == cl),
+      integer(1)
+    )
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Player",
+      "High-school class",
+      "Committed to",
+      "Stars",
+      "Composite rating",
+      "National rank",
+      "Quarterback rank in class",
+      "Quarterbacks rated in class"
+    ),
+    caption = "The two recruiting profiles. A lower rank is better: national rank counts every recruit in the class, quarterback rank only the rated quarterbacks."
+  )
+```
+
+```{r}
+#| label: figure
+# Each class's rated quarterback recruits, the two named players in the
+# quarterback orange, and the rest pale.
+labelled <- qb_pool |>
+  filter(named) |>
+  mutate(
+    label = sprintf(
+      "%s\n%d-star, quarterback %d of %d",
+      recruit_name,
+      stars,
+      qb_rank,
+      vapply(hs_class, \(cl) sum(qb_pool$hs_class == cl), integer(1))
+    )
+  )
+
+p <- ggplot(qb_pool, aes(rating, factor(hs_class))) +
+  geom_point(
+    data = filter(qb_pool, !named),
+    position = position_jitter(height = 0.18, width = 0, seed = 1),
+    colour = "gray75",
+    size = 2
+  ) +
+  geom_point(data = filter(qb_pool, named), colour = "#D95F02", size = 5) +
+  geom_label(
+    data = labelled,
+    aes(label = label),
+    vjust = -0.5,
+    hjust = 1,
+    size = 4.2,
+    lineheight = 0.9,
+    fill = "white",
+    label.size = 0
+  ) +
+  scale_y_discrete(expand = expansion(add = c(0.5, 0.9))) +
+  expand_limits(x = 1.03) +
+  labs(
+    title = "Quarterback recruits by rating",
+    subtitle = "Gray: other quarterbacks; orange: Allen and Buechele",
+    x = "Composite recruiting rating (0 to 1)",
+    y = "High-school class",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "allen-buechele-recruiting-rank", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: by-class
+# The same ratings split by class, every quarterback recruit hoverable, so a
+# reader can see the whole class behind each named player.
+p_class <- ggplot(qb_pool, aes(qb_rank, rating)) +
+  geom_point_interactive(
+    aes(
+      colour = named,
+      size = named,
+      tooltip = sprintf(
+        "%s (%s): %d-star, rating %.4f, quarterback %d in class, national rank %s, committed to %s",
+        recruit_name,
+        hs_class,
+        stars,
+        rating,
+        qb_rank,
+        coalesce(as.character(national_rank), "none"),
+        coalesce(committed_to, "unknown")
+      ),
+      data_id = recruit_name
+    )
+  ) +
+  facet_wrap(~hs_class, labeller = labeller(hs_class = \(x) paste("Class of", x))) +
+  scale_colour_manual(values = c(`TRUE` = "#D95F02", `FALSE` = "gray65")) +
+  scale_size_manual(values = c(`TRUE` = 4.5, `FALSE` = 1.8)) +
+  guides(colour = "none", size = "none") +
+  labs(
+    title = "Every quarterback recruit in the two classes",
+    subtitle = "Composite rating by quarterback rank within the class; orange: Allen and Buechele",
+    x = "Quarterback rank in class (1 is highest rated)",
+    y = "Composite rating",
+    caption = "Hover any point for the recruit's name, stars and commitment."
+  ) +
+  theme_card()
+card_interactive(p_class)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+```
