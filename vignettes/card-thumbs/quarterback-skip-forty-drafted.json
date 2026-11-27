@@ -1,0 +1,15 @@
+{
+  "id": "quarterback-skip-forty-drafted",
+  "release": "2026-11-25",
+  "code_hash": "47d991356635a92bf76b9ec9f0f5b02a",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "combine_position_group": "fa922621b568095810c7a114803e9ccb",
+    "last_complete_nfl_draft": "45d0ddfa429bb132c5cf1dc2d5213015",
+    "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
+    "position_group_levels": "20e3516fb9bf8abbe12f3fd702d9d55f",
+    "team_color_values": "81a321483d63e897ef3195d95350a746",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

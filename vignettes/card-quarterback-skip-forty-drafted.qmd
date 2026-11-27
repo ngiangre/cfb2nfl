@@ -1,0 +1,188 @@
+---
+title: "Do invitees who skip the forty-yard dash get drafted less often than those who run it?"
+image: card-thumbs/quarterback-skip-forty-drafted.png
+image-alt: "Dumbbell chart, one row per position group, joining the share drafted among invitees who ran the 40-yard dash to the share among those who skipped it; most rows slope down toward skipping, and the quarterback row, highlighted, slopes the other way."
+categories: ["Topic: Combine", "Position: By position group", "Population: Combine invitees", "Figure: Line chart", "Question: What matters for going pro"]
+status: investigation
+graduated_to: null
+terms: [combine, invitee, recorded-measurable, drafted]
+followups:
+  - text: "Add pro-day results for invitees who skip combine drills, to separate a skipped drill from an unmeasured player."
+    link: "Question: What matters for going pro"
+  - text: "Check whether quarterbacks who skip the 40 are drafted more often because scouts already rate them, using the draft rounds."
+    link: "Question: What matters for going pro"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+pos_levels <- position_group_levels()
+meta <- DBI::dbReadTable(con, "_meta")
+# Drafted counts only the draft years already held, so the last year is complete.
+last_draft <- meta$last_complete_nfl_draft
+combine <- DBI::dbReadTable(con, "combine") |>
+  mutate(
+    position_group = factor(combine_position_group(pos), pos_levels),
+    drafted = !is.na(draft_round)
+  )
+combine_years <- range(combine$season)
+claim_fill <- "#B45309"
+context_fill <- "#9CA3AF"
+# Named players, keyed on athlete id (decision 0013).
+subjects <- tibble::tribble(
+  ~who             , ~cfb_athlete_id , ~team           ,
+  "Joe Burrow"     , "3915511"       , "LSU"           ,
+  "Jordan Travis"  , "4360799"       , "Florida State" ,
+  "Cam Ward"       , "4688380"       , "Miami"         ,
+  "Shane Buechele" , "4039034"       , "SMU"           ,
+  "Kyle Allen"     , "559681"        , "Houston"
+)
+team_colors <- team_color_values(DBI::dbReadTable(con, "teams"))
+
+drafted_window <- combine |>
+  filter(season <= last_draft) |>
+  mutate(ran = !is.na(forty))
+skip_pos <- drafted_window |>
+  group_by(position_group) |>
+  summarise(
+    invitees = n(),
+    skipped = mean(!ran),
+    drafted_ran = mean(drafted[ran]),
+    drafted_skip = mean(drafted[!ran]),
+    .groups = "drop"
+  )
+```
+
+```{r}
+#| label: figure
+p <- skip_pos |>
+  mutate(
+    is_claim = position_group == "Quarterback",
+    tip = sprintf(
+      "%s: drafted %.0f%% when they ran the 40, %.0f%% when they skipped it",
+      position_group,
+      100 * drafted_ran,
+      100 * drafted_skip
+    )
+  ) |>
+  ggplot(aes(y = forcats::fct_rev(position_group))) +
+  geom_segment(
+    aes(x = drafted_ran, xend = drafted_skip, colour = is_claim),
+    linewidth = 1.4
+  ) +
+  geom_point_interactive(
+    aes(x = drafted_ran, tooltip = tip, data_id = position_group),
+    shape = 21,
+    size = 5,
+    fill = "white",
+    stroke = 1.6
+  ) +
+  geom_point_interactive(
+    aes(x = drafted_skip, fill = is_claim, tooltip = tip, data_id = position_group),
+    shape = 21,
+    size = 5,
+    stroke = 1.2
+  ) +
+  scale_colour_manual(values = c(`FALSE` = context_fill, `TRUE` = claim_fill), guide = "none") +
+  scale_fill_manual(values = c(`FALSE` = context_fill, `TRUE` = claim_fill), guide = "none") +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    title = "Do invitees who skip the forty-yard dash get drafted less often than those who run it?",
+    subtitle = "Open circle: ran the forty-yard dash. Filled circle: skipped it",
+    x = "Drafted that year",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "quarterback-skip-forty-drafted", release = release)
+card_interactive(p, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: quarterbacks
+# Every quarterback invitee by season; an undrafted player sits at the bottom.
+undrafted_y <- 290
+qbs <- drafted_window |>
+  filter(position_group == "Quarterback") |>
+  left_join(subjects, by = c("athlete_id" = "cfb_athlete_id")) |>
+  mutate(
+    status = if_else(ran, "Ran the 40", "Skipped the 40"),
+    pick = coalesce(draft_ovr, undrafted_y),
+    tip = sprintf(
+      "%s (%s), %s: %s; %s",
+      player_name,
+      school,
+      season,
+      if_else(ran, sprintf("40 in %.2f s", forty), "no 40 recorded"),
+      if_else(drafted, sprintf("pick %s", draft_ovr), "not drafted")
+    )
+  )
+cast_qbs <- filter(qbs, !is.na(who))
+p_qb <- ggplot(qbs, aes(season, pick, colour = status)) +
+  geom_point_interactive(
+    aes(tooltip = tip, data_id = paste(player_name, season)),
+    position = position_jitter(width = 0.25, height = 0, seed = 64),
+    size = 2.8,
+    alpha = 0.8
+  ) +
+  geom_point(
+    data = cast_qbs,
+    aes(fill = team),
+    shape = 21,
+    size = 6,
+    colour = "#111827",
+    stroke = 1.4
+  ) +
+  geom_text(
+    data = cast_qbs,
+    aes(label = who),
+    colour = "#111827",
+    nudge_y = -18,
+    fontface = "bold",
+    size = 4.5
+  ) +
+  scale_fill_manual(values = team_colors, guide = "none") +
+  scale_colour_manual(values = c(`Ran the 40` = "#6B7280", `Skipped the 40` = claim_fill)) +
+  scale_y_reverse(
+    breaks = c(1, 50, 100, 150, 200, 250, undrafted_y),
+    labels = c(1, 50, 100, 150, 200, 250, "Not drafted")
+  ) +
+  scale_x_continuous(breaks = seq(combine_years[1], last_draft, 2)) +
+  labs(
+    title = "Where did each quarterback invitee go in the draft?",
+    subtitle = "Every quarterback invitee; the named players are filled in their school's color",
+    x = "Combine year",
+    y = "Overall pick",
+    colour = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+card_interactive(p_qb, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

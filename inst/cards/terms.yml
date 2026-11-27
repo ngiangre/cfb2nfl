@@ -140,3 +140,19 @@ head-coach:
 head-coach-tenure:
   label: Head-coach tenure
   definition: "How many seasons a head coach held the job in the window, counted from the coaches table; a season counts once however many games it had."
+# ---- combine batch (F25, #147) ----
+combine:
+  label: NFL Scouting Combine
+  definition: "A week of measurements and drills each February before the spring draft. The 2021 combine was cancelled, so that year's records come from campus workouts."
+invitee:
+  label: Combine invitee
+  definition: "A player on the combine's list for a year, whether or not he took part in every drill."
+recorded-measurable:
+  label: Recorded measurable
+  definition: "A combine measurable with a value for the invitee. A missing value usually means he chose not to do the drill."
+middle-half:
+  label: Middle half
+  definition: "The range from the 25th to the 75th percentile: half of a position group's invitees fall inside it."
+invitation-rate:
+  label: Invitation rate
+  definition: "Invitees among a draft year's draft-eligible seasons, the share of eligible players the combine invites."
