@@ -1,5 +1,6 @@
 ---
 title: "Do schools that win more produce more draftees?"
+aliases: [2026-10-31-winning-and-draftees.html]
 image: card-thumbs/win-pct-and-draft-rate.png
 image-alt: "Scatter plot of FBS schools, with win percentage across the horizontal axis and draft rate up the vertical axis. Power schools in blue and Group of 5 schools in amber each rise along their own curve; the Power curve sits well above the Group of 5 curve, and both slope upward."
 categories: ["Topic: Programs and conferences", "Position: All positions", "Population: Draft-eligible players", "Unit: Schools", "Figure: Scatter plot", "Question: What matters for going pro"]

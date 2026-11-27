@@ -1,5 +1,6 @@
 ---
 title: "Are Power-conference players drafted more often?"
+aliases: [2026-10-31-who-produces-draftees.html]
 image: card-thumbs/power-conference-draft-rate.png
 image-alt: "Horizontal bar chart of the draft rate for each FBS conference, the share of eligible players drafted in their final college seasons: every Power conference's bar is longer than every Group of 5 conference's, and two dashed lines mark the tier totals, the Power total about five times the Group of 5 total."
 categories: ["Topic: Programs and conferences", "Position: All positions", "Population: Draft-eligible players", "Figure: Bar chart", "Question: What matters for going pro"]

@@ -4,6 +4,13 @@
   a footer chunk that would print the glossary as raw text instead of
   markdown, and stock palettes (viridis, the qualitative ColorBrewer sets)
   that reuse the drafted, undrafted or quarterback colours.
+- Investigations (feature F25,
+  [#144](https://github.com/ngiangre/cfb2nfl/issues/144)): **the programs
+  posts become figure cards**, so the conference, who-produces and
+  winning-school questions each sit on the figure wall as cards
+  ([decision 0054](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0054-figure-cards-replace-dated-posts.md)).
+  The three posts are retired and redirect to their cards, and every
+  section's fate is in `inst/cards/migration.yml`.
 
 - Investigations (feature F25,
   [#145](https://github.com/ngiangre/cfb2nfl/issues/145)): **the transfers,
