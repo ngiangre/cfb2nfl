@@ -1,0 +1,168 @@
+---
+title: "Do most college transfers stay at the same competition level?"
+image: card-thumbs/transfer-direction.png
+image-alt: "Horizontal bar chart of the share of college transfers by where the new school sits relative to the old one. The same-tier bar is the longest and highlighted dark, a little under half of all transfers; moves to a lower tier are the next largest and moves to a higher tier the smallest."
+categories: ["Topic: Movement", "Position: All positions", "Population: Stat-line seasons", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [stat-line-season, transfer-event, competition-tier, transfer-direction]
+followups:
+  - text: "Test whether a transfer season or its direction changes a player's draft chance, using the outcome labels."
+    link: "F17"
+  - text: "Group of Five players drop to FCS more often than they climb to the Power conferences; check whether that holds once playing time at the old school is controlled."
+    link: "F08"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+ps <- collect(tbl(con, "ps_change"))
+DBI::dbDisconnect(con, shutdown = TRUE)
+# The current college season is still being played, so its partial stat lines
+# are left out of the shares (decision 0053 and the card rules).
+through <- last_complete_cfb_season()
+ev <- transfer_events(ps) |>
+  filter(season <= through)
+```
+
+```{r}
+#| label: figure
+# Each transfer, sorted by where the new school sits in the tier order. The
+# same-tier bar is highlighted because it is the answer to the question.
+dir_tab <- ev |>
+  count(direction, name = "moves") |>
+  mutate(
+    share = moves / sum(moves),
+    tip = sprintf(
+      "%s: %s transfers (%.1f%%)",
+      direction,
+      formatC(moves, big.mark = ",", format = "d"),
+      100 * share
+    ),
+    label = sprintf("%.1f%% (%s)", 100 * share, formatC(moves, big.mark = ",", format = "d"))
+  )
+
+p <- ggplot(dir_tab, aes(100 * share, reorder(direction, share))) +
+  geom_col_interactive(
+    aes(
+      fill = direction == "Same tier",
+      tooltip = tip,
+      data_id = as.character(direction)
+    ),
+    width = 0.65
+  ) +
+  geom_text(aes(label = label), hjust = -0.05, size = 4.4) +
+  scale_fill_manual(values = c(`TRUE` = "#374151", `FALSE` = "gray65")) +
+  guides(fill = "none") +
+  expand_limits(x = 60) +
+  scale_x_continuous(labels = function(x) sprintf("%.0f%%", x)) +
+  labs(
+    title = "Transfers by direction of tier change",
+    subtitle = "Share of transfers; dark: same competition tier",
+    x = "Share of transfers",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "transfer-direction", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: direction-by-season
+# The same split season by season from 2016, when transfers are counted well
+# enough to split by direction.
+dir_season <- ev |>
+  filter(season >= 2016) |>
+  count(season, direction, name = "moves") |>
+  group_by(season) |>
+  mutate(season_share = moves / sum(moves)) |>
+  ungroup()
+
+p_season <- ggplot(
+  dir_season,
+  aes(season, 100 * season_share, colour = direction)
+) +
+  geom_line_interactive(
+    aes(data_id = as.character(direction), tooltip = as.character(direction)),
+    linewidth = 1.2
+  ) +
+  geom_point_interactive(
+    aes(
+      data_id = as.character(direction),
+      tooltip = sprintf(
+        "%d, %s: %.1f%% of that season's transfers (%s)",
+        season,
+        direction,
+        100 * season_share,
+        formatC(moves, big.mark = ",", format = "d")
+      )
+    ),
+    size = 2.6
+  ) +
+  scale_colour_manual(
+    values = c(
+      "To a higher tier" = "#1D4ED8",
+      "Same tier" = "#374151",
+      "To a lower tier" = "#9CA3AF"
+    )
+  ) +
+  scale_x_continuous(breaks = 2016:through) +
+  scale_y_continuous(limits = c(0, NA)) +
+  labs(
+    title = "The direction mix season by season",
+    subtitle = "Share of each season's transfers by direction",
+    x = "Season",
+    y = "Share of transfers (%)",
+    colour = NULL,
+    caption = "Hover a point for the count. Seasons before 2016 have too few observed transfers to split."
+  ) +
+  theme_card()
+card_interactive(p_season)
+```
+
+```{r}
+#| label: cast-table
+# The recurring cast's transfers, keyed on the CFBD athlete id (never on name).
+cast <- running_cast()
+ev |>
+  filter(playerId %in% cast, season >= 2016) |>
+  arrange(player, season) |>
+  transmute(
+    player = player,
+    season = season,
+    from = prev_team,
+    to = team,
+    direction = as.character(direction)
+  ) |>
+  knitr::kable(
+    col.names = c("Player", "Season", "From", "To", "Direction"),
+    caption = "Recurring-cast players' transfers from 2016 on, with the direction of each move."
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+```

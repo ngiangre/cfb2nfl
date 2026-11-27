@@ -1,0 +1,166 @@
+---
+title: "Is it getting more common for players to change schools?"
+aliases: [2026-10-24-transfers.html]
+image: card-thumbs/transfer-share-by-season.png
+image-alt: "Line chart of the share of college players in each season who are at a school different from the season before, from 2011 to the last complete season. The share stays under five in every hundred until 2020, then climbs to about seventeen in every hundred by the last complete season; the one-time transfer waiver seasons are dark."
+categories: ["Topic: Movement", "Position: All positions", "Population: Stat-line seasons", "Figure: Line chart"]
+status: investigation
+graduated_to: null
+terms: [stat-line-season, transfer-event, competition-tier, confidence-interval]
+followups:
+  - text: "Split the transfer population by portal era once season cutoffs are agreed; pre-2016 rates are coverage floors, not estimates."
+    link: "F08"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+ps <- collect(tbl(con, "ps_change"))
+career <- collect(tbl(con, "career_summary"))
+DBI::dbDisconnect(con, shutdown = TRUE)
+# The current college season is still being played, so it is left out of the
+# rates: its stat lines are partial (decision 0053 and the card rules).
+through <- last_complete_cfb_season()
+```
+
+```{r}
+#| label: figure
+# Each season's share of player-seasons that were at a new school. Dark points
+# are the seasons after the one-time transfer waiver, so the change reads at a
+# glance.
+by_season <- transfer_share_by_season(ps, through = through) |>
+  filter(season >= 2011) |>
+  mutate(
+    era = if_else(season >= 2021L, "waiver", "before"),
+    tip = sprintf(
+      "%d: %.1f%% of players at a new school (%s of %s)",
+      season,
+      100 * share,
+      fmt(transfers),
+      fmt(seasons)
+    )
+  )
+
+p <- ggplot(by_season, aes(season, 100 * share)) +
+  geom_line(linewidth = 1.2, colour = "gray70") +
+  geom_point_interactive(
+    aes(colour = era, tooltip = tip, data_id = season),
+    size = 3.6
+  ) +
+  scale_colour_manual(
+    values = c(before = "gray60", waiver = "#374151"),
+    guide = "none"
+  ) +
+  scale_x_continuous(breaks = seq(2011, max(by_season$season), by = 3)) +
+  scale_y_continuous(limits = c(0, NA)) +
+  labs(
+    title = "Players at a new school each season",
+    subtitle = "Share of players at a new school; dark: waiver era",
+    x = "Season",
+    y = "Share (%)",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "transfer-share-by-season", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: destination
+# The same seasons split by the tier of the new school, one line a tier.
+by_dest <- ps |>
+  filter(season >= 2011, !is.na(tier), transferred %in% TRUE) |>
+  count(season, tier, name = "transfers") |>
+  left_join(
+    ps |>
+      filter(season >= 2011, !is.na(tier)) |>
+      count(season, tier, name = "seasons"),
+    by = c("season", "tier")
+  ) |>
+  filter(season <= through) |>
+  mutate(
+    to = factor(
+      c(`1` = "FCS and below", `2` = "Group of Five", `3` = "Power")[as.character(tier)],
+      levels = transfer_tier_levels()
+    ),
+    share = transfers / seasons,
+    tip = sprintf(
+      "%s, %d: %.1f%% of its players arrived from another school (%s of %s)",
+      to,
+      season,
+      100 * share,
+      fmt(transfers),
+      fmt(seasons)
+    )
+  )
+
+p_dest <- ggplot(by_dest, aes(season, 100 * share, colour = to)) +
+  geom_line_interactive(aes(data_id = to, tooltip = to), linewidth = 1.2) +
+  geom_point_interactive(aes(data_id = to, tooltip = tip), size = 2.6) +
+  scale_colour_manual(
+    values = c(
+      "FCS and below" = "#9CA3AF",
+      "Group of Five" = "#374151",
+      "Power" = "#1B9E77"
+    )
+  ) +
+  scale_x_continuous(breaks = seq(2011, max(by_dest$season), by = 3)) +
+  labs(
+    title = "Every competition tier took on more newcomers",
+    subtitle = "Share of each tier's players who arrived from another school, by the tier of the new school",
+    x = "Season",
+    y = "Players new to their school (%)",
+    colour = "Tier of the new school",
+    caption = "Hover a point for the counts; hover a line to isolate one tier."
+  ) +
+  theme_card()
+card_interactive(p_dest)
+```
+
+```{r}
+#| label: career-table
+# Over whole careers, how many players changed schools at least once.
+rate <- transfer_rate(career)
+ci <- wilson(rate$transferred, rate$players)
+tibble(
+  players = fmt(rate$players),
+  changed = fmt(rate$transferred),
+  rate = pct(rate$share),
+  interval = paste(pct(ci[["lo"]]), "to", pct(ci[["hi"]]))
+) |>
+  knitr::kable(
+    col.names = c(
+      "Players",
+      "Changed schools at least once",
+      "Share",
+      "95% confidence interval"
+    ),
+    caption = "Players with at least one school change over their careers, across every season in the data. A move counts only when both seasons carry a stat line."
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+```

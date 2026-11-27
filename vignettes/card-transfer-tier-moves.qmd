@@ -1,0 +1,174 @@
+---
+title: "Do Group of Five transfers drop more often than they climb?"
+image: card-thumbs/transfer-tier-moves.png
+image-alt: "Heatmap of transfers by the tier of the old school (rows) and the new school (columns). Each row sums to one hundred percent of that tier's transfers. Players leaving FCS and below can only stay or climb; the Group of Five row has its two moves outlined, a larger share down to FCS than up to the Power conferences."
+categories: ["Topic: Movement", "Position: All positions", "Population: Stat-line seasons", "Figure: Heatmap"]
+status: investigation
+graduated_to: null
+terms: [stat-line-season, transfer-event, competition-tier, transfer-direction]
+followups:
+  - text: "Group of Five players drop to FCS more often than they climb to the Power conferences; check whether that holds once playing time at the old school is controlled."
+    link: "F08"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+ps <- collect(tbl(con, "ps_change"))
+DBI::dbDisconnect(con, shutdown = TRUE)
+# The current college season is still being played, so its partial stat lines
+# are left out of the shares (decision 0053 and the card rules).
+through <- last_complete_cfb_season()
+ev <- transfer_events(ps) |>
+  filter(season <= through)
+```
+
+```{r}
+#| label: figure
+# Each old tier's transfers split by the new tier, so every row sums to 100%.
+# The Group of Five row's two moves are outlined: down to FCS and up to Power.
+tier_moves <- ev |>
+  filter(!is.na(from_tier), !is.na(to_tier)) |>
+  count(from_tier, to_tier, name = "moves") |>
+  group_by(from_tier) |>
+  mutate(row_share = moves / sum(moves)) |>
+  ungroup() |>
+  mutate(
+    from_tier = factor(from_tier, rev(transfer_tier_levels())),
+    to_tier = factor(to_tier, transfer_tier_levels()),
+    direction = case_when(
+      as.integer(to_tier) > as.integer(from_tier) ~ "up",
+      as.integer(to_tier) < as.integer(from_tier) ~ "down",
+      TRUE ~ "same"
+    ),
+    text_colour = if_else(row_share > 0.5, "white", "#111827"),
+    tip = sprintf(
+      "From %s to %s: %s transfers, %.0f%% of those leaving %s",
+      from_tier,
+      to_tier,
+      formatC(moves, big.mark = ",", format = "d"),
+      100 * row_share,
+      from_tier
+    )
+  )
+outlined <- filter(
+  tier_moves,
+  from_tier == "Group of Five",
+  to_tier %in% c("FCS and below", "Power")
+)
+
+p <- ggplot(tier_moves, aes(to_tier, from_tier)) +
+  geom_tile_interactive(
+    aes(fill = row_share, tooltip = tip, data_id = paste(from_tier, to_tier)),
+    colour = "white",
+    linewidth = 2
+  ) +
+  geom_tile(data = outlined, fill = NA, colour = "#111827", linewidth = 1.6) +
+  geom_text(
+    aes(
+      label = sprintf("%.0f%%\n(%s)", 100 * row_share, formatC(moves, big.mark = ",", format = "d")),
+      colour = text_colour
+    ),
+    size = 4.4,
+    fontface = "bold",
+    lineheight = 0.9
+  ) +
+  scale_colour_identity() +
+  scale_x_discrete(
+    labels = c("FCS and below" = "FCS\nand below", "Group of Five" = "Group\nof Five", "Power" = "Power")
+  ) +
+  scale_fill_gradient(low = "#F3F4F6", high = "#374151", limits = c(0, 1), guide = "none") +
+  labs(
+    title = "Where each tier's transfers went",
+    subtitle = "Share of each old tier's transfers by new tier",
+    x = "New tier",
+    y = "Old tier",
+    caption = card_caption(release)
+  ) +
+  theme_card() +
+  theme(panel.grid = element_blank())
+
+card_thumbnail(p, "transfer-tier-moves", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: origin-by-season
+# Each old tier's direction mix season by season, from 2016 when transfers
+# are counted well enough to split.
+origin_season <- ev |>
+  filter(season >= 2016, !is.na(from_tier)) |>
+  mutate(
+    move = case_when(
+      direction == "To a higher tier" ~ "up",
+      direction == "Same tier" ~ "same",
+      TRUE ~ "down"
+    )
+  ) |>
+  count(season, from_tier, move, name = "moves") |>
+  group_by(season, from_tier) |>
+  mutate(origin_share = moves / sum(moves)) |>
+  ungroup()
+
+p_origin <- ggplot(
+  origin_season,
+  aes(season, 100 * origin_share, colour = move)
+) +
+  geom_line(linewidth = 1) +
+  geom_point_interactive(
+    aes(
+      data_id = paste(from_tier, move),
+      tooltip = sprintf(
+        "Leaving %s, %d: %.0f%% %s (%s transfers)",
+        from_tier,
+        season,
+        100 * origin_share,
+        move,
+        formatC(moves, big.mark = ",", format = "d")
+      )
+    ),
+    size = 2.2
+  ) +
+  facet_wrap(~from_tier, nrow = 1) +
+  scale_colour_manual(
+    values = c(up = "#1D4ED8", same = "#374151", down = "#9CA3AF"),
+    labels = c(up = "To a higher tier", same = "Same tier", down = "To a lower tier")
+  ) +
+  scale_x_continuous(breaks = unique(c(2016, 2021, through))) +
+  scale_y_continuous(limits = c(0, 100)) +
+  labs(
+    title = "Each old tier's direction mix by season",
+    subtitle = "Share of transfers leaving each tier, by direction",
+    x = "Season",
+    y = "Share of that tier's transfers (%)",
+    colour = NULL,
+    caption = "Hover a point for the season's count. Direction is measured between competition tiers, not programs, so a move between two Power schools is same tier."
+  ) +
+  theme_card()
+card_interactive(p_origin)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+```
