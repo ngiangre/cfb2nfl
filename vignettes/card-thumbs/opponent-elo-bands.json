@@ -1,0 +1,13 @@
+{
+  "id": "opponent-elo-bands",
+  "release": "2026-11-25",
+  "code_hash": "2779346b37d9ae2c6952780265dde1a5",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "fmt": "d4c89f195c447af907ba425a860522de",
+    "last_complete_cfb_season": "f279fba0ac2a12d60dd7965db5dd1f30",
+    "opponent_elo_band": "22c2ecf96f9a4c621fb90e653175a2af",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

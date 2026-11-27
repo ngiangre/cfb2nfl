@@ -1,0 +1,155 @@
+---
+title: "Which positions show up in the box score?"
+aliases: [2026-11-05-playing-time.html]
+image: card-thumbs/stat-line-share-by-position.png
+image-alt: "Horizontal bar chart of the share of rostered player-seasons with a stat line in at least one game, for each position group from 2019 through the last complete season; running backs, defensive backs and linebackers log one most often, tight ends and special teamers about half the time, and offensive linemen, in dark slate, least often by far."
+categories: ["Topic: Career shape", "Position: By position group", "Population: Roster seasons", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [position-group, stat-line-season, appearance-rate, player-season]
+followups:
+  - text: "Would a snap count in place of the box score reorder the positions that show up most?"
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+```
+
+```{r}
+#| label: figure
+# Rostered seasons from 2019 (the first class-year season) through the last
+# complete season; the season still being played is left out.
+complete_through <- last_complete_cfb_season()
+# The first season with a class year in the data.
+first_season <- 2019L
+usage <- targets::tar_read(player_usage, store = file.path(root, "_targets"))
+by_pos <- stat_line_share(usage, seasons = first_season:complete_through) |>
+  filter(position_group %in% names(position_palette()))
+
+p <- by_pos |>
+  mutate(
+    tip = paste0(
+      position_group,
+      ": ",
+      scales::percent(any_line, accuracy = 1),
+      " of ",
+      fmt(player_seasons),
+      " player-seasons logged a line"
+    )
+  ) |>
+  ggplot(aes(any_line, reorder(position_group, any_line), fill = position_group)) +
+  geom_col_interactive(aes(tooltip = tip), width = 0.7) +
+  scale_fill_manual(values = position_palette(), guide = "none") +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    title = "Which positions show up in the box score?",
+    subtitle = paste0(
+      "Share of rostered player-seasons with a stat line in at least one game, ",
+      first_season,
+      " to ",
+      complete_through
+    ),
+    x = "Share with a stat line",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "stat-line-share-by-position", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: by-season-figure
+# The same share season by season, to see whether a group moves or holds.
+by_season <- rostered_one_team(usage, seasons = first_season:complete_through) |>
+  filter(position_group %in% names(position_palette())) |>
+  group_by(position_group, season) |>
+  summarise(any_line = mean(games_appeared > 0), n = n(), .groups = "drop") |>
+  mutate(
+    tip = paste0(
+      position_group,
+      ", ",
+      season,
+      ": ",
+      scales::percent(any_line, accuracy = 1),
+      " of ",
+      fmt(n),
+      " logged a line"
+    )
+  )
+
+p_season <- ggplot(
+  by_season,
+  aes(season, any_line, colour = position_group, group = position_group)
+) +
+  geom_line(linewidth = 0.9) +
+  geom_point_interactive(aes(tooltip = tip), size = 3) +
+  scale_colour_position(guide = "none") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "Does the share hold season to season?",
+    subtitle = "Share of rostered player-seasons with a stat line in at least one game, by season",
+    x = "Season",
+    y = "Share with a stat line",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+card_interactive(p_season)
+```
+
+```{r}
+#| label: position-table
+by_pos |>
+  arrange(desc(any_line)) |>
+  transmute(
+    `Position group` = as.character(position_group),
+    `Player-seasons` = fmt(player_seasons),
+    `Logged a stat line in any game` = scales::percent(any_line, accuracy = 0.1),
+    `Median share of games, among those who logged one` = scales::percent(median_share_if_any, accuracy = 1)
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Position group",
+      "Player-seasons",
+      "Logged a stat line in any game",
+      "Median share of games, among those who logged one"
+    ),
+    align = "lrrr",
+    caption = paste0(
+      "Rostered player-seasons from ",
+      first_season,
+      " through the season ",
+      complete_through,
+      ". Athlete and unrecorded positions are left out of the comparison."
+    )
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

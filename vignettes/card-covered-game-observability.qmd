@@ -1,0 +1,197 @@
+---
+title: "Does a full-time player show up in nearly every covered game?"
+image: card-thumbs/covered-game-observability.png
+image-alt: "Horizontal bar chart of the median share of covered games in which a full-time player recorded a statistic, by position; quarterback, running back, receiver, linebacker and specialist bars are dark and long, near the top of the scale, while the defensive and tight end bars are light grey and shorter."
+categories: ["Topic: Career shape", "Position: By position group", "Population: Stat-line seasons", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [covered-game, full-time-season, position-group, redshirt-shaped-season]
+followups:
+  - text: "Which positions can a game-level redshirt flag be trusted for, once lower-division coverage gaps are removed?"
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(DBI)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+library(knitr)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+# Labels are the shared position-group names; the codes group the roster
+# positions (defensive ends and tackles form one defensive line).
+pos_label <- setNames(
+  position_group(c("QB", "RB", "WR", "TE", "OL", "DL", "LB", "DB", "PK")),
+  c("QB", "RB", "WR", "TE", "OL", "DL", "LB", "DB", "ST")
+)
+# The positions whose redshirt flag the box score can read.
+usable <- c("QB", "RB", "WR", "LB", "ST")
+```
+
+```{r}
+#| label: figure
+# Every regular-season stat line, by player-season, against the team's covered
+# games. Seasons still being played are left out of the rates.
+complete_through <- last_complete_cfb_season()
+gp_all <- tbl(con, "game_player_stats") |>
+  filter(seasonType == "regular") |>
+  select(playerId, season, team, gameId, category, statType, stat) |>
+  collect()
+pos_of <- tbl(con, "roster") |>
+  select(playerId, season, team, position) |>
+  distinct() |>
+  collect() |>
+  mutate(
+    pos = case_when(
+      position == "QB" ~ "QB",
+      position %in% c("RB", "FB") ~ "RB",
+      position == "WR" ~ "WR",
+      position == "TE" ~ "TE",
+      position %in% c("OL", "G", "OT", "C") ~ "OL",
+      position %in% c("DL", "DT", "NT", "DE", "EDGE") ~ "DL",
+      position %in% c("LB", "OLB", "ILB") ~ "LB",
+      position %in% c("DB", "S", "CB") ~ "DB",
+      position %in% c("PK", "P", "LS") ~ "ST"
+    )
+  ) |>
+  filter(!is.na(pos), !position %in% c("?", "ATH", "PR", "KR")) |>
+  group_by(playerId, season) |>
+  slice_head(n = 1) |>
+  ungroup()
+covered <- tbl(con, "game_player_stats") |>
+  filter(seasonType == "regular") |>
+  distinct(season, team, gameId) |>
+  count(season, team, name = "games_covered") |>
+  collect()
+
+# Season volume: attempts, carries, receptions, tackles or kicks, summed over
+# the season; the full-time seasons are the top quarter of each position.
+core_all <- gp_all |>
+  inner_join(pos_of |> select(-team), by = c("playerId", "season")) |>
+  filter(
+    (pos == "QB" & category == "passing" & statType == "C/ATT") |
+      (pos %in%
+        c("RB", "WR", "TE") &
+        category %in% c("rushing", "receiving") &
+        statType %in% c("CAR", "REC")) |
+      (pos %in%
+        c("DL", "LB", "DB") &
+        category == "defensive" &
+        statType == "TOT") |
+      (pos == "ST" &
+        category %in% c("kicking", "punting") &
+        statType %in% c("XP", "FG", "NO"))
+  ) |>
+  mutate(
+    v = if_else(pos == "QB", as.numeric(sub("/.*", "", stat)), as.numeric(stat))
+  )
+season_volume <- core_all |>
+  group_by(playerId, season, pos) |>
+  summarize(volume = sum(v, na.rm = TRUE), .groups = "drop")
+stat_rate <- gp_all |>
+  distinct(playerId, season, team, gameId) |>
+  count(playerId, season, team, name = "games_with_stat") |>
+  inner_join(pos_of |> select(-team), by = c("playerId", "season")) |>
+  left_join(season_volume, by = c("playerId", "season", "pos")) |>
+  left_join(covered, by = c("season", "team")) |>
+  filter(!is.na(games_covered), games_covered >= 5, season <= complete_through) |>
+  mutate(rate = games_with_stat / games_covered)
+
+obs <- observability_by_position(
+  filter(stat_rate, !is.na(volume)),
+  complete_through
+) |>
+  filter(full_time) |>
+  mutate(
+    Position = reorder(unname(pos_label[pos]), rate),
+    is_usable = pos %in% usable,
+    tip = sprintf(
+      "%s: a statistic in %s of covered games in a full-time season (%s seasons)",
+      Position,
+      scales::percent(rate, accuracy = 1),
+      fmt(n)
+    )
+  )
+
+p <- ggplot(obs, aes(rate, Position, fill = is_usable)) +
+  geom_col_interactive(aes(tooltip = tip, data_id = pos), width = 0.7) +
+  scale_fill_manual(values = c(`TRUE` = "#374151", `FALSE` = "#9CA3AF"), guide = "none") +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 1)) +
+  labs(
+    title = "Does a full-time player show up in nearly every covered game?",
+    subtitle = "Median share of covered games with a recorded statistic, full-time seasons; dark grey marks positions the redshirt flag can be read for",
+    x = "Covered games with a statistic",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "covered-game-observability", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: distribution-figure
+# How many covered games each player-season shows a statistic in, for the
+# positions the redshirt flag applies to.
+obs_hist <- stat_rate |>
+  filter(pos %in% usable, games_with_stat <= 15) |>
+  count(pos, games_with_stat, name = "n") |>
+  mutate(
+    Position = unname(pos_label[pos]),
+    flagged = games_with_stat <= 1
+  )
+p_hist <- ggplot(obs_hist, aes(games_with_stat, n)) +
+  geom_col_interactive(
+    aes(
+      fill = flagged,
+      tooltip = sprintf(
+        "%s: %s player-seasons with a statistic in %d games",
+        Position,
+        fmt(n),
+        games_with_stat
+      ),
+      data_id = paste(pos, games_with_stat)
+    ),
+    width = 0.9
+  ) +
+  facet_wrap(~Position, scales = "free_y") +
+  scale_fill_manual(
+    values = c(`TRUE` = "#374151", `FALSE` = "#9CA3AF"),
+    labels = c(`TRUE` = "One game or none", `FALSE` = "Two or more games"),
+    name = NULL
+  ) +
+  labs(
+    title = "Is there a spike at zero or one game, then real backup seasons?",
+    subtitle = "Player-seasons by covered games with a statistic, positions the redshirt flag applies to",
+    x = "Covered games with a recorded statistic",
+    y = "Player-seasons",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+card_interactive(p_hist)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

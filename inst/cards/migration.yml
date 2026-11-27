@@ -576,3 +576,212 @@
   section: "5. Discussion"
   fate: dropped
   reason: "Prose and callouts; its open questions are follow-ups on the cards, all mapped to F12."
+
+# ---- vignettes/2026-11-05-performance-arcs ----
+- post: 2026-11-05-performance-arcs
+  section: "1. Introduction"
+  fate: dropped
+  reason: "Prose; each question it posed is now a card's title."
+- post: 2026-11-05-performance-arcs
+  section: "2. Data"
+  fate: dropped
+  reason: "Section heading only; its three subsections are recorded below."
+- post: 2026-11-05-performance-arcs
+  section: "2.1 Each game is set against the league baseline for its opponent strength"
+  fate: merged
+  card: game-to-game-yardage-spread
+  reason: "The baseline and residual definitions are the baseline-yards and residual-yards glossary terms; the spread card reads the residual."
+- post: 2026-11-05-performance-arcs
+  section: "2.2 Opponent Elo is split into even 200-point bands"
+  fate: card
+  card: opponent-elo-bands
+  reason: "The Elo distribution with band edges is the card; the band definition is the opponent-band glossary term. The band table was dropped as restating the histogram."
+- post: 2026-11-05-performance-arcs
+  section: "2.3 Each group is tracked by one signature stat"
+  fate: merged
+  card: yardage-across-career
+  reason: "The signature stat is the signature-stat glossary term, shown in the card's subtitle and the population table."
+- post: 2026-11-05-performance-arcs
+  section: "3.1 Quarterback yardage keeps climbing across a career while running backs peak and receivers slow"
+  fate: card
+  card: yardage-across-career
+  reason: "The career-arc figure is the card; the population table is on its page. The card carries the 2026-11-05-performance-arcs alias. Number change: the arcs are capped at the last complete season (2025), so the 2026 season is not in the arcs. The post's per-group counts and the named example arcs are not compared with the post's freeze output yet."
+- post: 2026-11-05-performance-arcs
+  section: "3.2 Running back yardage falls the most against stronger opponents, while quarterbacks dip only against the strongest"
+  fate: card
+  card: yardage-by-opponent-strength
+  reason: "The band-by-group means with a one-standard-deviation range are the card; the Elo band labels are glossary entries. Number change: the card caps the window at the last complete season (2025); the band means are not yet compared with the post's freeze output, so any difference is unverified."
+- post: 2026-11-05-performance-arcs
+  section: "3.3 Quarterbacks swing the most yards from game to game, but running backs swing the most relative to their own average"
+  fate: card
+  card: game-to-game-yardage-spread
+  reason: "The spread bars are the card, with the box summaries as tooltips. Number change: the residual spread is computed through 2025; the 2026 season is excluded. The title was reworded as a question."
+- post: 2026-11-05-performance-arcs
+  section: "4. Summary"
+  fate: dropped
+  reason: "The summary restated the three results; each result is a card title and its figure."
+- post: 2026-11-05-performance-arcs
+  section: "5. Discussion"
+  fate: dropped
+  reason: "Callouts and caveats; the caveats are the card footers and the glossary terms, and the open questions are follow-ups (F17) on the cards."
+
+# ---- vignettes/2026-11-05-playing-time ----
+- post: 2026-11-05-playing-time
+  section: "1. Introduction"
+  fate: dropped
+  reason: "Prose; each question it posed is now a card's title."
+- post: 2026-11-05-playing-time
+  section: "2. Data"
+  fate: dropped
+  reason: "Section heading only; its one subsection is recorded below."
+- post: 2026-11-05-playing-time
+  section: "2.1 A player with no stat line in a game is not thereby absent from it"
+  fate: merged
+  card: stat-line-share-by-position
+  reason: "The stat-line-season and stat-line glossary terms define the measure, shared with the class-year and drafted cards."
+- post: 2026-11-05-playing-time
+  section: "3. Results"
+  fate: dropped
+  reason: "Section heading only; each subsection is a card."
+- post: 2026-11-05-playing-time
+  section: "3.1 Offensive linemen log a stat line in a small share of seasons, while the other groups log one in a much larger share"
+  fate: card
+  card: stat-line-share-by-position
+  reason: "The by-group share bars are the card. The card carries the 2026-11-05-playing-time alias. Number change: the population is complete seasons 2019 to 2025, so the 2026 season is excluded; the post's shares are not yet compared with the freeze output."
+- post: 2026-11-05-playing-time
+  section: "3.2 Stat lines rise from the third class year on"
+  fate: card
+  card: stat-line-share-by-class-year
+  reason: "The class-year bars are the card; the class-year definition is a glossary term. Not yet compared with the post's freeze output."
+- post: 2026-11-05-playing-time
+  section: "3.3 Drafted player-seasons log a stat line in more of their team's games than the rest"
+  fate: card
+  card: drafted-stat-line-share
+  reason: "The drafted and not-drafted bars are the card; the share is the average over a team's games. Not yet compared with the post's freeze output."
+- post: 2026-11-05-playing-time
+  section: "4. Summary"
+  fate: dropped
+  reason: "The summary restated the three results; each result is a card title and its figure."
+- post: 2026-11-05-playing-time
+  section: "5. Discussion"
+  fate: dropped
+  reason: "Callouts restated the figures; the caveats are carried by the stat-line glossary terms."
+
+# ---- vignettes/2026-11-07-absence-by-position ----
+- post: 2026-11-07-absence-by-position
+  section: "1. Introduction"
+  fate: dropped
+  reason: "Prose; each question it posed is now a card's title, and its expectations are not carried onto cards."
+- post: 2026-11-07-absence-by-position
+  section: "2. Data"
+  fate: dropped
+  reason: "Section heading only; its two subsections are recorded below."
+- post: 2026-11-07-absence-by-position
+  section: "2.1 Every signal here is a shape in the data, not a recorded injury or benching"
+  fate: merged
+  card: early-stop-by-position
+  reason: "The signal definitions are the finished-career, stat-line-career, early-stop, regular-player, injury-shaped-absence and benching-shaped-decline glossary terms, shared with the other absence cards."
+- post: 2026-11-07-absence-by-position
+  section: "2.2 Each position is followed through one box-score count, except the positions with none"
+  fate: merged
+  card: absence-readable-by-position
+  reason: "The usage-signal table is the usage_signal_map on the decline card and the position-group glossary term; the table itself was dropped as restating those cards."
+- post: 2026-11-07-absence-by-position
+  section: "3. Results"
+  fate: dropped
+  reason: "Section heading only; each subsection is a card."
+- post: 2026-11-07-absence-by-position
+  section: "3.1 A stop with eligibility left ends the largest share of finished stat-line careers at every position"
+  fate: card
+  card: early-stop-by-position
+  reason: "The early-stop against next-most-common ending bars are the card; the by-season view is its page figure. The card carries the 2026-11-07-absence-by-position alias. Number change: the careers are capped at the last complete season, which removes no career here (no finished career ends in 2026), so the all-careers share of 53.9 percent is unchanged. Not yet compared with the freeze output."
+- post: 2026-11-07-absence-by-position
+  section: "3.2 An injury-shaped absence can be read in only a small share of a position's seasons"
+  fate: card
+  card: absence-readable-by-position
+  reason: "The readable-share bars are the card. Seasons are 2016 to 2025, the box-score window, so no 2026 season enters the shares."
+- post: 2026-11-07-absence-by-position
+  section: "3.3 Benching-shaped declines appear less often than injury-shaped absences"
+  fate: card
+  card: benching-vs-injury-shape
+  reason: "The paired signal bars are the card, and the quarterback decline scatter is its page figure. The usage table was dropped as restating the bars."
+- post: 2026-11-07-absence-by-position
+  section: "3.4 Early stops end in a season-ending absence more often than used-up careers, but few can be read"
+  fate: card
+  card: final-season-absence-by-ending
+  reason: "The absence share by career ending is the card, and the by-position comparison is its page figure. The ending table was dropped as restating the bars."
+- post: 2026-11-07-absence-by-position
+  section: "4. Summary"
+  fate: dropped
+  reason: "The summary restated the four results; each result is a card title and its figure."
+- post: 2026-11-07-absence-by-position
+  section: "5. Discussion"
+  fate: dropped
+  reason: "Callouts and caveats; the window (2016 to 2025) and the censoring caveat are carried by the card captions, and the mechanism is not stated as a verdict."
+
+# ---- vignettes/2026-10-16-expectation-checks ----
+- post: 2026-10-16-expectation-checks
+  section: "1. Introduction"
+  fate: dropped
+  reason: "Prose; each question it posed is now a card's title, and its expectations are not carried onto cards."
+- post: 2026-10-16-expectation-checks
+  section: "2. Data"
+  fate: dropped
+  reason: "Section heading only; its two subsections are recorded below."
+- post: 2026-10-16-expectation-checks
+  section: "2.1 Seven quarterbacks' careers are traced season by season from the roster records"
+  fate: card
+  card: redshirt-shaped-seasons
+  reason: "The season timeline is the card, with the career summaries as its page table. The card carries the 2026-10-16-expectation-checks alias. Number change: the timeline stops at the last complete season (2025), so a 2026 season, such as Marchiol's, is not shown."
+- post: 2026-10-16-expectation-checks
+  section: "2.2 A game-level redshirt flag is meaningful only where playing reliably produces a statistic"
+  fate: card
+  card: covered-game-observability
+  reason: "The positions' observability bars are the card, with the distribution by player-season on the page. The rule table is dropped: the definitions are the covered-game, full-time-season and redshirt-shaped-season glossary terms. Number change: rates are computed through 2025, so 2026 seasons are excluded."
+- post: 2026-10-16-expectation-checks
+  section: "3. Results"
+  fate: dropped
+  reason: "Section heading only; the seven quarterback sections are recorded below."
+- post: 2026-10-16-expectation-checks
+  section: "3.1 Arch Manning's Texas career shows one redshirt-shaped season, 2023"
+  fate: merged
+  card: quarterback-game-coverage
+  reason: "The per-quarterback reading is one facet of the merged card, which shows all seven quarterbacks in one figure. The verdict sentence and expectation are dropped: cards carry no expectations."
+- post: 2026-10-16-expectation-checks
+  section: "3.2 Nicco Marchiol's freshman redshirt is recovered, his medical redshirt is not"
+  fate: merged
+  card: quarterback-game-coverage
+  reason: "One facet of the merged quarterback card; the verdict is dropped (no expectations on cards)."
+- post: 2026-10-16-expectation-checks
+  section: "3.3 Jordan Travis played at Louisville, and his roster record carries a duplicate 2021 row"
+  fate: merged
+  card: quarterback-game-coverage
+  reason: "One facet of the merged quarterback card. The duplicate 2021 roster row is a data note; the roster is not corrected here and the verdict is dropped."
+- post: 2026-10-16-expectation-checks
+  section: "3.4 Cam Ward's three schools and first overall pick are confirmed, but his FCS years are thin"
+  fate: merged
+  card: quarterback-game-coverage
+  reason: "One facet of the merged quarterback card. The school and pick check is the career summary, shown on the redshirt card's page; the verdict is dropped."
+- post: 2026-10-16-expectation-checks
+  section: "3.5 Trinidad Chambliss's Division II championship season is missing from the record"
+  fate: merged
+  card: quarterback-game-coverage
+  reason: "One facet of the merged quarterback card, where the season with no coverage shows as no coverage. The verdict and the Division II claim are dropped: the record cannot confirm the season."
+- post: 2026-10-16-expectation-checks
+  section: "3.6 Joe Burrow's four quiet Ohio State seasons all look like redshirts"
+  fate: merged
+  card: quarterback-game-coverage
+  reason: "One facet of the merged quarterback card; the verdict is dropped (no expectations on cards)."
+- post: 2026-10-16-expectation-checks
+  section: "3.7 Malachi Nelson's USC redshirt is recovered by usage where stat presence missed it"
+  fate: merged
+  card: quarterback-game-coverage
+  reason: "One facet of the merged quarterback card; the usage-based recovery is a follow-up (F17) on the redshirt card."
+- post: 2026-10-16-expectation-checks
+  section: "4. Summary"
+  fate: dropped
+  reason: "The verdict table restated the seven sections; the cards carry no expectations, which matches the 2026-11-22 ledger precedent."
+- post: 2026-10-16-expectation-checks
+  section: "5. Discussion"
+  fate: dropped
+  reason: "Callouts and caveats; the caveats are the covered-game and redshirt-shaped-season glossary terms, and the open questions are follow-ups (F17) on the cards."

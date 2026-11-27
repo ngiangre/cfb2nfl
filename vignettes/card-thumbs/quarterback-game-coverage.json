@@ -1,0 +1,17 @@
+{
+  "id": "quarterback-game-coverage",
+  "release": "2026-11-25",
+  "code_hash": "892b1c382780a2ba0d49f0b1884e930d",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "drop_pre_enrollment": "f7ee1d6f8fcda4f5305b2ce63530295c",
+    "flag_redshirt": "e69dd705c96486e8c786251290a00ac8",
+    "last_complete_cfb_season": "f279fba0ac2a12d60dd7965db5dd1f30",
+    "normalize_name": "aa6da7ad0932823bc881cabd08eba079",
+    "pre_enrollment_seasons": "26fdf5c36116f01e809b03c0841aad6c",
+    "redshirt_spine": "0e6f0dbed6e52c7cfecc5bf0bd14158a",
+    "reused_ids": "e252d83597b42db7c6a93169d6ada271",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

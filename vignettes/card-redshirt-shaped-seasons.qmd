@@ -1,0 +1,216 @@
+---
+title: "Which seasons of these quarterbacks look like redshirts?"
+aliases: [2026-10-16-expectation-checks.html]
+image: card-thumbs/redshirt-shaped-seasons.png
+image-alt: "Heatmap-style grid of seven quarterbacks by roster season in team colors, labeled with pass attempts; most careers run as a block of tiles with attempts climbing, and the few tiles marked RS, for redshirt-shaped, sit in the first or last seasons of a career."
+categories: ["Topic: Career shape", "Position: Quarterback", "Population: Roster seasons", "Figure: Heatmap"]
+status: investigation
+graduated_to: null
+terms: [redshirt-shaped-season, covered-game, player-season]
+followups:
+  - text: "Does a usage-based redshirt flag line up with the stated redshirts of players who transferred, once a coverage gap is accounted for?"
+    link: "F17"
+  - text: "Does a career's shape, with a thin lower-division record, read as a late start that the data does not support?"
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(DBI)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+library(knitr)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+
+# Key on athlete id, never name (recruiting ids collide, decision 0013). The
+# ids are the shared CFBD athlete namespace.
+subjects <- tibble::tribble(
+  ~who                 , ~cfb_athlete_id ,
+  "Arch Manning"       , "4870906"       ,
+  "Nicco Marchiol"     , "4685459"       ,
+  "Jordan Travis"      , "4360799"       ,
+  "Cam Ward"           , "4688380"       ,
+  "Trinidad Chambliss" , "4911529"       ,
+  "Joe Burrow"         , "3915511"       ,
+  "Malachi Nelson"     , "4870928"
+)
+```
+
+```{r}
+#| label: figure
+# Roster seasons of the seven quarterbacks through the last complete season.
+# The season still being played is left out, so its usage cannot set a flag.
+complete_through <- last_complete_cfb_season()
+ids <- subjects$cfb_athlete_id
+ids_sql <- paste(sprintf("'%s'", ids), collapse = ",")
+roster_rows <- dbGetQuery(
+  con,
+  sprintf("SELECT * FROM roster WHERE playerId IN (%s)", ids_sql)
+)
+stat_seasons <- dbGetQuery(
+  con,
+  sprintf(
+    "SELECT DISTINCT playerId, season FROM player_stats WHERE playerId IN (%s)",
+    ids_sql
+  )
+)
+# Drop the roster seasons listed before a player's recruiting class (issue
+# #114), as the pipeline's roster_enrolled does, before any flag is read.
+recruiting_rows <- dbGetQuery(
+  con,
+  sprintf(
+    "SELECT playerId, recruit_name, hs_class FROM recruiting WHERE playerId IN (%s)",
+    ids_sql
+  )
+)
+roster_rows <- drop_pre_enrollment(
+  roster_rows,
+  recruiting_rows,
+  stat_seasons,
+  reused_ids(roster_rows)
+)
+flags <- flag_redshirt(roster_rows, stat_seasons) |>
+  select(playerId, season, team) |>
+  mutate(
+    playerId = as.character(playerId),
+    who = subjects$who[match(playerId, subjects$cfb_athlete_id)]
+  )
+pass_attempts <- tbl(con, "player_stats") |>
+  filter(
+    playerId %in% !!ids,
+    category == "passing",
+    statType == "ATT"
+  ) |>
+  transmute(playerId, season, attempts = as.numeric(stat)) |>
+  collect()
+player_games <- tbl(con, "game_player_stats") |>
+  filter(playerId %in% !!ids, seasonType == "regular") |>
+  distinct(playerId, season, gameId) |>
+  count(playerId, season, name = "games_with_stat") |>
+  collect()
+covered <- tbl(con, "game_player_stats") |>
+  filter(seasonType == "regular") |>
+  distinct(season, team, gameId) |>
+  count(season, team, name = "games_covered") |>
+  collect()
+team_colours <- tbl(con, "teams") |>
+  select(team, color) |>
+  collect()
+
+spine <- redshirt_spine(flags, pass_attempts, player_games, covered) |>
+  left_join(team_colours, by = "team") |>
+  mutate(
+    color = if_else(is.na(color), "#9CA3AF", color),
+    text_col = label_text_colour(color),
+    who = subjects$who[match(playerId, subjects$cfb_athlete_id)]
+  ) |>
+  filter(season <= complete_through)
+
+p <- ggplot(spine, aes(x = season, y = who)) +
+  geom_tile_interactive(
+    aes(
+      fill = color,
+      tooltip = sprintf(
+        "%s, %s, %d: %s pass attempts; %s games with a statistic",
+        who,
+        team,
+        season,
+        coalesce(as.character(attempts), "no"),
+        games_with_stat
+      ),
+      data_id = paste(who, season)
+    ),
+    colour = "white",
+    height = 0.75
+  ) +
+  geom_text(
+    aes(
+      label = if_else(
+        likely_rs %in% TRUE,
+        "RS",
+        coalesce(as.character(attempts), "-")
+      ),
+      colour = text_col
+    ),
+    size = 3.2,
+    fontface = "bold"
+  ) +
+  scale_fill_identity() +
+  scale_colour_identity() +
+  scale_x_continuous(
+    breaks = sort(unique(spine$season)),
+    labels = function(x) paste0("'", substr(x, 3, 4))
+  ) +
+  labs(
+    title = "Which seasons of these quarterbacks look like redshirts?",
+    subtitle = "Each roster season in team colors; RS marks a redshirt-shaped season, and the number is pass attempts",
+    x = NULL,
+    y = NULL,
+    caption = paste0(
+      "Burrow's 2014 season is a pre-enrollment roster listing.\n",
+      card_caption(release)
+    )
+  ) +
+  theme_card() +
+  theme(panel.grid = element_blank(), legend.position = "none")
+
+card_thumbnail(p, "redshirt-shaped-seasons", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: career-table
+# The roster records behind the timeline: schools, transfers and roster gaps,
+# as the roster lists them (including the season still being played).
+career <- dbGetQuery(
+  con,
+  sprintf("SELECT * FROM career_summary WHERE playerId IN (%s)", ids_sql)
+) |>
+  mutate(who = subjects$who[match(playerId, subjects$cfb_athlete_id)])
+career |>
+  transmute(
+    Player = who,
+    Seasons = seasons,
+    First = first_season,
+    Last = last_season,
+    Schools = teams,
+    Transfers = transfers,
+    `Missing seasons` = gap_seasons
+  ) |>
+  kable(
+    col.names = c(
+      "Player",
+      "Seasons",
+      "First",
+      "Last",
+      "Schools",
+      "Transfers",
+      "Missing seasons"
+    ),
+    caption = "Career summaries from the roster records. Missing seasons counts years between the first and last roster season with no roster row."
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

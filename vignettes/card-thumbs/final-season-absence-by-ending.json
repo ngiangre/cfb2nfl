@@ -1,0 +1,27 @@
+{
+  "id": "final-season-absence-by-ending",
+  "release": "2026-11-25",
+  "code_hash": "9696784aad59fccc7561fb0552d3b6b6",
+  "functions": {
+    "absence_runs": "26b642a982be77f75dc5e5310e576549",
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "career_end_status": "f7c578ecda2732b85d2230a8d73a9d79",
+    "classify_absence": "851dbc8e2c914a1754748b9854bc697f",
+    "ending_labels": "d7e87df8d8263aa1b5193e5033cc1268",
+    "ending_palette": "85f0e7f0c9562b9bbc535350335a7253",
+    "final_endings": "adf71b53360ca6e3c73d89a67873dde2",
+    "fmt": "d4c89f195c447af907ba425a860522de",
+    "harmonize_position": "931d9b7daa25b80c9cd17abd32e7b3fd",
+    "harmonized_position_levels": "aefe6b78c6d8766f44b35e70824df851",
+    "last_complete_cfb_season": "f279fba0ac2a12d60dd7965db5dd1f30",
+    "pct": "3413c026fc8c907293b2fb1d96080440",
+    "player_appearance_sequence": "99e525442d3ee8eb7546ae0d0525cdb4",
+    "player_season_universe": "20aa0b7c1de22730fb6581dd5fe977ae",
+    "position_code_map": "23e4bba7fd7da54066373fb8a9761c45",
+    "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
+    "position_sources": "9adac2d8c4dfebfd2fbb956dee1f3a42",
+    "team_game_schedule": "8ce6a6078873f3d1ee4255bef1a402b7",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

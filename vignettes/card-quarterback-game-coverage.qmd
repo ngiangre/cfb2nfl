@@ -1,0 +1,180 @@
+---
+title: "In how many covered games does each quarterback's season show a statistic?"
+image: card-thumbs/quarterback-game-coverage.png
+image-alt: "Faceted bar charts, one panel per quarterback, of each roster season's covered regular-season games in grey with the games that show a statistic in team color in front; seasons with a short bar of statistics, or a grey bar with no colour, mark the quiet and uncovered seasons."
+categories: ["Topic: Career shape", "Position: Quarterback", "Population: Games", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [covered-game, redshirt-shaped-season, player-season]
+followups:
+  - text: "Can a missing covered game be recovered from season totals, so that an uncovered season such as a Division II year can be read?"
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(DBI)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+library(knitr)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+
+# Key on athlete id, never name (recruiting ids collide, decision 0013).
+subjects <- tibble::tribble(
+  ~who                 , ~cfb_athlete_id ,
+  "Arch Manning"       , "4870906"       ,
+  "Nicco Marchiol"     , "4685459"       ,
+  "Jordan Travis"      , "4360799"       ,
+  "Cam Ward"           , "4688380"       ,
+  "Trinidad Chambliss" , "4911529"       ,
+  "Joe Burrow"         , "3915511"       ,
+  "Malachi Nelson"     , "4870928"
+)
+```
+
+```{r}
+#| label: figure
+# The same seven roster records as the timeline, through the last complete
+# season; each covered game is one the game-statistics table holds for the team.
+complete_through <- last_complete_cfb_season()
+ids <- subjects$cfb_athlete_id
+ids_sql <- paste(sprintf("'%s'", ids), collapse = ",")
+roster_rows <- dbGetQuery(
+  con,
+  sprintf("SELECT * FROM roster WHERE playerId IN (%s)", ids_sql)
+)
+stat_seasons <- dbGetQuery(
+  con,
+  sprintf(
+    "SELECT DISTINCT playerId, season FROM player_stats WHERE playerId IN (%s)",
+    ids_sql
+  )
+)
+# Drop the roster seasons listed before a player's recruiting class (issue
+# #114), as the pipeline's roster_enrolled does, before any flag is read.
+recruiting_rows <- dbGetQuery(
+  con,
+  sprintf(
+    "SELECT playerId, recruit_name, hs_class FROM recruiting WHERE playerId IN (%s)",
+    ids_sql
+  )
+)
+roster_rows <- drop_pre_enrollment(
+  roster_rows,
+  recruiting_rows,
+  stat_seasons,
+  reused_ids(roster_rows)
+)
+flags <- flag_redshirt(roster_rows, stat_seasons) |>
+  select(playerId, season, team) |>
+  mutate(playerId = as.character(playerId))
+pass_attempts <- tbl(con, "player_stats") |>
+  filter(
+    playerId %in% !!ids,
+    category == "passing",
+    statType == "ATT"
+  ) |>
+  transmute(playerId, season, attempts = as.numeric(stat)) |>
+  collect()
+player_games <- tbl(con, "game_player_stats") |>
+  filter(playerId %in% !!ids, seasonType == "regular") |>
+  distinct(playerId, season, gameId) |>
+  count(playerId, season, name = "games_with_stat") |>
+  collect()
+covered <- tbl(con, "game_player_stats") |>
+  filter(seasonType == "regular") |>
+  distinct(season, team, gameId) |>
+  count(season, team, name = "games_covered") |>
+  collect()
+team_colours <- tbl(con, "teams") |>
+  select(team, color) |>
+  collect()
+
+spine <- redshirt_spine(flags, pass_attempts, player_games, covered) |>
+  left_join(team_colours, by = "team") |>
+  mutate(
+    color = if_else(is.na(color), "#9CA3AF", color),
+    who = subjects$who[match(playerId, subjects$cfb_athlete_id)],
+    x = paste0("'", substr(season, 3, 4)),
+    # "x of y" answers how many covered games showed a statistic.
+    bar_label = if_else(
+      is.na(games_covered),
+      "no coverage",
+      sprintf("%d of %d", games_with_stat, games_covered)
+    ),
+    tooltip = sprintf(
+      "%s %d, %s: a statistic in %d of %s covered games; %s pass attempts",
+      who,
+      season,
+      team,
+      games_with_stat,
+      coalesce(as.character(games_covered), "no"),
+      coalesce(as.character(attempts), "no")
+    )
+  ) |>
+  filter(season <= complete_through)
+
+# One row per quarterback and one tile per season, as on the redshirt card:
+# each tile reads "x/y", games with a statistic of the team's covered games.
+spine <- spine |>
+  mutate(
+    tile_label = if_else(
+      is.na(games_covered),
+      "none",
+      sprintf("%d/%d", games_with_stat, games_covered)
+    ),
+    who = factor(who, levels = rev(subjects$who))
+  )
+p <- ggplot(spine, aes(season, who)) +
+  geom_tile_interactive(
+    aes(fill = color, tooltip = tooltip, data_id = paste(who, season)),
+    colour = "white",
+    linewidth = 1.2,
+    height = 0.8
+  ) +
+  geom_text(aes(label = tile_label), size = 3.4, fontface = "bold", colour = "white") +
+  scale_fill_identity() +
+  scale_x_continuous(
+    breaks = seq(min(spine$season), max(spine$season)),
+    labels = \(x) paste0("'", substr(x, 3, 4))
+  ) +
+  labs(
+    title = "Covered games with a statistic, by quarterback season",
+    subtitle = "Each tile is a season in team colors: games with a recorded statistic out of the team's covered games",
+    x = NULL,
+    y = NULL,
+    caption = paste0(
+      "Burrow's 2014 season is a pre-enrollment roster listing.\n",
+      card_caption(release)
+    )
+  ) +
+  theme_card() +
+  theme(panel.grid = element_blank())
+
+card_thumbnail(p, "quarterback-game-coverage", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

@@ -1,0 +1,20 @@
+{
+  "id": "yardage-by-opponent-strength",
+  "release": "2026-11-25",
+  "code_hash": "206f355fd5f2f9f94f61ccac7d070de6",
+  "functions": {
+    "band_drop": "18303c4ee9cdb3293ca8b0859f366ce1",
+    "band_gradient": "58c6bb3ebd007158c839c70fcdfccfcc",
+    "build_game_production": "922956fd5a81dedfa74d3d0c088eadc3",
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "fmt": "d4c89f195c447af907ba425a860522de",
+    "last_complete_cfb_season": "f279fba0ac2a12d60dd7965db5dd1f30",
+    "opponent_elo_band": "22c2ecf96f9a4c621fb90e653175a2af",
+    "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
+    "position_palette": "11141b2b531ab5b7f31d6c196fcc46be",
+    "signature_game_values": "7c41284117e5d61799b87064e56803f4",
+    "signature_positions": "2518644c4393fc6369edf2762a01487f",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

@@ -1,0 +1,239 @@
+---
+title: "Is an early stop the most common ending at every position?"
+aliases: [2026-11-07-absence-by-position.html]
+image: card-thumbs/early-stop-by-position.png
+image-alt: "Horizontal bar chart, one pair of bars per position group, of the share of finished stat-line careers that stopped with eligibility left against the next most common ending; the early-stop bar is the longer one in most position groups, with offensive line nearly even, and offensive line is the group with the fewest careers."
+categories: ["Topic: Career shape", "Position: By position group", "Population: Stat-line seasons", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [finished-career, stat-line-career, early-stop, position-group, eligible-season]
+followups:
+  - text: "Does a stop with eligibility left reflect a player's choice, an injury or a depth-chart decision, and does the answer differ by position?"
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(DBI)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+library(knitr)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+```
+
+```{r}
+#| label: figure
+# Finished careers only: a career still running has no observed ending. The
+# season still being played is left out of the careers' last seasons.
+complete_through <- last_complete_cfb_season()
+store <- file.path(root, "_targets")
+outcomes <- targets::tar_read(outcomes, store = store)
+ending_status <- career_end_status(
+  targets::tar_read(career, store = store),
+  outcomes,
+  targets::tar_read(picks_nfl, store = store)
+)
+# Careers with at least one season stat line: the ones a box-score ending can
+# be read for.
+stat_ids <- unique(outcomes$playerId[outcomes$has_stat_line])
+roster <- dbReadTable(con, "roster")
+pos_levels <- setdiff(
+  harmonized_position_levels(),
+  c("Athlete", "Position not recorded")
+)
+# A career's position is its position in its last roster season.
+last_position <- roster |>
+  mutate(playerId = as.character(playerId)) |>
+  group_by(playerId) |>
+  slice_max(season, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  transmute(playerId, position_group = harmonize_position(position, "roster"))
+ended_careers <- ending_status |>
+  inner_join(last_position, by = "playerId") |>
+  filter(position_group %in% pos_levels, last_season <= complete_through) |>
+  mutate(position_group = factor(position_group, pos_levels))
+finished_careers <- ended_careers |>
+  filter(career_end != "right_censored") |>
+  mutate(with_line = playerId %in% stat_ids)
+statline <- finished_careers |> filter(with_line)
+
+ending_labels <- c(
+  early_stop = "Stopped with eligibility left",
+  eligibility_exhausted = "Used up eligibility",
+  eligibility_unknown = "Stopped, eligibility unknown",
+  transferred_then_stopped = "Changed schools, then stopped",
+  signed_udfa = "Signed undrafted",
+  drafted = "Drafted"
+)
+endings_by_pos <- statline |>
+  count(position_group, career_end) |>
+  group_by(position_group) |>
+  mutate(share = n / sum(n)) |>
+  ungroup() |>
+  mutate(ending = factor(ending_labels[career_end], ending_labels))
+statline_share <- finished_careers |>
+  group_by(position_group) |>
+  summarise(
+    finished = n(),
+    with_line = mean(with_line),
+    .groups = "drop"
+  )
+
+# The early stop against each position's next most common ending.
+comparison <- early_stop_comparison(statline) |>
+  mutate(
+    bar = factor(
+      bar,
+      c("Next most common ending", "Stopped with eligibility left")
+    ),
+    tip = sprintf(
+      "%s, %s: %s",
+      position_group,
+      ending_labels[career_end],
+      pct(share)
+    )
+  )
+
+p <- ggplot(comparison, aes(
+  x = share,
+  y = forcats::fct_rev(position_group),
+  fill = bar
+)) +
+  geom_col_interactive(
+    aes(tooltip = tip, data_id = paste(position_group, career_end)),
+    position = position_dodge(width = 0.8),
+    width = 0.75
+  ) +
+  scale_fill_manual(
+    values = c(
+      `Stopped with eligibility left` = "#374151",
+      `Next most common ending` = "#9CA3AF"
+    ),
+    breaks = c("Stopped with eligibility left", "Next most common ending"),
+    labels = c("Early stop", "Next most common ending")
+  ) +
+  scale_x_continuous(
+    labels = scales::percent,
+    expand = expansion(mult = c(0, 0.1))
+  ) +
+  labs(
+    title = "Is an early stop the most common ending at every position?",
+    subtitle = "Share of finished stat-line careers, by how they ended",
+    x = "Share of finished stat-line careers",
+    y = NULL,
+    fill = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "early-stop-by-position", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: by-season-figure
+# The same comparison by the career's last season, so one season does not
+# carry the position's share.
+game_window <- 2016:complete_through
+by_last <- statline |>
+  filter(last_season %in% game_window) |>
+  group_by(position_group, last_season) |>
+  summarise(
+    n = n(),
+    early = mean(career_end == "early_stop"),
+    .groups = "drop"
+  ) |>
+  mutate(
+    tip = sprintf(
+      "%s, last season %s: %s of %s careers stopped with eligibility left",
+      position_group,
+      last_season,
+      pct(early),
+      fmt(n)
+    )
+  )
+p_season <- ggplot(
+  by_last,
+  aes(last_season, early, colour = position_group, group = position_group)
+) +
+  geom_line(linewidth = 0.9) +
+  geom_point_interactive(
+    aes(tooltip = tip, data_id = paste(position_group, last_season)),
+    size = 3
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_continuous(breaks = game_window) +
+  scale_colour_position() +
+  labs(
+    title = "Is the early-stop share steady across the last seasons?",
+    subtitle = paste0(
+      "Careers whose last season is ",
+      min(game_window),
+      " to ",
+      max(game_window),
+      ", by position group"
+    ),
+    x = "Last season of the career",
+    y = "Stopped with eligibility left",
+    colour = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+card_interactive(p_season)
+```
+
+```{r}
+#| label: endings-table
+endings_by_pos |>
+  select(position_group, ending, share) |>
+  tidyr::pivot_wider(names_from = ending, values_from = share, values_fill = 0) |>
+  left_join(statline_share, by = "position_group") |>
+  arrange(position_group) |>
+  transmute(
+    `Position group` = as.character(position_group),
+    `Finished careers` = fmt(finished),
+    `With a stat line` = pct(with_line, 0),
+    `Stat-line careers` = fmt(round(finished * with_line)),
+    !!!rlang::syms(unname(ending_labels))
+  ) |>
+  mutate(across(all_of(unname(ending_labels)), \(x) pct(x, 0))) |>
+  kable(
+    col.names = c(
+      "Position group",
+      "Finished careers",
+      "With a stat line",
+      "Stat-line careers",
+      unname(ending_labels)
+    ),
+    align = paste0("l", strrep("r", 9)),
+    caption = paste0(
+      "Finished careers by the position of their last season, through the season ",
+      complete_through,
+      ", and how the stat-line careers among them ended. Each row of endings sums to 100%."
+    )
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

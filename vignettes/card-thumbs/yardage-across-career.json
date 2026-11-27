@@ -1,0 +1,23 @@
+{
+  "id": "yardage-across-career",
+  "release": "2026-11-25",
+  "code_hash": "09c2938bde4e38b40ef83f6dc549e7b7",
+  "functions": {
+    "build_game_production": "922956fd5a81dedfa74d3d0c088eadc3",
+    "build_season_arcs": "94be8e0bcd44342d7a8b9cb19d4ded8b",
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "fmt": "d4c89f195c447af907ba425a860522de",
+    "last_complete_cfb_season": "f279fba0ac2a12d60dd7965db5dd1f30",
+    "median_arcs": "1aab186b760eaedbcf25beff321a09dc",
+    "opponent_elo_band": "22c2ecf96f9a4c621fb90e653175a2af",
+    "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
+    "position_palette": "11141b2b531ab5b7f31d6c196fcc46be",
+    "scale_colour_position": "4cafb87d0ef9e51cdf13934043361fe6",
+    "season_arc": "431f341b1c9b55a28c4939ec616daca6",
+    "signature_game_values": "7c41284117e5d61799b87064e56803f4",
+    "signature_positions": "2518644c4393fc6369edf2762a01487f",
+    "signature_season_values": "fd4f2f4e584c7ff1fab994426b912410",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

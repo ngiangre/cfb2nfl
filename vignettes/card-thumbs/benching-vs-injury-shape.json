@@ -1,0 +1,23 @@
+{
+  "id": "benching-vs-injury-shape",
+  "release": "2026-11-25",
+  "code_hash": "0f15a32e247d5823377347c25f1f219f",
+  "functions": {
+    "absence_runs": "26b642a982be77f75dc5e5310e576549",
+    "absence_summary": "2f6b32aa0d81f98d41d7cb4fc9dbafa4",
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "classify_absence": "851dbc8e2c914a1754748b9854bc697f",
+    "decline_summary": "8b347511ac0bc25cd9e058d54af12ccd",
+    "harmonized_position_levels": "aefe6b78c6d8766f44b35e70824df851",
+    "last_complete_cfb_season": "f279fba0ac2a12d60dd7965db5dd1f30",
+    "pct": "3413c026fc8c907293b2fb1d96080440",
+    "player_appearance_sequence": "99e525442d3ee8eb7546ae0d0525cdb4",
+    "player_season_universe": "20aa0b7c1de22730fb6581dd5fe977ae",
+    "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
+    "team_game_schedule": "8ce6a6078873f3d1ee4255bef1a402b7",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b",
+    "usage_decline": "d342fc8e763bd1a5886afda983bf8843",
+    "usage_signal_map": "ce5e34fd489ffefa88e6f3c02415b6fa"
+  }
+}

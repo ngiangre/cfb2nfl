@@ -1,0 +1,103 @@
+---
+title: "How are opponents split by strength in the stat-line games?"
+image: card-thumbs/opponent-elo-bands.png
+image-alt: "Histogram of player-game counts by opponent pregame Elo rating, with dashed lines at 1400, 1600 and 1800 that split the scale into under 1400, 1400 to 1599, 1600 to 1799 and 1800 and up bands; most games fall between roughly 1200 and 1800 and the upper bands are thinner."
+categories: ["Topic: Career shape", "Position: All positions", "Population: Stat-line seasons", "Figure: Distribution"]
+status: investigation
+graduated_to: null
+terms: [opponent-band, elo, stat-line-season]
+followups:
+  - text: "Do unrated opponents, mostly lower-division teams, change how a game reads against the rated bands?"
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+```
+
+```{r}
+#| label: figure
+# Player-games in the complete seasons only; a season still being played
+# would add games without changing the Elo split.
+complete_through <- last_complete_cfb_season()
+pg <- collect(tbl(con, "player_game")) |>
+  filter(season <= complete_through)
+rated <- pg |>
+  filter(!is.na(opponent_pregame_elo))
+
+p <- ggplot(rated, aes(opponent_pregame_elo)) +
+  geom_histogram(binwidth = 25, fill = "#374151") +
+  geom_vline(xintercept = c(1400, 1600, 1800), linetype = "dashed", linewidth = 0.8) +
+  scale_x_continuous(breaks = c(1000, 1400, 1600, 1800, 2200)) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "How are opponents split by strength?",
+    subtitle = "Player-games by the opponent's pregame Elo rating; dashed lines mark the band edges",
+    x = "Opponent pregame Elo",
+    y = "Player-games",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "opponent-elo-bands", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: band-table
+# The Elo range and the number of games in each band, with the unrated games
+# that have no rating at all.
+pg |>
+  mutate(
+    band = factor(opponent_elo_band(opponent_pregame_elo), opponent_band_levels)
+  ) |>
+  group_by(band) |>
+  summarise(
+    games = n(),
+    lowest = min(opponent_pregame_elo),
+    highest = max(opponent_pregame_elo),
+    .groups = "drop"
+  ) |>
+  arrange(band) |>
+  transmute(
+    `Opponent band` = as.character(band),
+    `Player-games` = fmt(games),
+    `Lowest Elo` = ifelse(is.finite(lowest), fmt(lowest), "--"),
+    `Highest Elo` = ifelse(is.finite(highest), fmt(highest), "--")
+  ) |>
+  knitr::kable(
+    col.names = c("Opponent band", "Player-games", "Lowest Elo", "Highest Elo"),
+    caption = paste0(
+      "Player-games and the Elo range in each opponent band, over the seasons through ",
+      complete_through,
+      ". Unrated opponents have no Elo, so no range."
+    )
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

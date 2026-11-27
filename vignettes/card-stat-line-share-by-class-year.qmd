@@ -1,0 +1,167 @@
+---
+title: "Do players show up in the box score more as they get older?"
+image: card-thumbs/stat-line-share-by-class-year.png
+image-alt: "Column chart of the share of rostered player-seasons with a stat line in at least one game, for each class year from one to five; the share is about 42 percent in the first two class years, about 50 percent in the third, about 70 percent in the fourth, and highest in the fifth, which rests on the fewest player-seasons."
+categories: ["Topic: Career shape", "Position: All positions", "Population: Roster seasons", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [class-year, stat-line-season, player-season, appearance-rate]
+followups:
+  - text: "Does the rise in stat lines by class year reflect a player earning playing time, or a change in his role?"
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+```
+
+```{r}
+#| label: figure
+# Rostered player-seasons from 2019 through the last complete season, with a
+# class year; the season still being played is left out.
+complete_through <- last_complete_cfb_season()
+# The first season with a class year in the data.
+first_season <- 2019L
+usage <- targets::tar_read(player_usage, store = file.path(root, "_targets"))
+pop <- usage |>
+  filter(
+    on_roster,
+    team_games > 0,
+    season >= first_season,
+    season <= complete_through,
+    !is.na(class_year)
+  )
+by_class <- pop |>
+  group_by(class_year) |>
+  summarise(
+    player_seasons = n(),
+    any_line = mean(games_appeared > 0),
+    .groups = "drop"
+  ) |>
+  mutate(
+    tip = paste0(
+      "Class ",
+      class_year,
+      ": ",
+      scales::percent(any_line, accuracy = 1),
+      " of ",
+      fmt(player_seasons),
+      " player-seasons logged a line"
+    )
+  )
+
+p <- by_class |>
+  ggplot(aes(factor(class_year), any_line)) +
+  geom_col_interactive(
+    aes(tooltip = tip),
+    width = 0.7,
+    fill = "#374151"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "Do players show up in the box score more as they get older?",
+    subtitle = paste0(
+      "Share of rostered player-seasons with a stat line in at least one game, by class year, ",
+      first_season,
+      " to ",
+      complete_through
+    ),
+    x = "Class year",
+    y = "Share with a stat line",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "stat-line-share-by-class-year", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: by-season-figure
+# The class-year shares season by season, so one season does not carry the trend.
+by_class_season <- pop |>
+  group_by(season, class_year) |>
+  summarise(any_line = mean(games_appeared > 0), n = n(), .groups = "drop") |>
+  mutate(
+    tip = paste0(
+      "Class ",
+      class_year,
+      " in ",
+      season,
+      ": ",
+      scales::percent(any_line, accuracy = 1),
+      " of ",
+      fmt(n),
+      " logged a line"
+    )
+  )
+
+p_season <- ggplot(
+  by_class_season,
+  aes(season, any_line, colour = factor(class_year), group = class_year)
+) +
+  geom_line(linewidth = 0.8) +
+  geom_point_interactive(aes(tooltip = tip), size = 3) +
+  scale_colour_manual(
+    values = colorRampPalette(c("#D1D5DB", "#111827"))(5),
+    name = "Class year"
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "Is the class-year gap the same in every season?",
+    subtitle = "Share with a stat line in at least one game, by season and class year",
+    x = "Season",
+    y = "Share with a stat line",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+card_interactive(p_season)
+```
+
+```{r}
+#| label: class-table
+by_class |>
+  transmute(
+    `Class year` = as.character(class_year),
+    `Player-seasons` = fmt(player_seasons),
+    `Logged a stat line in any game` = scales::percent(any_line, accuracy = 0.1)
+  ) |>
+  knitr::kable(
+    col.names = c("Class year", "Player-seasons", "Logged a stat line in any game"),
+    align = "lrr",
+    caption = paste0(
+      "Rostered player-seasons by class year, from ",
+      first_season,
+      " through the season ",
+      complete_through,
+      ". Class year five is small."
+    )
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
