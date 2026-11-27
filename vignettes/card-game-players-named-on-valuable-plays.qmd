@@ -1,0 +1,202 @@
+---
+title: "Which players averaged the most EPA per involvement among those named repeatedly?"
+image: card-thumbs/game-players-named-on-valuable-plays.png
+image-alt: "Horizontal bar chart of the eight highest and eight lowest average EPA per involvement among players named at least four times in one game, one bar per player in their team's color; the leading receiver's bar is the longest and fully colored, and the lowest bars are defensive backs and linebackers."
+categories: ["Topic: Games", "Position: All positions", "Population: Games", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [involvement, epa-per-involvement, epa-contributed]
+followups:
+  - text: "Does a player's EPA per involvement hold up across games, or does one game's sample flatter the leaders?"
+    link: "F12"
+  - text: "Which defenders the play text names only as tacklers, and how much of their credit depends on that text?"
+    link: "F12"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+game_id <- 401856883
+teams <- collect(tbl(con, "teams"))
+```
+
+```{r}
+#| label: players
+# Each player's EPA contributed (the sum of the shares of the plays they were
+# named on) and their average EPA per involvement, from their own side. Only
+# players named at least min_inv times are ranked, so one big play cannot
+# top the board.
+plays <- game_plays(con, game_id)
+home <- plays$home[1]
+away <- plays$away[1]
+season <- DBI::dbGetQuery(
+  con,
+  paste0(
+    "SELECT gameId, driveId, driveNumber, playNumber, period, offense, ",
+    "defense, home, away, offenseScore, defenseScore, yardline, yardsToGoal, ",
+    "down, distance, yardsGained, playType, playText, ppa ",
+    "FROM plays WHERE season = 2026"
+  )
+)
+fit <- game_ep_fit(season)
+epa <- game_epa_model(game_scrimmage(plays), fit)
+rated <- dplyr::filter(epa, !is.na(ppa))
+inv <- game_involvement(con, game_id, 2026, rated, c(home, away))
+players <- game_players(inv$involvement)
+min_inv <- 4L
+regulars <- players |>
+  filter(involvements >= min_inv) |>
+  arrange(per_inv)
+top <- regulars |> slice_max(per_inv, n = 1, with_ties = FALSE)
+board <- bind_rows(
+  slice_max(regulars, per_inv, n = 8, with_ties = FALSE),
+  slice_min(regulars, per_inv, n = 8, with_ties = FALSE)
+) |>
+  mutate(
+    lead = playerId == top$playerId,
+    team = factor(team, c(away, home)),
+    label_plain = sub("^.* ", "", player)
+  ) |>
+  arrange(per_inv)
+```
+
+```{r}
+#| label: figure
+p <- ggplot(
+  board,
+  aes(per_inv, reorder(label_plain, per_inv), fill = team, alpha = lead)
+) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(
+        "<b>",
+        label,
+        "</b> (",
+        team,
+        ")<br>",
+        round(per_inv, 2),
+        " EPA per involvement over ",
+        involvements,
+        " involvements<br>",
+        round(epa, 2),
+        " EPA contributed"
+      ),
+      data_id = playerId
+    ),
+    width = 0.7
+  ) +
+  geom_vline(xintercept = 0, linewidth = 0.4) +
+  scale_alpha_manual(values = c(`TRUE` = 1, `FALSE` = 0.5), guide = "none") +
+  scale_fill_team(teams, name = NULL) +
+  labs(
+    title = "EPA per involvement, highest and lowest",
+    subtitle = paste0(
+      "Eight highest and eight lowest among players named at least ",
+      min_inv,
+      " times"
+    ),
+    x = "EPA per involvement",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "game-players-named-on-valuable-plays", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: explore
+# Every involvement of the ranked players in game order: each dot is one play
+# a player was named on, colored by the play's EPA from the player's side.
+timeline <- inv$involvement |>
+  filter(playerId %in% regulars$playerId) |>
+  mutate(
+    row_lab = factor(label, levels = regulars$label),
+    tip = paste0(
+      "<b>",
+      label,
+      "</b> (",
+      team,
+      ")<br>Q",
+      period,
+      ", ",
+      roles,
+      "<br>",
+      playText,
+      "<br>Play EPA for ",
+      team,
+      ": ",
+      round(epa_side, 2)
+    )
+  )
+p_timeline <- ggplot(timeline, aes(seq, row_lab)) +
+  geom_point_interactive(
+    aes(fill = epa_side, tooltip = tip, data_id = id),
+    shape = 21,
+    size = 3.6,
+    color = "black",
+    stroke = 0.3
+  ) +
+  scale_fill_gradient2(
+    low = "#b91c1c",
+    mid = "#f9fafb",
+    high = "#15803d",
+    midpoint = 0,
+    limits = c(-3, 3),
+    oob = scales::squish,
+    breaks = c(-3, 0, 3),
+    labels = c("-3 or less", "0", "3 or more"),
+    name = "Play EPA for the player's side  ",
+    guide = guide_colorbar(barwidth = unit(14, "lines"))
+  ) +
+  facet_grid(team ~ ., scales = "free_y", space = "free_y", switch = "y") +
+  labs(
+    x = "Play in game order",
+    y = NULL,
+    title = "Every involvement of the ranked players, in game order"
+  ) +
+  theme_card(base_size = 14) +
+  theme(legend.position = "bottom", strip.placement = "outside")
+card_interactive(p_timeline, width_svg = 12, height_svg = 11)
+```
+
+```{r}
+#| label: table
+board |>
+  arrange(desc(per_inv)) |>
+  transmute(
+    Player = label,
+    Team = as.character(team),
+    Involvements = involvements,
+    `EPA contributed` = round(epa, 2),
+    `EPA per involvement` = round(per_inv, 2)
+  ) |>
+  knitr::kable(
+    col.names = c("Player", "Team", "Involvements", "EPA contributed", "EPA per involvement"),
+    caption = "The players on the board, with the EPA their plays were credited with and their average EPA per involvement."
+  )
+```
+
+```{r}
+#| label: footer
+cat(card_footer())
+```

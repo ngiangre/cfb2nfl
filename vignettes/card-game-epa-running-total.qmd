@@ -107,6 +107,66 @@ card_interactive(p)
 ```
 
 ```{r}
+#| label: agreement
+# What CFBD's PPA measures: the change in expected points across each play,
+# read off the curve (the model above), against the published PPA. Every
+# other exhibit on this card runs on PPA itself.
+rated <- dplyr::filter(epa, !is.na(ppa))
+epa_cor <- cor(rated$epa_mine, rated$ppa, use = "complete.obs")
+gap_play <- rated |>
+  slice_max(abs(epa_mine - ppa), n = 1, with_ties = FALSE)
+p_agree <- rated |>
+  ggplot(aes(ppa, epa_mine, color = offense)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "22") +
+  geom_hline(yintercept = 0, linewidth = 0.3) +
+  geom_vline(xintercept = 0, linewidth = 0.3) +
+  geom_point_interactive(
+    aes(
+      tooltip = paste0(
+        "<b>",
+        offense,
+        "</b><br>",
+        playText,
+        "<br>CFBD PPA: ",
+        round(ppa, 2),
+        "<br>Expected points before: ",
+        round(ep_before, 2),
+        ", after: ",
+        round(ep_after, 2),
+        "<br>Change in expected points: ",
+        round(epa_mine, 2)
+      )
+    ),
+    size = 2,
+    alpha = 0.75
+  ) +
+  scale_color_team(teams, name = "Offense") +
+  coord_fixed(xlim = c(-10, 5), ylim = c(-10, 5)) +
+  annotate(
+    "segment",
+    x = gap_play$ppa + 3.6,
+    y = gap_play$epa_mine + 1.6,
+    xend = gap_play$ppa + 0.25,
+    yend = gap_play$epa_mine + 0.1,
+    arrow = arrow(length = unit(0.12, "inches"), type = "closed"),
+    linewidth = 0.6
+  ) +
+  labs(
+    title = "Change in expected points against CFBD's PPA, play by play",
+    subtitle = paste0(
+      "Correlation ",
+      round(epa_cor, 2),
+      "; the diagonal is where the two agree"
+    ),
+    x = "CFBD PPA for the play",
+    y = "Change in expected points across the play",
+    caption = card_caption(release)
+  ) +
+  theme_card(base_size = 16)
+card_interactive(p_agree, width_svg = 9, height_svg = 6.5)
+```
+
+```{r}
 #| label: table
 tot |>
   transmute(

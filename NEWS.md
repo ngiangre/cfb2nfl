@@ -29,6 +29,13 @@
   drift, invitation rate and the drafted rate. Both posts' URLs redirect to
   their cards, and `inst/cards/migration.yml` records every section's fate.
   Numbers now come from the 2026-11-25 data release.
+  [#148](https://github.com/ngiangre/cfb2nfl/issues/148)): **the Georgia vs
+  Missouri game-flow post becomes six figure cards** (running EPA, value by
+  quarter, drive outcomes, position-group EPA, players named on valuable plays,
+  and player attribution sources), with the terms moved to the glossary. The
+  correlation between the expected-points curve and CFBD PPA moves from 0.84 to
+  0.90 after a fix to the curve's field-position input, and the largest-gap play
+  changes with it.
 
 - Investigations (feature F25): **the figure wall's tiles resize with the
   screen** instead of holding a fixed width, so on a phone they fit one

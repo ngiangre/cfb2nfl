@@ -17,6 +17,6 @@ game_epa_model(scr, fit)
 }
 \description{
 The curve's change across a play: the EP after minus the EP before, with a
-touchdown worth \link{game_td_value}, a turnover handing the defense the mirrored
+touchdown worth \code{game_td_value} (6.94 points), a turnover handing the defense the mirrored
 field position, and an incompletion on fourth down a turnover on downs.
 }

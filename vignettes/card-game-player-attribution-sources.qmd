@@ -1,0 +1,175 @@
+---
+title: "Did the play text name most of the defensive involvements in one game?"
+image: card-thumbs/game-player-attribution-sources.png
+image-alt: "Stacked bar chart of one game's player involvements on the offense and on the defense, each bar split into involvements named by the play-stats log and those added from the play text; the defense bar's play-text share is larger than the log share."
+categories: ["Topic: Games", "Position: All positions", "Population: Games", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [involvement, scrimmage-play]
+followups:
+  - text: "Would the defensive credit change if the play text named tacklers the way a play-by-play feed would, rather than the way this game's text does?"
+    link: "F12"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+game_id <- 401856883
+teams <- collect(tbl(con, "teams"))
+```
+
+```{r}
+#| label: sources
+# Each player involvement carries where it came from: the play-stats log, the
+# play text, or both. The play text adds the tacklers the log leaves out.
+plays <- game_plays(con, game_id)
+home <- plays$home[1]
+away <- plays$away[1]
+season <- DBI::dbGetQuery(
+  con,
+  paste0(
+    "SELECT gameId, driveId, driveNumber, playNumber, period, offense, ",
+    "defense, home, away, offenseScore, defenseScore, yardline, yardsToGoal, ",
+    "down, distance, yardsGained, playType, playText, ppa ",
+    "FROM plays WHERE season = 2026"
+  )
+)
+fit <- game_ep_fit(season)
+epa <- game_epa_model(game_scrimmage(plays), fit)
+rated <- dplyr::filter(epa, !is.na(ppa))
+inv <- game_involvement(con, game_id, 2026, rated, c(home, away))
+involvement <- inv$involvement
+sources <- involvement |>
+  summarise(
+    involvements = n(),
+    players = n_distinct(playerId),
+    .by = c(source, side)
+  )
+```
+
+```{r}
+#| label: figure
+p <- ggplot(
+  sources,
+  aes(side, involvements, fill = source)
+) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(
+        "<b>",
+        side,
+        ", ",
+        source,
+        "</b><br>",
+        involvements,
+        " involvements by ",
+        players,
+        " players"
+      ),
+      data_id = paste(side, source)
+    ),
+    width = 0.6
+  ) +
+  scale_fill_manual(
+    values = c("Play-stats log" = "#374151", "Play text" = "#0ea5e9"),
+    name = "Named by"
+  ) +
+  labs(
+    title = "Involvements by side and source",
+    subtitle = "The play text adds most of the defensive names",
+    x = NULL,
+    y = "Player involvements",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "game-player-attribution-sources", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: players
+# Per player: involvements named by the log and by the text, for the dot plot.
+by_player <- involvement |>
+  summarise(
+    log = sum(source == "Play-stats log"),
+    text = sum(source == "Play text"),
+    team = first(team),
+    .by = c(playerId, player)
+  )
+p_players <- ggplot(by_player, aes(log, text, color = team)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "22") +
+  geom_point_interactive(
+    aes(
+      tooltip = paste0(
+        "<b>",
+        player,
+        "</b> (",
+        team,
+        ")<br>",
+        log,
+        " named by the log, ",
+        text,
+        " by the play text"
+      ),
+      data_id = playerId
+    ),
+    size = 3,
+    alpha = 0.85
+  ) +
+  scale_color_team(teams, name = NULL) +
+  labs(
+    title = "Each player's involvements, by source",
+    subtitle = "Points above the dashed line were named more by the play text",
+    x = "Named by the play-stats log",
+    y = "Named by the play text",
+    caption = card_caption(release)
+  ) +
+  theme_card(base_size = 16)
+card_interactive(p_players, width_svg = 10, height_svg = 7)
+```
+
+```{r}
+#| label: table
+sources |>
+  arrange(side, source) |>
+  transmute(
+    Side = side,
+    Source = source,
+    Involvements = involvements,
+    Players = players
+  ) |>
+  knitr::kable(
+    col.names = c("Side", "Named by", "Involvements", "Players"),
+    caption = paste0(
+      "Where each of the ",
+      nrow(involvement),
+      " player involvements comes from, over the scrimmage plays with an EPA. ",
+      inv$unresolved,
+      " text mentions matched no roster player and are left out."
+    )
+  )
+```
+
+```{r}
+#| label: footer
+cat(card_footer())
+```

@@ -1,0 +1,191 @@
+---
+title: "Did Georgia's players average more EPA per involvement than Missouri's in every position group?"
+image: card-thumbs/game-player-epa-by-position-group.png
+image-alt: "Dot plot of each team's average EPA per player involvement for each position group, quarterback through defensive back, with a tick marking the group's typical play; Georgia's dots sit to the right of Missouri's in every group."
+categories: ["Topic: Games", "Position: By position group", "Population: Games", "Figure: Distribution"]
+status: investigation
+graduated_to: null
+terms: [involvement, epa-per-involvement, typical-play]
+followups:
+  - text: "Do position-group averages hold across other games, or is one game's sample too small to separate the groups?"
+    link: "F12"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+game_id <- 401856883
+teams <- collect(tbl(con, "teams"))
+```
+
+```{r}
+#| label: involvement
+# Every player named on a scrimmage play, with the play's EPA split evenly
+# among the players named on each side; the typical play of a position group
+# is the average EPA per involvement over both teams.
+plays <- game_plays(con, game_id)
+home <- plays$home[1]
+away <- plays$away[1]
+season <- DBI::dbGetQuery(
+  con,
+  paste0(
+    "SELECT gameId, driveId, driveNumber, playNumber, period, offense, ",
+    "defense, home, away, offenseScore, defenseScore, yardline, yardsToGoal, ",
+    "down, distance, yardsGained, playType, playText, ppa ",
+    "FROM plays WHERE season = 2026"
+  )
+)
+fit <- game_ep_fit(season)
+epa <- game_epa_model(game_scrimmage(plays), fit)
+rated <- dplyr::filter(epa, !is.na(ppa))
+inv <- game_involvement(con, game_id, 2026, rated, c(home, away))
+involvement <- game_group_typical(inv$involvement) |>
+  mutate(team = factor(team, c(away, home)))
+groups <- involvement |>
+  distinct(group, typical)
+groups_team <- involvement |>
+  summarise(
+    involvements = n(),
+    per_inv = mean(epa_side),
+    median = median(epa_side),
+    .by = c(group, team)
+  ) |>
+  left_join(groups, by = "group") |>
+  mutate(vs_typical = per_inv - typical)
+```
+
+```{r}
+#| label: figure
+p <- ggplot(groups_team, aes(per_inv, factor(group, rev(levels(groups$group))))) +
+  geom_vline(xintercept = 0, linewidth = 0.3) +
+  geom_point(
+    data = groups,
+    aes(typical, factor(group, rev(levels(groups$group)))),
+    shape = "|",
+    size = 9,
+    color = "black",
+    inherit.aes = FALSE
+  ) +
+  geom_point_interactive(
+    aes(
+      color = team,
+      tooltip = paste0(
+        "<b>",
+        team,
+        " ",
+        group,
+        "</b><br>",
+        involvements,
+        " involvements, ",
+        round(per_inv, 2),
+        " EPA per involvement<br>Typical play: ",
+        round(typical, 2)
+      ),
+      data_id = paste(group, team)
+    ),
+    size = 5
+  ) +
+  scale_color_team(teams, name = NULL) +
+  labs(
+    title = "EPA per involvement by position group",
+    subtitle = "Dots: team averages. Ticks: typical play",
+    x = "EPA per involvement",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "game-player-epa-by-position-group", release = release)
+card_interactive(
+  ggplot(involvement, aes(epa_side, team)) +
+    geom_vline(
+      xintercept = 0,
+      linewidth = 0.3
+    ) +
+    geom_vline(
+      data = groups,
+      aes(xintercept = typical),
+      linetype = "dashed",
+      linewidth = 0.5
+    ) +
+    geom_boxplot(
+      fill = NA,
+      color = "black",
+      outlier.shape = NA,
+      width = 0.6,
+      linewidth = 0.5
+    ) +
+    geom_point_interactive(
+      aes(
+        color = team,
+        tooltip = paste0(
+          "<b>",
+          label,
+          "</b> (",
+          team,
+          ")<br>",
+          playText,
+          "<br>Play EPA for ",
+          team,
+          ": ",
+          round(epa_side, 2)
+        ),
+        data_id = id
+      ),
+      position = ggbeeswarm::position_quasirandom(orientation = "y", width = 0.25),
+      size = 2,
+      alpha = 0.8
+    ) +
+    facet_wrap(~group, ncol = 2, scales = "free_x") +
+    scale_color_team(teams, guide = "none") +
+    labs(
+      x = "Play EPA for the player's side; dashed line is the group's typical play",
+      y = NULL,
+      title = "Every involvement, by position group"
+    ) +
+    theme_card(base_size = 14)
+  ,
+  width_svg = 12,
+  height_svg = 9
+)
+```
+
+```{r}
+#| label: table
+groups_team |>
+  arrange(group, team) |>
+  transmute(
+    Group = as.character(group),
+    Team = as.character(team),
+    Involvements = involvements,
+    `EPA per involvement` = round(per_inv, 2),
+    `Typical play` = round(typical, 2)
+  ) |>
+  knitr::kable(
+    col.names = c("Position group", "Team", "Involvements", "EPA per involvement", "Typical play"),
+    caption = "Involvements and average EPA per involvement by position group and team; the typical play is the average over both teams."
+  )
+```
+
+```{r}
+#| label: footer
+cat(card_footer())
+```

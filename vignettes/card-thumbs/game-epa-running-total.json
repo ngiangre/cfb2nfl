@@ -1,7 +1,7 @@
 {
   "id": "game-epa-running-total",
   "release": "2026-11-25",
-  "code_hash": "8046a6d695a5c1bd6fcee8c9925c22ec",
+  "code_hash": "edd3b2b192fd0cb5f827aab21bfc382b",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
     "game_def_td": "7945fa4317259d2603ba3bceb8882aa0",

@@ -167,7 +167,7 @@ game_ep_at <- function(fit, yards_to_goal, down, distance) {
 #' Each scrimmage play's EP before and after, and its model EPA
 #'
 #' The curve's change across a play: the EP after minus the EP before, with a
-#' touchdown worth [game_td_value], a turnover handing the defense the mirrored
+#' touchdown worth `game_td_value` (6.94 points), a turnover handing the defense the mirrored
 #' field position, and an incompletion on fourth down a turnover on downs.
 #'
 #' @param scr Scrimmage plays ([game_scrimmage()]).
