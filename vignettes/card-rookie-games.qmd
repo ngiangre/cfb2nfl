@@ -43,7 +43,7 @@ bin_names <- c("None", "1 to 4", "5 to 8", "9 to 12", "13 to 17")
 ex_games <- risk |>
   filter(playerId %in% cast, outcome_nfl_entry_d) |>
   transmute(
-    short = sub(".* ", "", names(cast)[match(playerId, cast)]),
+    short = names(cast)[match(playerId, cast)],
     games = outcome_rookie_games_entry_year,
     bin = cut(games, bin_breaks, labels = bin_names)
   )
@@ -79,8 +79,8 @@ p <- ggplot(games_tab, aes(x = 100 * share, y = bin)) +
     width = 0.7
   ) +
   geom_text(aes(label = sprintf("%.1f%%", 100 * share)), hjust = -0.1, size = 5.5) +
-  scale_fill_manual(values = c(`TRUE` = "#1B9E77", `FALSE` = "grey65"), guide = "none") +
-  expand_limits(x = 100 * max(games_tab$share) + 12) +
+  scale_fill_manual(values = c(`TRUE` = "#374151", `FALSE` = "grey65"), guide = "none") +
+  expand_limits(x = 100 * max(games_tab$share) + 18) +
   scale_x_continuous(labels = \(x) sprintf("%.0f%%", x)) +
   labs(
     title = "Rookie-season games played by NFL entrants",

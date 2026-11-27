@@ -1,7 +1,7 @@
 {
   "id": "average-pick-by-position",
   "release": "2026-11-25",
-  "code_hash": "09421f2c45e50228008348e5d803e2bb",
+  "code_hash": "5612f1cdcb59834a323677b9c8ed26a1",
   "functions": {
     "add_position_group": "1da282ac9bc54c33518bf49d6a53a8d8",
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",

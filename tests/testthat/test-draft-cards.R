@@ -42,8 +42,31 @@ test_that("plot_outcome_ledger draws one bar per outcome and highlights the draf
   p <- plot_outcome_ledger(outcome_ledger(eligible_risk_set(outcomes_fixture())))
   expect_s3_class(p, "ggplot")
   built <- ggplot2::ggplot_build(p)
-  expect_equal(nrow(built$data[[2]]), 3L)
-  expect_equal(sort(unique(built$data[[2]]$fill)), sort(c("#1B9E77", "grey65")))
+  expect_equal(nrow(built$data[[1]]), 3L)
+  expect_equal(sort(unique(built$data[[1]]$fill)), sort(c("#1B9E77", "grey65")))
+})
+
+test_that("plot_outcome_ledger labels every axis tick with its true percent", {
+  skip_if_not_installed("ggplot2")
+  skip_if_not_installed("ggiraph")
+  # Shares like the real ones, where default breaks fall on 2.5 and 7.5.
+  ledger <- tibble::tibble(
+    outcome = c(
+      "Drafted, any round",
+      "Signed as an undrafted free agent",
+      "NFL entry (drafted or undrafted)"
+    ),
+    events = c(30L, 41L, 71L),
+    at_risk = 1000L,
+    share = c(0.030, 0.041, 0.071),
+    lo = c(0.021, 0.030, 0.056),
+    hi = c(0.042, 0.055, 0.089)
+  )
+  p <- plot_outcome_ledger(ledger)
+  built <- ggplot2::ggplot_build(p)
+  breaks <- built$layout$panel_params[[1]]$x$breaks
+  breaks <- breaks[!is.na(breaks)]
+  expect_true(all(breaks == round(breaks)))
 })
 
 test_that("running_cast names the recurring players by athlete id", {

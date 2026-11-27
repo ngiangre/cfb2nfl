@@ -1,8 +1,8 @@
 ---
 title: "How does a draft-eligible college season end?"
 image: card-thumbs/end-of-season-status.png
-image-alt: "Bar chart of draft-eligible college seasons by how they end: still playing next season, exhausted eligibility undrafted, left the data early, signed as an undrafted free agent, or drafted; still playing is by far the longest bar and the two NFL outcomes are the shortest."
-categories: ["Topic: Draft outcomes", "Topic: Career shape", "Position: All positions", "Population: Draft-eligible seasons", "Figure: Bar chart", "Question: Draft chance by position"]
+image-alt: "Bar chart of draft-eligible college seasons by how they end: still playing next season, exhausted eligibility undrafted, gone the next season for an unknown reason, signed as an undrafted free agent, or drafted; still playing is by far the longest bar and the two NFL outcomes are the shortest."
+categories: ["Topic: Draft outcomes", "Topic: Career shape", "Position: All positions", "Population: Draft-eligible seasons", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
 terms: [eligible-season, eligible-season-number, known-outcome, still-playing, exhausted-undrafted, left-the-data, drafted, signed-undrafted]
@@ -45,11 +45,15 @@ status_tab <- risk |>
       status_end_of_season,
       "continuing" = "Still playing next season",
       "exhausted_undrafted" = "Exhausted eligibility undrafted",
-      "left_data" = "Left the data early",
+      "left_data" = "Gone the next season, reason unknown",
       "signed_udfa" = "Signed as an undrafted free agent",
       "drafted" = "Drafted"
     ),
-    nfl = status_end_of_season %in% c("drafted", "signed_udfa"),
+    route = case_when(
+      status_end_of_season == "drafted" ~ "drafted",
+      status_end_of_season == "signed_udfa" ~ "undrafted",
+      TRUE ~ "other"
+    ),
     status_label = reorder(status_label, share)
   )
 p_continuing <- status_tab$share[status_tab$status_end_of_season == "continuing"]
@@ -57,7 +61,7 @@ p_continuing <- status_tab$share[status_tab$status_end_of_season == "continuing"
 p <- ggplot(status_tab, aes(x = 100 * share, y = status_label)) +
   geom_col_interactive(
     aes(
-      fill = nfl,
+      fill = route,
       tooltip = sprintf("%s: %s seasons (%.1f%%)", status_label, fmt(seasons), 100 * share),
       data_id = status_label
     ),
@@ -69,14 +73,14 @@ p <- ggplot(status_tab, aes(x = 100 * share, y = status_label)) +
     size = 5.5
   ) +
   scale_fill_manual(
-    values = c(`TRUE` = "#1B9E77", `FALSE` = "grey65"),
+    values = c(drafted = "#1B9E77", undrafted = "#7570B3", other = "grey65"),
     guide = "none"
   ) +
   expand_limits(x = 100 * p_continuing + 15) +
   scale_x_continuous(labels = \(x) sprintf("%.0f%%", x)) +
   labs(
     title = "How eligible seasons end",
-    subtitle = "Share of eligible player-seasons by end-of-season status; NFL outcomes in green",
+    subtitle = "Share of eligible player-seasons by end-of-season status; drafted in green, signed undrafted in purple",
     x = "Share of eligible seasons",
     y = NULL,
     caption = card_caption(release)

@@ -1,11 +1,11 @@
 ---
 title: "By their third eligible season, how have college careers ended at each position?"
 image: card-thumbs/career-endings-by-position.png
-image-alt: "Stacked bar chart for each position group of the cumulative percent of eligible players drafted, signed undrafted, with eligibility ended undrafted, or still playing by their third eligible season, with a dashed line at half; no group's NFL segments reach half, and eligibility ended undrafted is the largest segment everywhere."
-categories: ["Topic: Draft outcomes", "Topic: Career shape", "Position: All positions", "Population: Roster seasons", "Figure: Bar chart", "Question: Draft chance by position"]
+image-alt: "Stacked bar chart for each position group of the percent of eligible players drafted, signed undrafted, with eligibility ended undrafted, or still playing by their third eligible season, each row labelled with its NFL total; no group's NFL share reaches one in five, and eligibility ended undrafted is the largest segment everywhere."
+categories: ["Topic: Draft outcomes", "Topic: Career shape", "Position: By position group", "Position: Quarterback", "Population: Draft-eligible players", "Figure: Bar chart", "Question: Draft chance by position"]
 status: investigation
 graduated_to: null
-terms: [career-eligible-season, study-population, first-eligible-position, cumulative-percent, at-risk, career-drafted, career-signed-undrafted, eligibility-ended, career-still-playing, confidence-interval]
+terms: [career-eligible-season, study-population, first-eligible-position, cumulative-percent, at-risk, career-drafted, career-signed-undrafted, eligibility-ended, career-still-playing, confidence-interval, seasons-and-players]
 followups:
   - text: "Fit cause-specific hazard models of the three endings with position, conference tier and recruiting rating, as the baseline for the draft forecast."
     link: "F17"
@@ -73,23 +73,28 @@ p <- at_horizon |>
     linewidth = 0.3,
     position = position_stack(reverse = TRUE)
   ) +
-  geom_vline(xintercept = 50, linetype = "dashed", colour = "#111827") +
   geom_text(
-    aes(
-      label = if_else(estimate >= 0.1, pct(estimate, 0), ""),
-      group = label,
-      colour = label %in% c("Left the data", "Still playing")
-    ),
-    position = position_stack(vjust = 0.5, reverse = TRUE),
-    size = 4.4,
-    fontface = "bold"
+    data = mutate(nfl_share, group = factor(group, rev(as.character(nfl_share$group)))),
+    aes(x = 100 * nfl + 1, y = group, label = paste0(pct(nfl, 0), " NFL")),
+    inherit.aes = FALSE,
+    hjust = 0,
+    size = 5,
+    fontface = "bold",
+    colour = "#111827"
   ) +
-  scale_colour_manual(values = c(`FALSE` = "#FFFFFF", `TRUE` = "#111827"), guide = "none") +
-  scale_fill_manual(values = state_fill) +
+  # The two NFL routes keep their colours; the other endings go pale.
+  scale_fill_manual(
+    values = c(
+      state_fill[c("Drafted", "Signed undrafted")],
+      "Eligibility ended, undrafted" = "#D1D5DB",
+      "Left the data" = "#E5E7EB",
+      "Still playing" = "#F3F4F6"
+    )
+  ) +
   scale_x_continuous(labels = \(x) paste0(x, "%"), breaks = seq(0, 100, 25), expand = expansion(mult = c(0, 0.01))) +
   labs(
     title = sprintf("How careers had ended by the %s eligible season", ordinal(horizon)),
-    subtitle = "Cumulative percent of each position group's eligible players; dashed line at half",
+    subtitle = "Percent of each position's eligible players by how their career had ended; label: drafted plus signed",
     x = "Percent of the group's eligible players",
     y = NULL,
     fill = NULL,

@@ -1,11 +1,11 @@
 ---
-title: "Do players with a matched recruiting record reach the NFL more often?"
+title: "Do players with a known high-school recruiting profile reach the NFL more often?"
 image: card-thumbs/recruiting-record-gap.png
-image-alt: "Three line charts, drafted, signed undrafted and either NFL route, of the cumulative percent of eligible players reaching each route by eligible season, for players with a matched high-school recruiting record (solid) and without one (dashed); the solid line is higher in every panel, labelled with how many times as often by the third season."
-categories: ["Topic: Draft outcomes", "Position: All positions", "Population: Roster seasons", "Population: Recruits", "Figure: Line chart", "Question: What matters for going pro"]
+image-alt: "Three line charts, drafted, signed undrafted and either NFL route, of the cumulative percent of eligible players reaching each route by eligible season, for players with a known high-school recruiting profile (solid) and without one (dashed); the solid line is higher in every panel, labelled with how many times as often by the third season."
+categories: ["Topic: Draft outcomes", "Position: All positions", "Population: Draft-eligible players", "Figure: Line chart", "Question: What matters for going pro"]
 status: investigation
 graduated_to: null
-terms: [career-eligible-season, matched-recruiting-record, cumulative-percent, at-risk, career-drafted, career-signed-undrafted, study-population, confidence-interval]
+terms: [career-eligible-season, matched-recruiting-record, cumulative-percent, at-risk, career-drafted, career-signed-undrafted, study-population, confidence-interval, seasons-and-players]
 followups:
   - text: "Add a school guard to the undrafted-signing match, since newer links match the NFL roster's college less often."
     link: "F22"
@@ -80,11 +80,11 @@ p <- rec_routes |>
     data = rec_gap,
     aes(x = horizon, y = y, label = sprintf("%.1fx", ratio)),
     inherit.aes = FALSE,
-    hjust = 1.15,
-    vjust = -0.2,
+    hjust = -0.15,
+    vjust = 1.2,
     size = 5.5,
     fontface = "bold",
-    colour = "#B45309",
+    colour = "#374151",
     label.size = 0
   ) +
   facet_wrap(~route, nrow = 1) +
@@ -94,13 +94,13 @@ p <- rec_routes |>
   scale_x_continuous(breaks = 0:5) +
   scale_y_continuous(labels = \(x) paste0(x, "%"), expand = expansion(mult = c(0.02, 0.2))) +
   labs(
-    title = "NFL routes with and without a matched recruiting record",
+    title = "NFL routes with and without a known recruiting profile",
     subtitle = sprintf(
-      "Solid: matched record; dashed: none. Labels: how many times as often by season %s",
+      "Solid: profile matched; dashed: none. Labels: how many times as often by season %s",
       horizon
     ),
-    x = "Eligible season",
-    y = NULL,
+    x = "Eligible season (0 is the start)",
+    y = "Cumulative percent",
     linetype = NULL,
     caption = card_caption(release)
   ) +

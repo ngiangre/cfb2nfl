@@ -2,10 +2,10 @@
 title: "Do more players reach the NFL through the draft or undrafted?"
 image: card-thumbs/nfl-entry-routes.png
 image-alt: "Bar chart of NFL entrants from draft-eligible college seasons by entry route: undrafted free agent, drafted in round 1, rounds 2 to 3 and rounds 4 to 7; the undrafted bar is the longest, more than half of all entrants."
-categories: ["Topic: Draft outcomes", "Position: All positions", "Population: Draft-eligible seasons", "Figure: Bar chart", "Question: Draft chance by position"]
+categories: ["Topic: Draft outcomes", "Position: All positions", "Population: Draft-eligible seasons", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
-terms: [eligible-season, known-outcome, drafted, signed-undrafted, nfl-entry, draft-class]
+terms: [eligible-season, known-outcome, drafted, signed-undrafted, nfl-entry, draft-class, seasons-and-players]
 followups:
   - text: "At which positions do entrants most often arrive undrafted?"
     link: "Question: Draft chance by position"
@@ -75,7 +75,11 @@ p <- ggplot(routes, aes(x = 100 * share, y = route)) +
   scale_x_continuous(labels = \(x) sprintf("%.0f%%", x)) +
   labs(
     title = "NFL entrants by entry route",
-    subtitle = "Share of all entrants from eligible seasons with a known outcome; undrafted in purple",
+    subtitle = sprintf(
+      "Share of NFL entrants from eligible college seasons, %d to %d drafts; undrafted in purple",
+      min(risk$draft_year),
+      max(risk$draft_year)
+    ),
     x = "Share of NFL entrants",
     y = NULL,
     caption = card_caption(release)
@@ -141,10 +145,10 @@ risk |>
     )
   ) |>
   arrange(draft_year) |>
-  select(player, season, draft_year, route, eligible_season_index) |>
+  select(player, season, draft_year, route) |>
   knitr::kable(
-    col.names = c("Player", "Final college season", "Draft class", "Route", "Eligible season number"),
-    caption = "The running examples at their NFL entry. Burrow's eligible-season count starts a season early and Ward's a season late: Burrow's roster record starts the season before he enrolled, and Ward's starts in his second college season."
+    col.names = c("Player", "Final college season", "Draft class", "Route"),
+    caption = "The running examples at their NFL entry."
   )
 ```
 

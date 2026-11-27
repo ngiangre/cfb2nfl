@@ -52,8 +52,8 @@ outcome_ledger <- function(risk) {
 
 #' Figure: the outcome ledger
 #'
-#' One bar per outcome with its 95% interval, the draft highlighted, and a
-#' dashed reference line at five percent.
+#' One bar per outcome with its 95% interval and its share labelled past the
+#' whisker, the draft highlighted.
 #'
 #' @param ledger [outcome_ledger()] output.
 #' @return A ggplot with `ggiraph` tooltips.
@@ -74,12 +74,8 @@ plot_outcome_ledger <- function(ledger) {
         100 * .data$hi
       )
     )
+  top <- ceiling(100 * max(d$hi) + 2)
   ggplot2::ggplot(d, ggplot2::aes(100 * .data$share, .data$outcome)) +
-    ggplot2::geom_vline(
-      xintercept = 5,
-      linetype = "dashed",
-      colour = "grey50"
-    ) +
     ggiraph::geom_col_interactive(
       ggplot2::aes(
         fill = .data$drafted,
@@ -93,24 +89,20 @@ plot_outcome_ledger <- function(ledger) {
       linewidth = 0.8
     ) +
     ggplot2::geom_text(
-      ggplot2::aes(x = 100 * .data$hi + 0.2, label = pct(.data$share)),
+      ggplot2::aes(x = 100 * .data$hi + 0.4, label = pct(.data$share)),
       hjust = 0,
       size = 6
-    ) +
-    ggplot2::annotate(
-      "text",
-      x = 5.1,
-      y = 0.55,
-      label = "5% line",
-      hjust = 0,
-      size = 5
     ) +
     ggplot2::scale_fill_manual(
       values = c(`TRUE` = "#1B9E77", `FALSE` = "grey65"),
       guide = "none"
     ) +
-    ggplot2::expand_limits(x = 10) +
-    ggplot2::scale_x_continuous(labels = \(x) sprintf("%.0f%%", x))
+    # Whole-percent breaks, so every tick label is the value it marks.
+    ggplot2::scale_x_continuous(
+      breaks = seq(0, top, by = 2),
+      labels = \(x) paste0(x, "%"),
+      limits = c(0, top)
+    )
 }
 
 #' The recurring named players

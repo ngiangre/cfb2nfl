@@ -1,7 +1,7 @@
 {
   "id": "drafted-rate-by-position",
   "release": "2026-11-25",
-  "code_hash": "3055a7865cecb19f917fd05ad08f7581",
+  "code_hash": "091382ef585d641a9bb19de63d09f6e8",
   "functions": {
     "add_position_group": "1da282ac9bc54c33518bf49d6a53a8d8",
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",

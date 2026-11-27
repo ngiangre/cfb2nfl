@@ -2,7 +2,7 @@
 title: "Are quarterbacks picked earliest in every draft class?"
 image: card-thumbs/average-pick-by-position.png
 image-alt: "Line chart by draft class of the average overall pick for each position group, with quarterbacks in orange and the other groups in grey; filled orange points mark the classes where quarterbacks had the earliest average, and the quarterback line swings by dozens of picks from class to class."
-categories: ["Topic: Draft outcomes", "Position: All positions", "Position: Quarterback", "Population: Draft picks", "Figure: Line chart", "Question: Draft chance by position"]
+categories: ["Topic: Draft outcomes", "Position: By position group", "Position: Quarterback", "Population: Draft picks", "Figure: Line chart", "Question: Draft chance by position"]
 status: investigation
 graduated_to: null
 terms: [eligible-season, position-group, drafted, overall-pick, draft-class]
@@ -50,6 +50,8 @@ lowest_per_year <- pick_trend |>
   group_by(draft_year) |>
   slice_min(avg_pick, n = 1) |>
   ungroup()
+n_classes <- nrow(lowest_per_year)
+n_qb_lowest <- sum(lowest_per_year$group == "Quarterback")
 qb_trend <- pick_trend |>
   filter(group == "Quarterback") |>
   mutate(lowest = draft_year %in% lowest_per_year$draft_year[lowest_per_year$group == "Quarterback"])
@@ -75,13 +77,27 @@ p <- ggplot(pick_trend, aes(draft_year, avg_pick)) +
     stroke = 1.2
   ) +
   scale_shape_manual(values = c(`TRUE` = 21, `FALSE` = 1), guide = "none") +
+  annotate(
+    "label",
+    x = max(pick_trend$draft_year),
+    y = 20,
+    label = "Dashed: all picks, average",
+    hjust = 1,
+    size = 5,
+    colour = "grey30",
+    label.size = 0
+  ) +
   scale_x_continuous(breaks = seq(min(qb_trend$draft_year), max(qb_trend$draft_year), by = 3)) +
   scale_y_continuous(limits = c(0, NA)) +
   labs(
     title = "Average overall pick by draft class",
-    subtitle = "Lower is earlier. Quarterbacks in orange, filled where earliest; other groups in grey",
+    subtitle = sprintf(
+      "Lower is earlier. Quarterbacks (orange) earliest in %d of %d classes",
+      n_qb_lowest,
+      n_classes
+    ),
     x = "Draft class",
-    y = NULL,
+    y = "Average pick",
     caption = card_caption(release)
   ) +
   theme_card()

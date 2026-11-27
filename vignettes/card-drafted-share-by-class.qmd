@@ -1,8 +1,8 @@
 ---
-title: "Has the drafted share of eligible seasons changed across draft classes?"
+title: "Is it getting harder to get drafted?"
 image: card-thumbs/drafted-share-by-class.png
-image-alt: "Line chart by draft class of the share of draft-eligible seasons ending drafted and ending in NFL entry, with a confidence band on entry; the drafted line falls steadily across classes while entry jumps with recorded undrafted signings from the 2016 class on."
-categories: ["Topic: Draft outcomes", "Position: All positions", "Population: Draft-eligible seasons", "Figure: Line chart", "Question: Draft chance by position"]
+image-alt: "Line chart by draft class of the share of draft-eligible seasons ending drafted and ending in NFL entry, each with a confidence band; the drafted line holds near the same share through the 2021 class and then drops, while entry jumps at the 2016 class, when undrafted signings start being recorded."
+categories: ["Topic: Draft outcomes", "Position: All positions", "Population: Draft-eligible seasons", "Figure: Line chart"]
 status: investigation
 graduated_to: null
 terms: [eligible-season, known-outcome, draft-class, drafted, signed-undrafted, nfl-entry, confidence-interval]
@@ -49,6 +49,8 @@ trend <- risk |>
   mutate(
     drafted = drafted_ev / seasons,
     entry = entry_ev / seasons,
+    drafted_lo = vapply(seq_along(seasons), \(i) wilson(drafted_ev[i], seasons[i])[["lo"]], numeric(1)),
+    drafted_hi = vapply(seq_along(seasons), \(i) wilson(drafted_ev[i], seasons[i])[["hi"]], numeric(1)),
     entry_lo = vapply(seq_along(seasons), \(i) wilson(entry_ev[i], seasons[i])[["lo"]], numeric(1)),
     entry_hi = vapply(seq_along(seasons), \(i) wilson(entry_ev[i], seasons[i])[["hi"]], numeric(1))
   )
@@ -61,6 +63,7 @@ trend_tip <- function(label, col) {
 
 p <- ggplot(trend, aes(draft_year)) +
   geom_ribbon(aes(ymin = entry_lo, ymax = entry_hi), fill = "grey80", alpha = 0.6) +
+  geom_ribbon(aes(ymin = drafted_lo, ymax = drafted_hi), fill = "#1B9E77", alpha = 0.2) +
   geom_line(aes(y = entry), linewidth = 1.4, colour = "grey35") +
   geom_line(aes(y = drafted), linewidth = 1.6, colour = "#1B9E77") +
   geom_point_interactive(aes(y = entry, tooltip = trend_tip("NFL entry", "entry")), size = 2.6, colour = "grey35") +
@@ -83,13 +86,22 @@ p <- ggplot(trend, aes(draft_year)) +
     hjust = 0,
     colour = "grey30"
   ) +
-  scale_y_continuous(labels = \(x) sprintf("%.0f%%", 100 * x), limits = c(0, NA)) +
+  annotate(
+    "text",
+    x = 2016.3,
+    y = tr(2016, "entry") + 0.01,
+    label = "Undrafted signings recorded\nfrom the 2016 class on",
+    hjust = 0,
+    size = 5,
+    colour = "grey30"
+  ) +
+  scale_y_continuous(labels = \(x) sprintf("%.0f%%", 100 * x), limits = c(0, NA), expand = expansion(mult = c(0, 0.15))) +
   scale_x_continuous(breaks = seq(y0, y1, by = 3)) +
   labs(
     title = "Drafted and NFL entry shares by draft class",
-    subtitle = "Share of eligible seasons; grey band: entry's confidence interval",
+    subtitle = "Bands are confidence intervals",
     x = "Draft class",
-    y = NULL,
+    y = "Share of eligible seasons",
     caption = card_caption(release)
   ) +
   theme_card()

@@ -1,8 +1,8 @@
 ---
-title: "Which drafted positions go in the first round most often?"
+title: "Which positions' draft picks go in the first round most often?"
 image: card-thumbs/first-round-share-by-position.png
 image-alt: "Bar chart of the share of each position group's drafted seasons that were first-round picks; quarterbacks, highlighted orange, have the longest bar, well ahead of the other groups."
-categories: ["Topic: Draft outcomes", "Position: All positions", "Position: Quarterback", "Population: Draft picks", "Figure: Bar chart", "Question: Draft chance by position"]
+categories: ["Topic: Draft outcomes", "Position: By position group", "Position: Quarterback", "Population: Draft picks", "Figure: Bar chart", "Question: Draft chance by position"]
 status: investigation
 graduated_to: null
 terms: [eligible-season, known-outcome, position-group, drafted]
@@ -69,8 +69,8 @@ p <- ggplot(round_mix, aes(100 * round1_share, group_f)) +
   scale_fill_manual(values = c(`TRUE` = "#D95F02", `FALSE` = "grey65"), guide = "none") +
   labs(
     title = "First-round share by position group",
-    subtitle = "Share of each group's drafted seasons picked in the first round; quarterbacks in orange",
-    x = "Drafted seasons picked in the first round",
+    subtitle = "Share of each group's draft picks taken in the first round; quarterbacks in orange",
+    x = "Draft picks taken in the first round",
     y = NULL,
     caption = card_caption(release)
   ) +

@@ -16,7 +16,7 @@ known-outcome:
   definition: "Eligible seasons whose next draft has already happened. Later draft classes are left out rather than counted as failures."
 draft-class:
   label: Draft class
-  definition: "The NFL draft held the spring after the season; a player's class is the draft his final eligible season leads into."
+  definition: "The NFL draft held the spring after an eligible season; a season's class is that draft, so one player's seasons fall in several classes."
 drafted:
   label: Drafted
   definition: "Selected in the NFL draft held the spring after the season, reported by round: round 1, rounds 2 to 3, rounds 4 to 7."
@@ -33,7 +33,7 @@ exhausted-undrafted:
   label: Exhausted eligibility undrafted
   definition: "The player's last observed college season, with no draft selection and no NFL roster appearance after it."
 left-the-data:
-  label: Left the data early
+  label: Gone the next season, reason unknown
   definition: "Absent the next season although his record says a next season should exist (a transfer with sitting time, an injury retirement, or an unobserved departure); the outcome is unknown."
 per-season-chance:
   label: Per-season chance
@@ -89,3 +89,6 @@ at-risk:
 matched-recruiting-record:
   label: Matched recruiting record
   definition: "A high-school recruiting record safely matched to the player by name. Without one his high-school year is estimated, which is not the same as being unrecruited."
+seasons-and-players:
+  label: Seasons and players
+  definition: "Some cards count eligible seasons, others players. A player has several eligible seasons but his NFL entry falls on one of them, so drafted and undrafted totals nearly match; the career-ending cards also leave out players ruled out or with no recorded position, so their totals run slightly lower."

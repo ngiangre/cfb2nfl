@@ -80,18 +80,18 @@ p <- ggplot(
     "text",
     x = 1,
     y = hz(3) + 0.04,
-    label = sprintf("NFL entry (dashed) reaches %.1f%%\nby the third eligible season", 100 * hz(3)),
+    label = sprintf("NFL entry chance (dashed)\nin the third eligible season: %.1f%%", 100 * hz(3)),
     size = 5.5,
     hjust = 0
   ) +
   scale_y_continuous(labels = \(x) sprintf("%.0f%%", 100 * x), limits = c(0, 0.25)) +
   scale_x_continuous(breaks = hazard$eligible_season_index) +
-  scale_colour_brewer(palette = "Dark2") +
+  scale_colour_manual(values = c(Drafted = "#1B9E77", `Undrafted free agent` = "#7570B3")) +
   labs(
     title = "Per-season chance of each NFL outcome",
     subtitle = "By eligible season number; dashed line is NFL entry by either route",
     x = "Eligible season number",
-    y = "Chance the next draft\nbrings the outcome",
+    y = "Chance that season",
     colour = NULL,
     caption = card_caption(release)
   ) +

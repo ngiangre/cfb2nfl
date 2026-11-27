@@ -2,10 +2,10 @@
 title: "For players who stay in college, is the draft or undrafted signing likelier each season?"
 image: card-thumbs/nfl-route-chance-by-season.png
 image-alt: "Line chart, all positions, of the per-season chance of being drafted and of signing undrafted among players still playing going into each eligible season; the drafted line peaks early and falls, the undrafted line keeps climbing and crosses above it from the second eligible season."
-categories: ["Topic: Draft outcomes", "Topic: Career shape", "Position: All positions", "Population: Roster seasons", "Figure: Line chart", "Question: Draft chance by position"]
+categories: ["Topic: Draft outcomes", "Topic: Career shape", "Position: All positions", "Population: Draft-eligible players", "Figure: Line chart", "Question: Draft chance by position"]
 status: investigation
 graduated_to: null
-terms: [career-eligible-season, at-risk, per-season-chance, career-drafted, career-signed-undrafted, study-population, confidence-interval]
+terms: [career-eligible-season, at-risk, per-season-chance, career-drafted, career-signed-undrafted, study-population, confidence-interval, seasons-and-players]
 followups:
   - text: "Check whether the timing of each ending is stable across draft classes before a forecast relies on it."
     link: "F17"
@@ -75,7 +75,7 @@ p <- ggplot(hz_all, aes(time, 100 * hazard, colour = hz_lab[ending])) +
     title = "Per-season chance of each NFL route",
     subtitle = "Of players still playing going into each eligible season; shaded where signing undrafted leads",
     x = "Eligible season",
-    y = NULL,
+    y = "Chance that season",
     colour = NULL,
     caption = card_caption(release)
   ) +

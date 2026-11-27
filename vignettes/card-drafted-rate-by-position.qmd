@@ -2,7 +2,7 @@
 title: "Which positions are drafted most often?"
 image: card-thumbs/drafted-rate-by-position.png
 image-alt: "Bar chart of the share of draft-eligible college seasons ending in a draft pick for each of nine position groups, with confidence intervals; the three leading groups are highlighted green and quarterbacks orange in the middle of the table, and the leaders' intervals overlap."
-categories: ["Topic: Draft outcomes", "Position: All positions", "Position: Quarterback", "Population: Draft-eligible seasons", "Figure: Bar chart", "Question: Draft chance by position"]
+categories: ["Topic: Draft outcomes", "Position: By position group", "Position: Quarterback", "Population: Draft-eligible seasons", "Figure: Bar chart", "Question: Draft chance by position"]
 status: investigation
 graduated_to: null
 terms: [eligible-season, known-outcome, position-group, drafted, confidence-interval, draft-class]
@@ -74,12 +74,12 @@ p <- ggplot(rates, aes(100 * drafted, group_f)) +
   expand_limits(x = max(rates$hi) + 1.2) +
   scale_x_continuous(labels = \(x) sprintf("%.0f%%", x), expand = expansion(mult = c(0, 0.02))) +
   scale_fill_manual(
-    values = c("Leading three" = "#1B9E77", Quarterback = "#D95F02", "Other groups" = "grey65"),
+    values = c("Leading three" = "#374151", Quarterback = "#D95F02", "Other groups" = "grey65"),
     guide = "none"
   ) +
   labs(
     title = "Drafted rate by position group",
-    subtitle = "Share of eligible seasons ending in a draft pick; leading three in green, quarterbacks in orange",
+    subtitle = "Leading three in dark grey, quarterbacks in orange; lines are confidence intervals, which overlap at the top",
     x = "Eligible seasons drafted",
     y = NULL,
     fill = NULL,

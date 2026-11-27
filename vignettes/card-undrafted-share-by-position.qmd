@@ -2,7 +2,7 @@
 title: "At which positions do NFL entrants mostly arrive undrafted?"
 image: card-thumbs/undrafted-share-by-position.png
 image-alt: "Bar chart of the share of each position group's NFL entrants who arrived as undrafted free agents, with a dashed line at half; quarterbacks, highlighted orange, are the only group below half, and every other group is mostly undrafted."
-categories: ["Topic: Draft outcomes", "Position: All positions", "Position: Quarterback", "Population: Draft-eligible seasons", "Figure: Bar chart", "Question: Draft chance by position"]
+categories: ["Topic: Draft outcomes", "Position: By position group", "Position: Quarterback", "Population: Draft-eligible seasons", "Figure: Bar chart", "Question: Draft chance by position"]
 status: investigation
 graduated_to: null
 terms: [eligible-season, known-outcome, position-group, nfl-entry, signed-undrafted, drafted, draft-class]
@@ -70,7 +70,7 @@ p <- ggplot(udfa, aes(100 * share, group_f)) +
     expand = expansion(mult = c(0, 0.01))
   ) +
   scale_fill_manual(
-    values = c("Mostly drafted" = "#D95F02", "Mostly undrafted" = "#1b4f8a"),
+    values = c("Mostly drafted" = "#D95F02", "Mostly undrafted" = "#7570B3"),
     guide = "none"
   ) +
   labs(
