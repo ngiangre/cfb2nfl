@@ -130,45 +130,42 @@ spine <- redshirt_spine(flags, pass_attempts, player_games, covered) |>
   ) |>
   filter(season <= complete_through)
 
-p <- ggplot(spine, aes(x)) +
-  geom_col(
-    aes(y = coalesce(games_covered, 0L)),
-    fill = "gray88",
-    width = 0.75
-  ) +
-  geom_col_interactive(
-    aes(y = games_with_stat, fill = color, tooltip = tooltip, data_id = x),
-    width = 0.5
-  ) +
-  geom_text(
-    aes(
-      y = coalesce(games_covered, 0L) + 0.4,
-      label = bar_label
+# One row per quarterback and one tile per season, as on the redshirt card:
+# each tile reads "x/y", games with a statistic of the team's covered games.
+spine <- spine |>
+  mutate(
+    tile_label = if_else(
+      is.na(games_covered),
+      "none",
+      sprintf("%d/%d", games_with_stat, games_covered)
     ),
-    vjust = 0,
-    size = 3.2,
-    fontface = "bold",
-    colour = "#111827"
+    who = factor(who, levels = rev(subjects$who))
+  )
+p <- ggplot(spine, aes(season, who)) +
+  geom_tile_interactive(
+    aes(fill = color, tooltip = tooltip, data_id = paste(who, season)),
+    colour = "white",
+    linewidth = 1.2,
+    height = 0.8
   ) +
+  geom_text(aes(label = tile_label), size = 3.4, fontface = "bold", colour = "white") +
   scale_fill_identity() +
-  scale_y_continuous(
-    breaks = NULL,
-    expand = expansion(mult = c(0, 0.22))
+  scale_x_continuous(
+    breaks = seq(min(spine$season), max(spine$season)),
+    labels = \(x) paste0("'", substr(x, 3, 4))
   ) +
-  facet_wrap(~who, ncol = 2, scales = "free_x") +
   labs(
-    title = "In how many covered games does each quarterback's season show a statistic?",
-    subtitle = "Games with a recorded statistic (team color) out of the team's covered games (gray)",
+    title = "Covered games with a statistic, by quarterback season",
+    subtitle = "Each tile is a season in team colors: games with a recorded statistic out of the team's covered games",
     x = NULL,
     y = NULL,
-    caption = card_caption(release)
+    caption = paste0(
+      "Burrow's 2014 season is a pre-enrollment roster listing.\n",
+      card_caption(release)
+    )
   ) +
   theme_card() +
-  theme(
-    panel.grid.major.x = element_blank(),
-    axis.text.x = element_text(size = 9),
-    strip.text = element_text(size = 12, face = "bold")
-  )
+  theme(panel.grid = element_blank())
 
 card_thumbnail(p, "quarterback-game-coverage", release = release)
 card_interactive(p)
