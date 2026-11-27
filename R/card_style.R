@@ -104,6 +104,90 @@ n_kable_without <- function(x, arg) {
   n
 }
 
+# String constants anywhere inside an expression (so paste("Top 10", y)
+# yields "Top 10").
+string_constants <- function(x) {
+  if (is.character(x)) {
+    return(x)
+  }
+  if (!is.call(x)) {
+    return(character())
+  }
+  unlist(lapply(as.list(x)[-1], function(a) {
+    if (identical(a, quote(expr = ))) character() else string_constants(a)
+  }))
+}
+
+# The function a call names, without its `pkg::` prefix.
+call_name <- function(x) {
+  fn <- x[[1]]
+  if (is.call(fn) && identical(fn[[1]], as.name("::"))) {
+    fn <- fn[[3]]
+  }
+  if (is.name(fn)) as.character(fn) else ""
+}
+
+# The text a card's figures and tables show: titles and subtitles (from
+# labs() and ggtitle()), every labs() label, and kable() col.names.
+figure_text <- function(
+  x,
+  out = list(titles = character(), labels = character(), headers = character())
+) {
+  if (is.expression(x)) {
+    for (e in as.list(x)) {
+      out <- figure_text(e, out)
+    }
+    return(out)
+  }
+  if (!is.call(x)) {
+    return(out)
+  }
+  args <- as.list(x)[-1]
+  nms <- names(args) %||% rep("", length(args))
+  fn <- call_name(x)
+  if (fn == "labs") {
+    label_args <- c(
+      "x",
+      "y",
+      "title",
+      "subtitle",
+      "fill",
+      "colour",
+      "color",
+      "caption",
+      "size",
+      "shape",
+      "linetype",
+      "alpha"
+    )
+    for (j in which(nms %in% label_args)) {
+      txt <- string_constants(args[[j]])
+      out$labels <- c(out$labels, txt)
+      if (nms[j] %in% c("title", "subtitle")) {
+        out$titles <- c(out$titles, txt)
+      }
+    }
+  } else if (fn == "ggtitle") {
+    first <- seq_along(args) == 1L & nms == ""
+    for (j in which(nms %in% c("label", "subtitle") | first)) {
+      txt <- string_constants(args[[j]])
+      out$titles <- c(out$titles, txt)
+      out$labels <- c(out$labels, txt)
+    }
+  } else if (fn == "kable" && "col.names" %in% nms) {
+    out$headers <- c(
+      out$headers,
+      string_constants(args[[which(nms == "col.names")[1]]])
+    )
+  }
+  for (a in args) {
+    if (!identical(a, quote(expr = ))) {
+      out <- figure_text(a, out)
+    }
+  }
+  out
+}
+
 #' Check one figure card against the mechanical card rules
 #'
 #' Reads a `vignettes/card-<id>.qmd` and reports every rule it breaks: the
@@ -277,26 +361,6 @@ check_card_style <- function(
   }
   for (k in seq_along(code)) {
     i <- code_rows[k]
-    if (grepl("\\b(title|subtitle)\\s*=\\s*\"[^\"]*[0-9]", code[k])) {
-      flag(
-        "numeric_title",
-        "A number in a figure title or subtitle is typed in; compute it from the data.",
-        i
-      )
-    }
-    label_args <- "\\b(x|y|title|subtitle|fill|colou?r|caption|size|shape|linetype|alpha)\\s*=\\s*\""
-    if (
-      grepl(
-        paste0(label_args, "[^\"]*\\b[a-z][a-z0-9]*_[a-z0-9_]+\\b"),
-        code[k]
-      )
-    ) {
-      flag(
-        "column_name",
-        "Figure text shows a column name; use a reader-facing label.",
-        i
-      )
-    }
     helper_def <- paste0(
       "^\\s*(",
       paste(card_shared_helpers, collapse = "|"),
@@ -322,6 +386,26 @@ check_card_style <- function(
       flag(
         "column_name",
         "Give every `kable()` reader-facing headers with `col.names`."
+      )
+    }
+    # Walk the parsed calls, so text built with paste() or ggtitle() and
+    # kable() headers are read too.
+    text <- figure_text(exprs)
+    if (any(grepl("[0-9]", text$titles))) {
+      flag(
+        "numeric_title",
+        "A number in a figure title or subtitle is typed in; compute it from the data."
+      )
+    }
+    if (
+      any(grepl(
+        "\\b[a-z][a-z0-9]*_[a-z0-9_]+\\b",
+        c(text$labels, text$headers)
+      ))
+    ) {
+      flag(
+        "column_name",
+        "Figure or table text shows a column name; use a reader-facing label."
       )
     }
   }

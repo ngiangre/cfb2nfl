@@ -270,6 +270,45 @@ test_that("figure text carries no typed numbers and no column names", {
   expect_true("column_name" %in% card_rules(root, p))
 })
 
+test_that("typed numbers and column names are caught inside paste(), ggtitle() and col.names", {
+  skip_if_not_installed("ggplot2")
+  root <- local_card_root()
+  lines <- good_card_lines()
+  fig <- which(lines == "card_interactive(p)")
+  p <- write_good_card(
+    root,
+    edit_lines(lines, '"Draft picks by position"', 'paste("Top 10 schools", y)')
+  )
+  expect_true("numeric_title" %in% card_rules(root, p))
+  p <- write_good_card(
+    root,
+    append(
+      lines,
+      'p <- p + ggplot2::ggtitle("The 2024 class")',
+      after = fig - 1
+    )
+  )
+  expect_true("numeric_title" %in% card_rules(root, p))
+  p <- write_good_card(
+    root,
+    append(
+      lines,
+      'knitr::kable(d, caption = "Picks.", col.names = c("draft_year", "n"))',
+      after = fig
+    )
+  )
+  expect_true("column_name" %in% card_rules(root, p))
+  p <- write_good_card(
+    root,
+    append(
+      lines,
+      'knitr::kable(d, caption = "Picks.", col.names = c("Draft year", "Picks"))',
+      after = fig
+    )
+  )
+  expect_false("column_name" %in% card_rules(root, p))
+})
+
 test_that("a card carries no narrative prose", {
   skip_if_not_installed("ggplot2")
   root <- local_card_root()
