@@ -43,7 +43,8 @@ qmd_front_matter <- function(lines) {
 }
 
 # Approved tags: "Facet: value" from inst/cards/tags.yml, plus
-# "Question: <tag>" for every entry of inst/cards/questions.yml.
+# "Question: <tag>" for every entry of inst/cards/questions.yml; and the
+# glossary of terms cards define (inst/cards/terms.yml).
 card_vocabulary <- function(root) {
   facets <- yaml::read_yaml(file.path(root, "inst", "cards", "tags.yml"))
   questions <- yaml::read_yaml(file.path(
@@ -52,10 +53,12 @@ card_vocabulary <- function(root) {
     "cards",
     "questions.yml"
   ))
+  terms_path <- file.path(root, "inst", "cards", "terms.yml")
   list(
     tags = unlist(lapply(names(facets), \(f) paste0(f, ": ", facets[[f]]))),
     questions = questions,
-    question_tags = paste0("Question: ", vapply(questions, \(q) q$tag, ""))
+    question_tags = paste0("Question: ", vapply(questions, \(q) q$tag, "")),
+    terms = if (file.exists(terms_path)) yaml::read_yaml(terms_path) else list()
   )
 }
 
@@ -193,7 +196,7 @@ figure_text <- function(
 #' Reads a `vignettes/card-<id>.qmd` and reports every rule it breaks: the
 #' front matter (a question as the title, the thumbnail path for its id,
 #' searchable alt text, a status, `graduated_to` once graduated), approved
-#' and registered tags, follow-ups linked to a question or a feature, a
+#' and registered tags, glossary terms, follow-ups linked to a question or a feature, a
 #' thumbnail that is present and fresh, an interactive figure, the release
 #' date drawn in, data read from `cfb2nfl.duckdb`, figure text with no typed
 #' numbers or column names, captioned tables with reader-facing headers, no
@@ -283,6 +286,12 @@ check_card_style <- function(
     flag(
       "tags",
       paste0("`", t, "` is not an approved tag (inst/cards/tags.yml).")
+    )
+  }
+  for (t in setdiff(unlist(meta$terms), names(vocab$terms))) {
+    flag(
+      "terms",
+      paste0("Term `", t, "` is not in the glossary (inst/cards/terms.yml).")
     )
   }
   for (f in meta$followups) {
@@ -523,7 +532,8 @@ new_card <- function(
 #' The footer of a card page
 #'
 #' Markdown for the bottom of a card: the data release it was rendered from,
-#' the status of each question it serves (with the reason when a question is
+#' the definitions of the terms it uses (`terms:`, from the glossary), the
+#' status of each question it serves (with the reason when a question is
 #' not answerable), its follow-ups linked to the question's cards on the
 #' Investigations wall or to the feature that tracks them, and where the card
 #' graduated to. Print it from an `output: asis` chunk with `cat()`.
@@ -554,6 +564,15 @@ card_footer <- function(card = card_source(root = root), root = card_root()) {
       line <- paste0(line, ". ", q$reason)
     }
     out <- c(out, "", "**Question**", "", line)
+  }
+  terms <- vocab$terms[intersect(unlist(meta$terms), names(vocab$terms))]
+  if (length(terms) > 0L) {
+    defs <- vapply(
+      terms,
+      \(t) paste0("- **", t$label, ":** ", t$definition),
+      ""
+    )
+    out <- c(out, "", "**Terms**", "", defs)
   }
   if (length(meta$followups) > 0L) {
     links <- vapply(

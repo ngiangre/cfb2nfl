@@ -1,0 +1,164 @@
+---
+title: "Do players with a matched recruiting record reach the NFL more often?"
+image: card-thumbs/recruiting-record-gap.png
+image-alt: "Three line charts, drafted, signed undrafted and either NFL route, of the cumulative percent of eligible players reaching each route by eligible season, for players with a matched high-school recruiting record (solid) and without one (dashed); the solid line is higher in every panel, labelled with how many times as often by the third season."
+categories: ["Topic: Draft outcomes", "Position: All positions", "Population: Roster seasons", "Population: Recruits", "Figure: Line chart", "Question: What matters for going pro"]
+status: investigation
+graduated_to: null
+terms: [career-eligible-season, matched-recruiting-record, cumulative-percent, at-risk, career-drafted, career-signed-undrafted, study-population, confidence-interval]
+followups:
+  - text: "Add a school guard to the undrafted-signing match, since newer links match the NFL roster's college less often."
+    link: "F22"
+  - text: "Does recruiting rating, not just having a record, carry the gap?"
+    link: "Question: What matters for going pro"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+outcomes <- DBI::dbReadTable(con, "outcomes")
+roster_pos <- DBI::dbGetQuery(
+  con,
+  "SELECT playerId, season, any_value(position) AS position FROM roster GROUP BY playerId, season"
+)
+endings <- career_endings(outcomes, roster_pos) |> label_endings()
+study_pop <- filter(endings, group != "Position not recorded")
+state_fill <- ending_palette()
+route_colour <- c(
+  Drafted = state_fill[["Drafted"]],
+  `Signed undrafted` = state_fill[["Signed undrafted"]],
+  `Either NFL route` = "#374151"
+)
+rec_lines <- c(`Matched recruiting record` = "solid", `No matched recruiting record` = "dashed")
+horizon <- 3L
+min_curve <- 30
+```
+
+```{r}
+#| label: figure
+rec_routes <- route_incidence(study_pop, "recruited")
+rec_gap <- rec_routes |>
+  filter(time == horizon) |>
+  select(route, recruited, estimate) |>
+  tidyr::pivot_wider(names_from = recruited, values_from = estimate) |>
+  mutate(
+    ratio = `Matched recruiting record` / `No matched recruiting record`,
+    y = 100 * `Matched recruiting record`
+  )
+
+p <- rec_routes |>
+  filter(n_risk >= min_curve) |>
+  mutate(
+    tooltip = sprintf(
+      "All positions, %s, by season %d: %s %s (95%% CI %s to %s; %s at risk)",
+      tolower(recruited), time, pct(estimate), tolower(route), pct(lower), pct(upper), fmt(n_risk)
+    )
+  ) |>
+  ggplot(aes(time, 100 * estimate, colour = route, fill = route, linetype = recruited, group = recruited)) +
+  geom_ribbon(aes(ymin = 100 * lower, ymax = 100 * upper), alpha = 0.12, colour = NA, show.legend = FALSE) +
+  geom_line(linewidth = 1.3) +
+  geom_point_interactive(aes(tooltip = tooltip, data_id = paste(state, recruited, time)), size = 2.6) +
+  geom_label(
+    data = rec_gap,
+    aes(x = horizon, y = y, label = sprintf("%.1fx", ratio)),
+    inherit.aes = FALSE,
+    hjust = 1.15,
+    vjust = -0.2,
+    size = 5.5,
+    fontface = "bold",
+    colour = "#B45309",
+    label.size = 0
+  ) +
+  facet_wrap(~route, nrow = 1) +
+  scale_colour_manual(values = route_colour, guide = "none") +
+  scale_fill_manual(values = route_colour, guide = "none") +
+  scale_linetype_manual(values = rec_lines, guide = "none") +
+  scale_x_continuous(breaks = 0:5) +
+  scale_y_continuous(labels = \(x) paste0(x, "%"), expand = expansion(mult = c(0.02, 0.2))) +
+  labs(
+    title = "NFL routes with and without a matched recruiting record",
+    subtitle = sprintf(
+      "Solid: matched record; dashed: none. Labels: how many times as often by season %s",
+      horizon
+    ),
+    x = "Eligible season",
+    y = NULL,
+    linetype = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "recruiting-record-gap", release = release)
+card_interactive(p, width_svg = 13)
+```
+
+```{r}
+#| label: by-position
+ci <- ending_incidence(endings) |> filter(group != "Position not recorded")
+thin <- thin_position_groups(ci, horizon, min_curve)
+rec_routes_group <- study_pop |>
+  mutate(cell = paste(group, recruited, sep = "|")) |>
+  route_incidence("cell") |>
+  tidyr::separate_wider_delim(cell, "|", names = c("group", "recruited")) |>
+  filter(!group %in% thin) |>
+  mutate(group = factor(group, position_group_levels()))
+p_group <- rec_routes_group |>
+  filter(n_risk >= min_curve) |>
+  mutate(
+    tooltip = sprintf(
+      "%s, %s, by season %d: %s %s (95%% CI %s to %s; %s at risk)",
+      group, tolower(recruited), time, pct(estimate), tolower(route), pct(lower), pct(upper), fmt(n_risk)
+    )
+  ) |>
+  ggplot(aes(time, 100 * estimate, colour = route, fill = route, linetype = recruited, group = recruited)) +
+  geom_ribbon(aes(ymin = 100 * lower, ymax = 100 * upper), alpha = 0.12, colour = NA, show.legend = FALSE) +
+  geom_line(linewidth = 1.1) +
+  geom_point_interactive(aes(tooltip = tooltip, data_id = paste(group, state, recruited)), size = 2) +
+  facet_grid(rows = vars(group), cols = vars(route), labeller = labeller(group = label_wrap_gen(10))) +
+  scale_colour_manual(values = route_colour, guide = "none") +
+  scale_fill_manual(values = route_colour, guide = "none") +
+  scale_linetype_manual(values = rec_lines) +
+  scale_x_continuous(breaks = 0:5) +
+  scale_y_continuous(labels = \(x) paste0(x, "%")) +
+  labs(
+    title = "The recruiting-record gap by position group",
+    subtitle = "Cumulative percent of eligible players by NFL route, matched recruiting record (solid) or not (dashed)",
+    x = "Eligible season",
+    y = "Cumulative percent",
+    linetype = NULL,
+    caption = paste0(
+      "Seasons with fewer than ", min_curve, " players at risk are omitted.",
+      if (length(thin)) paste0(" Omitted groups: ", paste(tolower(thin), collapse = ", "), ".") else "",
+      " Hover a point for its interval."
+    )
+  ) +
+  theme_cfb2nfl() +
+  guides(linetype = guide_legend(override.aes = list(colour = "#374151", linewidth = 1.1), keywidth = unit(4, "lines")))
+card_interactive(p_group, width_svg = 13, height_svg = 16)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

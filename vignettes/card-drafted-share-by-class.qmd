@@ -1,0 +1,144 @@
+---
+title: "Has the drafted share of eligible seasons changed across draft classes?"
+image: card-thumbs/drafted-share-by-class.png
+image-alt: "Line chart by draft class of the share of draft-eligible seasons ending drafted and ending in NFL entry, with a confidence band on entry; the drafted line falls steadily across classes while entry jumps with recorded undrafted signings from the 2016 class on."
+categories: ["Topic: Draft outcomes", "Position: All positions", "Population: Draft-eligible seasons", "Figure: Line chart", "Question: Draft chance by position"]
+status: investigation
+graduated_to: null
+terms: [eligible-season, known-outcome, draft-class, drafted, signed-undrafted, nfl-entry, confidence-interval]
+followups:
+  - text: "Score out-of-time forecasts against later classes, where the drafted share is lower than in the training data."
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+library(tidyr)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+risk <- eligible_risk_set(collect(tbl(con, "outcomes")))
+```
+
+```{r}
+#| label: figure
+trend <- risk |>
+  group_by(draft_year) |>
+  summarise(
+    seasons = n(),
+    drafted_ev = sum(outcome_drafted_d),
+    entry_ev = sum(outcome_nfl_entry_d),
+    .groups = "drop"
+  ) |>
+  mutate(
+    drafted = drafted_ev / seasons,
+    entry = entry_ev / seasons,
+    entry_lo = vapply(seq_along(seasons), \(i) wilson(entry_ev[i], seasons[i])[["lo"]], numeric(1)),
+    entry_hi = vapply(seq_along(seasons), \(i) wilson(entry_ev[i], seasons[i])[["hi"]], numeric(1))
+  )
+y0 <- min(trend$draft_year)
+y1 <- max(trend$draft_year)
+tr <- function(y, col) trend[[col]][trend$draft_year == y]
+trend_tip <- function(label, col) {
+  sprintf("%d, %s: %.1f%% of %s eligible seasons", trend$draft_year, label, 100 * trend[[col]], fmt(trend$seasons))
+}
+
+p <- ggplot(trend, aes(draft_year)) +
+  geom_ribbon(aes(ymin = entry_lo, ymax = entry_hi), fill = "grey80", alpha = 0.6) +
+  geom_line(aes(y = entry), linewidth = 1.4, colour = "grey35") +
+  geom_line(aes(y = drafted), linewidth = 1.6, colour = "#1B9E77") +
+  geom_point_interactive(aes(y = entry, tooltip = trend_tip("NFL entry", "entry")), size = 2.6, colour = "grey35") +
+  geom_point_interactive(aes(y = drafted, tooltip = trend_tip("drafted", "drafted")), size = 2.6, colour = "#1B9E77") +
+  annotate(
+    "text",
+    x = y1,
+    y = tr(y1, "drafted") - 0.008,
+    label = sprintf("Drafted: %.1f%% in %d, %.1f%% in %d", 100 * tr(y0, "drafted"), y0, 100 * tr(y1, "drafted"), y1),
+    size = 5.5,
+    hjust = 1,
+    colour = "#1B9E77"
+  ) +
+  annotate(
+    "text",
+    x = y0,
+    y = tr(y0, "entry") + 0.012,
+    label = "NFL entry",
+    size = 5.5,
+    hjust = 0,
+    colour = "grey30"
+  ) +
+  scale_y_continuous(labels = \(x) sprintf("%.0f%%", 100 * x), limits = c(0, NA)) +
+  scale_x_continuous(breaks = seq(y0, y1, by = 3)) +
+  labs(
+    title = "Drafted and NFL entry shares by draft class",
+    subtitle = "Share of eligible seasons; grey band: entry's confidence interval",
+    x = "Draft class",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "drafted-share-by-class", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: counts
+trend_counts <- trend |>
+  transmute(
+    draft_year,
+    `Eligible seasons` = seasons,
+    Drafted = drafted_ev,
+    `Undrafted free agent` = entry_ev - drafted_ev
+  ) |>
+  pivot_longer(-draft_year, names_to = "measure", values_to = "n") |>
+  mutate(measure = factor(measure, c("Eligible seasons", "Drafted", "Undrafted free agent")))
+p_counts <- ggplot(trend_counts, aes(draft_year, n)) +
+  geom_col_interactive(
+    aes(
+      fill = measure,
+      tooltip = sprintf("%d class, %s: %s", draft_year, tolower(measure), fmt(n)),
+      data_id = paste(draft_year, measure)
+    ),
+    width = 0.75
+  ) +
+  facet_wrap(~measure, scales = "free_y") +
+  scale_fill_manual(
+    values = c("Eligible seasons" = "grey55", Drafted = "#1B9E77", `Undrafted free agent` = "#7570B3"),
+    guide = "none"
+  ) +
+  scale_x_continuous(breaks = seq(y0, y1, 4)) +
+  labs(
+    title = "Eligible seasons and NFL entrants by draft class",
+    subtitle = "Each panel on its own scale",
+    x = "Draft class",
+    y = "Count",
+    caption = "Hover a bar for the count."
+  ) +
+  theme_cfb2nfl()
+card_interactive(p_counts)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

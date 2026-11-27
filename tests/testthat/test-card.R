@@ -184,3 +184,15 @@ test_that("card_interactive wraps the same plot in a girafe widget", {
   w <- card_interactive(ggplot2::ggplot())
   expect_s3_class(w, "girafe")
 })
+
+test_that("card_label_wrap breaks long figure titles to fit the thumbnail", {
+  skip_if_not_installed("ggplot2")
+  p <- ggplot2::ggplot() +
+    ggplot2::labs(
+      title = "Share of eligible seasons ending in each NFL outcome, every class",
+      subtitle = "Short"
+    )
+  w <- card_label_wrap(p)
+  expect_match(w$labels$title, "\n", fixed = TRUE)
+  expect_equal(w$labels$subtitle, "Short")
+})

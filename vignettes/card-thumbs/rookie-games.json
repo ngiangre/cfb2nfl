@@ -1,0 +1,13 @@
+{
+  "id": "rookie-games",
+  "release": "2026-11-25",
+  "code_hash": "19d86659ed36bb48af9d7302427efeac",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "eligible_risk_set": "454454253743138b58529b8ff72e9fa8",
+    "fmt": "d4c89f195c447af907ba425a860522de",
+    "running_cast": "d7bf7a57f65209a6ee8b3250af8c3461",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

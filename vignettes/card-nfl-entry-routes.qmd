@@ -1,0 +1,157 @@
+---
+title: "Do more players reach the NFL through the draft or undrafted?"
+image: card-thumbs/nfl-entry-routes.png
+image-alt: "Bar chart of NFL entrants from draft-eligible college seasons by entry route: undrafted free agent, drafted in round 1, rounds 2 to 3 and rounds 4 to 7; the undrafted bar is the longest, more than half of all entrants."
+categories: ["Topic: Draft outcomes", "Position: All positions", "Population: Draft-eligible seasons", "Figure: Bar chart", "Question: Draft chance by position"]
+status: investigation
+graduated_to: null
+terms: [eligible-season, known-outcome, drafted, signed-undrafted, nfl-entry, draft-class]
+followups:
+  - text: "At which positions do entrants most often arrive undrafted?"
+    link: "Question: Draft chance by position"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+risk <- eligible_risk_set(collect(tbl(con, "outcomes")))
+```
+
+```{r}
+#| label: figure
+routes <- risk |>
+  filter(outcome_nfl_entry_d) |>
+  mutate(
+    route = case_when(
+      !outcome_drafted_d ~ "Undrafted free agent",
+      outcome_draft_round_d == 1L ~ "Drafted, round 1",
+      outcome_draft_round_d %in% 2:3 ~ "Drafted, rounds 2 to 3",
+      TRUE ~ "Drafted, rounds 4 to 7"
+    )
+  ) |>
+  count(route, name = "n") |>
+  mutate(
+    share = n / sum(n),
+    undrafted = route == "Undrafted free agent",
+    route = reorder(route, share)
+  )
+p <- ggplot(routes, aes(x = 100 * share, y = route)) +
+  geom_col_interactive(
+    aes(
+      fill = undrafted,
+      tooltip = sprintf("%s: %s entrants (%.1f%%)", route, fmt(n), 100 * share),
+      data_id = route
+    ),
+    width = 0.7
+  ) +
+  geom_text(
+    aes(label = sprintf("%.1f%% (%s)", 100 * share, fmt(n))),
+    hjust = -0.05,
+    size = 5.5
+  ) +
+  scale_fill_manual(
+    values = c(`TRUE` = "#7570B3", `FALSE` = "#1B9E77"),
+    guide = "none"
+  ) +
+  expand_limits(x = 100) +
+  scale_x_continuous(labels = \(x) sprintf("%.0f%%", x)) +
+  labs(
+    title = "NFL entrants by entry route",
+    subtitle = "Share of all entrants from eligible seasons with a known outcome; undrafted in purple",
+    x = "Share of NFL entrants",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "nfl-entry-routes", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: by-class
+route_class <- risk |>
+  filter(outcome_nfl_entry_d) |>
+  mutate(route = if_else(outcome_drafted_d, "Drafted", "Undrafted free agent")) |>
+  count(draft_year, route, name = "n") |>
+  group_by(draft_year) |>
+  mutate(share = n / sum(n)) |>
+  ungroup()
+p_class <- ggplot(route_class, aes(draft_year, n, fill = route)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf(
+        "%d class, %s: %s entrants (%.0f%% of the class's entrants)",
+        draft_year,
+        tolower(route),
+        fmt(n),
+        100 * share
+      ),
+      data_id = paste(draft_year, route)
+    ),
+    width = 0.75
+  ) +
+  scale_fill_manual(
+    values = c(Drafted = "#1B9E77", `Undrafted free agent` = "#7570B3")
+  ) +
+  scale_x_continuous(
+    breaks = seq(min(route_class$draft_year), max(route_class$draft_year), 2)
+  ) +
+  labs(
+    title = "NFL entrants by entry route and draft class",
+    subtitle = "Drafted and undrafted entrants in each class",
+    x = "Draft class",
+    y = "NFL entrants",
+    fill = NULL,
+    caption = "Hover a segment for the count and share."
+  ) +
+  theme_cfb2nfl()
+card_interactive(p_class)
+```
+
+```{r}
+#| label: examples
+cast <- running_cast()
+risk |>
+  filter(playerId %in% cast, outcome_nfl_entry_d) |>
+  mutate(
+    player = names(cast)[match(playerId, cast)],
+    route = if_else(
+      outcome_drafted_d,
+      sprintf("Drafted, round %d, pick %d", outcome_draft_round_d, outcome_draft_pick_d),
+      "Undrafted free agent"
+    )
+  ) |>
+  arrange(draft_year) |>
+  select(player, season, draft_year, route, eligible_season_index) |>
+  knitr::kable(
+    col.names = c("Player", "Final college season", "Draft class", "Route", "Eligible season number"),
+    caption = "The running examples at their NFL entry. Burrow's eligible-season count starts a season early and Ward's a season late: Burrow's roster record starts the season before he enrolled, and Ward's starts in his second college season."
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

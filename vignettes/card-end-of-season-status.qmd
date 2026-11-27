@@ -1,0 +1,141 @@
+---
+title: "How does a draft-eligible college season end?"
+image: card-thumbs/end-of-season-status.png
+image-alt: "Bar chart of draft-eligible college seasons by how they end: still playing next season, exhausted eligibility undrafted, left the data early, signed as an undrafted free agent, or drafted; still playing is by far the longest bar and the two NFL outcomes are the shortest."
+categories: ["Topic: Draft outcomes", "Topic: Career shape", "Position: All positions", "Population: Draft-eligible seasons", "Figure: Bar chart", "Question: Draft chance by position"]
+status: investigation
+graduated_to: null
+terms: [eligible-season, eligible-season-number, known-outcome, still-playing, exhausted-undrafted, left-the-data, drafted, signed-undrafted]
+followups:
+  - text: "How many seasons that leave the data early hide a transfer or an injury, rather than an unknown ending?"
+    link: "F22"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+risk <- eligible_risk_set(collect(tbl(con, "outcomes")))
+```
+
+```{r}
+#| label: figure
+status_tab <- risk |>
+  count(status_end_of_season, name = "seasons") |>
+  mutate(
+    share = seasons / sum(seasons),
+    status_label = recode(
+      status_end_of_season,
+      "continuing" = "Still playing next season",
+      "exhausted_undrafted" = "Exhausted eligibility undrafted",
+      "left_data" = "Left the data early",
+      "signed_udfa" = "Signed as an undrafted free agent",
+      "drafted" = "Drafted"
+    ),
+    nfl = status_end_of_season %in% c("drafted", "signed_udfa"),
+    status_label = reorder(status_label, share)
+  )
+p_continuing <- status_tab$share[status_tab$status_end_of_season == "continuing"]
+
+p <- ggplot(status_tab, aes(x = 100 * share, y = status_label)) +
+  geom_col_interactive(
+    aes(
+      fill = nfl,
+      tooltip = sprintf("%s: %s seasons (%.1f%%)", status_label, fmt(seasons), 100 * share),
+      data_id = status_label
+    ),
+    width = 0.7
+  ) +
+  geom_text(
+    aes(label = sprintf("%.1f%%", 100 * share)),
+    hjust = -0.1,
+    size = 5.5
+  ) +
+  scale_fill_manual(
+    values = c(`TRUE` = "#1B9E77", `FALSE` = "grey65"),
+    guide = "none"
+  ) +
+  expand_limits(x = 100 * p_continuing + 15) +
+  scale_x_continuous(labels = \(x) sprintf("%.0f%%", x)) +
+  labs(
+    title = "How eligible seasons end",
+    subtitle = "Share of eligible player-seasons by end-of-season status; NFL outcomes in green",
+    x = "Share of eligible seasons",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "end-of-season-status", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: by-eligible-season
+status_idx <- risk |>
+  count(eligible_season_index, status_end_of_season, name = "n") |>
+  group_by(eligible_season_index) |>
+  mutate(share = n / sum(n), seasons = sum(n)) |>
+  ungroup() |>
+  filter(seasons >= 100) |>
+  left_join(
+    distinct(status_tab, status_end_of_season, status_label),
+    by = "status_end_of_season"
+  ) |>
+  mutate(status_label = factor(status_label, levels = levels(status_tab$status_label)))
+p_idx <- ggplot(
+  status_idx,
+  aes(factor(eligible_season_index), 100 * share, fill = status_label)
+) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf(
+        "Eligible season %d, %s: %.1f%% (%s of %s seasons)",
+        eligible_season_index,
+        status_label,
+        100 * share,
+        fmt(n),
+        fmt(seasons)
+      ),
+      data_id = paste(eligible_season_index, status_label)
+    ),
+    width = 0.75
+  ) +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(
+    title = "How eligible seasons end, by eligible season number",
+    subtitle = "Share of eligible seasons by end-of-season status",
+    x = "Eligible season number",
+    y = "Share of eligible seasons (%)",
+    fill = NULL,
+    caption = "Eligible seasons with fewer than 100 player-seasons omitted. Hover a segment for the count."
+  ) +
+  theme_cfb2nfl() +
+  theme(legend.position = "right")
+card_interactive(p_idx)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

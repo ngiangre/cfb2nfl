@@ -1,0 +1,154 @@
+---
+title: "Are quarterbacks picked earliest in every draft class?"
+image: card-thumbs/average-pick-by-position.png
+image-alt: "Line chart by draft class of the average overall pick for each position group, with quarterbacks in orange and the other groups in grey; filled orange points mark the classes where quarterbacks had the earliest average, and the quarterback line swings by dozens of picks from class to class."
+categories: ["Topic: Draft outcomes", "Position: All positions", "Position: Quarterback", "Population: Draft picks", "Figure: Line chart", "Question: Draft chance by position"]
+status: investigation
+graduated_to: null
+terms: [eligible-season, position-group, drafted, overall-pick, draft-class]
+followups:
+  - text: "Do quarterbacks picked earlier last longer in the NFL?"
+    link: "F19"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+risk <- eligible_risk_set(collect(tbl(con, "outcomes"))) |>
+  add_position_group(collect(select(tbl(con, "roster"), playerId, season, position))) |>
+  filter(group != "Position not recorded")
+```
+
+```{r}
+#| label: figure
+min_picks <- 5
+pick_trend <- risk |>
+  filter(outcome_drafted_d, !is.na(outcome_draft_pick_d)) |>
+  group_by(group, draft_year) |>
+  summarise(picks = n(), avg_pick = mean(outcome_draft_pick_d), .groups = "drop") |>
+  filter(picks >= min_picks)
+pooled_pick <- mean(risk$outcome_draft_pick_d[risk$outcome_drafted_d & !is.na(risk$outcome_draft_pick_d)])
+lowest_per_year <- pick_trend |>
+  group_by(draft_year) |>
+  slice_min(avg_pick, n = 1) |>
+  ungroup()
+qb_trend <- pick_trend |>
+  filter(group == "Quarterback") |>
+  mutate(lowest = draft_year %in% lowest_per_year$draft_year[lowest_per_year$group == "Quarterback"])
+
+p <- ggplot(pick_trend, aes(draft_year, avg_pick)) +
+  geom_hline(yintercept = pooled_pick, linetype = "dashed", colour = "grey50") +
+  geom_line_interactive(
+    data = filter(pick_trend, group != "Quarterback"),
+    aes(group = group, tooltip = group, data_id = group),
+    colour = "grey75",
+    linewidth = 0.9
+  ) +
+  geom_line(data = qb_trend, colour = "#D95F02", linewidth = 1.4) +
+  geom_point_interactive(
+    data = qb_trend,
+    aes(
+      shape = lowest,
+      tooltip = sprintf("Quarterbacks, %d: pick %.0f on average (%d picks)", draft_year, avg_pick, picks)
+    ),
+    colour = "#D95F02",
+    fill = "#D95F02",
+    size = 3.4,
+    stroke = 1.2
+  ) +
+  scale_shape_manual(values = c(`TRUE` = 21, `FALSE` = 1), guide = "none") +
+  scale_x_continuous(breaks = seq(min(qb_trend$draft_year), max(qb_trend$draft_year), by = 3)) +
+  scale_y_continuous(limits = c(0, NA)) +
+  labs(
+    title = "Average overall pick by draft class",
+    subtitle = "Lower is earlier. Quarterbacks in orange, filled where earliest; other groups in grey",
+    x = "Draft class",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "average-pick-by-position", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: every-pick
+all_picks <- risk |>
+  filter(outcome_drafted_d, !is.na(outcome_draft_pick_d)) |>
+  mutate(group = reorder(group, outcome_draft_pick_d, median))
+p_all <- ggplot(all_picks, aes(outcome_draft_pick_d, group)) +
+  geom_boxplot(outlier.shape = NA, width = 0.55, colour = "grey45") +
+  geom_point_interactive(
+    aes(
+      colour = group == "Quarterback",
+      tooltip = sprintf(
+        "%s, %s: %d class, round %d, pick %d",
+        player, group, draft_year, outcome_draft_round_d, outcome_draft_pick_d
+      ),
+      data_id = paste(playerId, draft_year)
+    ),
+    position = position_jitter(height = 0.2, width = 0, seed = 1),
+    size = 1.4,
+    alpha = 0.6
+  ) +
+  scale_colour_manual(values = c(`TRUE` = "#D95F02", `FALSE` = "grey55"), guide = "none") +
+  labs(
+    title = "Every drafted season behind the averages",
+    subtitle = "Overall pick of each drafted season by position group (box: middle half of picks)",
+    x = "Overall pick (lower is earlier)",
+    y = NULL,
+    caption = "Hover a point for the player, class and pick."
+  ) +
+  theme_cfb2nfl()
+card_interactive(p_all)
+```
+
+```{r}
+#| label: classes-table
+pick_trend |>
+  group_by(group) |>
+  summarise(
+    classes = n(),
+    average = round(mean(avg_pick)),
+    earliest = sum(paste(group, draft_year) %in% paste(lowest_per_year$group, lowest_per_year$draft_year)),
+    .groups = "drop"
+  ) |>
+  arrange(average) |>
+  knitr::kable(
+    col.names = c("Position group", "Classes counted", "Average pick across classes", "Classes with the earliest average"),
+    caption = paste0(
+      "Average overall pick over each group's draft classes with at least ",
+      min_picks,
+      " picks, and how many of those classes the group had the earliest average in. The dashed line in the figure is pick ",
+      round(pooled_pick),
+      ", the average over all drafted seasons."
+    )
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
