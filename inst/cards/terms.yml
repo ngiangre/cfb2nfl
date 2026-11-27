@@ -202,3 +202,24 @@ credited-pick:
 draft-day-school:
   label: Draft-day school
   definition: "The college the NFL draft lists for a player."
+eligible-player:
+  label: Eligible player
+  definition: "A player whose college career has ended and who had a real shot at the NFL: at least three seasons on college rosters, or drafted, or signed by an NFL team undrafted. Players who left after one or two seasons without reaching the NFL are not counted, and neither are undrafted players still on a current roster, whose outcome is not yet known."
+final-season:
+  label: Final season
+  definition: "A player's last season on a college roster before the draft. Each player counts once, for the school and conference of that season, so a transfer counts for his last stop."
+draft-rate:
+  label: Draft rate
+  definition: "Drafted players divided by eligible players. A draft rate of 10 percent means 10 of every 100 eligible players were drafted."
+undrafted-rate:
+  label: Undrafted rate
+  definition: "Eligible players who signed with an NFL team undrafted, divided by eligible players. The signing is matched by name from the college roster, so players with no college stat line are included."
+expected-draftees:
+  label: Expected draftees
+  definition: "How many draftees a school would have produced at the rates of its benchmark, times its eligible players at each position: the FBS-wide rates for the school ranking, or its own tier's rates for the within-tier version."
+draftees-above-expected:
+  label: Draftees above expected
+  definition: "Drafted players minus expected draftees. A negative value means fewer draftees than the benchmark predicts."
+adjusted-rate:
+  label: Adjusted rate
+  definition: "A school's draft rate pulled toward its group's average, more strongly the fewer eligible players it has, so a small sample cannot top a ranking by luck."
