@@ -1,0 +1,133 @@
+---
+title: "Did the median forty-yard dash get faster at every position?"
+image: card-thumbs/forty-yard-dash-drift.png
+image-alt: "Arrows, one per position group, running from each position's median forty-yard-dash time in the first five combines to its median in the last five; the arrows point left, showing faster medians, and the position whose share running the drill fell most is highlighted."
+categories: ["Topic: Combine", "Position: By position group", "Population: Combine invitees", "Figure: Line chart", "Question: What matters for going pro"]
+status: investigation
+graduated_to: null
+terms: [combine, invitee, recorded-measurable]
+followups:
+  - text: "Check whether the faster medians since the first five combines come from faster players or from slower players choosing not to run."
+    link: "Question: What matters for going pro"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+pos_levels <- position_group_levels()
+combine <- DBI::dbReadTable(con, "combine") |>
+  mutate(position_group = factor(combine_position_group(pos), pos_levels))
+combine_years <- range(combine$season)
+sep_levels <- setdiff(pos_levels, "Special teams")
+claim_fill <- "#B45309"
+context_fill <- "#9CA3AF"
+# The first five combines against the last five (the cancelled year is skipped).
+early_window <- combine_years[1]:(combine_years[1] + 4L)
+late_window <- (combine_years[2] - 4L):combine_years[2]
+
+drift <- combine |>
+  filter(season %in% c(early_window, late_window), position_group %in% sep_levels) |>
+  mutate(window = if_else(season %in% early_window, "first", "last")) |>
+  group_by(position_group, window) |>
+  summarise(
+    ran = mean(!is.na(forty)),
+    forty = stats::median(forty, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  tidyr::pivot_wider(names_from = window, values_from = c(forty, ran)) |>
+  mutate(forty_change = forty_last - forty_first)
+# The position whose share running the forty fell the most is the highlight.
+fewest_ran <- drift |> slice_min(ran_last - ran_first, n = 1)
+medians_season <- combine |>
+  filter(!is.na(forty), position_group %in% sep_levels) |>
+  group_by(position_group, season) |>
+  summarise(med = stats::median(forty), n = n(), .groups = "drop")
+```
+
+```{r}
+#| label: figure
+p <- drift |>
+  mutate(
+    is_claim = position_group == fewest_ran$position_group,
+    tip = sprintf(
+      "%s: median %.2f s to %.2f s; ran the drill, %.0f%% to %.0f%%",
+      position_group,
+      forty_first,
+      forty_last,
+      100 * ran_first,
+      100 * ran_last
+    )
+  ) |>
+  ggplot(aes(y = forcats::fct_rev(position_group))) +
+  geom_segment(
+    aes(x = forty_first, xend = forty_last, colour = is_claim),
+    linewidth = 1.4,
+    arrow = grid::arrow(length = grid::unit(0.3, "cm"), type = "closed")
+  ) +
+  geom_point_interactive(
+    aes(x = forty_first, tooltip = tip, data_id = position_group),
+    size = 4,
+    colour = "#6B7280"
+  ) +
+  scale_colour_manual(values = c(`FALSE` = context_fill, `TRUE` = claim_fill), guide = "none") +
+  labs(
+    title = "Did the median forty-yard dash get faster at every position?",
+    subtitle = "Arrows run from the first five combines' median to the last five's; the largest fall in running is highlighted",
+    x = "Median forty-yard dash (s)",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "forty-yard-dash-drift", release = release)
+card_interactive(p, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: by-season
+p_season <- medians_season |>
+  mutate(
+    tip = sprintf("%s, %s: median %.2f s (%d invitees)", position_group, season, med, n)
+  ) |>
+  ggplot(aes(season, med, colour = position_group, group = position_group)) +
+  geom_line(linewidth = 0.6) +
+  geom_point_interactive(aes(tooltip = tip, data_id = paste(position_group, season)), size = 1.8) +
+  scale_colour_viridis_d(option = "D", end = 0.9) +
+  scale_x_continuous(breaks = seq(combine_years[1], combine_years[2], 4)) +
+  labs(
+    title = "The median forty-yard dash, combine by combine",
+    subtitle = "One line per position group; a shorter time is faster",
+    x = "Combine year",
+    y = "Median forty-yard dash (s)",
+    colour = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+card_interactive(p_season, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

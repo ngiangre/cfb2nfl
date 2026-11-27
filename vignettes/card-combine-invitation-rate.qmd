@@ -1,0 +1,144 @@
+---
+title: "What share of draft-eligible players does the combine invite each year?"
+image: card-thumbs/combine-invitation-rate.png
+image-alt: "Vertical bars of the share of draft-eligible seasons that were invited to the combine, one per draft year; every bar sits well under a dashed one-in-ten line, and the highest bar is highlighted."
+categories: ["Topic: Combine", "Position: All positions", "Population: Draft-eligible seasons", "Figure: Bar chart", "Question: What matters for going pro"]
+status: investigation
+graduated_to: null
+terms: [combine, invitee, invitation-rate, eligible-season]
+followups:
+  - text: "Link more unmatched invitees, mostly offensive linemen without a stat line, through roster names and schools."
+    link: "Question: What matters for going pro"
+  - text: "Separate the falling rate from the growing eligible count, which tracks the number of rostered players each season."
+    link: "Question: What matters for going pro"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+pos_levels <- position_group_levels()
+claim_fill <- "#B45309"
+context_fill <- "#9CA3AF"
+combine <- DBI::dbReadTable(con, "combine") |>
+  mutate(
+    position_group = factor(combine_position_group(pos), pos_levels),
+    drafted = !is.na(draft_round)
+  )
+outcomes <- DBI::dbReadTable(con, "outcomes")
+# One position per player-season (a handful of ids repeat within a season).
+roster_pos <- DBI::dbGetQuery(
+  con,
+  "SELECT playerId, season, any_value(position) AS position
+   FROM roster GROUP BY playerId, season"
+)
+# Draft-eligible player-seasons with the invitation flag, by draft year.
+funnel <- build_combine_funnel(combine, outcomes) |>
+  left_join(roster_pos, by = c("playerId", "season"), relationship = "many-to-one") |>
+  mutate(position_group = factor(position_group(position), c(pos_levels, "Position not recorded")))
+by_year <- funnel |>
+  group_by(draft_year) |>
+  summarise(
+    eligible = n(),
+    invited_n = sum(invited),
+    invite_rate = mean(invited),
+    .groups = "drop"
+  )
+invite_hi_year <- by_year$draft_year[which.max(by_year$invite_rate)]
+by_pos_year <- funnel |>
+  filter(position_group %in% pos_levels) |>
+  group_by(position_group, draft_year) |>
+  summarise(
+    eligible = n(),
+    invited_n = sum(invited),
+    invite_rate = mean(invited),
+    .groups = "drop"
+  )
+```
+
+```{r}
+#| label: figure
+p <- by_year |>
+  mutate(
+    tip = sprintf(
+      "%s: %d of %d eligible seasons invited (%.1f%%)",
+      draft_year,
+      invited_n,
+      eligible,
+      100 * invite_rate
+    )
+  ) |>
+  ggplot(aes(draft_year, 100 * invite_rate, fill = draft_year == invite_hi_year)) +
+  geom_col_interactive(aes(tooltip = tip, data_id = draft_year), width = 0.75) +
+  geom_hline(yintercept = 10, linetype = "dashed", colour = "#111827") +
+  scale_fill_manual(values = c(`FALSE` = context_fill, `TRUE` = claim_fill), guide = "none") +
+  scale_y_continuous(labels = function(x) sprintf("%.0f%%", x), limits = c(0, 12)) +
+  scale_x_continuous(breaks = seq(min(by_year$draft_year), max(by_year$draft_year), 2)) +
+  labs(
+    title = "What share of draft-eligible players does the combine invite each year?",
+    subtitle = "Invitees among each draft year's draft-eligible seasons; the highest year is highlighted",
+    x = "Draft year",
+    y = "Eligible seasons invited",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "combine-invitation-rate", release = release)
+card_interactive(p, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: by-position
+p_pos <- by_pos_year |>
+  mutate(
+    tip = sprintf(
+      "%s, %s: %d of %d eligible seasons invited (%.1f%%)",
+      position_group,
+      draft_year,
+      invited_n,
+      eligible,
+      100 * invite_rate
+    )
+  ) |>
+  ggplot(aes(draft_year, invite_rate, colour = position_group, group = position_group)) +
+  geom_line(linewidth = 0.6) +
+  geom_point_interactive(aes(tooltip = tip, data_id = paste(position_group, draft_year)), size = 3) +
+  scale_colour_viridis_d(option = "D", end = 0.9) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_continuous(breaks = seq(min(by_year$draft_year), max(by_year$draft_year), 2)) +
+  labs(
+    title = "Which position groups see the highest invitation rates?",
+    subtitle = "One line per position group, by the roster position in the eligible season",
+    x = "Draft year",
+    y = "Eligible seasons invited",
+    colour = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+card_interactive(p_pos, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
