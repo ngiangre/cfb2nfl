@@ -521,7 +521,26 @@ acceptance criteria.
 ### F02 · Contract-gated pipeline with an audit log
 
 - **Goals:** C1 · **Personas:** P2 · **Status:** shipped
-- **Links:** decisions 0005, 0023
+- **Links:** decisions 0005, 0023, 0053
+- **Why:** the play-level tables grow every week (decision 0045), and the
+  build copied each one into memory and into the targets store.
+- **Acceptance criteria** (added 2026-11-26 with issue #126; the gating
+  itself shipped earlier):
+  - [x] A track-mode `tar_make()` from the published release finishes
+    faster than the previous build on the same machine, with the wall time
+    and store size measured in decision 0053.
+  - [x] Holding the largest tables as lazy Arrow datasets (decision 0053)
+    leaves every contract result, audit row, explorer file and DuckDB table
+    identical to the previous build, shown by a recorded comparison.
+  - [x] A failed contract on a lazily held table still stops `tar_make()`
+    (a fixture test).
+  - [x] Reading a lazy target whose parquet changed after the build errors
+    instead of returning the new data (a fixture test), and the pipeline
+    docs tell a P2 reader to set `TAR_ASK=false` for a non-interactive
+    `tar_read()` of one.
+- **Out of scope:** peak memory (decision 0053).
+- **Cost:** 0 CFBD calls, no new tables, decision 0053.
+- **Review:** feature-reviewer 2026-11-26: aligned after changes (applied).
 - **Tasks:**
 <!-- tasks F02 -->
 - [ ] [#126](https://github.com/ngiangre/cfb2nfl/issues/126) perf(pipeline): keep large data-frame targets lazy with an Arrow-backed custom format

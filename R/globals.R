@@ -13,6 +13,7 @@ utils::globalVariables(c(
   "playId",
   "athleteId",
   "statTypeId",
+  "roles",
   "player_name",
   "pos",
   "collegeAthleteId",

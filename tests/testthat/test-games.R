@@ -321,3 +321,16 @@ test_that("ingest_game_player_stats_chunk flattens one /games/players call", {
   expect_equal(nrow(out), 4L)
   expect_setequal(out$playerId, c("4426688", "5550001"))
 })
+
+test_that("contract_game_player_stats gates a lazy table like an in-memory one", {
+  skip_if_not_installed("arrow")
+  p <- clean_game_player_stats(
+    flatten_game_player_stats(mk_game_raw(), 2023L, 5L, "regular")
+  )
+  expect_true(pointblank::all_passed(
+    contract_game_player_stats(as_lazy(p), stop_on_fail = FALSE)
+  ))
+  expect_false(pointblank::all_passed(
+    contract_game_player_stats(as_lazy(p[c(1, 1), ]), stop_on_fail = FALSE)
+  ))
+})

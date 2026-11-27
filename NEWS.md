@@ -13,6 +13,20 @@
   can tell when a thumbnail no longer matches its card or the data has moved
   on.
 
+- Pipeline (feature F02): **a full track-mode build is about a quarter
+  faster and its targets store less than half the size**, with every
+  output unchanged. The largest tables (plays, play stats, player game
+  stats, NFL play-by-play and participation, explorer plays) stay lazy
+  Arrow datasets between targets with the new `format_arrow_lazy()` format:
+  the published parquet is referenced, not copied into `_targets/`, and each
+  step reads only the columns it needs (`collect_cols()`). Contracts, the
+  audit log and the DuckDB bundle check and carry exactly what they did
+  before. The explorer's play table builds about five times faster (135 s
+  to 28 s), its player lists now written for all plays at once. A
+  non-interactive `tar_read()` of one of these tables now needs
+  `TAR_ASK=false`
+  ([decision 0053](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0053-lazy-arrow-pipeline-tables.md)).
+
 - Explorer (feature F13): **the game view's play card names the players the
   play text lists but the play-stats log leaves out**, mostly tacklers, plus
   kickers, holders and penalized players. They are matched by jersey number

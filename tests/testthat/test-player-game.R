@@ -197,3 +197,17 @@ test_that("contract_player_game aborts by default when it fails", {
     "data contract failed"
   )
 })
+
+test_that("build_player_game and its contract take a lazy game_player_stats", {
+  skip_if_not_installed("arrow")
+  stats <- game_player_stats_fixture()
+  lazy <- as_lazy(stats)
+  pg <- build_player_game(stats, games_fixture())
+  expect_identical(build_player_game(lazy, games_fixture()), pg)
+  expect_true(pointblank::all_passed(
+    contract_player_game(pg, lazy, games_fixture(), stop_on_fail = FALSE)
+  ))
+  expect_false(pointblank::all_passed(
+    contract_player_game(pg[-1, ], lazy, games_fixture(), stop_on_fail = FALSE)
+  ))
+})
