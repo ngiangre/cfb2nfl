@@ -287,6 +287,7 @@ acceptance criteria.
 - [ ] [#134](https://github.com/ngiangre/cfb2nfl/issues/134) Decision 0053, goals.md signals and AGENTS.md for the figure wall (F25)
 - [x] [PR #135](https://github.com/ngiangre/cfb2nfl/pull/135) docs(product): add the F25 figure wall card and sync task links (F25)
 - [x] [PR #136](https://github.com/ngiangre/cfb2nfl/pull/136) feat(cards): shared number helpers and card thumbnail helpers (F25)
+- [ ] [PR #137](https://github.com/ngiangre/cfb2nfl/pull/137) docs(product): mark F25 in progress and sync task links (F25)
 <!-- /tasks -->
 
 ### F21 · Question status board
