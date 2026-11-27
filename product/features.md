@@ -223,8 +223,7 @@ acceptance criteria.
 
 ### F13 · Interactive Explorer
 
-- **Goals:** G3 · **Personas:** P1 · **Status:** in progress (reopened
-  2026-11-26 for the #128 revisions)
+- **Goals:** G3 · **Personas:** P1 · **Status:** shipped
 - **Links:** decision 0046; `plans/explorer.md`
 - **Tasks:**
 <!-- tasks F13 -->
@@ -235,7 +234,8 @@ acceptance criteria.
 - [x] [#89](https://github.com/ngiangre/cfb2nfl/issues/89) Combine explorer: label UDFAs who made NFL rosters; clarify Draft pending
 - [x] [#110](https://github.com/ngiangre/cfb2nfl/issues/110) Explorer: player outcomes rebuilt on the roster population of outcomes
 - [x] [PR #118](https://github.com/ngiangre/cfb2nfl/pull/118) docs(posts): revise outcome posts for the roster population; Explorer lists NFL entrants without a stat line
-- [ ] [#128](https://github.com/ngiangre/cfb2nfl/issues/128) Explorer revisions: bolder team line, play-text players in game view, drop Team dropdown on Players/Combine, fix Combine 3D plot
+- [x] [#128](https://github.com/ngiangre/cfb2nfl/issues/128) Explorer revisions: bolder team line, play-text players in game view, drop Team dropdown on Players/Combine, fix Combine 3D plot
+- [x] [PR #129](https://github.com/ngiangre/cfb2nfl/pull/129) feat(explorer): play-text players, bolder team line, hide Team on Players/Combine, size the Combine 3D plot (F13)
 <!-- /tasks -->
 
 ### F06 · Team and conference geography
