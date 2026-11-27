@@ -248,3 +248,114 @@
   section: "5. Discussion"
   fate: dropped
   reason: "Callouts restated the cards. The caveat that a roster season is presence, not playing time, is the roster-season glossary term."
+# ---- 2026-10-30-counting-coaches (coaches-combine batch, #147) ----
+- post: 2026-10-30-counting-coaches
+  section: "1. Introduction"
+  fate: dropped
+  reason: "Prose; each question it posed is now a card's title, and its expectations are not carried onto cards."
+- post: 2026-10-30-counting-coaches
+  section: "2.1 The two counting rules differ only in how much of the pre-draft career each one covers"
+  fate: merged
+  card: coach-counting-rules
+  reason: "The rules table is the 'last-school rule' and 'every-season rule' glossary terms; the rules-overlap table restated the figure and was dropped."
+- post: 2026-10-30-counting-coaches
+  section: "2.2 The two rules name the same coach set for barely half of recent picks"
+  fate: card
+  card: coach-counting-rules
+  reason: "Figure moved; the coach-set glossary term defines the set. Shares are recomputed on the 2026-11-25 release, so they differ from the post's 2026-10-30 release."
+- post: 2026-10-30-counting-coaches
+  section: "3.1 Three in four head coaches active since 2013 produced a draftee, and the rest mostly had short tenures"
+  fate: card
+  card: coach-tenure-and-draftees
+  reason: "Figures moved; the universe table was dropped because the universe is defined by the head-coach glossary terms and the figures carry the counts. The card answers 'Head coach effect'."
+- post: 2026-10-30-counting-coaches
+  section: "3.2 Quarterback draftees are the smallest share of the draft among field positions"
+  fate: card
+  card: draftee-position-groups-by-coach
+  reason: "Figures moved; the position table restated the figure and was dropped. WR and TE are now split on the card, where the post combined them."
+- post: 2026-10-30-counting-coaches
+  section: "3.3 Undrafted entry shrinks the quarterback share, it does not grow it"
+  fate: merged
+  card: undrafted-share-by-position
+  reason: "The NFL rookie quarterback route content repeats the existing undrafted-share card, so it is merged there. The quarterback share-by-class time series is not carried; the UDFA table was dropped."
+- post: 2026-10-30-counting-coaches
+  section: "3.4 A fifth of recent draftees belong to ten coaches"
+  fate: card
+  card: coaches-share-of-draftees
+  reason: "The share curve is the card's figure; the top-coaches table and top-coaches bar were dropped, the top-12 movers appear on coach-draftees-by-school."
+- post: 2026-10-30-counting-coaches
+  section: "3.5 Each top coach's draftee mix leans a different direction"
+  fate: card
+  card: top-coaches-position-mix
+  reason: "Figure moved; the positions table restated the figure and was dropped. Head coach effect tag applies."
+- post: 2026-10-30-counting-coaches
+  section: "3.6 Most draftee-producing coaches ran a single program"
+  fate: card
+  card: coach-draftees-by-school
+  reason: "Figure moved to the top 12 movers; the teams-coached table restated the figure and was dropped."
+- post: 2026-10-30-counting-coaches
+  section: "4. Summary"
+  fate: dropped
+  reason: "The expectation summary served the post; cards carry no expectations."
+- post: 2026-10-30-counting-coaches
+  section: "5. Discussion"
+  fate: dropped
+  reason: "Prose; its caveats are carried by the cards' captions and terms."
+
+# ---- 2026-11-14-combine-measurables-funnel (coaches-combine batch, #147) ----
+- post: 2026-11-14-combine-measurables-funnel
+  section: "1. Introduction"
+  fate: dropped
+  reason: "Prose; each question it posed is now a card's title, and its expectations are not carried onto cards."
+- post: 2026-11-14-combine-measurables-funnel
+  section: "2.1 The combine measures size, speed, strength and agility, and the draft follows it that spring"
+  fate: merged
+  card: combine-invitees-in-the-population
+  reason: "The measure definitions are the 'combine' and 'recorded-measurable' glossary terms; the terms table was converted to glossary entries."
+- post: 2026-11-14-combine-measurables-funnel
+  section: "2.2 Of the invitees, most can be placed among draft-eligible players"
+  fate: card
+  card: combine-invitees-in-the-population
+  reason: "Figure moved; the placement table restated the figure and was dropped. Linemen without a college id stay unmatched, as the caption notes."
+- post: 2026-11-14-combine-measurables-funnel
+  section: "2.3 Every position has height and weight recorded, but only a small share of quarterback invitees have a bench press"
+  fate: dropped
+  reason: "The recorded-by-position table restated the heatmap on combine-measurables-recorded, which carries it as the exploratory view."
+- post: 2026-11-14-combine-measurables-funnel
+  section: "3.1 Height and weight are recorded for nearly all invitees, while the bench press fell sharply"
+  fate: card
+  card: combine-measurables-recorded
+  reason: "Figure moved; the measurable table restated the figure and was dropped. The grey band marks the 2021 cancellation."
+- post: 2026-11-14-combine-measurables-funnel
+  section: "3.2 Quarterbacks who skip the 40-yard dash are drafted more often than the post's share"
+  fate: card
+  card: quarterback-skip-forty-drafted
+  reason: "Figure moved; the skip table restated the dumbbell and was dropped. Named players are on the exploratory view. Figures are recomputed on the 2026-11-25 release and only count drafts already held."
+- post: 2026-11-14-combine-measurables-funnel
+  section: "3.3 Positions sort into size and speed bands, with some pairs sharing a middle half on weight and the 40-yard dash"
+  fate: card
+  card: combine-position-size-and-speed
+  reason: "Figure moved; the overlap-pairs table was dropped, the outlined groups show the overlaps. Special teams are excluded from the separation test."
+- post: 2026-11-14-combine-measurables-funnel
+  section: "3.4 The median 40-yard dash fell at most positions between the first and last five combines"
+  fate: card
+  card: forty-yard-dash-drift
+  reason: "Figure moved; the drift table restated the arrows and was dropped."
+- post: 2026-11-14-combine-measurables-funnel
+  section: "3.5 The combine invites a small share of a draft year's eligible players"
+  fate: card
+  card: combine-invitation-rate
+  reason: "Figure moved; the invitation table was dropped. The eligible-season count tracks rostered players, a follow-up noted on the card."
+- post: 2026-11-14-combine-measurables-funnel
+  section: "3.6 Invited eligible seasons end in a draft selection far more often than uninvited ones"
+  fate: card
+  card: invited-players-drafted-rate
+  reason: "Figure moved; the funnel table was dropped. Position-group split is the exploratory view."
+- post: 2026-11-14-combine-measurables-funnel
+  section: "4. Summary"
+  fate: dropped
+  reason: "The expectation summary served the post; cards carry no expectations."
+- post: 2026-11-14-combine-measurables-funnel
+  section: "5. Discussion"
+  fate: dropped
+  reason: "Prose; its open questions are follow-ups on the cards."
