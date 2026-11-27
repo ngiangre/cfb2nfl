@@ -1,0 +1,14 @@
+{
+  "id": "school-draft-concentration",
+  "release": "2026-11-25",
+  "code_hash": "9796e792e2665bc852778648a6ce1af4",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "fmt": "d4c89f195c447af907ba425a860522de",
+    "highlight_colors": "e6a6b964e0ab4b50554810d8bd6b76ca",
+    "pct": "3413c026fc8c907293b2fb1d96080440",
+    "team_color_values": "81a321483d63e897ef3195d95350a746",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

@@ -1,0 +1,181 @@
+---
+title: "Do offensive linemen appear in the stat records?"
+image: card-thumbs/offensive-line-stat-lines.png
+image-alt: "Bar chart of the share of roster player-seasons that carry a stat line, by position group: the offensive line, in dark grey, is the shortest bar by a wide margin, while running backs are the longest."
+categories: ["Topic: Programs and conferences", "Position: By position group", "Population: Roster seasons", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [stat-line, player-season, position-group, draft-class, credited-pick, seasons-and-players]
+followups:
+  - text: "Recover offensive-line careers from rosters alone so the model population can include them."
+    link: "F10"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+last_season <- 2025L # the 2026 season is still being played
+team_draft <- tbl(con, "team_draft") |> collect()
+roster <- tbl(con, "roster") |>
+  filter(season <= last_season) |>
+  distinct(playerId, season, position) |>
+  collect()
+player_stats_seasons <- tbl(con, "player_stats") |>
+  distinct(playerId, season) |>
+  mutate(has_stat = TRUE) |>
+  collect()
+```
+
+```{r}
+#| label: compute
+# Credited picks: players whose final college season was 2013 to 2025,
+# approximately the draft classes of 2014 to 2026.
+credited <- filter(team_draft, season >= 2013L, season <= last_season)
+group_picks <- credited |>
+  group_by(group = position_group) |>
+  summarise(picks = sum(n_drafted), .groups = "drop")
+roster_stat <- roster |>
+  left_join(player_stats_seasons, by = c("playerId", "season")) |>
+  mutate(
+    group = position_group(position),
+    has_stat = coalesce(has_stat, FALSE)
+  )
+ol_cov <- roster_stat |>
+  group_by(group) |>
+  summarise(
+    seasons = n(),
+    with_stat = sum(has_stat),
+    share = mean(has_stat),
+    .groups = "drop"
+  ) |>
+  left_join(group_picks, by = "group") |>
+  mutate(pick_share = picks / sum(picks)) |>
+  arrange(share)
+ol <- filter(ol_cov, group == "Offensive line")
+```
+
+```{r}
+#| label: figure
+p <- ggplot(
+  ol_cov,
+  aes(share, reorder(group, share), fill = group == "Offensive line")
+) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(
+        group, ": ", fmt(with_stat), " of ", fmt(seasons),
+        " roster seasons with a stat line (", pct(share), ")\n",
+        fmt(picks), " credited draft picks (", pct(pick_share), " of all)"
+      ),
+      data_id = group
+    ),
+    width = 0.75
+  ) +
+  geom_text(
+    aes(label = pct(share, 0)),
+    hjust = -0.15,
+    size = 5,
+    fontface = "bold"
+  ) +
+  scale_fill_manual(
+    values = c(`TRUE` = "#374151", `FALSE` = "grey65"),
+    guide = "none"
+  ) +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 0.8)) +
+  labs(
+    title = "Stat-line share by position group",
+    subtitle = "The offensive line is in dark grey; hover a bar for counts",
+    x = "Roster seasons with a stat line",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "offensive-line-stat-lines", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: table
+ol_cov |>
+  transmute(
+    group = group,
+    seasons = fmt(seasons),
+    with_stat = fmt(with_stat),
+    share = pct(share),
+    picks = fmt(picks),
+    pick_share = pct(pick_share)
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Position group", "Roster player-seasons", "With a stat line",
+      "Share with a stat line", "Credited draft picks", "Share of picks"
+    ),
+    caption = "Roster player-seasons and how many carry a stat line, with credited draft picks for the classes of 2014 to 2026, by position group. The share of picks shows how much of the draft each group supplies."
+  )
+```
+
+```{r}
+#| label: codes
+by_code <- roster_stat |>
+  mutate(position = coalesce(position, "None listed")) |>
+  group_by(position, group) |>
+  summarise(seasons = n(), share = mean(has_stat), .groups = "drop") |>
+  mutate(is_ol = group == "Offensive line")
+p_codes <- ggplot(by_code, aes(share, reorder(position, share), color = is_ol)) +
+  geom_segment(
+    aes(x = 0, xend = share, yend = reorder(position, share)),
+    linewidth = 0.8
+  ) +
+  geom_point_interactive(
+    aes(
+      size = seasons,
+      tooltip = paste0(
+        position, " (", group, "): ", fmt(seasons),
+        " roster seasons, ", pct(share), " with a stat line"
+      ),
+      data_id = position
+    )
+  ) +
+  scale_color_manual(
+    values = c(`TRUE` = "#374151", `FALSE` = "#6b7280"),
+    guide = "none"
+  ) +
+  scale_size_area(max_size = 9, guide = "none") +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 1)) +
+  labs(
+    x = "Roster player-seasons with a stat line",
+    y = "Roster position code",
+    title = "Share with a stat line, by roster position code",
+    subtitle = "Offensive-line codes in dark grey; dot size is roster seasons",
+    caption = card_caption(release)
+  ) +
+  theme_cfb2nfl(base_size = 13)
+card_interactive(p_codes)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

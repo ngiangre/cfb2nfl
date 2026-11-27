@@ -168,3 +168,73 @@ linked-outside-population:
 no-college-id:
   label: No college id
   definition: "Invitees the link could not match to a college player id, mostly offensive linemen, who rarely have a stat line."
+# ---- batch programs ----
+division:
+  label: Division
+  definition: "The NCAA level a school plays at: FBS (the top level), FCS (the level below it), Division II and Division III. Division II, Division III and schools with no recorded division are grouped as Division II and below."
+conference:
+  label: Conference
+  definition: "A league of schools that schedule each other and share a championship, such as the SEC or the Big Sky. A few FBS schools are independents and belong to no football conference."
+realignment:
+  label: Conference change
+  definition: "An FBS school playing in a different conference, or as an independent, than in its previous FBS season. The Pac-10's 2011 rename to the Pac-12 is not counted."
+tier:
+  label: Tier
+  definition: "A three-level grouping of conferences by competitive level, set season by season, so a school that changes conference can change tier."
+power-tier:
+  label: Power
+  definition: "The top tier: the SEC, Big Ten, ACC and Big 12; the Pac-12 through 2023; the Big East through 2012; and Notre Dame, which plays as an independent."
+group-of-5-tier:
+  label: Group of 5
+  definition: "The rest of FBS: the American Athletic from 2013, Conference USA, Mid-American, Mountain West, Sun Belt, Western Athletic through 2012, the two-school Pac-12 from 2024, and the independents other than Notre Dame."
+fcs-and-below:
+  label: FCS and below
+  definition: "Every school outside FBS: the FCS, Division II and Division III."
+team-season:
+  label: Team-season
+  definition: "One school in one season."
+stat-line:
+  label: Stat line
+  definition: "At least one recorded statistic (a carry, catch, tackle or kick) for a player in a season."
+credited-pick:
+  label: Credited pick
+  definition: "A draft pick traced to the last college roster the player was on before the draft. A pick with no matching roster is not credited to any school."
+draft-day-school:
+  label: Draft-day school
+  definition: "The college the NFL draft lists for a player."
+eligible-player:
+  label: Eligible player
+  definition: "A player whose college career has ended and who had a real shot at the NFL: at least three seasons on college rosters, or drafted, or signed by an NFL team undrafted. Players who left after one or two seasons without reaching the NFL are not counted, and neither are undrafted players still on a current roster, whose outcome is not yet known."
+final-season:
+  label: Final season
+  definition: "A player's last season on a college roster before the draft. Each player counts once, for the school and conference of that season, so a transfer counts for his last stop."
+draft-rate:
+  label: Draft rate
+  definition: "Drafted players divided by eligible players. A draft rate of 10 percent means 10 of every 100 eligible players were drafted."
+undrafted-rate:
+  label: Undrafted rate
+  definition: "Eligible players who signed with an NFL team undrafted, divided by eligible players. The signing is matched by name from the college roster, so players with no college stat line are included."
+expected-draftees:
+  label: Expected draftees
+  definition: "How many draftees a school would have produced at the rates of its benchmark, times its eligible players at each position: the FBS-wide rates for the school ranking, or its own tier's rates for the within-tier version."
+expected-for-the-record:
+  label: Expected for the record
+  definition: "The draftees a school's tier win curve predicts from its win percentage over 2010 to 2025, times its eligible players. The same calculation as expected draftees; the name marks a benchmark that uses only the record."
+draftees-above-expected:
+  label: Draftees above expected
+  definition: "Drafted players minus expected draftees. A negative value means fewer draftees than the benchmark predicts."
+adjusted-rate:
+  label: Adjusted rate
+  definition: "A school's draft rate pulled toward its group's average, more strongly the fewer eligible players it has, so a small sample cannot top a ranking by luck."
+win-pct:
+  label: Win %
+  definition: "Wins divided by completed games over a school's FBS seasons from 2010 to 2025, bowls and playoffs included. A school that wins six of every ten games has a win % of 60%."
+correlation:
+  label: Correlation (r)
+  definition: "How closely two numbers rise and fall together across schools: 0 means no relationship, 1 means the schools sit on a perfect rising line, and negative values mean one falls as the other rises."
+sp-plus:
+  label: SP+
+  definition: "A rating of how strong a team was in a season that adjusts each game for the opponent's strength, so a win over a strong team counts for more than a win over a weak one. Higher is better; a school's SP+ here is its average over its FBS seasons from 2010 to 2025."
+transfer-in:
+  label: Transfer-in
+  definition: "An eligible player who was on a different school's roster in an earlier season before finishing at the school that gets the credit."

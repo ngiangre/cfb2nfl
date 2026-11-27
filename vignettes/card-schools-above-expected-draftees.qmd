@@ -1,0 +1,222 @@
+---
+title: "Which schools produce more draftees than their players predict?"
+image: card-thumbs/schools-above-expected-draftees.png
+image-alt: "Horizontal bar chart of the FBS schools with the most draftees above what their eligible players, weighted by position, predict: Alabama leads, highlighted in its team color, and the schools below it trail off in pale grey."
+categories: ["Topic: Programs and conferences", "Position: By position group", "Population: Draft-eligible players", "Unit: Schools", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [eligible-player, draft-rate, expected-draftees, draftees-above-expected, adjusted-rate, position-group, tier, conference, draft-day-school]
+followups:
+  - text: "Do schools that win more produce more draftees, once their players are weighted by position?"
+    link: "F09"
+  - text: "Forecast each position's draft chance before the draft, then score it once the draft is known."
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+first_season <- 2013L
+last_season <- 2025L # the 2026 season is still being played
+tier_order <- c("Power", "Group of 5", "FCS and below")
+credited <- tbl(con, "team_draft") |>
+  filter(season >= first_season, season <= last_season) |>
+  collect() |>
+  mutate(tier_label = factor(tier_label, levels = tier_order))
+team_season <- tbl(con, "team_season") |>
+  filter(classification == "fbs", season <= last_season) |>
+  collect()
+teams <- tbl(con, "teams") |> collect()
+team_colors <- team_color_values(teams)
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
+
+```{r}
+#| label: compute
+fbs_cr <- credited |>
+  filter(tier_label != "FCS and below") |>
+  mutate(
+    league = case_when(
+      conference == "FBS Independents" & team == "Notre Dame" ~ "Notre Dame",
+      conference == "FBS Independents" ~ "Other FBS independents",
+      .default = conference
+    )
+  )
+fbs_pos <- fbs_cr |>
+  filter(position_group != "Position not recorded")
+pos_rate <- draft_rates(group_by(fbs_pos, position_group)) |>
+  select(position_group, pos_rate = draft_rate)
+pos_tier_rate <- draft_rates(group_by(fbs_pos, position_group, tier_label)) |>
+  select(position_group, tier_label, tier_pos_rate = draft_rate)
+# Each school's expected draftees: its eligible players times the FBS-wide
+# rate at each position, and times its own tier's rate at each position.
+school_pos <- fbs_pos |>
+  left_join(pos_tier_rate, by = c("position_group", "tier_label")) |>
+  group_by(team, position_group) |>
+  summarise(
+    eligible = sum(n_eligible),
+    drafted = sum(n_drafted),
+    expected_tier = sum(n_eligible * tier_pos_rate),
+    .groups = "drop"
+  ) |>
+  left_join(pos_rate, by = "position_group") |>
+  mutate(expected = eligible * pos_rate)
+conf_now <- team_season |>
+  group_by(team) |>
+  slice_max(season, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  transmute(team, conf_now = if_else(conference == "FBS Independents", "FBS independents", conference))
+school_tier <- fbs_cr |>
+  count(team, tier_label, wt = n_eligible) |>
+  group_by(team) |>
+  slice_max(n, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  select(team, school_tier = tier_label)
+school <- school_pos |>
+  group_by(team) |>
+  summarise(
+    eligible = sum(eligible),
+    drafted = sum(drafted),
+    expected = sum(expected),
+    expected_tier = sum(expected_tier),
+    .groups = "drop"
+  ) |>
+  mutate(
+    above = drafted - expected,
+    above_tier = drafted - expected_tier,
+    draft_rate = drafted / eligible
+  ) |>
+  left_join(conf_now, by = "team") |>
+  left_join(school_tier, by = "team") |>
+  mutate(adjusted = shrink_rate(drafted, eligible, group = conf_now)) |>
+  arrange(desc(above))
+bama <- filter(school, team == "Alabama")
+g5 <- filter(school, school_tier == "Group of 5")
+g5_best <- slice_max(g5, above_tier, n = 1, with_ties = FALSE)
+n_g5_above_tier <- sum(g5$above_tier > 0)
+```
+
+```{r}
+#| label: figure
+top_fbs <- slice_head(school, n = 10) |>
+  mutate(highlight = if_else(team == "Alabama", team, "Other"))
+p <- ggplot(top_fbs, aes(above, reorder(team, above), fill = highlight)) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(
+        team, ": ", drafted, " drafted of ", fmt(eligible), " eligible; ",
+        fmt(expected, 1), " expected, ", fmt(above, 1), " above"
+      ),
+      data_id = team
+    ),
+    width = 0.75
+  ) +
+  scale_fill_manual(
+    values = c("Alabama" = highlight_colors(team_colors)[["Alabama"]], "Other" = "#d1d5db"),
+    guide = "none"
+  ) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.12))) +
+  labs(
+    title = "Draftees above expected, by FBS school",
+    subtitle = "Schools furthest above the FBS draft rate at each position predicts for their players; Alabama in its team color",
+    x = "Draftees above expected",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "schools-above-expected-draftees", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: table
+bind_rows(
+  slice_head(school, n = 10),
+  g5 |> arrange(desc(above_tier)) |> slice_head(n = 5)
+) |>
+  transmute(
+    School = team,
+    Tier = school_tier,
+    Eligible = fmt(eligible),
+    Drafted = drafted,
+    `Out of 100 eligible, drafted` = round(100 * draft_rate),
+    `Expected, FBS average` = fmt(expected, 1),
+    `Above FBS average` = fmt(above, 1),
+    `Expected, own tier` = fmt(expected_tier, 1),
+    `Above own tier` = fmt(above_tier, 1)
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "School", "Tier", "Eligible players", "Drafted", "Out of 100 eligible, drafted",
+      "Expected, FBS average", "Above FBS average", "Expected, own tier", "Above own tier"
+    ),
+    caption = "The 10 FBS schools furthest above the FBS-wide expectation, then the 5 Group of 5 schools furthest above their own tier's expectation. Expected draftees multiply each position's draft rate (FBS-wide, or the tier's rate in each player's final season) by the school's eligible players there. A school's tier is the one most of its eligible players finished in."
+  )
+```
+
+```{r}
+#| label: dots
+conf_avg <- school |>
+  group_by(conf_now) |>
+  summarise(avg = sum(drafted) / sum(eligible), .groups = "drop") |>
+  arrange(avg) |>
+  mutate(conf_now = factor(conf_now, levels = conf_now))
+dots <- school |>
+  mutate(
+    conf_now = factor(conf_now, levels = levels(conf_avg$conf_now)),
+    tip = paste0(
+      team, " (", conf_now, ")\n", drafted, " drafted of ", eligible,
+      " eligible; adjusted rate ", pct(adjusted)
+    )
+  )
+p_dots <- ggplot(dots, aes(adjusted, conf_now)) +
+  geom_point(
+    data = conf_avg,
+    aes(avg, conf_now),
+    shape = 124,
+    size = 12,
+    color = "#111827"
+  ) +
+  geom_point_interactive(
+    aes(tooltip = tip, data_id = team),
+    size = 3.6,
+    color = "grey65",
+    alpha = 0.8
+  ) +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 0.47)) +
+  labs(
+    x = "Adjusted draft rate",
+    y = "Conference, most recent season",
+    title = "Every FBS school against its conference's average",
+    subtitle = "Black tick: conference average; hover a dot for the school and its adjusted rate",
+    caption = card_caption(release)
+  ) +
+  theme_cfb2nfl()
+card_interactive(p_dots)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+```

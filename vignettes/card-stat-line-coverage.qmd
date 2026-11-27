@@ -1,0 +1,166 @@
+---
+title: "Does the data record every school's players?"
+image: card-thumbs/stat-line-coverage.png
+image-alt: "Line chart of the share of teams in each division with at least one player stat line by season: the FBS line stays at the top throughout, the FCS line starts well below it and climbs to the top in the later seasons, and the Division II and below line stays near the bottom."
+categories: ["Topic: Programs and conferences", "Position: All positions", "Unit: Schools", "Figure: Line chart"]
+status: investigation
+graduated_to: null
+terms: [stat-line, division, team-season, player-season]
+followups:
+  - text: "Fill the FCS and Division II and below rosters, especially 2020, from another source so every school's players are covered."
+    link: "F09"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+last_season <- 2025L # the 2026 season is still being played
+played <- tbl(con, "team_season") |>
+  filter(games_played > 0, season <= last_season) |>
+  collect()
+coverage <- stat_coverage(played)
+division_colors <- c(
+  "FBS" = "#374151",
+  "FCS" = "#6b7280",
+  "Division II and below" = "#9ca3af"
+)
+cov_at <- function(s, d, col) {
+  coverage[[col]][coverage$season == s & coverage$division == d]
+}
+fcs_pre <- coverage |> filter(division == "FCS", season <= 2020L)
+fcs_2020 <- filter(coverage, season == 2020L, division == "FCS")
+fbs_depth_2015 <- cov_at(2015L, "FBS", "depth")
+fbs_depth_2016 <- cov_at(2016L, "FBS", "depth")
+fbs_roster_2015 <- cov_at(2015L, "FBS", "roster_size")
+fbs_roster_2016 <- cov_at(2016L, "FBS", "roster_size")
+```
+
+```{r}
+#| label: figure
+p <- ggplot(coverage, aes(season, share, color = division)) +
+  geom_line(linewidth = 1.4) +
+  geom_point_interactive(
+    aes(
+      tooltip = paste0(
+        season, ", ", division, ": ", with_stats, " of ", played,
+        " teams (", scales::percent(share, accuracy = 1), ")"
+      ),
+      data_id = paste(season, division)
+    ),
+    size = 3
+  ) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1.02)) +
+  scale_x_continuous(breaks = seq(2010, last_season, 3)) +
+  scale_color_manual(values = division_colors, name = NULL) +
+  labs(
+    title = "Share of teams with a player stat line",
+    subtitle = "Share of teams with at least one player stat line, by division",
+    x = "Season",
+    y = "Teams with a stat line",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "stat-line-coverage", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: table
+coverage |>
+  mutate(cell = paste0(with_stats, " of ", played)) |>
+  select(season, division, cell) |>
+  tidyr::pivot_wider(names_from = division, values_from = cell) |>
+  left_join(
+    coverage |>
+      filter(division == "FBS") |>
+      select(season, depth, roster_size),
+    by = "season"
+  ) |>
+  transmute(
+    Season = season,
+    FBS = FBS,
+    FCS = FCS,
+    `Division II and below` = `Division II and below`,
+    depth = depth,
+    roster_size = roster_size
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Season", "FBS teams with stat lines", "FCS teams with stat lines",
+      "Division II and below teams with stat lines",
+      "FBS median players with a stat line", "FBS median roster size"
+    ),
+    caption = sprintf(
+      "Teams with at least one player stat line, of the teams that played at least one recorded game, by division and season, with the median FBS team's players with a stat line and roster size. From 2016 the stat records list about twice as many players per FBS team (a median of %d in 2015, %d in 2016) while roster sizes held level (%d and %d), so the change is in how many players the stat records include.",
+      fbs_depth_2015,
+      fbs_depth_2016,
+      fbs_roster_2015,
+      fbs_roster_2016
+    )
+  )
+```
+
+```{r}
+#| label: tiles
+fcs_tiles <- played |>
+  filter(classification == "fcs") |>
+  group_by(team) |>
+  mutate(stat_seasons = sum(has_stat_lines)) |>
+  ungroup() |>
+  mutate(status = if_else(has_stat_lines, "Has stat lines", "No stat lines"))
+p_tiles <- ggplot(
+  fcs_tiles,
+  aes(season, reorder(team, stat_seasons), fill = status)
+) +
+  geom_tile_interactive(
+    aes(
+      tooltip = paste0(
+        team, ", ", season, " (", coalesce(conference, "no conference"), ")\n",
+        n_stat_players, " players with a stat line; ", n_roster, " on the roster"
+      ),
+      data_id = team
+    ),
+    color = "white"
+  ) +
+  scale_fill_manual(
+    values = c("Has stat lines" = "#6b7280", "No stat lines" = "#e5e7eb"),
+    name = NULL
+  ) +
+  scale_x_continuous(breaks = seq(2010, last_season, 3)) +
+  labs(
+    x = "Season",
+    y = NULL,
+    title = "Every FCS team-season, with or without stat lines",
+    subtitle = "Teams with the most stat-line seasons at the top",
+    caption = "Gaps are seasons a school played outside FCS or played no recorded game."
+  ) +
+  theme_cfb2nfl(base_size = 9)
+card_interactive(p_tiles)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

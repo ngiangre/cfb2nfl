@@ -1,0 +1,204 @@
+---
+title: "Do Power conferences dominate undrafted signings as much as the draft?"
+image: card-thumbs/undrafted-signings-by-conference.png
+image-alt: "Dumbbell chart for each FBS conference, with the draft rate in dark grey and the undrafted rate in mid grey: the draft rates spread widely, with the Power conferences at the far right, while the undrafted rates sit much closer together."
+categories: ["Topic: Programs and conferences", "Position: All positions", "Population: Draft-eligible players", "Figure: Scatter plot", "Question: What matters for going pro"]
+status: investigation
+graduated_to: null
+terms: [eligible-player, draft-rate, undrafted-rate, signed-undrafted, tier, power-tier, group-of-5-tier, conference]
+followups:
+  - text: "Which schools produce draftees above expectation, by position, once each school is credited to its conference?"
+    link: "F09"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+first_season <- 2013L
+last_season <- 2025L # the 2026 season is still being played
+tier_order <- c("Power", "Group of 5", "FCS and below")
+credited <- tbl(con, "team_draft") |>
+  filter(season >= first_season, season <= last_season) |>
+  collect() |>
+  mutate(tier_label = factor(tier_label, levels = tier_order))
+team_season <- tbl(con, "team_season") |>
+  filter(classification == "fbs", season <= last_season) |>
+  collect()
+teams <- tbl(con, "teams") |> collect()
+team_colors <- team_color_values(teams)
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
+
+```{r}
+#| label: compute
+tier_rates <- draft_rates(group_by(credited, tier_label))
+tr <- function(t, col) tier_rates[[col]][tier_rates$tier_label == t]
+power_g5_udfa <- tr("Power", "udfa_rate") / tr("Group of 5", "udfa_rate")
+fbs_cr <- credited |>
+  filter(tier_label != "FCS and below") |>
+  mutate(
+    league = case_when(
+      conference == "FBS Independents" & team == "Notre Dame" ~ "Notre Dame",
+      conference == "FBS Independents" ~ "Other FBS independents",
+      .default = conference
+    )
+  )
+league_tier <- fbs_cr |>
+  count(league, tier_label, wt = n_eligible) |>
+  group_by(league) |>
+  slice_max(n, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  select(league, tier = tier_label)
+conf_rates <- draft_rates(group_by(fbs_cr, league)) |>
+  left_join(league_tier, by = "league") |>
+  arrange(draft_rate)
+# Each school's last FBS conference.
+conf_now <- team_season |>
+  group_by(team) |>
+  slice_max(season, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  transmute(team, conf_now = if_else(conference == "FBS Independents", "FBS independents", conference))
+school_tier <- fbs_cr |>
+  count(team, tier_label, wt = n_eligible) |>
+  group_by(team) |>
+  slice_max(n, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  select(team, school_tier = tier_label)
+school_rates <- draft_rates(group_by(fbs_cr, team)) |>
+  left_join(school_tier, by = "team") |>
+  left_join(conf_now, by = "team")
+n_power_schools <- sum(school_rates$school_tier == "Power")
+udfa_heavy <- school_rates |>
+  filter(school_tier == "Power", udfa > drafted) |>
+  arrange(desc(udfa - drafted), team)
+```
+
+```{r}
+#| label: figure
+dumb <- conf_rates |>
+  tidyr::pivot_longer(
+    c(draft_rate, udfa_rate),
+    names_to = "outcome",
+    values_to = "rate"
+  ) |>
+  mutate(
+    outcome = if_else(outcome == "draft_rate", "Drafted", "Undrafted free agent"),
+    league = factor(league, levels = conf_rates$league)
+  )
+p <- ggplot(dumb, aes(rate, league)) +
+  geom_line(aes(group = league), color = "grey75", linewidth = 1.2) +
+  geom_point_interactive(
+    aes(
+      color = outcome,
+      tooltip = paste0(
+        league, ": ", pct(rate), " of ", fmt(eligible), " eligible players ",
+        tolower(outcome)
+      ),
+      data_id = paste(league, outcome)
+    ),
+    size = 3.5
+  ) +
+  scale_color_manual(
+    values = c("Drafted" = "#374151", "Undrafted free agent" = "#9ca3af"),
+    name = NULL
+  ) +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    title = "Draft and undrafted rates by conference",
+    subtitle = "Eligible players drafted (dark grey) and signed undrafted (mid grey)",
+    x = "Share of eligible players",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "undrafted-signings-by-conference", release = release, height = 8)
+card_interactive(p)
+```
+
+```{r}
+#| label: table
+bind_rows(
+  tier_rates |>
+    filter(tier_label != "FCS and below") |>
+    transmute(Group = paste("All", tier_label), eligible, drafted, udfa, draft_rate, udfa_rate),
+  conf_rates |>
+    transmute(Group = league, eligible, drafted, udfa, draft_rate, udfa_rate)
+) |>
+  transmute(
+    Group,
+    Eligible = fmt(eligible),
+    Drafted = fmt(drafted),
+    `Draft rate` = pct(draft_rate),
+    `Undrafted free agents` = fmt(udfa),
+    `Undrafted rate` = pct(udfa_rate)
+  ) |>
+  knitr::kable(
+    col.names = c("Group", "Eligible players", "Drafted", "Draft rate", "Undrafted free agents", "Undrafted rate"),
+    caption = sprintf(
+      "Draft and undrafted rates by FBS tier and conference, final seasons %s to %s. Power players were drafted at %.1f times the Group of 5 rate but signed undrafted at %.1f times it.",
+      first_season,
+      last_season,
+      tr("Power", "draft_rate") / tr("Group of 5", "draft_rate"),
+      power_g5_udfa
+    )
+  )
+```
+
+```{r}
+#| label: schools
+p_schools <- ggplot(school_rates, aes(draft_rate, udfa_rate)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "#6b7280") +
+  geom_point_interactive(
+    aes(
+      fill = team,
+      size = eligible,
+      tooltip = paste0(
+        team, " (", conf_now, ")\n", drafted, " drafted, ", udfa,
+        " undrafted free agents, of ", eligible, " eligible"
+      ),
+      data_id = team
+    ),
+    shape = 21,
+    color = "white",
+    alpha = 0.9
+  ) +
+  scale_fill_manual(values = highlight_colors(team_colors), na.value = "#6b7280", guide = "none") +
+  scale_size_area(max_size = 7, guide = "none") +
+  scale_x_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    x = "Draft rate",
+    y = "Undrafted rate",
+    title = "Every FBS school's draft and undrafted rates",
+    subtitle = "Team colors; the dashed line is equal rates, and dot size is eligible players",
+    caption = card_caption(release)
+  ) +
+  theme_cfb2nfl()
+card_interactive(p_schools)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+```

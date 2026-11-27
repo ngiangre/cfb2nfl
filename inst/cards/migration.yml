@@ -359,3 +359,164 @@
   section: "5. Discussion"
   fate: dropped
   reason: "Prose; its open questions are follow-ups on the cards."
+# ---- 2026-10-31-conferences-landscape ----
+- post: 2026-10-31-conferences-landscape
+  section: "1. Introduction"
+  fate: dropped
+  reason: "Prose; each question it posed is now a card's title."
+- post: 2026-10-31-conferences-landscape
+  section: "2. Data"
+  fate: merged
+  card: fbs-realignment-waves
+  reason: "The section heading only; its one subsection is recorded below."
+- post: 2026-10-31-conferences-landscape
+  section: "2.1 Teams are grouped into conferences, and conferences into three tiers"
+  fate: merged
+  card: fbs-realignment-waves
+  reason: "The tier and conference definitions are glossary terms (division, conference, realignment, tier, power-tier, group-of-5-tier, fcs-and-below); the tier colours are the shared tier palette on the card."
+- post: 2026-10-31-conferences-landscape
+  section: "3. Results"
+  fate: merged
+  card: fbs-realignment-waves
+  reason: "The section heading only; each result is recorded below."
+- post: 2026-10-31-conferences-landscape
+  section: "3.1 FBS grew from 120 to 136 teams, and 61 schools changed conference at least once"
+  fate: card
+  card: fbs-realignment-waves
+  reason: "Figures moved. The card counts 81 conference-change moves across the 61 schools; the post's 61 schools is unchanged."
+- post: 2026-10-31-conferences-landscape
+  section: "3.2 Every FBS team has stat lines every season, every FCS team from 2021 but only 39% to 71% before, and Division II and below almost none"
+  fate: card
+  card: stat-line-coverage
+  reason: "Figures moved; the coverage table restated the figure and was dropped. Stat-line is a glossary term. The card keeps 3.2 and 3.3 separate, since their numbers differ."
+- post: 2026-10-31-conferences-landscape
+  section: "3.3 Offensive linemen supply one in six credited draft picks, but only 6% of their roster seasons carry a stat line"
+  fate: card
+  card: offensive-line-stat-lines
+  reason: "Figures moved."
+- post: 2026-10-31-conferences-landscape
+  section: "3.4 Twenty-seven schools account for half of all draft picks"
+  fate: card
+  card: school-draft-concentration
+  reason: "Figures moved. The card carries the 2026-10-31-conferences-landscape alias."
+- post: 2026-10-31-conferences-landscape
+  section: "3.5 FCS-and-below schools sent 193 players to the draft, North Dakota State 15 of them, but rosters trace fewer than half"
+  fate: card
+  card: fcs-school-draft-picks
+  reason: "Figures moved. Credited pick is a glossary term."
+- post: 2026-10-31-conferences-landscape
+  section: "4. Summary"
+  fate: dropped
+  reason: "The summary restated the results; each result is a card title and its figure."
+- post: 2026-10-31-conferences-landscape
+  section: "5. Discussion"
+  fate: dropped
+  reason: "Prose and caveats; the open questions are followups on the cards."
+
+# ---- 2026-10-31-who-produces-draftees ----
+- post: 2026-10-31-who-produces-draftees
+  section: "1. Introduction"
+  fate: dropped
+  reason: "Prose; each question it posed is now a card's title."
+- post: 2026-10-31-who-produces-draftees
+  section: "2. Data"
+  fate: merged
+  card: power-conference-draft-rate
+  reason: "The section heading only; its one subsection is recorded below."
+- post: 2026-10-31-who-produces-draftees
+  section: "2.1 An eligible player is one whose college career ended with a real shot at the draft"
+  fate: merged
+  card: power-conference-draft-rate
+  reason: "The eligible-player, final-season, draft-rate and undrafted-rate definitions are glossary terms."
+- post: 2026-10-31-who-produces-draftees
+  section: "3. Results"
+  fate: merged
+  card: power-conference-draft-rate
+  reason: "The section heading only; each result is recorded below."
+- post: 2026-10-31-who-produces-draftees
+  section: "3.1 Power-conference players were drafted at five times the Group of 5 rate"
+  fate: card
+  card: power-conference-draft-rate
+  reason: "Figures moved. The card carries the 2026-10-31-who-produces-draftees alias."
+- post: 2026-10-31-who-produces-draftees
+  section: "3.2 Undrafted signings are spread far more evenly, with Power players signing at about twice the Group of 5 rate"
+  fate: card
+  card: undrafted-signings-by-conference
+  reason: "Figures moved."
+- post: 2026-10-31-who-produces-draftees
+  section: "3.3 At every position Power players were drafted at four to six times the Group of 5 rate, and the SEC led eight of nine positions"
+  fate: card
+  card: conference-draft-rate-by-position
+  reason: "Figures moved. The heatmap of every conference at every position was dropped as a completeness exhibit."
+- post: 2026-10-31-who-produces-draftees
+  section: "3.4 Alabama produced 92 more draftees than an average FBS school with as many eligible players at the same positions, and Boise State led the Group of 5 against its own tier's rates"
+  fate: card
+  card: schools-above-expected-draftees
+  reason: "Figures moved. Expected draftees is a glossary term. The Boise State within-tier comparison is not on any card and is dropped with the post."
+- post: 2026-10-31-who-produces-draftees
+  section: "3.5 Alabama leads four positions, and three of six fan nicknames hold up as top-five schools, with only LSU's WRU first"
+  fate: card
+  card: fan-nicknames-against-data
+  reason: "Explanatory rank bars and a top-five facet moved; the all-schools position heatmap was dropped as a completeness exhibit. The nickname ranks were rechecked against the database."
+- post: 2026-10-31-who-produces-draftees
+  section: "4. Summary"
+  fate: dropped
+  reason: "The summary restated the results; each result is a card title and its figure."
+- post: 2026-10-31-who-produces-draftees
+  section: "5. Discussion"
+  fate: dropped
+  reason: "Prose and caveats; the caveats are card footers and the open questions are followups (F09, F17) on the cards."
+
+# ---- 2026-10-31-winning-and-draftees ----
+- post: 2026-10-31-winning-and-draftees
+  section: "1. Introduction"
+  fate: dropped
+  reason: "Prose; each question it posed is now a card's title."
+- post: 2026-10-31-winning-and-draftees
+  section: "2. Data"
+  fate: merged
+  card: win-pct-and-draft-rate
+  reason: "The section heading only; its one subsection is recorded below."
+- post: 2026-10-31-winning-and-draftees
+  section: "2.1 Each of 137 FBS schools has a winning percentage and a draft rate"
+  fate: merged
+  card: win-pct-and-draft-rate
+  reason: "The win-pct, team-season, draft-rate, expected-draftees, tier and correlation definitions are glossary terms; the school table is built once by the shared school_record() helper."
+- post: 2026-10-31-winning-and-draftees
+  section: "3. Results"
+  fate: merged
+  card: win-pct-and-draft-rate
+  reason: "The section heading only; each result is recorded below."
+- post: 2026-10-31-winning-and-draftees
+  section: "3.1 Within each tier, schools that win more have higher draft rates"
+  fate: card
+  card: win-pct-and-draft-rate
+  reason: "Figures moved; the tier correlation table is the card's table. The card carries the 2026-10-31-winning-and-draftees alias."
+- post: 2026-10-31-winning-and-draftees
+  section: "3.2 Florida and LSU produced the most draftees above what their records predict, and Oklahoma State and Kansas State the most below"
+  fate: card
+  card: over-under-producers
+  reason: "Figures moved; the five-and-five table is the card's table. The card names Oklahoma State as furthest below; Kansas State is not named on the card."
+- post: 2026-10-31-winning-and-draftees
+  section: "3.3 SP+, which adjusts for opponents, tracks draft rate more closely than win %, most of all in the Group of 5"
+  fate: card
+  card: sp-plus-and-draft-rate
+  reason: "Figures moved; the correlation table is the card's table. Correlation and SP+ are glossary terms."
+- post: 2026-10-31-winning-and-draftees
+  section: "3.4 A Power school's draft rate carries over from one five-year window to the next"
+  fate: card
+  card: draft-rate-across-windows
+  reason: "Figures moved. The two windows are 2013 to 2017 and 2019 to 2023, with 2018 left out; the Power school count is computed, not typed."
+- post: 2026-10-31-winning-and-draftees
+  section: "3.5 Leaving out transfer-ins barely changes how closely win % tracks draft rate"
+  fate: card
+  card: win-pct-without-transfer-ins
+  reason: "Figures moved; the transfer-in table is the card's table. Transfer-in is a glossary term."
+- post: 2026-10-31-winning-and-draftees
+  section: "4. Summary"
+  fate: dropped
+  reason: "The verdict table restated the five sections; each verdict is the card title it became."
+- post: 2026-10-31-winning-and-draftees
+  section: "5. Discussion"
+  fate: dropped
+  reason: "Callouts and caveats; the follow-ups (F09, Question: Head coach effect, F19) are on the cards."

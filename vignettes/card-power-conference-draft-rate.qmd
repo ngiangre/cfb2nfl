@@ -1,0 +1,192 @@
+---
+title: "Are Power-conference players drafted more often?"
+aliases: [2026-10-31-who-produces-draftees.html]
+image: card-thumbs/power-conference-draft-rate.png
+image-alt: "Horizontal bar chart of the draft rate for each FBS conference, the share of eligible players drafted in their final college seasons, with bars shaded by tier: every Power conference's bar is longer than every Group of 5 conference's, and two dashed lines, labelled Power and Group of 5, mark the tier totals."
+categories: ["Topic: Programs and conferences", "Position: All positions", "Population: Draft-eligible players", "Figure: Bar chart", "Question: What matters for going pro"]
+status: investigation
+graduated_to: null
+terms: [eligible-player, draft-rate, final-season, tier, power-tier, group-of-5-tier, fcs-and-below, conference]
+followups:
+  - text: "Which schools produce draftees above expectation, by position, once each school is credited to its conference?"
+    link: "F09"
+  - text: "Do schools that win more produce more draftees?"
+    link: "F09"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+first_season <- 2013L # final college seasons, approximately the 2014 draft
+last_season <- 2025L # the 2026 season is still being played
+tier_order <- c("Power", "Group of 5", "FCS and below")
+tier_colors <- tier_palette()
+credited <- tbl(con, "team_draft") |>
+  filter(season >= first_season, season <= last_season) |>
+  collect() |>
+  mutate(tier_label = factor(tier_label, levels = tier_order))
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
+
+```{r}
+#| label: compute
+tier_rates <- draft_rates(group_by(credited, tier_label))
+tr <- function(t, col) tier_rates[[col]][tier_rates$tier_label == t]
+power_g5 <- tr("Power", "draft_rate") / tr("Group of 5", "draft_rate")
+# Notre Dame as an independent is a one-school Power group; the other
+# independents are Group of 5.
+fbs_cr <- credited |>
+  filter(tier_label != "FCS and below") |>
+  mutate(
+    league = case_when(
+      conference == "FBS Independents" & team == "Notre Dame" ~ "Notre Dame",
+      conference == "FBS Independents" ~ "Other FBS independents",
+      .default = conference
+    )
+  )
+# A conference's tier is the one most of its eligible players played in.
+league_tier <- fbs_cr |>
+  count(league, tier_label, wt = n_eligible) |>
+  group_by(league) |>
+  slice_max(n, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  select(league, tier = tier_label)
+conf_rates <- draft_rates(group_by(fbs_cr, league)) |>
+  left_join(league_tier, by = "league") |>
+  arrange(desc(draft_rate))
+league_season <- draft_rates(group_by(fbs_cr, league, season)) |>
+  left_join(league_tier, by = "league")
+power_line <- tr("Power", "draft_rate")
+g5_line <- tr("Group of 5", "draft_rate")
+```
+
+```{r}
+#| label: figure
+p <- ggplot(
+  conf_rates,
+  aes(draft_rate, reorder(league, draft_rate))
+) +
+  geom_col_interactive(
+    aes(
+      fill = tier,
+      tooltip = paste0(
+        league, " (", tier, "): ", fmt(drafted), " drafted of ",
+        fmt(eligible), " eligible (", pct(draft_rate), ")"
+      ),
+      data_id = league
+    ),
+    width = 0.75
+  ) +
+  geom_vline(
+    xintercept = c(power_line, g5_line),
+    color = "#374151",
+    linetype = "dashed",
+    linewidth = 0.9
+  ) +
+  annotate(
+    "text",
+    x = c(power_line, g5_line),
+    y = nrow(conf_rates) + 1.5,
+    label = c("Power total", "Group of 5 total"),
+    hjust = c(0, 0),
+    color = "#374151",
+    size = 4.5,
+    fontface = "bold"
+  ) +
+  scale_y_discrete(expand = expansion(add = c(0.6, 2.4))) +
+  scale_fill_manual(values = tier_colors, name = NULL) +
+  scale_x_continuous(labels = scales::percent, expand = expansion(mult = c(0, 0.08))) +
+  labs(
+    title = "Draft rate by FBS conference",
+    subtitle = "Eligible players drafted, shaded by tier; dashed lines are the tier totals",
+    x = "Draft rate",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card() +
+  theme(legend.position = "top")
+
+card_thumbnail(p, "power-conference-draft-rate", release = release, height = 7.5)
+card_interactive(p)
+```
+
+```{r}
+#| label: table
+bind_rows(
+  tier_rates |>
+    transmute(Group = paste("All", tier_label), schools, eligible, drafted, draft_rate),
+  conf_rates |>
+    transmute(Group = league, schools, eligible, drafted, draft_rate)
+) |>
+  transmute(
+    Group,
+    Schools = schools,
+    Eligible = fmt(eligible),
+    Drafted = fmt(drafted),
+    `Draft rate` = pct(draft_rate)
+  ) |>
+  knitr::kable(
+    col.names = c("Group", "Schools", "Eligible players", "Drafted", "Draft rate"),
+    caption = "Eligible players and draftees by tier and by conference, with each conference's draft rate. A conference's tier is the one most of its eligible players played in. Conference rates use the conference of each player's final season."
+  )
+```
+
+```{r}
+#| label: seasons
+p_seasons <- ggplot(
+  league_season,
+  aes(season, draft_rate, color = tier, group = league)
+) +
+  geom_line_interactive(
+    aes(data_id = league, tooltip = league),
+    linewidth = 1.1,
+    alpha = 0.8
+  ) +
+  geom_point_interactive(
+    aes(
+      data_id = league,
+      tooltip = paste0(
+        league, ", ", season, ": ", drafted, " drafted of ", eligible,
+        " eligible (", pct(draft_rate), ")"
+      )
+    ),
+    size = 2.6
+  ) +
+  scale_color_manual(values = tier_colors, name = NULL) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_continuous(breaks = seq(first_season, last_season, 2)) +
+  labs(
+    x = "Final college season",
+    y = "Draft rate",
+    title = "Each conference's draft rate, season by season",
+    subtitle = "Hover a line to follow one conference; hover a point for its counts",
+    caption = card_caption(release)
+  ) +
+  theme_cfb2nfl()
+card_interactive(p_seasons)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+```

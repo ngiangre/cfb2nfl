@@ -1,0 +1,203 @@
+---
+title: "Do schools that win more produce more draftees?"
+aliases: [2026-10-31-winning-and-draftees.html]
+image: card-thumbs/win-pct-and-draft-rate.png
+image-alt: "Scatter plot of FBS schools, with win percentage across the horizontal axis and draft rate up the vertical axis. Power schools in dark grey and Group of 5 schools in mid grey each rise along their own curve; the Power curve sits well above the Group of 5 curve, and both slope upward."
+categories: ["Topic: Programs and conferences", "Position: All positions", "Population: Draft-eligible players", "Unit: Schools", "Figure: Scatter plot", "Question: What matters for going pro"]
+status: investigation
+graduated_to: null
+terms: [win-pct, tier, power-tier, group-of-5-tier, draft-rate, expected-draftees, confidence-interval, correlation, team-season]
+followups:
+  - text: "Does recruited talent drive both winning and drafting? Add team recruiting ratings at entry as a common cause."
+    link: "F09"
+  - text: "Do head coaches carry draft production with them when they change schools?"
+    link: "Question: Head coach effect"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+first_record <- 2010L # records cover every FBS season from 2010
+first_season <- 2013L
+last_season <- 2025L # the 2026 season is still being played
+fbs_seasons <- tbl(con, "team_season") |>
+  filter(
+    classification == "fbs",
+    season >= first_record,
+    season <= last_season
+  ) |>
+  collect()
+credited <- tbl(con, "team_draft") |>
+  filter(
+    season >= first_season,
+    season <= last_season,
+    tier_label != "FCS and below"
+  ) |>
+  collect()
+teams <- tbl(con, "teams") |> collect()
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
+
+```{r}
+#| label: compute
+#| output: false
+school <- school_record(fbs_seasons, credited)
+tier_levels <- levels(school$tier)
+# Each tier's correlation of win % with draft rate, and its plausible range.
+win_cor <- school |>
+  group_by(tier) |>
+  group_modify(\(g, k) {
+    ct <- cor.test(g$win_pct, g$draft_rate)
+    tibble::tibble(
+      schools = nrow(g),
+      r = unname(ct$estimate),
+      lo = ct$conf.int[1],
+      hi = ct$conf.int[2]
+    )
+  }) |>
+  ungroup()
+r_of <- function(t) win_cor$r[win_cor$tier == t]
+fits <- fit_tier_curves(school, "win_pct")
+at60 <- vapply(
+  fits,
+  \(m) unname(predict(m, newdata = data.frame(win_pct = 0.6), type = "response")),
+  numeric(1)
+)
+grid <- school |>
+  group_by(tier) |>
+  reframe(win_pct = seq(min(win_pct), max(win_pct), length.out = 100)) |>
+  group_by(tier) |>
+  mutate(
+    fit = predict(
+      fits[[as.character(first(tier))]],
+      newdata = pick(everything()),
+      type = "response"
+    )
+  ) |>
+  ungroup()
+school$tip <- paste0(
+  school$team,
+  " (",
+  school$tier,
+  ")\nRecord 2010 to 2025: ",
+  school$record_label,
+  " (",
+  sprintf("%.1f%%", 100 * school$win_pct),
+  "); ",
+  school$drafted,
+  " drafted of ",
+  school$eligible,
+  " eligible (",
+  sprintf("%.1f%%", 100 * school$draft_rate),
+  ")"
+)
+```
+
+```{r}
+#| label: figure
+p <- ggplot(school, aes(win_pct, draft_rate, color = tier)) +
+  geom_point_interactive(
+    aes(tooltip = tip, data_id = team),
+    size = 3.4,
+    alpha = 0.55
+  ) +
+  geom_line(data = grid, aes(y = fit), linewidth = 1.6) +
+  annotate(
+    "text",
+    x = 0.22,
+    y = 0.36,
+    label = sprintf(
+      "Power: r = %.2f\nGroup of 5: r = %.2f",
+      r_of("Power"),
+      r_of("Group of 5")
+    ),
+    hjust = 0,
+    size = 5,
+    fontface = "bold",
+    color = "#111827"
+  ) +
+  scale_color_manual(values = tier_palette()[tier_levels], name = NULL) +
+  scale_x_continuous(labels = scales::percent, expand = expansion(mult = c(0.03, 0.08))) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    x = "Win % (FBS seasons 2010 to 2025)",
+    y = "Draft rate",
+    title = "Draft rate against win %, by tier",
+    subtitle = "Each dot is a school; lines are each tier's fitted curve",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "win-pct-and-draft-rate", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: explore
+p_explore <- ggplot(school, aes(win_pct, draft_rate)) +
+  geom_line(data = grid, aes(y = fit), color = "#9ca3af", linewidth = 1.2) +
+  geom_point_interactive(
+    aes(fill = team, tooltip = tip, data_id = team),
+    shape = 21,
+    size = 4.2,
+    color = "white",
+    stroke = 0.6
+  ) +
+  facet_wrap(~tier, scales = "free_y") +
+  scale_fill_manual(values = highlight_colors(team_color_values(teams)), guide = "none") +
+  scale_x_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    x = "Win % (FBS seasons 2010 to 2025)",
+    y = "Draft rate",
+    title = "Every FBS school's record and draft rate",
+    subtitle = "Team colors; each panel has its own vertical scale; hover a dot for the record and counts",
+    caption = card_caption(release)
+  ) +
+  theme_cfb2nfl()
+card_interactive(p_explore, width_svg = 13, height_svg = 8)
+```
+
+```{r}
+#| label: table
+win_cor |>
+  transmute(
+    Tier = tier,
+    Schools = schools,
+    `Correlation of win % with draft rate (r)` = sprintf("%.2f", r),
+    `Plausible range of r` = paste(sprintf("%.2f", lo), "to", sprintf("%.2f", hi)),
+    `Expected draft rate at a 60% win %` = sprintf("%.1f%%", 100 * at60[as.character(tier)])
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Tier", "Schools", "Correlation of win % with draft rate (r)",
+      "Plausible range of r", "Expected draft rate at a 60% win %"
+    ),
+    caption = "School win % (FBS seasons 2010 to 2025) against draft rate (final seasons 2013 to 2025), by tier. A correlation near 1 means schools with higher win % sit on a rising line of draft rates; the plausible range is the span the true correlation likely falls in (a 95% confidence interval). The expected draft rate comes from the tier's fitted curve."
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+```

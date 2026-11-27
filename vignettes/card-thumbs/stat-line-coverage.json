@@ -1,0 +1,11 @@
+{
+  "id": "stat-line-coverage",
+  "release": "2026-11-25",
+  "code_hash": "9af2def24deb92dae94da8b6c7de5ac9",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "stat_coverage": "39c0ef8a63b3915f0e387bc3eb2a8cbf",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

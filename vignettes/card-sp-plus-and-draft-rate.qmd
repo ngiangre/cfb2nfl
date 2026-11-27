@@ -1,0 +1,223 @@
+---
+title: "Does SP+ track draft rate more closely than win %?"
+image: card-thumbs/sp-plus-and-draft-rate.png
+image-alt: "Dumbbell chart of the correlation with draft rate for Power and Group of 5 schools, one row each for win percentage and average SP+. In both tiers the SP+ dot sits further right than the win % dot, and the gap is widest in the Group of 5."
+categories: ["Topic: Programs and conferences", "Position: All positions", "Population: Draft-eligible players", "Unit: Schools", "Figure: Scatter plot", "Question: What matters for going pro"]
+status: investigation
+graduated_to: null
+terms: [sp-plus, win-pct, tier, power-tier, group-of-5-tier, draft-rate, correlation, confidence-interval]
+followups:
+  - text: "Do schools that win more produce more draftees at each position, once players are weighted by position?"
+    link: "F09"
+  - text: "Forecast each school's draft rate from its strength before the draft, then score the forecast once the draft is known."
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+first_record <- 2010L
+first_season <- 2013L
+last_season <- 2025L # the 2026 season is still being played
+fbs_seasons <- tbl(con, "team_season") |>
+  filter(
+    classification == "fbs",
+    season >= first_record,
+    season <= last_season
+  ) |>
+  collect()
+credited <- tbl(con, "team_draft") |>
+  filter(
+    season >= first_season,
+    season <= last_season,
+    tier_label != "FCS and below"
+  ) |>
+  collect()
+teams <- tbl(con, "teams") |> collect()
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
+
+```{r}
+#| label: compute
+#| output: false
+school <- school_record(fbs_seasons, credited)
+tier_levels <- levels(school$tier)
+# Each tier's correlation with draft rate, for win % and for average SP+.
+cor_by_tier <- function(d, x) {
+  d |>
+    group_by(tier) |>
+    group_modify(\(g, k) {
+      ct <- cor.test(g[[x]], g$draft_rate)
+      tibble::tibble(
+        schools = nrow(g),
+        r = unname(ct$estimate),
+        lo = ct$conf.int[1],
+        hi = ct$conf.int[2]
+      )
+    }) |>
+    ungroup()
+}
+win_cor <- cor_by_tier(school, "win_pct")
+sp_cor <- cor_by_tier(school, "sp")
+win_sp <- school |>
+  group_by(tier) |>
+  summarise(r_win_sp = cor(win_pct, sp), .groups = "drop")
+both <- bind_rows(
+  mutate(win_cor, measure = "Win %"),
+  mutate(sp_cor, measure = "Average SP+")
+) |>
+  mutate(measure = factor(measure, levels = c("Win %", "Average SP+")))
+school$tip <- paste0(
+  school$team,
+  " (",
+  school$tier,
+  ")\nRecord 2010 to 2025: ",
+  school$record_label,
+  ", average SP+ ",
+  sprintf("%.1f", school$sp),
+  "\n",
+  school$drafted,
+  " drafted of ",
+  school$eligible,
+  " eligible (",
+  sprintf("%.1f%%", 100 * school$draft_rate),
+  ")"
+)
+```
+
+```{r}
+#| label: figure
+p <- ggplot(both, aes(r, tier)) +
+  geom_segment(
+    data = tidyr::pivot_wider(
+      select(both, tier, measure, r),
+      names_from = measure,
+      values_from = r
+    ),
+    aes(x = `Win %`, xend = `Average SP+`, y = tier, yend = tier),
+    inherit.aes = FALSE,
+    color = "#9ca3af",
+    linewidth = 1.4
+  ) +
+  geom_point_interactive(
+    aes(
+      color = measure,
+      tooltip = paste0(
+        tier,
+        ", ",
+        tolower(as.character(measure)),
+        ": r = ",
+        sprintf("%.2f", r),
+        " (plausible range ",
+        sprintf("%.2f", lo),
+        " to ",
+        sprintf("%.2f", hi),
+        ")"
+      ),
+      data_id = paste(tier, measure)
+    ),
+    size = 7
+  ) +
+  scale_color_manual(
+    values = c("Win %" = "#9ca3af", "Average SP+" = "#111827"),
+    name = NULL
+  ) +
+  scale_x_continuous(limits = c(0, 1), breaks = seq(0, 1, 0.25)) +
+  scale_y_discrete(limits = rev(tier_levels)) +
+  labs(
+    x = "Correlation with draft rate (r)",
+    y = NULL,
+    title = "Correlation of draft rate with win % and average SP+, by tier",
+    subtitle = "Each row is a tier; the dark dot is average SP+, the grey dot win %",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "sp-plus-and-draft-rate", release = release)
+card_interactive(p, width_svg = 11, height_svg = 5)
+```
+
+```{r}
+#| label: explore
+sp_grid <- school |>
+  group_by(tier) |>
+  reframe(sp = seq(min(sp), max(sp), length.out = 100)) |>
+  group_by(tier) |>
+  mutate(
+    fit = predict(
+      fit_tier_curves(school, "sp")[[as.character(first(tier))]],
+      newdata = pick(everything()),
+      type = "response"
+    )
+  ) |>
+  ungroup()
+p_explore <- ggplot(school, aes(sp, draft_rate)) +
+  geom_line(data = sp_grid, aes(y = fit), color = "#9ca3af", linewidth = 1.2) +
+  geom_point_interactive(
+    aes(fill = team, tooltip = tip, data_id = team),
+    shape = 21,
+    size = 4.2,
+    color = "white",
+    stroke = 0.6
+  ) +
+  facet_wrap(~tier, scales = "free") +
+  scale_fill_team(teams, guide = "none") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    x = "Average SP+ (FBS seasons 2010 to 2025)",
+    y = "Draft rate",
+    title = "Every school's average SP+ and draft rate",
+    subtitle = "Team colors; each panel has its own scales; hover a dot for the record and counts",
+    caption = card_caption(release)
+  ) +
+  theme_cfb2nfl()
+card_interactive(p_explore, width_svg = 13, height_svg = 8)
+```
+
+```{r}
+#| label: table
+win_cor |>
+  select(tier, schools, r_win = r) |>
+  left_join(select(sp_cor, tier, r_sp = r, lo, hi), by = "tier") |>
+  left_join(win_sp, by = "tier") |>
+  transmute(
+    Tier = tier,
+    Schools = schools,
+    `r, win % with draft rate` = sprintf("%.2f", r_win),
+    `r, SP+ with draft rate` = sprintf("%.2f", r_sp),
+    `Plausible range, SP+` = paste(sprintf("%.2f", lo), "to", sprintf("%.2f", hi)),
+    `r, win % with SP+` = sprintf("%.2f", r_win_sp)
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Tier", "Schools", "r, win % with draft rate", "r, SP+ with draft rate",
+      "Plausible range, SP+", "r, win % with SP+"
+    ),
+    caption = "Correlations with school draft rate (final seasons 2013 to 2025) of win % and of average SP+ (FBS seasons 2010 to 2025), by tier, and of the two measures with each other. The plausible range is the span the SP+ correlation likely falls in (a 95% confidence interval)."
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+```

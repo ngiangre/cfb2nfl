@@ -1,0 +1,191 @@
+---
+title: "How many schools produce half of the draft picks?"
+aliases: [2026-10-31-conferences-landscape.html]
+image: card-thumbs/school-draft-concentration.png
+image-alt: "Step curve of the cumulative share of NFL draft picks against schools ranked from most to fewest picks, for the classes of 2014 to 2026: the curve climbs steeply through a highlighted group of leading schools, which reaches half of all picks, and the long tail of schools flattens near the top."
+categories: ["Topic: Programs and conferences", "Position: All positions", "Unit: Schools", "Figure: Line chart"]
+status: investigation
+graduated_to: null
+terms: [draft-day-school, credited-pick, conference, tier, power-tier, group-of-5-tier, fcs-and-below]
+followups:
+  - text: "Which schools produce draftees above expectation, by position, once each school is credited to its conference?"
+    link: "F09"
+  - text: "Do schools that win more produce more draftees?"
+    link: "F09"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+last_season <- 2025L # the 2026 season is still being played
+tier_order <- c("Power", "Group of 5", "FCS and below")
+team_season <- tbl(con, "team_season") |>
+  filter(season <= last_season, games_played > 0) |>
+  collect() |>
+  mutate(tier_label = factor(tier_label, levels = tier_order))
+teams <- tbl(con, "teams") |> collect()
+picks <- tbl(con, "picks") |>
+  filter(year >= 2014L, year <= last_season + 1L) |>
+  collect()
+# Each school's tier in its latest recorded season before the draft.
+school_tier <- team_season |>
+  filter(!is.na(tier_label)) |>
+  transmute(
+    collegeTeam = team,
+    tier_season = season,
+    tier = as.character(tier_label),
+    conference
+  )
+window_picks <- picks |>
+  left_join(
+    school_tier,
+    by = join_by(collegeTeam, closest(year > tier_season))
+  ) |>
+  mutate(tier = coalesce(tier, "School not in the data"))
+n_window <- nrow(window_picks)
+# Josh Allen (Wyoming, 2018), keyed on athlete id (picks has two Josh Allens).
+allen_id <- "3918298"
+allen <- filter(picks, playerId == allen_id, year == 2018L)
+```
+
+```{r}
+#| label: compute
+school_picks <- window_picks |>
+  arrange(collegeTeam, year) |>
+  group_by(team = collegeTeam) |>
+  summarise(
+    picks = n(),
+    tier = last(tier),
+    conference = last(conference),
+    .groups = "drop"
+  ) |>
+  arrange(desc(picks), team) |>
+  mutate(rank = row_number(), cum_share = cumsum(picks) / sum(picks))
+n_schools <- nrow(school_picks)
+half_n <- which(school_picks$cum_share >= 0.5)[1]
+wyo <- filter(school_picks, team == allen$collegeTeam)
+wyo_color <- team_color_values(teams)[[allen$collegeTeam]]
+```
+
+```{r}
+#| label: figure
+top_schools <- filter(school_picks, rank <= half_n)
+p <- ggplot(school_picks, aes(rank, cum_share)) +
+  geom_step(linewidth = 1.3, color = "grey55") +
+  geom_point_interactive(
+    data = top_schools,
+    aes(
+      tooltip = paste0(
+        "#", rank, " ", team, ": ", picks, " picks (",
+        scales::percent(cum_share, accuracy = 1), " cumulative)"
+      ),
+      data_id = team
+    ),
+    color = "#374151",
+    size = 2.5
+  ) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  labs(
+    title = "Share of draft picks by school",
+    subtitle = paste0(
+      half_n, " schools reach half of all picks; dark points mark them"
+    ),
+    x = "Draft-day schools, ranked by draft picks",
+    y = "Share of picks",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "school-draft-concentration", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: table
+tibble::tibble(
+  Schools = c(
+    "Top 10",
+    "Top 25",
+    paste("Top", half_n),
+    "Top 50",
+    "Top 100",
+    paste("All", n_schools, "draft-day schools")
+  ),
+  n = c(10L, 25L, half_n, 50L, 100L, n_schools)
+) |>
+  mutate(
+    picks_n = cumsum(school_picks$picks)[n],
+    share = school_picks$cum_share[n],
+    `Draft picks` = fmt(picks_n),
+    `Share of picks` = pct(share)
+  ) |>
+  select(Schools, `Draft picks`, `Share of picks`) |>
+  knitr::kable(
+    col.names = c("Schools", "Draft picks", "Share of picks"),
+    caption = "Share of all draft picks in the classes of 2014 to 2026 from the draft-day schools with the most picks."
+  )
+```
+
+```{r}
+#| label: top-schools
+top <- filter(school_picks, rank <= 60 | team == allen$collegeTeam) |>
+  mutate(
+    label = if_else(
+      team == allen$collegeTeam,
+      paste0(team, " (#", rank, ")"),
+      team
+    ),
+    note = if_else(
+      team == allen$collegeTeam,
+      paste0(", including Josh Allen (", allen$year, ", pick ", allen$overall, ")"),
+      ""
+    )
+  )
+p_top <- ggplot(top, aes(picks, reorder(label, picks), fill = team)) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(
+        "#", rank, " ", team, " (", conference, ", ", tier, "): ",
+        picks, " picks", note
+      ),
+      data_id = team
+    ),
+    width = 0.8
+  ) +
+  scale_fill_manual(values = highlight_colors(team_color_values(teams)), guide = "none") +
+  labs(
+    x = "Draft picks, classes of 2014 to 2026",
+    y = NULL,
+    title = "Draft picks by school, leaders and Wyoming",
+    subtitle = "Team colors, with green and purple teams in dark grey; the leaders plus Wyoming, where Josh Allen played",
+    caption = card_caption(release)
+  ) +
+  theme_cfb2nfl(base_size = 12)
+card_interactive(p_top)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
