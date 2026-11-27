@@ -366,7 +366,7 @@ all of it. Years 2010–2026.
   `scale_fill_team()`/`scale_color_team()`, and for card thumbnails
   `theme_card()` with `card_caption()` (feature F25).
 - **Figure cards** (feature F25, replacing the dated posts; full rules land
-  with decision 0053, #134): one question, one figure, one file
+  with decision 0054, #134): one question, one figure, one file
   `vignettes/card-<id>.qmd` (the id is the permanent URL). Start one with
   `new_card("<id>", "<question>?")` from `vignettes/_card-template.qmd`; tag
   it only from `inst/cards/tags.yml` and `inst/cards/questions.yml` (a new

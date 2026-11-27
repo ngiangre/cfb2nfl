@@ -120,7 +120,7 @@ acceptance criteria.
 
 - **Goals:** G1, C1 · **Personas:** P1, P2 · **Status:** shipped
 - **Links:** decisions 0025, 0040; `R/post_style.R`; superseded by F25
-  once decision 0053 lands
+  once decision 0054 lands
 - **Tasks:**
 <!-- tasks F16 -->
 <!-- /tasks -->
@@ -205,7 +205,7 @@ acceptance criteria.
 
 - **Goals:** G1, G3, C1 · **Personas:** P1 (P2 via each card's code) ·
   **Status:** accepted
-- **Links:** issue #127; supersedes F16 once decision 0053 lands (F16 →
+- **Links:** issue #127; supersedes F16 once decision 0054 lands (F16 →
   superseded by F25); replaces F14's Blog index page and its navbar entry;
   lays the ground for F21
 - **Why:** after 16 dated posts the figures are what readers come back to,
@@ -268,12 +268,12 @@ acceptance criteria.
   promoted at graduation); Explorer or Analysis redesign beyond the one
   graduated card; multi-tag (AND) filtering beyond Quarto's listing;
   interactive thumbnails.
-- **Order:** the pilot posts stay up until decision 0053 is accepted;
+- **Order:** the pilot posts stay up until decision 0054 is accepted;
   redirects land with or after it.
 - **Cost:** 0 CFBD calls; no new data tables; new registries
   `inst/cards/tags.yml`, `questions.yml` and the migration ledger;
   `site.yaml` render time for about 70 cards (measured early). Decision
-  record 0053 (supersedes or amends 0015 and 0025, and 0040 where it
+  record 0054 (supersedes or amends 0015 and 0025, and 0040 where it
   applies) and a `goals.md` signal change for G1 ("has a dated post") and
   G3 ("every Results section"), written after the pilot.
 - **Review:** feature-reviewer 2026-11-26: aligned after changes (7
