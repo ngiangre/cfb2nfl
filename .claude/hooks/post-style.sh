@@ -14,7 +14,10 @@ case "$file" in
   *) exit 0 ;;
 esac
 
-root="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+# Check the repository the card lives in (a worktree has its own registries
+# and thumbnails), falling back to the project directory.
+root=$(git -C "$(dirname "$file")" rev-parse --show-toplevel 2>/dev/null)
+[ -n "$root" ] || root="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 out=$(cd "$root" && Rscript -e '
   for (f in c("R/format.R", "R/card.R", "R/card_style.R")) source(f)
   bad <- check_card_style(commandArgs(TRUE)[1], root = ".")
