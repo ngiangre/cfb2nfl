@@ -132,28 +132,36 @@ $navbar-light-toggler-border-color: rgba(250, 251, 252, 0.4);
 }
 
 // Investigations figure wall (feature F25, vignettes/card-wall.ejs): a grid
-// of card tiles that collapses to one column on a phone.
+// of card tiles that resize with the screen. Columns shrink to the screen
+// width rather than holding a fixed minimum, images keep their own
+// proportions, and below a phone's width the wall is one column.
 .card-wall {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  gap: 1.25rem;
+  width: 100%;
 }
 .card-wall-tile {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+  min-width: 0;
+}
+.card-wall-image {
+  display: block;
 }
 .card-wall-image img {
+  display: block;
   width: 100%;
+  max-width: 100%;
   height: auto;
-  aspect-ratio: 8 / 5.5;
-  object-fit: contain;
   border: 1px solid #dee2e6;
   border-radius: 4px;
 }
 .card-wall-title {
-  font-size: 1.15rem;
+  font-size: clamp(1rem, 0.95rem + 0.3vw, 1.15rem);
   margin: 0;
+  overflow-wrap: anywhere;
 }
 .card-wall-status {
   align-self: flex-start;
@@ -175,6 +183,7 @@ $navbar-light-toggler-border-color: rgba(250, 251, 252, 0.4);
   display: flex;
   flex-wrap: wrap;
   gap: 0.3rem;
+  min-width: 0;
 }
 .card-wall-tag {
   border: 1px solid #ced4da;
@@ -183,8 +192,11 @@ $navbar-light-toggler-border-color: rgba(250, 251, 252, 0.4);
   font-size: 0.8rem;
   padding: 0 0.4em;
   cursor: pointer;
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
 }
-@media (max-width: 420px) {
+@media (max-width: 576px) {
   .card-wall {
     grid-template-columns: 1fr;
   }
