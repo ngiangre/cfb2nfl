@@ -35,8 +35,9 @@ and registered tags, glossary terms, follow-ups linked to a question or a featur
 thumbnail that is present and fresh, an interactive figure, the release
 date drawn in, data read from \code{cfb2nfl.duckdb}, figure text with no typed
 numbers or column names, captioned tables with reader-facing headers, no
-narrative prose, no redefined shared helper, and no em dashes or pie
-charts. A newer data release than the thumbnail's is a \code{note}; everything
+narrative prose, no redefined shared helper, the footer chunk printed as
+markdown, no stock palette that reuses the outcome colours, and no em
+dashes or pie charts. A newer data release than the thumbnail's is a \code{note}; everything
 else is an \code{error}.
 }
 \keyword{internal}

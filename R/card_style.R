@@ -200,8 +200,9 @@ figure_text <- function(
 #' thumbnail that is present and fresh, an interactive figure, the release
 #' date drawn in, data read from `cfb2nfl.duckdb`, figure text with no typed
 #' numbers or column names, captioned tables with reader-facing headers, no
-#' narrative prose, no redefined shared helper, and no em dashes or pie
-#' charts. A newer data release than the thumbnail's is a `note`; everything
+#' narrative prose, no redefined shared helper, the footer chunk printed as
+#' markdown, no stock palette that reuses the outcome colours, and no em
+#' dashes or pie charts. A newer data release than the thumbnail's is a `note`; everything
 #' else is an `error`.
 #'
 #' @param path Path to a card `.qmd` file.
@@ -382,6 +383,16 @@ check_card_style <- function(
         i
       )
     }
+    # Viridis and the qualitative ColorBrewer sets reuse drafted green,
+    # undrafted purple or quarterback orange; sequential sets are fine.
+    stock <- "viridis|scale_(colour|color|fill)_brewer\\([^)]*(Dark2|Paired|Set1|Set2|Set3|Accent|Pastel1|Pastel2)"
+    if (grepl(stock, code[k])) {
+      flag(
+        "palette",
+        "Stock palette that reuses the outcome colours; use position_palette(), the team scales or greys.",
+        i
+      )
+    }
     if (grepl("coord_polar|\\bpie\\(", code[k])) {
       flag("pie_chart", "No pie charts; use ordered horizontal bars.", i)
     }
@@ -417,6 +428,24 @@ check_card_style <- function(
         "Figure or table text shows a column name; use a reader-facing label."
       )
     }
+  }
+
+  # ---- Footer ----
+  # card_footer() returns markdown, so its chunk must print it as is.
+  starts <- which(body & grepl("^\\s*```+\\s*\\{r", lines))
+  footer_ok <- FALSE
+  for (st in starts) {
+    end <- st + which(grepl("^\\s*```+\\s*$", lines[-seq_len(st)]))[1]
+    chunk <- lines[st:end]
+    if (any(grepl("card_footer(", chunk, fixed = TRUE))) {
+      footer_ok <- any(grepl("^#\\|\\s*output:\\s*asis", chunk))
+    }
+  }
+  if (!footer_ok) {
+    flag(
+      "footer",
+      "End with the template's footer chunk: `#| output: asis` and `cat(card_footer())`."
+    )
   }
 
   # ---- Text ----

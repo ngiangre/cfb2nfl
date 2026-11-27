@@ -1,5 +1,10 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Investigations (feature F25): **the card check catches two more slips**:
+  a footer chunk that would print the glossary as raw text instead of
+  markdown, and stock palettes (viridis, the qualitative ColorBrewer sets)
+  that reuse the drafted, undrafted or quarterback colours.
+
 - Investigations (feature F25): **the figure wall's tiles resize with the
   screen** instead of holding a fixed width, so on a phone they fit one
   column without overflowing; thumbnails keep their own proportions, and
