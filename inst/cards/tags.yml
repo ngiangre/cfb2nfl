@@ -47,3 +47,8 @@ Figure:
   - Map
   - Distribution
   - Flow chart
+# ---- batch programs ----
+# Team-level cards (a school or a school-season, not a player).
+Unit:
+  - Schools
+  - Team-seasons

@@ -1,0 +1,158 @@
+---
+title: "When did FBS schools change conference?"
+image: card-thumbs/fbs-realignment-waves.png
+image-alt: "Column chart of FBS conference changes in each season from 2011 to 2025, with the two waves in dark grey: the 2011 to 2014 wave peaks at 23 changes in 2013, and the 2023 to 2024 wave at 14 in 2024. Most seasons between the waves show one to three changes."
+categories: ["Topic: Programs and conferences", "Position: All positions", "Unit: Team-seasons", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [realignment, conference, division, tier, power-tier, group-of-5-tier, fcs-and-below, team-season]
+followups:
+  - text: "Which schools produce draftees above expectation, by position, once each school is credited to its conference?"
+    link: "F09"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+tier_order <- c("Power", "Group of 5", "FCS and below")
+tier_colors <- c(
+  "Power" = "#1d4ed8",
+  "Group of 5" = "#f59e0b",
+  "FCS and below" = "#6b7280"
+)
+# The last complete season; the 2026 season is still being played.
+last_season <- 2025L
+played <- tbl(con, "team_season") |>
+  filter(games_played > 0, season <= last_season) |>
+  collect() |>
+  mutate(tier_label = factor(tier_label, levels = tier_order))
+# FBS schools, with the Pac-10 rename handled by realignment_moves().
+fbs <- filter(played, classification == "fbs")
+moves <- realignment_moves(fbs)
+```
+
+```{r}
+#| label: figure
+moves_n <- moves |>
+  count(season, name = "moves") |>
+  tidyr::complete(season = 2011:last_season, fill = list(moves = 0L)) |>
+  mutate(wave = season %in% c(2011:2014, 2023:2024))
+peak1 <- moves_n$moves[moves_n$season == 2013L]
+peak2 <- moves_n$moves[moves_n$season == 2024L]
+p <- ggplot(moves_n, aes(season, moves, fill = wave)) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(season, ": ", moves, " conference changes"),
+      data_id = season
+    ),
+    width = 0.8
+  ) +
+  scale_fill_manual(
+    values = c(`TRUE` = "#374151", `FALSE` = "grey65"),
+    guide = "none"
+  ) +
+  scale_x_continuous(breaks = seq(2011, last_season, 2)) +
+  labs(
+    title = "FBS conference changes by season",
+    subtitle = "Schools that changed conference or went independent; the two waves in dark",
+    x = "Season",
+    y = "Conference changes",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "fbs-realignment-waves", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: table
+teams_by_tier <- count(played, season, tier_label, name = "teams")
+conf_by_tier <- played |>
+  filter(conference != "FBS Independents" | is.na(conference)) |>
+  group_by(season, tier_label) |>
+  summarise(conferences = n_distinct(conference), .groups = "drop")
+sel <- c(2010L, 2012L, 2013L, 2014L, 2023L, 2024L, 2025L)
+teams_by_tier |>
+  left_join(conf_by_tier, by = c("season", "tier_label")) |>
+  filter(season %in% sel) |>
+  tidyr::pivot_wider(
+    names_from = tier_label,
+    values_from = c(teams, conferences)
+  ) |>
+  left_join(count(moves, season, name = "moved"), by = "season") |>
+  transmute(
+    Season = season,
+    `Power teams` = teams_Power,
+    `Power conferences` = conferences_Power,
+    `Group of 5 teams` = `teams_Group of 5`,
+    `Group of 5 conferences` = `conferences_Group of 5`,
+    `FCS and below teams` = fmt(`teams_FCS and below`),
+    `FBS conference changes` = coalesce(moved, 0L)
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Season", "Power teams", "Power conferences", "Group of 5 teams",
+      "Group of 5 conferences", "FCS and below teams", "FBS conference changes"
+    ),
+    caption = "Teams that played at least one recorded game, and the conferences they played in, by tier, in seasons around the two waves. Conference counts leave out the FBS independents; conference changes include moves into and out of independence. FCS-and-below team counts jump in 2021 and 2022 as more Division II and III games enter the data."
+  )
+```
+
+```{r}
+#| label: movers
+movers <- fbs |>
+  filter(team %in% moves$team) |>
+  left_join(
+    summarise(group_by(moves, team), first_move = min(season)),
+    by = "team"
+  )
+p_movers <- ggplot(
+  movers,
+  aes(season, reorder(team, -first_move), fill = tier_label)
+) +
+  geom_tile_interactive(
+    aes(
+      tooltip = paste0(team, ", ", season, ": ", conference, " (", tier_label, ")"),
+      data_id = team
+    ),
+    color = "white"
+  ) +
+  scale_fill_manual(values = tier_colors, name = NULL) +
+  scale_x_continuous(breaks = seq(2010, last_season, 3)) +
+  labs(
+    x = "Season",
+    y = NULL,
+    title = "Every FBS school that changed conference",
+    subtitle = "Ordered by first move, earliest at the top; hover a tile for the conference",
+    caption = "Gaps are seasons a school played outside FBS or played no games."
+  ) +
+  theme_cfb2nfl(base_size = 12)
+card_interactive(p_movers)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
