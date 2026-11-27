@@ -292,7 +292,7 @@ all of it. Years 2010–2026.
   consumer needs a test with a lazy input (`as_lazy()` in
   `tests/testthat/helper-lazy.R`). Don't push row filters into Arrow where
   order matters (dataset query order is not guaranteed). Keep the lazy
-  format off any target a post `tar_read()`s; a non-interactive `tar_read()`
+  format off any target a card or post `tar_read()`s; a non-interactive `tar_read()`
   of a lazy target needs `TAR_ASK=false`.
 - **Lineage/audit** (decision 0005): `audit_step()` emits a uniform per-step
   record (row/col counts, rows dropped, key coverage, NA cells, schema hash,
@@ -369,10 +369,10 @@ all of it. Years 2010–2026.
   be added to the `duckdb_file` table list and to `inst/data-model.md`.
 - **Keep the data model lean** (decision 0041). A new *derived* table starts
   in the investigation that needs it: write and test the `build_*()` function
-  in `R/`, then call it in the post on the tables it already loads. Promote it
+  in `R/`, then call it in the card on the tables it already loads. Promote it
   to the data model (target + contract + audit row + `inst/dict` + DuckDB +
-  `data-model.md`) only once a **second** post needs it or another table is
-  built from it. Complex logic used by one post can be a contract-checked
+  `data-model.md`) only once a **second** card needs it or another table is
+  built from it. Complex logic used by one card can be a contract-checked
   target read with `tar_read()` but kept out of the DuckDB. Currently on the
   fly: `flag_redshirt()`, `career_end_status()`, `build_season_arcs()`,
   `build_game_production()`, `build_player_season_stats()`, `absence_runs()`,
