@@ -1,0 +1,179 @@
+---
+title: "Which schools produced the most draftees above or below what their record predicts?"
+image: card-thumbs/over-under-producers.png
+image-alt: "Diverging bar chart of the five Power and five Group of 5 schools furthest above and below their expected draftees. Florida and LSU lead the Power schools above expectation and Oklahoma State is furthest below; Cincinnati leads the Group of 5, and Army, Navy and Air Force sit among the furthest below."
+categories: ["Topic: Programs and conferences", "Position: All positions", "Population: Draft-eligible players", "Unit: Schools", "Figure: Bar chart", "Question: What matters for going pro"]
+status: investigation
+graduated_to: null
+terms: [win-pct, tier, power-tier, group-of-5-tier, eligible-player, expected-draftees, draftees-above-expected]
+followups:
+  - text: "Do draftees from programs that produce above expectation also last longer in the NFL?"
+    link: "Question: NFL careers"
+  - text: "Do schools that win more produce more draftees at each position, once players are weighted by position?"
+    link: "F09"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+first_record <- 2010L
+first_season <- 2013L
+last_season <- 2025L # the 2026 season is still being played
+fbs_seasons <- tbl(con, "team_season") |>
+  filter(
+    classification == "fbs",
+    season >= first_record,
+    season <= last_season
+  ) |>
+  collect()
+credited <- tbl(con, "team_draft") |>
+  filter(
+    season >= first_season,
+    season <= last_season,
+    tier_label != "FCS and below"
+  ) |>
+  collect()
+teams <- tbl(con, "teams") |> collect()
+team_colors <- team_color_values(teams)
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
+
+```{r}
+#| label: compute
+#| output: false
+school <- school_record(fbs_seasons, credited)
+ranked <- school |>
+  group_by(tier) |>
+  arrange(desc(above), .by_group = TRUE) |>
+  mutate(rank_over = row_number(), rank_under = rev(row_number())) |>
+  ungroup()
+over <- filter(ranked, rank_over <= 5L)
+under <- filter(ranked, rank_under <= 5L)
+# The schools the card names: the top two Power schools above and below,
+# the top Group of 5 school, and the three service academies.
+top_power <- filter(over, tier == "Power")$team[1:2]
+bottom_power <- filter(under, tier == "Power")$team[1:2]
+top_g5 <- filter(over, tier == "Group of 5")$team[1]
+academies <- c("Army", "Navy", "Air Force")
+named <- c(top_power, bottom_power, top_g5, academies)
+school$tip <- paste0(
+  school$team,
+  " (",
+  school$tier,
+  ")\nRecord 2010 to 2025: ",
+  school$record_label,
+  "; ",
+  school$drafted,
+  " drafted of ",
+  school$eligible,
+  " eligible; ",
+  sprintf("%.1f", school$expected),
+  " expected"
+)
+```
+
+```{r}
+#| label: figure
+bars <- bind_rows(over, under) |>
+  left_join(select(school, team, tier, tip), by = c("team", "tier")) |>
+  mutate(
+    key = paste(tier, team, sep = "___"),
+    shade = if_else(team %in% named, team, "Other")
+  )
+p <- ggplot(bars, aes(above, reorder(key, above), fill = shade)) +
+  geom_col_interactive(
+    aes(tooltip = tip, data_id = team),
+    width = 0.75
+  ) +
+  geom_vline(xintercept = 0, color = "#111827", linewidth = 0.8) +
+  facet_wrap(~tier, scales = "free_y", ncol = 1) +
+  scale_y_discrete(labels = function(x) sub(".*___", "", x)) +
+  scale_x_continuous(expand = expansion(mult = c(0.08, 0.08))) +
+  scale_fill_manual(
+    values = c(team_colors[intersect(named, names(team_colors))], Other = "#9ca3af"),
+    guide = "none"
+  ) +
+  labs(
+    x = "Drafted minus expected for the record",
+    y = NULL,
+    title = "Florida and LSU lead the Power schools above expectation",
+    subtitle = "Five furthest over and under in each tier; the named schools in team colors",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "over-under-producers", release = release, height = 8)
+card_interactive(p, width_svg = 13, height_svg = 9)
+```
+
+```{r}
+#| label: explore
+p_explore <- ggplot(school, aes(expected, drafted)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "#6b7280") +
+  geom_point_interactive(
+    aes(fill = team, tooltip = tip, data_id = team),
+    shape = 21,
+    size = 4.2,
+    color = "white",
+    stroke = 0.6
+  ) +
+  facet_wrap(~tier, scales = "free") +
+  scale_fill_team(teams, guide = "none") +
+  labs(
+    x = "Expected draftees for the record",
+    y = "Drafted",
+    title = "Every school's draftees against its record's prediction",
+    subtitle = "Above the dashed line: more draftees than expected; hover a dot for counts",
+    caption = card_caption(release)
+  ) +
+  theme_cfb2nfl()
+card_interactive(p_explore, width_svg = 13, height_svg = 8)
+```
+
+```{r}
+#| label: table
+bind_rows(over, under) |>
+  arrange(tier, desc(above)) |>
+  transmute(
+    Tier = tier,
+    School = team,
+    `Record 2010 to 2025` = record_label,
+    `Win %` = sprintf("%.1f%%", 100 * win_pct),
+    `Eligible players` = eligible,
+    Drafted = drafted,
+    Expected = sprintf("%.1f", expected),
+    `Drafted minus expected` = sprintf("%+.1f", above)
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Tier", "School", "Record 2010 to 2025", "Win %", "Eligible players",
+      "Drafted", "Expected", "Drafted minus expected"
+    ),
+    caption = "The five schools in each tier with the most draftees above and below the number expected for their record, final seasons 2013 to 2025. Expected draftees come from the tier's win curve applied to the school's eligible players."
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+```
