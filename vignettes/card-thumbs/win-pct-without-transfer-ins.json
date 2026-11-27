@@ -1,7 +1,7 @@
 {
   "id": "win-pct-without-transfer-ins",
   "release": "2026-11-25",
-  "code_hash": "a7c2c93014760101a9b8f741415f2f6c",
+  "code_hash": "5d588146d64962003bd93a572138b1a2",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
     "exit_cohort": "cc895a42f01bef1679dc27df982bdd70",

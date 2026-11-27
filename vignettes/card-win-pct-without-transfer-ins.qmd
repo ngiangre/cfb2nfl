@@ -186,7 +186,7 @@ p <- ggplot(r_bars, aes(r, tier, fill = version)) +
   labs(
     x = "Correlation of win % with draft rate (r)",
     y = NULL,
-    title = "Dropping transfer-ins leaves both correlations almost where they were",
+    title = "Correlation of win % with draft rate, with and without transfer-ins",
     subtitle = "Dark bars: all eligible players; grey bars: transfer-ins left out",
     caption = card_caption(release)
   ) +

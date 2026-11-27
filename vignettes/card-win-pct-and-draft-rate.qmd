@@ -140,7 +140,7 @@ p <- ggplot(school, aes(win_pct, draft_rate, color = tier)) +
   labs(
     x = "Win % (FBS seasons 2010 to 2025)",
     y = "Draft rate",
-    title = "Draft rate rises with win % in both tiers",
+    title = "Draft rate against win %, by tier",
     subtitle = "Each dot is a school; lines are each tier's fitted curve",
     caption = card_caption(release)
   ) +
