@@ -223,3 +223,15 @@ draftees-above-expected:
 adjusted-rate:
   label: Adjusted rate
   definition: "A school's draft rate pulled toward its group's average, more strongly the fewer eligible players it has, so a small sample cannot top a ranking by luck."
+win-pct:
+  label: Win %
+  definition: "Wins divided by completed games over a school's FBS seasons from 2010 to 2025, bowls and playoffs included. A school that wins six of every ten games has a win % of 60%."
+correlation:
+  label: Correlation (r)
+  definition: "How closely two numbers rise and fall together across schools: 0 means no relationship, 1 means the schools sit on a perfect rising line, and negative values mean one falls as the other rises."
+sp-plus:
+  label: SP+
+  definition: "A rating of how strong a team was in a season that adjusts each game for the opponent's strength, so a win over a strong team counts for more than a win over a weak one. Higher is better; a school's SP+ here is its average over its FBS seasons from 2010 to 2025."
+transfer-in:
+  label: Transfer-in
+  definition: "An eligible player who was on a different school's roster in an earlier season before finishing at the school that gets the credit."

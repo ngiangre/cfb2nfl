@@ -147,3 +147,56 @@ tier_palette <- function() {
     "FCS and below" = "#6b7280"
   )
 }
+
+#' One row per FBS school: record, draft rate and expected draftees
+#'
+#' The school table behind the winning-and-draftees cards. A school's tier is
+#' the one it held in most of its FBS seasons; its record covers all of those
+#' seasons, and its draft counts come from `credited` (final seasons).
+#'
+#' @param fbs_seasons FBS team-seasons with `team`, `season`, `tier_label`,
+#'   `games_played`, `wins`, `losses` and `sp_overall`.
+#' @param credited Credited draft rows with `team`, `n_eligible`, `n_drafted`.
+#' @param tier_levels The tiers to keep, in order; schools in other tiers drop out.
+#' @return One row per school: `eligible`, `drafted`, `draft_rate`, `wins`,
+#'   `losses`, `games`, `win_pct`, `record_label`, `sp` (average SP+), `tier`,
+#'   and the expected draftees from a per-tier win curve ([expected_draftees()]).
+#' @export
+school_record <- function(
+  fbs_seasons,
+  credited,
+  tier_levels = c("Power", "Group of 5")
+) {
+  record <- fbs_seasons |>
+    dplyr::group_by(.data$team) |>
+    dplyr::summarise(
+      games = sum(.data$games_played),
+      wins = sum(.data$wins),
+      losses = sum(.data$losses),
+      sp = mean(.data$sp_overall, na.rm = TRUE),
+      .groups = "drop"
+    ) |>
+    dplyr::mutate(
+      win_pct = .data$wins / .data$games,
+      record_label = paste0(.data$wins, "-", .data$losses)
+    )
+  school_tier <- fbs_seasons |>
+    dplyr::count(.data$team, .data$tier_label) |>
+    dplyr::group_by(.data$team) |>
+    dplyr::slice_max(.data$n, n = 1, with_ties = FALSE) |>
+    dplyr::ungroup() |>
+    dplyr::select("team", tier = "tier_label")
+  d <- credited |>
+    dplyr::group_by(.data$team) |>
+    dplyr::summarise(
+      eligible = sum(.data$n_eligible),
+      drafted = sum(.data$n_drafted),
+      .groups = "drop"
+    ) |>
+    dplyr::mutate(draft_rate = .data$drafted / .data$eligible) |>
+    dplyr::inner_join(record, by = "team") |>
+    dplyr::inner_join(school_tier, by = "team") |>
+    dplyr::filter(.data$tier %in% tier_levels) |>
+    dplyr::mutate(tier = factor(.data$tier, levels = tier_levels))
+  expected_draftees(d, "win_pct")
+}

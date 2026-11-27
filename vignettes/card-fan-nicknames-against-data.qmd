@@ -1,0 +1,230 @@
+---
+title: "Do fan nicknames for position schools match the schools that produce the most draftees?"
+image: card-thumbs/fan-nicknames-against-data.png
+image-alt: "Horizontal bar chart of six fan nicknames, each showing the rank of the school that claims it among FBS schools at that position by draftees above expected. WRU ranks first, Tight End U and DBU fifth, shown in dark as the top five; Tailback U and Linebacker U rank 22nd and QBU 36th."
+categories: ["Topic: Programs and conferences", "Position: By position group", "Population: Draft-eligible players", "Unit: Schools", "Figure: Bar chart", "Question: Draft chance by position"]
+status: investigation
+graduated_to: null
+terms: [position-group, eligible-player, draft-rate, expected-draftees, draftees-above-expected, draft-day-school]
+followups:
+  - text: "Do schools that win more produce more draftees at each position, once players are weighted by position?"
+    link: "F09"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+first_season <- 2013L
+last_season <- 2025L # the 2026 season is still being played
+credited <- tbl(con, "team_draft") |>
+  filter(season >= first_season, season <= last_season) |>
+  collect()
+teams <- tbl(con, "teams") |> collect()
+team_colors <- team_color_values(teams)
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
+
+```{r}
+#| label: compute
+#| output: false
+# Each school's draftees against the FBS-wide draft rate at each position,
+# ranked among the FBS schools with an eligible player there.
+fbs_pos <- credited |>
+  filter(
+    tier_label != "FCS and below",
+    position_group != "Position not recorded"
+  )
+pos_rate <- draft_rates(group_by(fbs_pos, position_group)) |>
+  select(position_group, pos_rate = draft_rate)
+school_pos <- fbs_pos |>
+  group_by(team, position_group) |>
+  summarise(
+    eligible = sum(n_eligible),
+    drafted = sum(n_drafted),
+    .groups = "drop"
+  ) |>
+  left_join(pos_rate, by = "position_group") |>
+  mutate(expected = eligible * pos_rate, above = drafted - expected) |>
+  group_by(position_group) |>
+  mutate(rank = rank(-above, ties.method = "min"), n_schools = n()) |>
+  ungroup()
+pos_top <- school_pos |>
+  filter(rank == 1L) |>
+  arrange(position_group)
+# Fan nicknames and the school that claims each one (school names, not ids).
+nicknames <- tibble::tribble(
+  ~nickname      , ~position_group   , ~claimant    ,
+  "DBU"          , "Defensive back"  , "LSU"        ,
+  "Linebacker U" , "Linebacker"      , "Penn State" ,
+  "WRU"          , "Receiver"        , "LSU"        ,
+  "Tailback U"   , "Running back"    , "USC"        ,
+  "QBU"          , "Quarterback"     , "BYU"        ,
+  "Tight End U"  , "Tight end"       , "Iowa"
+) |>
+  left_join(
+    select(
+      school_pos,
+      claimant = team, position_group, eligible, drafted, above, rank, n_schools
+    ),
+    by = c("claimant", "position_group")
+  ) |>
+  left_join(
+    select(pos_top, position_group, leader = team, leader_drafted = drafted),
+    by = "position_group"
+  ) |>
+  mutate(top5 = rank <= 5L)
+n_top5 <- sum(nicknames$top5)
+n_bama_leads <- sum(pos_top$team == "Alabama")
+```
+
+```{r}
+#| label: figure
+p <- ggplot(nicknames, aes(rank, reorder(nickname, -rank), fill = top5)) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(
+        nickname,
+        ": ",
+        claimant,
+        " ranks ",
+        rank,
+        " of ",
+        n_schools,
+        " at ",
+        tolower(position_group),
+        " (",
+        drafted,
+        " drafted of ",
+        eligible,
+        " eligible)"
+      ),
+      data_id = nickname
+    ),
+    width = 0.7
+  ) +
+  geom_vline(xintercept = 5.5, linetype = "dashed", color = "grey40") +
+  scale_fill_manual(
+    values = c(`TRUE` = "#374151", `FALSE` = "grey65"),
+    guide = "none"
+  ) +
+  scale_x_continuous(breaks = c(1, 5, 10, 15, 20), expand = expansion(mult = c(0, 0.05))) +
+  labs(
+    title = "Fan nicknames against the producing schools",
+    subtitle = "Rank of the claiming school at its position; dark bars are the top five",
+    x = "Rank at the position (1 is the most)",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "fan-nicknames-against-data", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: table
+nicknames |>
+  transmute(
+    Nickname = nickname,
+    Position = position_group,
+    `Claiming school` = claimant,
+    `Its draftees (eligible)` = paste0(drafted, " (", eligible, ")"),
+    `Its above expected` = fmt(above, 1),
+    `Its rank` = paste0(rank, " of ", n_schools),
+    `In the top five` = if_else(top5, "Yes", "No"),
+    `Data leader` = leader,
+    `Leader's draftees` = leader_drafted
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Nickname", "Position", "Claiming school", "Its draftees (eligible)",
+      "Its above expected", "Its rank", "In the top five", "Data leader",
+      "Leader's draftees"
+    ),
+    caption = "Fan nicknames for position schools against the data, final seasons 2013 to 2025. Schools are ranked among the FBS schools with an eligible player at the position, by draftees above expected (drafted minus the FBS-wide rate for the position times the school's eligible players there). The data leader is the top-ranked school at that position."
+  )
+```
+
+```{r}
+#| label: by-position
+#| fig-height: 11
+# The top five schools at each position, with the claimant added where it
+# falls outside them, so every nickname can be checked against its position.
+bars <- school_pos |>
+  left_join(
+    select(nicknames, position_group, claimant, nickname),
+    by = "position_group"
+  ) |>
+  filter(rank <= 5L | (!is.na(claimant) & team == claimant)) |>
+  mutate(
+    is_claim = !is.na(claimant) & team == claimant,
+    label = if_else(rank > 5L, paste0(team, " (#", rank, ")"), team),
+    key = paste(position_group, label, sep = "___")
+  )
+p_pos <- ggplot(
+  bars,
+  aes(above, reorder(key, above), fill = if_else(is_claim, team, "Other"))
+) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(
+        team,
+        ", ",
+        tolower(position_group),
+        ": ",
+        drafted,
+        " drafted of ",
+        eligible,
+        " eligible, ",
+        fmt(above, 1),
+        " above expected (rank ",
+        rank,
+        ")",
+        if_else(is_claim, paste0("\nClaims the nickname ", nickname), "")
+      ),
+      data_id = paste(team, position_group)
+    ),
+    width = 0.75
+  ) +
+  facet_wrap(~position_group, scales = "free_y", ncol = 3) +
+  scale_y_discrete(labels = function(x) sub(".*___", "", x)) +
+  scale_fill_manual(
+    values = c(team_colors, Other = "#9ca3af"),
+    guide = "none"
+  ) +
+  labs(
+    x = "Draftees above expected",
+    y = NULL,
+    title = "The top five schools at each position",
+    subtitle = "Ties included; in team colors, the school that claims the position's nickname",
+    caption = card_caption(release)
+  ) +
+  theme_cfb2nfl(base_size = 13)
+card_interactive(p_pos, width_svg = 13, height_svg = 11)
+
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+```

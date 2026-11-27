@@ -87,3 +87,36 @@ test_that("tier_palette names the three tiers and gives each a distinct colour",
   expect_equal(length(unique(pal)), 3L)
   expect_true(all(grepl("^#[0-9a-f]{6}$", pal)))
 })
+
+test_that("school_record builds one row per school with record, tier and expected draftees", {
+  set.seed(2)
+  schools <- paste0("S", 1:12)
+  tiers <- rep(c("Power", "Group of 5"), each = 6)
+  seasons <- tidyr::expand_grid(team = schools, season = 2010:2011) |>
+    dplyr::mutate(
+      tier_label = tiers[match(team, schools)],
+      classification = "fbs",
+      games_played = 12L,
+      wins = sample(3:10, dplyr::n(), replace = TRUE),
+      losses = 12L - wins,
+      sp_overall = runif(dplyr::n(), -5, 20)
+    )
+  credited <- tibble::tibble(
+    team = schools,
+    n_eligible = sample(5:30, 12, replace = TRUE)
+  )
+  credited$n_drafted <- rbinom(12, credited$n_eligible, 0.2)
+  out <- school_record(seasons, credited)
+  expect_equal(nrow(out), 12L)
+  expect_equal(levels(out$tier), c("Power", "Group of 5"))
+  expect_equal(out$wins + out$losses, out$games)
+  expect_true(all(out$record_label == paste0(out$wins, "-", out$losses)))
+  for (t in levels(out$tier)) {
+    i <- out$tier == t
+    expect_equal(sum(out$expected[i]), sum(out$drafted[i]), tolerance = 1e-6)
+  }
+  # a school whose only seasons are in FCS is not in the table
+  fcs <- seasons
+  fcs$tier_label[fcs$team == "S1"] <- "FCS and below"
+  expect_false("S1" %in% school_record(fcs, credited)$team)
+})
