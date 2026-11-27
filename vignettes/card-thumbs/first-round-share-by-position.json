@@ -1,0 +1,13 @@
+{
+  "id": "first-round-share-by-position",
+  "release": "2026-11-25",
+  "code_hash": "42a93094a26bb429ca95a1a494c9f6cd",
+  "functions": {
+    "add_position_group": "1da282ac9bc54c33518bf49d6a53a8d8",
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "eligible_risk_set": "454454253743138b58529b8ff72e9fa8",
+    "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

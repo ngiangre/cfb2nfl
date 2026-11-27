@@ -1,0 +1,16 @@
+{
+  "id": "outcome-ledger",
+  "release": "2026-11-25",
+  "code_hash": "6fd0e9cd262b3127184bf0350a277834",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "eligible_risk_set": "454454253743138b58529b8ff72e9fa8",
+    "fmt": "d4c89f195c447af907ba425a860522de",
+    "outcome_ledger": "a2b8f7c8fe83ab8a7e1dbe0ef2974e88",
+    "pct": "3413c026fc8c907293b2fb1d96080440",
+    "plot_outcome_ledger": "66257df026fd0724b09d506b8aab86bb",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b",
+    "wilson": "65af8ccc8d3f2b6cdd25b54bc520f7d4"
+  }
+}

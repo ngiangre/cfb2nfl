@@ -204,88 +204,66 @@ all of it. Years 2010–2026.
 - **Plans:** multi-session work plans live in `plans/*.md` (e.g.
   `plans/explore-questions.md` — the question-driven Explore revision).
   `decisions/` is for ratified choices only.
-- **Blog style (decision 0025, revised):** posts are written in a research-article
-  register — numbered Introduction / Data / Results / Summary / Discussion,
-  no em dashes anywhere, no rhetorical framing phrases, and no pipeline
-  internals (decision records, cleaning mechanics) in the narrative.
-  **Titles** are one declarative sentence — subject first, then the observed
-  takeaway — never a colon-joined fragment pair ("blah: blah"). Keep `title:`
-  and `%\VignetteIndexEntry{}` in sync.
-  - **Snapshots, not tours.** A post shows particular snapshots of the data for
-    its question, not everything the data contains about a topic. Cut any
-    exhibit that serves completeness rather than the argument.
-  - **A sentence or two per section; exhibits carry the picture.** Each
-    section heading is a numbered **assertion** (`### 3.1 <claim>`, a claim
-    the section demonstrates). The body is **one or two sentences** saying
-    what the exhibits below show and why they are there, and nothing more:
-    any further detail moves into a table, a figure annotation, or a caption.
-    The prose is then followed by its supporting exhibits, in this order:
-    1. **Table, only when it adds a different summary** (`knitr::kable`,
-       captioned): a table earns its place only by showing something the
-       section's figures do not, such as definitions, counts the figures
-       cannot carry, or a reconciliation. Never lead with a table that
-       restates the data a figure below already shows; readers skip it
-       (revised 2026-11-20).
-    2. **Explanatory figure**: makes the section's claim at a glance; the
-       claim's element is highlighted (color, annotation, arrow) and the
-       rest is context.
-    3. **Exploratory figure**: an interactive `ggiraph` view of the same
-       snapshot at finer grain (every category, season, or player behind the
-       claim) with hover tooltips carrying the full detail, so the reader can
-       probe beyond the claim without leaving the question.
-    Data sections need at least the table (they define the data). Every
-    Results section carries both figures unless the claim is a single fact
-    (then one figure), plus a table only under the rule above. A
-    Results section that tests an expectation states it first, italicized,
-    with its verdict emoji (`*Expectation: ...* ✅`), and the one or two
-    sentences follow. The skeleton lives in `vignettes/_post-template.qmd`.
-  - **Flow.** The post must read as one argument from beginning to end: each
-    section's assertion should follow from the previous section's exhibits, so
-    a reader can reconstruct the takeaway from headings and exhibits alone.
-  - Code chunks back every exhibit, and **every number in the prose is an
-    inline variable** (`` `r x` ``) computed from the database, never a
-    hardcoded literal — so a data refresh flows through instead of silently
-    rotting. Do **not** use `stopifnot()` pins in posts (removed 2026-11-06,
-    decision 0040): keep prose minimal and let inline variables carry the
-    values. Start from `vignettes/_post-template.qmd`; every dated post follows
-    this format (revised 2026-11-06).
-- **Vignette writing critiques (user review of the 2026-10-24 outcome
-  prevalence post, applied going forward):**
-  - Define every variable and term in the narrative (person-season, eligible
-    season, round groups, status categories, hazard); readers do not know
-    column names like `outcome_drafted_d` or codes like `r2_3`. Display
-    reader-facing labels, not raw column values, in figures and tables.
-  - **Setup and loading code must be visible so the post is reproducible**
-    (changed 2026-11-06, decision 0040): do not hide loading chunks with
-    `include: false`. Show the code (the default `echo`) and instead suppress
-    only the noise — `message: false`/`warning: false` on the setup chunk, and
-    `output: false` on setup/load/compute chunks so their code shows but
-    nothing prints. The reader can see exactly how every exhibit is produced
-    from the database.
-  - **One setup chunk before the Introduction** (2026-11-07): everything the
-    post computes up front (packages, data connection, figure defaults, the
-    named-player registry, table loads, numbers quoted in the prose) lives in
-    a single `setup` chunk, split into sections by `# ---- <section> ----`
-    comment rules, so the page shows one collapsed "Code" fold, not a stack.
-  - Render every vector/data-frame output with `knitr::kable` (with a
-    caption), never a bare tibble print.
-  - Introduce any statistical machinery in plain language before use (e.g.
-    "a confidence interval is the range the true rate plausibly occupies"),
-    naming the method (Wilson) only after the concept.
-  - No pie charts; use ordered horizontal `geom_col_interactive` bars.
-  - Avoid authoritative over-interpretation ("the failure is structural");
-    state what happened and the mechanism as explanation, not verdict.
-  - Verdict emojis (✅ holds / ❌ does not hold) are welcome after each
-    expectation statement, used sparingly and only there.
-  - Write for fans who love the game and want the answers: deductive framing
-    ("out of every 100 eligible seasons ...") and named player examples
-    (prefer the recurring cast of earlier vignettes: Burrow, Cam Ward, Jordan
-    Travis, Buechele, Kyle Allen), with example facts carried by inline
-    variables computed from the data (not hardcoded).
-  - Discussion is callouts (`callout-important`) plus a short caveats
-    paragraph, not prose blocks.
-  - **Authorship:** vignette `author:` is "AI directed by Nick Giangreco"
-    unless the user says otherwise.
+- **Figure cards (decision 0054; supersedes the dated-post rules of 0015
+  and 0025):** Investigations are cards, one question answered by one
+  figure, one file `vignettes/card-<id>.qmd`. No new dated posts; the
+  remaining ones are migrated in batches (`inst/cards/migration.yml`).
+  - **Start** with `new_card("<id>", "<question>?")` from
+    `vignettes/_card-template.qmd`. The id is the permanent URL: renaming a
+    published card needs an `aliases:` entry on its replacement.
+  - **Front matter is the registry:** `title` (a fan's question ending in
+    `?`), `image`, `image-alt` (what the figure shows, in words; search reads
+    it), `categories`, `status` (`sketch` / `investigation` / `graduated`),
+    `graduated_to`, `terms`, `followups` (each with a `link:` to a
+    `Question: <tag>` or a feature id).
+  - **No narrative prose.** The page is the visible setup code (decision
+    0040: it reads `cfb2nfl.duckdb`, `message`/`warning`/`output` suppressed,
+    never `include: false`), the figure, any finer-grain figure, a table only
+    when it adds a different summary (`kable` with `caption` and reader-facing
+    `col.names`), and `cat(card_footer())`.
+  - **The figure explains itself.** The title says what is shown and the
+    subtitle who, when and how to read it; highlighting (not words) carries
+    the takeaway. Numbers in figure text are computed, never typed (units in
+    words: "per hundred"). Style with `theme_card()` and `card_caption()`;
+    `card_thumbnail()` saves the tile and `card_interactive()` the page view
+    (`ggiraph` tooltips carrying the full detail).
+  - **One colour per meaning on every card:** drafted green `#1B9E77`,
+    undrafted purple `#7570B3`, quarterbacks orange `#D95F02`, other
+    highlights dark grey, endings without the NFL pale grey
+    (`ending_palette()`); position groups only via `position_palette()` /
+    `scale_colour_position()`. No stock palette that reuses those colours,
+    no pie charts, no em dashes.
+  - **Terms come from the glossary** `inst/cards/terms.yml`: list the keys in
+    `terms:`, and the footer prints them. Define the term there before a
+    figure relies on it; reconcile counts that differ (seasons vs players)
+    with a term rather than prose.
+  - **Tags only from** `inst/cards/tags.yml` and `inst/cards/questions.yml`;
+    a new tag is added there in the PR that uses it. "Position: All
+    positions" for pooled cards, "Position: By position group" for split
+    ones; a question tag only on cards that answer it.
+  - **Render locally and commit the thumbnail** (`vignettes/card-thumbs/<id>.png`
+    and `.json`): the sidecar hashes the card's code and the `R/` functions
+    that shape the figure, and a stale one fails the check. The site build
+    copies `vignettes/` before rendering, so a first render in CI would show
+    no tile.
+  - **Never name a card variable like a data column.** Inside `dplyr` verbs
+    the column wins silently (the pilot computed 68% instead of 51.5% that
+    way); use a distinct name or `.env$`.
+  - **Shared logic lives in `R/`** with tests (`eligible_risk_set()`,
+    `add_position_group()`, `label_endings()`, `route_incidence()`, ...);
+    never redefine `fmt`, `pct`, `wilson`, `and_join` or the theme helpers in
+    a card.
+  - **Graduation** (the user decides, one issue each): the builder moves to
+    `R/` with a test, a destination renders it and links back (Explorer for
+    probing, Analysis "What we know" for a settled answer), and the card
+    records `graduated_to:` and `status: graduated`.
+  - **Fan framing still applies:** prefer the recurring named players keyed
+    on athlete id (`running_cast()`), and do not over-interpret.
+  - **Review (required):** `check_card_style()` runs in the edit hook, CI
+    and the tests; then run the `vignette-reviewer` agent on the cards
+    before the PR and address its findings.
+  - **Authorship:** card pages carry no author line; commits and PRs carry
+    the attribution.
 - **Decision log:** record substantive decisions in `decisions/` (copy
   `TEMPLATE.md`, next number); distill spike-branch findings into an entry.
   Decisions 0004–0006 cover `targets`, the lineage/audit layer, and the site.
@@ -304,6 +282,18 @@ all of it. Years 2010–2026.
   re-clean); `<table>` then reads that cleaned parquet. So **parquet == DuckDB ==
   dict schema** (decision 0018). `conference_tiers` derives from the cleaned
   `player_stats` via `build_conference_tiers()` (`R/conference_tiers.R`).
+- **Lazy large tables** (decision 0053): `plays`, `play_stats`,
+  `game_player_stats`, `nfl_pbp`, `nfl_participation` and `explorer_plays`
+  use `format_arrow_lazy()` (`R/lazy.R`): the target is an
+  `arrow::open_dataset()` handle, stored as a hashed reference to the
+  published parquet (no copy in `_targets/`). **`x$col` on a dataset is
+  `NULL`, not an error**: consumers read through `collect_cols(x, cols)`
+  (file order kept), `distinct_values()` and `n_rows()`, and each new
+  consumer needs a test with a lazy input (`as_lazy()` in
+  `tests/testthat/helper-lazy.R`). Don't push row filters into Arrow where
+  order matters (dataset query order is not guaranteed). Keep the lazy
+  format off any target a card or post `tar_read()`s; a non-interactive `tar_read()`
+  of a lazy target needs `TAR_ASK=false`.
 - **Lineage/audit** (decision 0005): `audit_step()` emits a uniform per-step
   record (row/col counts, rows dropped, key coverage, NA cells, schema hash,
   contract pass/fail, git SHA) → the `audit_log` target. Data dictionaries in
@@ -316,16 +306,15 @@ all of it. Years 2010–2026.
 - **Site** (decision 0006): **`altdoc` owns the site** (`quarto_website`),
   configured in `altdoc/quarto_website.yml`, built to `docs/` via
   `altdoc::render_docs()`. Navigation lives entirely in the top **navbar**
-  (no sidebar): Home, Explore, Blog, Reference on the left; News/License/
+  (no sidebar): Home, Explore, Investigations, Reference on the left; News/License/
   Citation + GitHub on the right (`$ALTDOC_*` placeholders substitute fine in
   navbar, but `$ALTDOC_VIGNETTE_BLOCK`/`$ALTDOC_MAN_BLOCK` only expand in the
   sidebar in altdoc 0.7.3, so the pages are hand-wired instead). Content pages
   are vignettes: `explore.qmd` is a hub of bslib value-card tiles linking to
   `about`, `analysis`, `data`, `explorer` (the Quarto OJS explorer,
   decision 0046, which replaced the old `visualizations` page; that URL
-  redirects via `aliases:`), and `pipeline`; `investigations.qmd` builds a
-  reactable table of all dated posts (`YYYY-MM-DD-*.qmd`) from their YAML at
-  render time; `reference.qmd` builds a searchable reactable of every
+  redirects via `aliases:`), and `pipeline`; `investigations.qmd` is the
+  figure-card wall (see "Investigations page" below); `reference.qmd` builds a searchable reactable of every
   non-internal function linking to `../man/<fn>.html` (75 rendered man pages).
   **The repo is never installed as a package** (decision 0042):
   `DESCRIPTION`/`NAMESPACE` exist so `pkgload`, roxygen and
@@ -353,29 +342,17 @@ all of it. Years 2010–2026.
   apply it everywhere rather than re-theming per plot: `theme_cfb2nfl()`,
   `scale_fill_team()`/`scale_color_team()`, and for card thumbnails
   `theme_card()` with `card_caption()` (feature F25).
-- **Blog posts** (decision 0015): dated files `vignettes/YYYY-MM-DD-slug.qmd`,
-  each YAML carrying `description:` (one declarative sentence stating the
-  finding, not the topic) and `followups:` (list of open questions / next
-  analyses informing later investigations and pipeline work); displayed in the
-  `investigations.qmd` index table and grep-able across `vignettes/`,
-  `freeze: auto` + committed `_freeze/` so they don't rebreak on data refresh
-  while source edits still propagate (`freeze: true` serves the cache even
-  after edits — caused stale deployed titles, fixed 2026-10-24); the `blog`/
-  `reference` index pages' freeze caches are deleted in `site.yaml` because
-  their knit-time reads of other files' YAML are invisible to Quarto's cache
-  check; key on athlete id; start from `vignettes/_post-template.qmd`.
-- **Post review (required).** After drafting or revising a dated post, run the
-  **`vignette-reviewer` agent** (`.claude/agents/vignette-reviewer.md`) on it
-  and address its findings before opening the PR. The agent reads the post in a
-  fresh context, as a fan would; it does not edit. The mechanical rules (front
-  matter, a single setup chunk, section and heading numbering, verdict emojis,
-  kable captions, no em dashes, `stopifnot()`, `include: false` or pie charts)
-  are enforced by `check_post_style()` (`R/post_style.R`). That check runs in
-  the `post-style.yaml` CI job and in `devtools::test()`, and the project
-  `PostToolUse` hook (`.claude/hooks/post-style.sh`) runs it after every edit
-  to a post.
+- **Investigations page** (decision 0054): a Quarto listing over
+  `vignettes/card-*.qmd` with the tile template `vignettes/card-wall.ejs`
+  (tile styles in `altdoc/custom.scss`), search and tag filter
+  (`#category=<tag>` URLs open it filtered); the remaining dated posts are
+  listed in a table below it, built from their YAML at knit time. Pages use
+  `freeze: auto` + committed `_freeze/`; the `investigations` and
+  `reference` freeze caches are deleted in `site.yaml` because their
+  knit-time reads of other files' YAML are invisible to Quarto's cache check.
+  A retired post's URL redirects with `aliases:` on its main card.
 - **CI** (`.github/workflows/`): `check.yaml` (R CMD check + testthat + contract
-  fixtures), `post-style.yaml` (`check_posts_style()` over the dated posts), `site.yaml` (pull data release asset → `tar_make()` → render →
+  fixtures), `post-style.yaml` (`check_cards_style()` over the figure cards), `site.yaml` (pull data release asset → `tar_make()` → render →
   Pages), `data-current.yaml` (scheduled season-scoped refresh: download the
   release → `tar_make()` with `CFB2NFL_REFRESH_SEASONS=current` → publish
   `*.{parquet,duckdb}` via `piggyback` → dispatch `site.yaml`; decision 0034),
@@ -392,10 +369,10 @@ all of it. Years 2010–2026.
   be added to the `duckdb_file` table list and to `inst/data-model.md`.
 - **Keep the data model lean** (decision 0041). A new *derived* table starts
   in the investigation that needs it: write and test the `build_*()` function
-  in `R/`, then call it in the post on the tables it already loads. Promote it
+  in `R/`, then call it in the card on the tables it already loads. Promote it
   to the data model (target + contract + audit row + `inst/dict` + DuckDB +
-  `data-model.md`) only once a **second** post needs it or another table is
-  built from it. Complex logic used by one post can be a contract-checked
+  `data-model.md`) only once a **second** card needs it or another table is
+  built from it. Complex logic used by one card can be a contract-checked
   target read with `tar_read()` but kept out of the DuckDB. Currently on the
   fly: `flag_redshirt()`, `career_end_status()`, `build_season_arcs()`,
   `build_game_production()`, `build_player_season_stats()`, `absence_runs()`,

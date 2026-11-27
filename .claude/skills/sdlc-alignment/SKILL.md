@@ -31,7 +31,7 @@ highest-priority goal with an `accepted` or `idea` feature.
 | 1. Intake | Restate the request as a persona need ("P1 wants to know ..."). Find its feature in `features.md`. | none |
 | 2. Feature | Existing feature: reuse its ID. New capability: add a card (`idea`) under its primary goal, from the template below, and bump "Next free ID". | run **`feature-reviewer`**; status → `accepted` only on "aligned" |
 | 3. Tasks | Open one GitHub issue per task (template below): `Feature: Fnn` in the body, the card's goal labels, the criteria it covers. Then run `sync_feature_tasks()`. | run **`task-reviewer`** on the feature's issues (or the plan) before building |
-| 4. Build | Normal repo workflow (TDD, contracts, `architecture-improver`, `vignette-reviewer` for posts). Status → `in progress`. | none |
+| 4. Build | Normal repo workflow (TDD, contracts, `architecture-improver`, `vignette-reviewer` for figure cards). Status → `in progress`. | none |
 | 5. Finish | Before the PR: run **`task-reviewer`** on the branch diff. PR body says `Feature: Fnn` and `Closes #NN`; the NEWS entry names the feature. After merge, `sync_feature_tasks()`, tick the met criteria, status → `shipped` when all are met. | reviewer verdict "delivers" |
 
 Small fixes (typos, a broken link, a CI repair) skip stages 2–3: put

@@ -52,6 +52,21 @@ player_game_stat_map <- tibble::tribble(
 #'   `pass_cmp` and `pass_att`.
 #' @export
 build_player_game <- function(game_player_stats, games) {
+  game_player_stats <- collect_cols(
+    game_player_stats,
+    c(
+      "playerId",
+      "gameId",
+      "season",
+      "week",
+      "seasonType",
+      "team",
+      "homeAway",
+      "category",
+      "statType",
+      "stat"
+    )
+  )
   meta <- game_player_stats |>
     dplyr::distinct(
       .data$playerId,

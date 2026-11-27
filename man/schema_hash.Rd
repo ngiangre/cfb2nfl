@@ -7,7 +7,8 @@
 schema_hash(data)
 }
 \arguments{
-\item{data}{A data frame.}
+\item{data}{A data frame, or a lazy Arrow table (hashed on the R classes
+its columns collect to, so both give the same hash).}
 }
 \value{
 A short character hash.

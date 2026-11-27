@@ -1,0 +1,17 @@
+# The project's questions (VISION §1), each a "Question: <tag>" a card can
+# carry (feature F25). Status is answered, in progress or not answerable; a
+# question that is not answerable carries a one-line reason, shown on its
+# cards. Filtering the Investigations wall by a question tag shows every card
+# behind it; the status board itself is F21.
+- tag: What matters for going pro
+  question: "What about a player's time in football matters for becoming a pro?"
+  status: in progress
+- tag: Head coach effect
+  question: "Does the head coach matter?"
+  status: in progress
+- tag: Draft chance by position
+  question: "After each season, what is a player's chance of being drafted, by position?"
+  status: in progress
+- tag: NFL careers
+  question: "For players who reach the NFL, what do they go on to do, and how long do they last?"
+  status: in progress

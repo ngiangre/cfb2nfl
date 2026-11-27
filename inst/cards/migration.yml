@@ -1,0 +1,148 @@
+# Migration ledger (feature F25): where every section of each dated post
+# went. `fate` is card (the section's figures became the card), merged (its
+# table or definitions now live on the card named, or in the glossary,
+# inst/cards/terms.yml) or dropped (with the reason). A `card:` listed here
+# is published: check_cards_style() fails if it is renamed or deleted
+# without an `aliases:` entry on its replacement.
+
+# ---- 2026-10-24-outcome-prevalence ----
+- post: 2026-10-24-outcome-prevalence
+  section: "1. Introduction"
+  fate: dropped
+  reason: "Prose; each question it posed is now a card's title, and its expectations are not carried onto cards."
+- post: 2026-10-24-outcome-prevalence
+  section: "2.1 Every eligible season ends in exactly one of five statuses"
+  fate: merged
+  card: end-of-season-status
+  reason: "The five status definitions are glossary terms on every card that uses them."
+- post: 2026-10-24-outcome-prevalence
+  section: "2.2 The risk set counts seasons, while each NFL event falls on one season per player"
+  fate: merged
+  card: outcome-ledger
+  reason: "The season and player counts are the caption of the outcome ledger table; 'eligible seasons with a known outcome' is a glossary term."
+- post: 2026-10-24-outcome-prevalence
+  section: "3.1 About three in every hundred eligible seasons end in a draft selection"
+  fate: card
+  card: outcome-ledger
+  reason: "Figures and the outcome table (with the round split) moved; graduated to the Analysis page."
+- post: 2026-10-24-outcome-prevalence
+  section: "3.2 More NFL entrants arrive undrafted than drafted"
+  fate: card
+  card: nfl-entry-routes
+  reason: "Figures and the running-examples table moved; the routes table restated the figure and was dropped."
+- post: 2026-10-24-outcome-prevalence
+  section: "3.3 Most eligible seasons end with the player coming back, not with an outcome"
+  fate: card
+  card: end-of-season-status
+  reason: "Figures moved; the status table restated the figure and was dropped."
+- post: 2026-10-24-outcome-prevalence
+  section: "3.4 The chance of entry climbs steeply through the third eligible season, then levels off"
+  fate: merged
+  card: nfl-route-chance-by-season
+  reason: "Its per-season curves repeated the career-endings card's (counting seasons rather than players), so the two cards merged: the era split moved to that card's page, its first era now ending with the 2015 class because undrafted signings are recorded from 2016 on. The per-season table and the arrows to Ward's and Travis's draft seasons were dropped."
+- post: 2026-10-24-outcome-prevalence
+  section: "3.5 The drafted share of eligible seasons has fallen across draft classes"
+  fate: card
+  card: drafted-share-by-class
+  reason: "Figures moved; the selected-classes table restated the figure and was dropped."
+- post: 2026-10-24-outcome-prevalence
+  section: "3.6 About half of NFL entrants play no games in their rookie season"
+  fate: card
+  card: rookie-games
+  reason: "Figures moved; the games table restated the figure and was dropped. The card counts only draft classes whose rookie season is complete; the post also counted the class still playing its rookie season, which overstated the no-games share."
+- post: 2026-10-24-outcome-prevalence
+  section: "4. Summary"
+  fate: dropped
+  reason: "The expectation summary served the post; cards carry no expectations."
+- post: 2026-10-24-outcome-prevalence
+  section: "5. Discussion"
+  fate: dropped
+  reason: "Prose; its forecasting points are follow-ups (F17, F19) on the cards."
+
+# ---- 2026-10-24-draft-eligibility-by-position ----
+- post: 2026-10-24-draft-eligibility-by-position
+  section: "1. Introduction"
+  fate: dropped
+  reason: "Prose; each question it posed is now a card's title, and its expectations are not carried onto cards."
+- post: 2026-10-24-draft-eligibility-by-position
+  section: "2.1 Nine position groups stand in for two dozen roster codes"
+  fate: merged
+  card: drafted-rate-by-position
+  reason: "The group-to-code table is the 'position group' glossary term. The cards use position_group(), which also counts the single eligible KR season as special teams (the post left it unrecorded)."
+- post: 2026-10-24-draft-eligibility-by-position
+  section: "2.2 The risk set is every eligible season whose draft outcome is already known"
+  fate: merged
+  card: outcome-ledger
+  reason: "The same risk set as the outcome ledger; its counts are that card's table caption."
+- post: 2026-10-24-draft-eligibility-by-position
+  section: "3.1 Linemen and defensive backs edge the other groups in drafted rate, and quarterbacks sit mid-table"
+  fate: card
+  card: drafted-rate-by-position
+  reason: "Figures moved; the rates table restated the figure and was dropped."
+- post: 2026-10-24-draft-eligibility-by-position
+  section: "3.2 Drafted quarterbacks go in the first round more often than any other group"
+  fate: card
+  card: first-round-share-by-position
+  reason: "Figures moved; the round table restated the figure and was dropped."
+- post: 2026-10-24-draft-eligibility-by-position
+  section: "3.3 Quarterbacks carry the earliest average pick across classes, but not in most single classes"
+  fate: card
+  card: average-pick-by-position
+  reason: "Figures and the classes table moved."
+- post: 2026-10-24-draft-eligibility-by-position
+  section: "3.4 Quarterbacks are the only group with fewer than half of entrants undrafted"
+  fate: card
+  card: undrafted-share-by-position
+  reason: "Figures moved; the table restated the figure and was dropped."
+- post: 2026-10-24-draft-eligibility-by-position
+  section: "4. Summary"
+  fate: dropped
+  reason: "The expectation summary served the post; cards carry no expectations."
+- post: 2026-10-24-draft-eligibility-by-position
+  section: "5. Discussion"
+  fate: dropped
+  reason: "Prose; its forecasting points are follow-ups (F17) on the cards."
+
+# ---- 2026-11-22-career-endings-by-position ----
+- post: 2026-11-22-career-endings-by-position
+  section: "1. Introduction"
+  fate: dropped
+  reason: "Prose; each question it posed is now a card's title, and its expectations are not carried onto cards."
+- post: 2026-11-22-career-endings-by-position
+  section: "2.1 The study population (terms, flow chart, when careers end)"
+  fate: card
+  card: career-study-population
+  reason: "Both Data figures moved (the flow chart is the thumbnail, the when-careers-end figure is on the page); the terms table is glossary terms."
+- post: 2026-11-22-career-endings-by-position
+  section: "2.2 The example players"
+  fate: merged
+  card: career-study-population
+  reason: "The example-player table sits under the study-population figures."
+- post: 2026-11-22-career-endings-by-position
+  section: "3.1 No position has most eligible players in the NFL by the third eligible season"
+  fate: card
+  card: career-endings-by-position
+  reason: "Figures moved."
+- post: 2026-11-22-career-endings-by-position
+  section: "3.2 The quarterbacks' per-season chance of being drafted"
+  fate: card
+  card: quarterback-drafted-chance
+  reason: "The flow diagram moved to the page; the thumbnail is a new bar chart of the same drafted / at-risk steps the post annotated under the flows."
+- post: 2026-11-22-career-endings-by-position
+  section: "3.3 From the second eligible season more players sign undrafted than get drafted"
+  fate: card
+  card: nfl-route-chance-by-season
+  reason: "Figures moved; the crossing is shaded instead of annotated."
+- post: 2026-11-22-career-endings-by-position
+  section: "3.4 Players with a matched recruiting record reach the NFL more often"
+  fate: card
+  card: recruiting-record-gap
+  reason: "Figures moved."
+- post: 2026-11-22-career-endings-by-position
+  section: "4. Summary"
+  fate: dropped
+  reason: "The expectation summary served the post; cards carry no expectations."
+- post: 2026-11-22-career-endings-by-position
+  section: "5. Discussion"
+  fate: dropped
+  reason: "Prose; its open questions are follow-ups (F17, F22) on the cards."

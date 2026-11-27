@@ -4,10 +4,12 @@
 \alias{card_interactive}
 \title{The interactive version of a card's figure}
 \usage{
-card_interactive(p, ...)
+card_interactive(p, width_svg = 11, height_svg = 6, ...)
 }
 \arguments{
 \item{p}{The card's ggplot, with \code{ggiraph} interactive layers for hover.}
+
+\item{width_svg, height_svg}{Figure size in inches.}
 
 \item{...}{Passed to \code{\link[ggiraph:girafe]{ggiraph::girafe()}}.}
 }

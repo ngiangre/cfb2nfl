@@ -118,9 +118,10 @@ acceptance criteria.
 
 ### F16 · Post style rules, checker and cold-read reviewer
 
-- **Goals:** G1, C1 · **Personas:** P1, P2 · **Status:** shipped
-- **Links:** decisions 0025, 0040; `R/post_style.R`; superseded by F25
-  once decision 0053 lands
+- **Goals:** G1, C1 · **Personas:** P1, P2 · **Status:** superseded by F25
+  (decision 0054, 2026-11-27: `check_post_style()` and the post rules
+  retired; cards use `check_card_style()` and the card-mode reviewer)
+- **Links:** decisions 0025, 0040; superseded by F25 (decision 0054)
 - **Tasks:**
 <!-- tasks F16 -->
 <!-- /tasks -->
@@ -205,7 +206,7 @@ acceptance criteria.
 
 - **Goals:** G1, G3, C1 · **Personas:** P1 (P2 via each card's code) ·
   **Status:** in progress
-- **Links:** issue #127; supersedes F16 once decision 0053 lands (F16 →
+- **Links:** issue #127; supersedes F16 once decision 0054 lands (F16 →
   superseded by F25); replaces F14's Blog index page and its navbar entry;
   lays the ground for F21
 - **Why:** after 16 dated posts the figures are what readers come back to,
@@ -231,7 +232,8 @@ acceptance criteria.
     reviewer on the thumbnail alone; the card page carries no narrative
     prose beyond the question and its follow-ups.
   - [ ] Every term and method a card uses is defined on the card (in the
-    figure's subtitle or caption, or a definitions table under it), with
+    figure's subtitle or caption, a definitions table under it, or the
+    card's glossary footer from `inst/cards/terms.yml`), with
     reader-facing labels and no column names, and every card page passes
     the `site-personas` P1 walkthrough.
   - [ ] Every number in a card's title, subtitle, annotation or table is
@@ -268,12 +270,12 @@ acceptance criteria.
   promoted at graduation); Explorer or Analysis redesign beyond the one
   graduated card; multi-tag (AND) filtering beyond Quarto's listing;
   interactive thumbnails.
-- **Order:** the pilot posts stay up until decision 0053 is accepted;
+- **Order:** the pilot posts stay up until decision 0054 is accepted;
   redirects land with or after it.
 - **Cost:** 0 CFBD calls; no new data tables; new registries
   `inst/cards/tags.yml`, `questions.yml` and the migration ledger;
   `site.yaml` render time for about 70 cards (measured early). Decision
-  record 0053 (supersedes or amends 0015 and 0025, and 0040 where it
+  record 0054 (supersedes or amends 0015 and 0025, and 0040 where it
   applies) and a `goals.md` signal change for G1 ("has a dated post") and
   G3 ("every Results section"), written after the pilot.
 - **Review:** feature-reviewer 2026-11-26: aligned after changes (7
@@ -282,12 +284,15 @@ acceptance criteria.
 <!-- tasks F25 -->
 - [ ] [#127](https://github.com/ngiangre/cfb2nfl/issues/127) Rework Investigations into a figure wall of cards that graduates ideas to the rest of the site
 - [x] [#131](https://github.com/ngiangre/cfb2nfl/issues/131) Shared post helpers, the card theme and card_thumbnail() in R/ (F25)
-- [ ] [#132](https://github.com/ngiangre/cfb2nfl/issues/132) Card template, approved tags, questions registry, check_card_style() and the figure wall page (F25)
-- [ ] [#133](https://github.com/ngiangre/cfb2nfl/issues/133) Pilot: migrate the draft-outcomes posts to cards and graduate one card (F25)
-- [ ] [#134](https://github.com/ngiangre/cfb2nfl/issues/134) Decision 0053, goals.md signals and AGENTS.md for the figure wall (F25)
+- [x] [#132](https://github.com/ngiangre/cfb2nfl/issues/132) Card template, approved tags, questions registry, check_card_style() and the figure wall page (F25)
+- [x] [#133](https://github.com/ngiangre/cfb2nfl/issues/133) Pilot: migrate the draft-outcomes posts to cards and graduate one card (F25)
+- [x] [#134](https://github.com/ngiangre/cfb2nfl/issues/134) Decision 0054, goals.md signals and AGENTS.md for the figure wall (F25)
 - [x] [PR #135](https://github.com/ngiangre/cfb2nfl/pull/135) docs(product): add the F25 figure wall card and sync task links (F25)
 - [x] [PR #136](https://github.com/ngiangre/cfb2nfl/pull/136) feat(cards): shared number helpers and card thumbnail helpers (F25)
 - [ ] [PR #137](https://github.com/ngiangre/cfb2nfl/pull/137) docs(product): mark F25 in progress and sync task links (F25)
+- [x] [PR #140](https://github.com/ngiangre/cfb2nfl/pull/140) feat(cards): Investigations figure wall, card template and card style checks (F25)
+- [x] [PR #141](https://github.com/ngiangre/cfb2nfl/pull/141) feat(cards): pilot cards from the three draft-outcome posts, one graduated (F25)
+- [x] [PR #142](https://github.com/ngiangre/cfb2nfl/pull/142) docs(decisions): figure cards replace dated posts; retire the post rules (F25)
 <!-- /tasks -->
 
 ### F21 · Question status board
@@ -523,10 +528,31 @@ acceptance criteria.
 ### F02 · Contract-gated pipeline with an audit log
 
 - **Goals:** C1 · **Personas:** P2 · **Status:** shipped
-- **Links:** decisions 0005, 0023
+- **Links:** decisions 0005, 0023, 0053
+- **Why:** the play-level tables grow every week (decision 0045), and the
+  build copied each one into memory and into the targets store.
+- **Acceptance criteria** (added 2026-11-26 with issue #126; the gating
+  itself shipped earlier):
+  - [x] A track-mode `tar_make()` from the published release finishes
+    faster than the previous build on the same machine, with the wall time
+    and store size measured in decision 0053.
+  - [x] Holding the largest tables as lazy Arrow datasets (decision 0053)
+    leaves every contract result, audit row, explorer file and DuckDB table
+    identical to the previous build, shown by a recorded comparison.
+  - [x] A failed contract on a lazily held table still stops `tar_make()`
+    (a fixture test).
+  - [x] Reading a lazy target whose parquet changed after the build errors
+    instead of returning the new data (a fixture test), and the pipeline
+    docs tell a P2 reader to set `TAR_ASK=false` for a non-interactive
+    `tar_read()` of one.
+- **Out of scope:** peak memory (decision 0053).
+- **Cost:** 0 CFBD calls, no new tables, decision 0053.
+- **Review:** feature-reviewer 2026-11-26: aligned after changes (applied).
 - **Tasks:**
 <!-- tasks F02 -->
-- [ ] [#126](https://github.com/ngiangre/cfb2nfl/issues/126) perf(pipeline): keep large data-frame targets lazy with an Arrow-backed custom format
+- [x] [#126](https://github.com/ngiangre/cfb2nfl/issues/126) perf(pipeline): keep large data-frame targets lazy with an Arrow-backed custom format
+- [x] [PR #138](https://github.com/ngiangre/cfb2nfl/pull/138) perf(pipeline): keep the largest tables lazy with an Arrow-backed format (F02)
+- [x] [PR #139](https://github.com/ngiangre/cfb2nfl/pull/139) docs(product): sync feature task links after F02 lazy pipeline (F02)
 <!-- /tasks -->
 
 ### F15 · Technical pages: Data, Pipeline, Reference

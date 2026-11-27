@@ -1,0 +1,184 @@
+---
+title: "For players who stay in college, is the draft or undrafted signing likelier each season?"
+image: card-thumbs/nfl-route-chance-by-season.png
+image-alt: "Line chart, all positions, of the per-season chance of being drafted and of signing undrafted among players still playing going into each eligible season; the drafted line peaks early and falls, the undrafted line keeps climbing and crosses above it from the second eligible season."
+categories: ["Topic: Draft outcomes", "Topic: Career shape", "Position: All positions", "Population: Draft-eligible players", "Figure: Line chart", "Question: Draft chance by position"]
+status: investigation
+graduated_to: null
+terms: [career-eligible-season, at-risk, per-season-chance, career-drafted, career-signed-undrafted, study-population, confidence-interval, eligible-season-number, draft-class, nfl-entry, seasons-and-players]
+followups:
+  - text: "Check whether the timing of each ending is stable across draft classes before a forecast relies on it."
+    link: "F17"
+  - text: "Use the eligible season number as a model term, since the entry chance varies several-fold across it."
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+outcomes <- DBI::dbReadTable(con, "outcomes")
+roster_pos <- DBI::dbGetQuery(
+  con,
+  "SELECT playerId, season, any_value(position) AS position FROM roster GROUP BY playerId, season"
+)
+endings <- career_endings(outcomes, roster_pos) |> label_endings()
+study_pop <- filter(endings, group != "Position not recorded")
+state_fill <- ending_palette()
+hz_lab <- c(drafted = "Drafted", signed_udfa = "Signed undrafted")
+# Too few players at risk make a per-season rate noise.
+min_risk <- 500
+min_curve <- 30
+```
+
+```{r}
+#| label: figure
+hz_all <- ending_hazards(study_pop, by = NULL) |>
+  filter(ending %in% names(hz_lab), at_risk >= min_risk)
+hz_wide <- hz_all |>
+  select(time, ending, hazard) |>
+  tidyr::pivot_wider(names_from = ending, values_from = hazard)
+cross_season <- min(hz_wide$time[hz_wide$signed_udfa > hz_wide$drafted])
+
+p <- ggplot(hz_all, aes(time, 100 * hazard, colour = hz_lab[ending])) +
+  annotate("rect", xmin = cross_season - 0.5, xmax = Inf, ymin = -Inf, ymax = Inf, fill = "#7570B3", alpha = 0.08) +
+  geom_line(linewidth = 1.8) +
+  geom_point_interactive(
+    aes(
+      tooltip = sprintf(
+        "All positions, season %d: %s %s (95%% CI %s to %s; %s of %s at risk)",
+        time, pct(hazard), tolower(hz_lab[ending]), pct(lower), pct(upper), fmt(events), fmt(at_risk)
+      ),
+      data_id = paste(ending, time)
+    ),
+    size = 3.4
+  ) +
+  scale_colour_manual(values = state_fill[c("Drafted", "Signed undrafted")]) +
+  scale_x_continuous(breaks = hz_wide$time) +
+  scale_y_continuous(labels = \(x) paste0(x, "%"), limits = c(0, NA)) +
+  labs(
+    title = "Per-season chance of each NFL route",
+    subtitle = "Of players still playing going into each eligible season; shaded where signing undrafted leads",
+    x = "Eligible season",
+    y = "Chance that season",
+    colour = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "nfl-route-chance-by-season", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: by-position
+ci <- ending_incidence(endings) |> filter(group != "Position not recorded")
+thin <- thin_position_groups(ci, 3L, min_curve)
+hz_group <- ending_hazards(study_pop) |>
+  filter(ending %in% names(hz_lab), at_risk >= min_curve, !group %in% thin) |>
+  mutate(group = factor(group, position_group_levels()))
+p_group <- hz_group |>
+  mutate(
+    tooltip = sprintf(
+      "%s, season %d: %s %s (95%% CI %s to %s; %s of %s at risk)",
+      group, time, pct(hazard), tolower(hz_lab[ending]), pct(lower), pct(upper), fmt(events), fmt(at_risk)
+    )
+  ) |>
+  ggplot(aes(time, 100 * hazard, colour = hz_lab[ending])) +
+  geom_line(linewidth = 1.1) +
+  geom_point_interactive(aes(tooltip = tooltip, data_id = paste(group, ending, time)), size = 2.2) +
+  facet_wrap(~group, ncol = 3) +
+  scale_colour_manual(values = state_fill[c("Drafted", "Signed undrafted")]) +
+  scale_x_continuous(breaks = seq_len(max(hz_group$time))) +
+  labs(
+    title = "Each position's per-season chance of each NFL route",
+    subtitle = "Of players still playing going into each eligible season, the share drafted or signed undrafted that season",
+    x = "Eligible season",
+    y = "Share that season (%)",
+    colour = NULL,
+    caption = paste0(
+      "Seasons with fewer than ", min_curve, " players at risk are omitted.",
+      if (length(thin)) paste0(" Omitted groups: ", paste(tolower(thin), collapse = ", "), ".") else "",
+      " Hover a point for its interval and counts."
+    )
+  ) +
+  theme_cfb2nfl()
+card_interactive(p_group, width_svg = 13, height_svg = 10)
+```
+
+```{r}
+#| label: by-era
+# The era split comes from the draft-outcome cards' eligible seasons (one row
+# per season, not per player), where each season carries its draft class.
+risk <- eligible_risk_set(collect(tbl(con, "outcomes")))
+y0 <- min(risk$draft_year)
+y1 <- max(risk$draft_year)
+hazard_era <- risk |>
+  mutate(
+    era = cut(
+      draft_year,
+      breaks = c(y0 - 1, 2015, 2021, y1),
+      labels = c(
+        sprintf("%d to 2015 classes", y0),
+        "2016 to 2021 classes",
+        sprintf("2022 to %d classes", y1)
+      )
+    )
+  ) |>
+  group_by(era, eligible_season_index) |>
+  summarise(seasons = n(), p = mean(outcome_nfl_entry_d), .groups = "drop") |>
+  filter(seasons >= 100)
+p_era <- ggplot(hazard_era, aes(eligible_season_index, p, colour = era)) +
+  geom_line_interactive(aes(data_id = era, tooltip = era), linewidth = 1.3) +
+  geom_point_interactive(
+    aes(
+      data_id = era,
+      tooltip = sprintf(
+        "%s, eligible season %d: %.1f%% entered the NFL (%s seasons)",
+        era,
+        eligible_season_index,
+        100 * p,
+        fmt(seasons)
+      )
+    ),
+    size = 3
+  ) +
+  scale_y_continuous(labels = \(x) sprintf("%.0f%%", 100 * x), limits = c(0, NA)) +
+  scale_x_continuous(breaks = unique(hazard_era$eligible_season_index)) +
+  scale_colour_manual(values = c("#9CA3AF", "#4B5563", "#111827")) +
+  labs(
+    title = "Per-season chance of NFL entry, by era of draft classes",
+    subtitle = "Drafted or signed undrafted, by eligible season number",
+    x = "Eligible season number",
+    y = "Chance that season",
+    colour = NULL,
+    caption = "Undrafted signings are recorded from the 2016 class on, so the first era counts drafted entries only. Counts eligible seasons rather than players; cells with fewer than 100 seasons omitted."
+  ) +
+  theme_cfb2nfl()
+card_interactive(p_era)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

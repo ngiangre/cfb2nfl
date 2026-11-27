@@ -4,16 +4,21 @@
 \alias{card_functions}
 \title{The cfb2nfl functions a card calls}
 \usage{
-card_functions(card)
+card_functions(card, root = card_root(), index = r_function_index(root))
 }
 \arguments{
 \item{card}{Path to a \verb{card-<id>.qmd}.}
+
+\item{root}{The checkout root.}
+
+\item{index}{The parsed \verb{R/} functions (built from \code{root} if not given).}
 }
 \value{
 A sorted character vector of function names.
 }
 \description{
-Every package function the card's code names, plus every package function
+Every function defined in \verb{R/} that the card's code names, plus every one
 those call in turn, so a change to a helper deep in a builder still stales
-the thumbnail.
+the thumbnail. The card machinery (saving, showing and checking the
+figure) is left out: it does not change what the figure shows.
 }

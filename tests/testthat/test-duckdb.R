@@ -177,3 +177,27 @@ test_that("build_duckdb fails a bundle over the release-asset limit", {
     "release-asset limit"
   )
 })
+
+test_that("build_duckdb copies a lazy parquet table without changing it", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("duckdb")
+  plays <- tibble::tibble(
+    id = c("2", "1"),
+    season = c(2025L, 2024L),
+    ppa = c(0.5, NA),
+    start = as.POSIXct("2025-09-01 12:00:00", tz = "UTC") + 0:1
+  )
+  db_eager <- withr::local_tempfile(fileext = ".duckdb")
+  db_lazy <- withr::local_tempfile(fileext = ".duckdb")
+  build_duckdb(list(plays = plays), db_eager)
+  build_duckdb(list(plays = as_lazy(plays)), db_lazy)
+  read <- function(db) {
+    con <- DBI::dbConnect(duckdb::duckdb(), db, read_only = TRUE)
+    on.exit(DBI::dbDisconnect(con, shutdown = TRUE))
+    list(
+      schema = DBI::dbGetQuery(con, "DESCRIBE plays")[1:2],
+      rows = DBI::dbGetQuery(con, "SELECT * FROM plays")
+    )
+  }
+  expect_identical(read(db_lazy), read(db_eager))
+})

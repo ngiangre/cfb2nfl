@@ -1,0 +1,157 @@
+---
+title: "By their third eligible season, how have college careers ended at each position?"
+aliases: [2026-11-22-career-endings-by-position.html]
+image: card-thumbs/career-endings-by-position.png
+image-alt: "Stacked bar chart for each position group of the percent of eligible players drafted, signed undrafted, with eligibility ended undrafted, or still playing by their third eligible season, each row labelled with its NFL total; no group's NFL share reaches one in five, and eligibility ended undrafted is the largest segment everywhere."
+categories: ["Topic: Draft outcomes", "Topic: Career shape", "Position: By position group", "Population: Draft-eligible players", "Figure: Bar chart", "Question: Draft chance by position"]
+status: investigation
+graduated_to: null
+terms: [career-eligible-season, study-population, first-eligible-position, cumulative-percent, at-risk, career-drafted, career-signed-undrafted, eligibility-ended, career-still-playing, confidence-interval, seasons-and-players]
+followups:
+  - text: "Fit cause-specific hazard models of the three endings with position, conference tier and recruiting rating, as the baseline for the draft forecast."
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+outcomes <- DBI::dbReadTable(con, "outcomes")
+roster_pos <- DBI::dbGetQuery(
+  con,
+  "SELECT playerId, season, any_value(position) AS position FROM roster GROUP BY playerId, season"
+)
+endings <- career_endings(outcomes, roster_pos) |> label_endings()
+state_fill <- ending_palette()
+state_lab <- c(ending_labels(), playing = "Still playing")
+horizon <- 3L
+min_curve <- 30
+ordinal <- function(n) c("first", "second", "third", "fourth", "fifth")[n]
+```
+
+```{r}
+#| label: figure
+ci <- ending_incidence(endings) |> filter(group != "Position not recorded")
+thin <- thin_position_groups(ci, horizon, min_curve)
+at_horizon <- ci |>
+  filter(time == horizon, !group %in% thin) |>
+  mutate(label = factor(state_lab[state], names(state_fill)))
+nfl_share <- at_horizon |>
+  filter(state %in% c("drafted", "signed_udfa")) |>
+  summarise(nfl = sum(estimate), .by = "group") |>
+  arrange(desc(nfl))
+
+p <- at_horizon |>
+  mutate(
+    group = factor(group, rev(as.character(nfl_share$group))),
+    tooltip = sprintf(
+      "%s, season %d: %s %s (95%% CI %s to %s; %s players at risk going into season %d)",
+      group, time, pct(estimate), tolower(label), pct(lower), pct(upper), fmt(n_risk), time
+    )
+  ) |>
+  ggplot(aes(100 * estimate, group, fill = label)) +
+  geom_col_interactive(
+    aes(tooltip = tooltip, data_id = paste(group, state), group = label),
+    width = 0.75,
+    colour = "#9CA3AF",
+    linewidth = 0.3,
+    position = position_stack(reverse = TRUE)
+  ) +
+  geom_text(
+    data = mutate(nfl_share, group = factor(group, rev(as.character(nfl_share$group)))),
+    aes(x = 100 * nfl + 1, y = group, label = paste0(pct(nfl, 0), " NFL")),
+    inherit.aes = FALSE,
+    hjust = 0,
+    size = 5,
+    fontface = "bold",
+    colour = "#111827"
+  ) +
+  scale_fill_manual(values = state_fill) +
+  scale_x_continuous(labels = \(x) paste0(x, "%"), breaks = seq(0, 100, 25), expand = expansion(mult = c(0, 0.04))) +
+  labs(
+    title = sprintf("How careers had ended by the %s eligible season", ordinal(horizon)),
+    subtitle = "Percent of each position's eligible players by how their career had ended; label: drafted plus signed",
+    x = "Percent of the group's eligible players",
+    y = NULL,
+    fill = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card() +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = rel(0.75)),
+    legend.key.size = unit(0.9, "lines")
+  ) +
+  guides(fill = guide_legend(nrow = 2))
+
+card_thumbnail(p, "career-endings-by-position", release = release, height = 6.5)
+card_interactive(p, height_svg = 7)
+```
+
+```{r}
+#| label: route-curves
+route_ci <- route_incidence(endings) |>
+  filter(group != "Position not recorded", n_risk >= min_curve, !group %in% thin) |>
+  mutate(group = factor(group, position_group_levels()))
+route_colour <- c(
+  Drafted = state_fill[["Drafted"]],
+  `Signed undrafted` = state_fill[["Signed undrafted"]],
+  `Either NFL route` = "#374151"
+)
+p_routes <- route_ci |>
+  mutate(
+    tooltip = sprintf(
+      "%s, by season %d: %s %s (95%% CI %s to %s; %s at risk)",
+      group, time, pct(estimate), tolower(route), pct(lower), pct(upper), fmt(n_risk)
+    )
+  ) |>
+  ggplot(aes(time, 100 * estimate, colour = route, fill = route)) +
+  geom_ribbon(aes(ymin = 100 * lower, ymax = 100 * upper), alpha = 0.2, colour = NA) +
+  geom_line(linewidth = 1.1) +
+  geom_point_interactive(aes(tooltip = tooltip, data_id = paste(group, state)), size = 2) +
+  facet_wrap(~group, ncol = 3) +
+  scale_colour_manual(values = route_colour) +
+  scale_fill_manual(values = route_colour) +
+  scale_x_continuous(breaks = 0:5) +
+  scale_y_continuous(labels = \(x) paste0(x, "%")) +
+  labs(
+    title = "Each position's cumulative percent reaching the NFL, season by season",
+    subtitle = "Cumulative percent of eligible players by eligible season, with confidence intervals",
+    x = "Eligible season",
+    y = "Cumulative percent",
+    colour = NULL,
+    fill = NULL,
+    caption = paste0(
+      "Seasons with fewer than ", min_curve, " players at risk are omitted.",
+      if (length(thin)) paste0(" Omitted groups: ", paste(tolower(thin), collapse = ", "), ".") else "",
+      " Hover a point for its interval."
+    )
+  ) +
+  theme_cfb2nfl()
+card_interactive(p_routes, width_svg = 13, height_svg = 10)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

@@ -1,6 +1,6 @@
 # 0040 — Drop stopifnot pins in posts; show setup code
 
-- **Status:** Accepted
+- **Status:** Accepted; amended by 0054 (numbers move from prose to figure text)
 - **Date:** 2026-11-06
 
 ## Context

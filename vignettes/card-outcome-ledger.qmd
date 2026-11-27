@@ -1,0 +1,139 @@
+---
+title: "How often does an eligible college season end in the draft or the NFL?"
+aliases: [2026-10-24-outcome-prevalence.html]
+image: card-thumbs/outcome-ledger.png
+image-alt: "Bar chart of the share of draft-eligible college seasons that end drafted, signed as an undrafted free agent, or in NFL entry by either route, each with a confidence interval; the highlighted draft bar is about three in every hundred seasons, and NFL entry by either route about seven."
+categories: ["Topic: Draft outcomes", "Position: All positions", "Population: Draft-eligible seasons", "Figure: Bar chart"]
+status: graduated
+graduated_to: analysis.html#how-often-eligible-seasons-end-in-the-nfl
+terms: [player-season, eligible-season, known-outcome, drafted, signed-undrafted, nfl-entry, confidence-interval, seasons-and-players]
+followups:
+  - text: "Score out-of-time forecasts with calibration, since the drafted share is rarer in later classes than in the training data."
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+risk <- eligible_risk_set(collect(tbl(con, "outcomes")))
+```
+
+```{r}
+#| label: figure
+ledger <- outcome_ledger(risk)
+p <- plot_outcome_ledger(ledger) +
+  labs(
+    title = "Share of eligible seasons ending in each NFL outcome",
+    subtitle = paste0(
+      "Eligible player-seasons with a known outcome, draft classes ",
+      min(risk$draft_year),
+      " to ",
+      max(risk$draft_year)
+    ),
+    x = "Share of eligible seasons",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "outcome-ledger", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: by-round
+by_round <- risk |>
+  filter(outcome_drafted_d) |>
+  count(round = outcome_draft_round_d, name = "n") |>
+  mutate(per100 = 100 * n / nrow(risk))
+p_round <- ggplot(by_round, aes(factor(round), per100)) +
+  geom_col_interactive(
+    aes(
+      tooltip = sprintf(
+        "Round %d: %s eligible seasons drafted, %.2f in every 100",
+        round,
+        fmt(n),
+        per100
+      ),
+      data_id = round
+    ),
+    fill = "#1B9E77",
+    width = 0.7
+  ) +
+  labs(
+    title = "Eligible seasons drafted in each round",
+    subtitle = "Per hundred eligible seasons with a known outcome",
+    x = "Draft round",
+    y = "Per 100 eligible seasons",
+    caption = "Hover a bar for the count."
+  ) +
+  theme_cfb2nfl()
+card_interactive(p_round)
+```
+
+```{r}
+#| label: ledger-table
+rounds <- tibble(
+  outcome = c(
+    "  Drafted, round 1",
+    "  Drafted, rounds 2 to 3",
+    "  Drafted, rounds 4 to 7"
+  ),
+  events = c(
+    sum(risk$outcome_drafted_d & risk$outcome_draft_round_d == 1L),
+    sum(risk$outcome_drafted_d & risk$outcome_draft_round_d %in% 2:3),
+    sum(risk$outcome_drafted_d & risk$outcome_draft_round_d >= 4L)
+  )
+)
+n_seasons <- nrow(risk)
+bind_rows(
+  ledger[1, c("outcome", "events")],
+  rounds,
+  ledger[2:3, c("outcome", "events")]
+) |>
+  mutate(
+    lo = vapply(events, \(x) wilson(x, n_seasons)[["lo"]], numeric(1)),
+    hi = vapply(events, \(x) wilson(x, n_seasons)[["hi"]], numeric(1)),
+    interval = paste(pct(lo), "to", pct(hi)),
+    share = pct(events / n_seasons),
+    at_risk = fmt(n_seasons),
+    events = fmt(events)
+  ) |>
+  select(outcome, events, at_risk, share, interval) |>
+  knitr::kable(
+    col.names = c("Outcome", "Seasons", "Eligible seasons", "Share", "95% interval"),
+    caption = paste0(
+      "Each outcome over the ",
+      fmt(n_seasons),
+      " eligible seasons of ",
+      fmt(n_distinct(risk$playerId)),
+      " players, with the draft split by round. A player usually has several eligible seasons, and his NFL entry, if any, falls on exactly one of them."
+    )
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

@@ -1,0 +1,18 @@
+{
+  "id": "drafted-rate-by-position",
+  "release": "2026-11-25",
+  "code_hash": "c5ddf932d2c86b9138354e61a564e58f",
+  "functions": {
+    "add_position_group": "1da282ac9bc54c33518bf49d6a53a8d8",
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "eligible_risk_set": "454454253743138b58529b8ff72e9fa8",
+    "fmt": "d4c89f195c447af907ba425a860522de",
+    "pct": "3413c026fc8c907293b2fb1d96080440",
+    "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
+    "position_palette": "11141b2b531ab5b7f31d6c196fcc46be",
+    "scale_colour_position": "4cafb87d0ef9e51cdf13934043361fe6",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b",
+    "wilson": "65af8ccc8d3f2b6cdd25b54bc520f7d4"
+  }
+}

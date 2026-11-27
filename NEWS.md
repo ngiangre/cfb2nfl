@@ -1,5 +1,57 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Investigations (feature F25,
+  [#134](https://github.com/ngiangre/cfb2nfl/issues/134)): **figure cards
+  replace dated posts**
+  ([decision 0054](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0054-figure-cards-replace-dated-posts.md),
+  superseding 0015 and 0025 and amending 0040). The three draft-outcome
+  posts are retired: their pages now redirect to their main cards, and
+  every section's fate is in `inst/cards/migration.yml`. The post rules,
+  template and `check_post_style()` are gone; `check_card_style()` runs in
+  their place in CI, the tests and the edit hook, and the
+  `vignette-reviewer` agent reviews cards only. AGENTS.md "Figure cards"
+  holds the rules, and the G1 and G3 goals now count cards. The 13
+  remaining posts stay listed under the wall until their migration.
+
+- Investigations (feature F25,
+  [#133](https://github.com/ngiangre/cfb2nfl/issues/133)): **the first 14
+  figure cards are up**, every figure from the three draft-outcome posts
+  (outcome prevalence, drafted rate by position, how careers end), Data
+  sections included. Each card asks one question, carries its figure as a
+  thumbnail on the wall and as interactive figures on its page, and defines
+  its terms from a shared glossary (`inst/cards/terms.yml`) printed in its
+  footer. The outcome-ledger card **graduated** to a new "What we know"
+  section of the Analysis page, drawn by the tested `plot_outcome_ledger()`
+  and linking back. `inst/cards/migration.yml` records where every section
+  of those posts went; the posts stay up until the card rules are adopted.
+  Shared builders behind the cards: `eligible_risk_set()`,
+  `add_position_group()`, `outcome_ledger()`, `running_cast()`,
+  `label_endings()`, `ending_palette()`, `route_incidence()`,
+  `thin_position_groups()`; `card_thumbnail()` now wraps long figure titles
+  to the tile, and `position_palette()` / `scale_colour_position()` give
+  every position group one colour across cards (drafted green, undrafted
+  purple and quarterback orange are reserved). Two cards correct their
+  post: rookie games count only completed rookie seasons, and the era
+  split of the NFL-entry chance separates the classes before undrafted
+  signings were recorded.
+
+- Investigations (feature F25,
+  [#132](https://github.com/ngiangre/cfb2nfl/issues/132)): **the
+  Investigations page now opens with a wall of figure cards**, a grid of
+  tiles (question, thumbnail, status, tags) that a fan can search, including
+  each figure's description, or filter by clicking any tag; it is one column
+  on a phone, and the dated posts stay listed below until their cards are
+  up. A card is one `vignettes/card-<id>.qmd`, started with `new_card()`
+  from a template whose page shows the interactive figure, its code, the
+  data release and linked follow-ups (`card_footer()`). Tags come only from
+  the approved `inst/cards/tags.yml` and the project's questions in
+  `inst/cards/questions.yml`. `check_card_style()` runs in CI and the tests
+  and fails a card with an unapproved tag, a missing or stale thumbnail,
+  typed numbers or column names in figure text, narrative prose, or a
+  redefined shared helper. Thumbnail freshness now hashes the source of the
+  `R/` functions that shape the figure, so it matches on every platform and
+  ignores comments and the card machinery.
+
 - Investigations (feature F25, groundwork for the figure wall in
   [#127](https://github.com/ngiangre/cfb2nfl/issues/127)): **the number
   helpers every post copied inline are now shared, tested functions**
@@ -12,6 +64,20 @@
   the card's code and the package functions it calls, so `card_freshness()`
   can tell when a thumbnail no longer matches its card or the data has moved
   on.
+
+- Pipeline (feature F02): **a full track-mode build is about a quarter
+  faster and its targets store less than half the size**, with every
+  output unchanged. The largest tables (plays, play stats, player game
+  stats, NFL play-by-play and participation, explorer plays) stay lazy
+  Arrow datasets between targets with the new `format_arrow_lazy()` format:
+  the published parquet is referenced, not copied into `_targets/`, and each
+  step reads only the columns it needs (`collect_cols()`). Contracts, the
+  audit log and the DuckDB bundle check and carry exactly what they did
+  before. The explorer's play table builds about five times faster (135 s
+  to 28 s), its player lists now written for all plays at once. A
+  non-interactive `tar_read()` of one of these tables now needs
+  `TAR_ASK=false`
+  ([decision 0053](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0053-lazy-arrow-pipeline-tables.md)).
 
 - Explorer (feature F13): **the game view's play card names the players the
   play text lists but the play-stats log leaves out**, mostly tacklers, plus

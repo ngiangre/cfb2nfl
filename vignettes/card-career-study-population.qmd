@@ -1,0 +1,248 @@
+---
+title: "How many college players ever get a shot at the draft?"
+image: card-thumbs/career-study-population.png
+image-alt: "Flow chart from every player on a college roster down to the draft-eligible players with a recorded position, the study population, with side boxes for players never draft-eligible, players ruled out, and players with no position, and the study population split into its career endings: drafted, signed undrafted, eligibility ended undrafted and still playing."
+categories: ["Topic: Draft outcomes", "Topic: Career shape", "Position: All positions", "Population: Draft-eligible players", "Figure: Flow chart"]
+status: investigation
+graduated_to: null
+terms: [career-eligible-season, study-population, ruled-out, first-eligible-position, career-drafted, career-signed-undrafted, eligibility-ended, career-still-playing, awaiting-first-draft, missed-season, seasons-and-players]
+followups:
+  - text: "Find the earlier college years of the NFL entrants ruled out, so their clocks start on time."
+    link: "F22"
+  - text: "Find the roster records listed before a player enrolled, which start an estimated clock too early."
+    link: "F22"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+outcomes <- DBI::dbReadTable(con, "outcomes")
+# One position and team per player-season (a handful of ids repeat).
+roster_pos <- DBI::dbGetQuery(
+  con,
+  "SELECT playerId, season, any_value(position) AS position,
+          any_value(team) AS team
+   FROM roster GROUP BY playerId, season"
+)
+endings <- career_endings(outcomes, select(roster_pos, -team)) |> label_endings()
+study_pop <- filter(endings, group != "Position not recorded")
+state_fill <- ending_palette()
+state_lab <- c(ending_labels(), playing = "Still playing")
+```
+
+```{r}
+#| label: figure
+never <- never_eligible_entrants(outcomes, select(roster_pos, -team))
+n_roster <- n_distinct(outcomes$playerId)
+n_players <- nrow(endings)
+n_never <- nrow(never)
+n_no_pos <- sum(endings$group == "Position not recorded")
+n_awaiting <- sum(study_pop$time == 0)
+step <- 3
+trunk_x <- -1.9
+flow_main <- tibble(
+  label = c("Players on a college roster", "Draft-eligible", "Study population"),
+  n = c(n_roster, n_players, nrow(study_pop)),
+  y = c(4.65, 3, 2) * step
+) |>
+  mutate(
+    share = n / lag(n),
+    box = if_else(
+      is.na(share),
+      sprintf("%s\n%s", label, fmt(n)),
+      sprintf("%s\n%s (%s)", label, fmt(n), pct(share))
+    )
+  )
+flow_side <- tibble(
+  label = c(
+    sprintf("Never draft-eligible\n%s (%s)", fmt(n_roster - n_players - n_never), pct((n_roster - n_players - n_never) / n_roster)),
+    sprintf("Ruled out: reached the NFL\nbefore he could be eligible\n%s (%s)", fmt(n_never), pct(n_never / n_roster)),
+    sprintf("Position not recorded\n%s (%s)", fmt(n_no_pos), pct(n_no_pos / n_players))
+  ),
+  y = c(4.65 * step - 1.3, 4.65 * step - 3.4, 3 * step - 1.5)
+)
+flow_end <- study_pop |>
+  mutate(state = if_else(ending == "censored", "playing", ending)) |>
+  count(state) |>
+  mutate(
+    label = factor(state_lab[state], names(state_fill)),
+    share = n / nrow(study_pop)
+  ) |>
+  arrange(label) |>
+  mutate(
+    x = seq(-3.6, 3.6, length.out = n()),
+    box = sprintf("%s\n%s (%s)", sub(", ", ",\n", label), fmt(n), pct(share)),
+    text_colour = if_else(state %in% c("drafted", "signed_udfa"), "#FFFFFF", "#111827")
+  )
+h <- 0.5
+bar_y <- min(flow_main$y) - 1.1
+end_y <- bar_y - 1.25
+side_x <- 0.1
+
+p <- ggplot() +
+  geom_segment(
+    data = tibble(y = head(flow_main$y, -1), yend = tail(flow_main$y, -1)),
+    aes(x = trunk_x, xend = trunk_x, y = y - h, yend = yend + h),
+    arrow = arrow(length = unit(0.25, "cm"), type = "closed"),
+    colour = "#4B5563",
+    linewidth = 0.8
+  ) +
+  geom_segment(
+    data = flow_side,
+    aes(x = trunk_x, xend = side_x - 0.05, y = y, yend = y),
+    arrow = arrow(length = unit(0.25, "cm"), type = "closed"),
+    colour = "#4B5563",
+    linewidth = 0.8
+  ) +
+  annotate("segment", x = trunk_x, xend = trunk_x, y = min(flow_main$y) - h, yend = bar_y, colour = "#4B5563", linewidth = 0.8) +
+  annotate("segment", x = min(flow_end$x), xend = max(flow_end$x), y = bar_y, yend = bar_y, colour = "#4B5563", linewidth = 0.8) +
+  geom_segment(
+    data = flow_end,
+    aes(x = x, xend = x, y = bar_y, yend = end_y + h),
+    arrow = arrow(length = unit(0.25, "cm"), type = "closed"),
+    colour = "#4B5563",
+    linewidth = 0.8
+  ) +
+  geom_label(
+    data = flow_main,
+    aes(trunk_x, y, label = box),
+    size = 6,
+    fontface = "bold",
+    fill = "#FFFFFF",
+    colour = "#111827",
+    lineheight = 1
+  ) +
+  geom_label(
+    data = flow_side,
+    aes(side_x, y, label = label),
+    hjust = 0,
+    size = 5,
+    fontface = "bold",
+    fill = "#F3F4F6",
+    colour = "#374151",
+    lineheight = 1
+  ) +
+  geom_label(
+    data = flow_end,
+    aes(x, end_y + h, label = box, fill = label, colour = text_colour),
+    vjust = 1,
+    size = 4.8,
+    fontface = "bold",
+    lineheight = 1
+  ) +
+  scale_fill_manual(values = state_fill, guide = "none") +
+  scale_colour_identity() +
+  scale_x_continuous(limits = c(-4.6, 4.8)) +
+  scale_y_continuous(limits = c(end_y - 1.2, max(flow_main$y) + 0.6)) +
+  labs(
+    title = "From every roster player to the study population",
+    subtitle = "Each box is a count of players and its percent of the box above it",
+    caption = card_caption(release)
+  ) +
+  theme_card() +
+  theme(axis.text = element_blank(), axis.title = element_blank(), panel.grid = element_blank())
+
+card_thumbnail(p, "career-study-population", release = release, height = 6.5)
+card_interactive(p, height_svg = 8)
+```
+
+```{r}
+#| label: when-careers-end
+season_counts <- study_pop |>
+  mutate(group = droplevels(group), state = if_else(ending == "censored", "playing", ending)) |>
+  count(group, state, time) |>
+  tidyr::complete(group, state, time = 0:max(endings$time), fill = list(n = 0L)) |>
+  filter(state == "playing" | time > 0) |>
+  mutate(label = factor(state_lab[state], names(state_fill)), share = n / sum(n), .by = "group") |>
+  filter(sum(n) > 0, .by = "state")
+p_when <- season_counts |>
+  mutate(
+    tooltip = sprintf(
+      "%s, eligible season %d: %s %s (%s of the group)",
+      group,
+      time,
+      fmt(n),
+      if_else(
+        state == "playing",
+        if_else(time == 0, "still playing, awaiting their first draft", "still playing, counted through this season"),
+        tolower(label)
+      ),
+      pct(share)
+    )
+  ) |>
+  ggplot(aes(time, n, colour = group)) +
+  geom_line_interactive(aes(data_id = group), linewidth = 1.1) +
+  geom_point_interactive(aes(tooltip = tooltip, data_id = group), size = 2.2) +
+  facet_wrap(~label, nrow = 1, scales = "free_y", labeller = label_wrap_gen(18)) +
+  scale_colour_position() +
+  scale_x_continuous(breaks = 0:max(season_counts$time)) +
+  scale_y_continuous(labels = scales::label_comma()) +
+  labs(
+    title = "When careers end, ending by ending",
+    subtitle = "Players by the eligible season their career ended in; still playing is counted at his last season observed",
+    x = "Eligible season",
+    y = "Players",
+    colour = NULL,
+    caption = "Each panel has its own scale. Hover a line to follow one group across the endings."
+  ) +
+  theme_cfb2nfl() +
+  guides(colour = guide_legend(nrow = 2))
+card_interactive(p_when, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: examples
+subjects <- tibble::tribble(
+  ~who               , ~cfb_athlete_id ,
+  "Jordan Travis"    , "4360799"       ,
+  "Shane Buechele"   , "4039034"       ,
+  "Zane Zandier"     , "4240855"       ,
+  "Grant Calcaterra" , "4241374"
+)
+last_team <- outcomes |>
+  summarise(last = max(season), .by = "playerId") |>
+  left_join(select(roster_pos, playerId, season, team), by = c("playerId", "last" = "season"))
+ending_lab <- ending_labels()
+subjects |>
+  inner_join(endings, by = c("cfb_athlete_id" = "playerId")) |>
+  left_join(last_team, by = c("cfb_athlete_id" = "playerId")) |>
+  mutate(
+    url = explorer_player_url(cfb_athlete_id, as.character(group)),
+    who = if_else(is.na(url), who, sprintf("[%s](%s)", who, url)),
+    how = if_else(ending == "drafted", sprintf("Drafted, round %d", round), unname(ending_lab[ending])),
+    hs = if_else(hs_year_imputed, "Estimated", "From recruiting"),
+    missed = if_else(missed_season, "Yes", "No")
+  ) |>
+  arrange(match(ending, names(ending_lab)), desc(missed_season)) |>
+  transmute(who, group = as.character(group), team, how, time, hs, missed) |>
+  knitr::kable(
+    col.names = c("Player", "Position", "Last team", "How it ended", "In eligible season", "High-school year", "Missed a season"),
+    caption = "Example players, one per ending plus a missed season, computed from the data. Names link to the Explorer. The figures describe groups, not any one player's chances."
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

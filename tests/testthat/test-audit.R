@@ -76,3 +76,27 @@ test_that("audit_step profiles NA per column", {
   expect_equal(prof$na_rate, c(1, 0.5))
   expect_equal(nrow(rec$na_by_col[[1]]), 2L)
 })
+
+test_that("audit_step and schema_hash agree on a lazy table and its tibble", {
+  skip_if_not_installed("arrow")
+  output <- tibble::tibble(
+    id = c("1", "2", "2"),
+    v = c(NA, 2.5, NaN),
+    when = as.POSIXct("2025-01-01", tz = "UTC") + 0:2
+  )
+  input <- tibble::tibble(id = c("1", "2", "3"))
+  path <- withr::local_tempfile(fileext = ".parquet")
+  arrow::write_parquet(output, path)
+  lazy <- arrow::open_dataset(path)
+  expect_identical(schema_hash(lazy), schema_hash(output))
+  drop_time <- function(x) dplyr::select(x, -"timestamp")
+  expect_identical(
+    drop_time(audit_step(lazy, "s", "clean", input = input, keys = "id")),
+    drop_time(audit_step(output, "s", "clean", input = input, keys = "id"))
+  )
+  # A lazy input counts the same as an in-memory one.
+  expect_identical(
+    drop_time(audit_step(input, "s", "clean", input = lazy, keys = "id")),
+    drop_time(audit_step(input, "s", "clean", input = output, keys = "id"))
+  )
+})

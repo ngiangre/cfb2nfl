@@ -365,3 +365,44 @@ test_that("clean_plays normalizes CFBD's out-of-range situations", {
   expect_equal(out$period, c(NA, 1L, 6L))
   expect_equal(out$clock_minutes, c(NA, 14L, 0L))
 })
+
+test_that("plays contracts gate a lazy table like an in-memory one", {
+  skip_if_not_installed("arrow")
+  games <- mk_plays_games()
+  plays <- mk_plays()
+  expect_true(pointblank::all_passed(
+    contract_plays(as_lazy(plays), games, stop_on_fail = FALSE)
+  ))
+  bad <- dplyr::mutate(plays, down = 5L)
+  expect_false(pointblank::all_passed(
+    contract_plays(as_lazy(bad), games, stop_on_fail = FALSE)
+  ))
+  # The gate aborts tar_make() on a lazy table's failed contract.
+  expect_error(
+    assert_contracts_pass(list(
+      plays = pointblank::all_passed(
+        contract_plays(as_lazy(bad), games, stop_on_fail = FALSE)
+      )
+    )),
+    "plays"
+  )
+  types <- mk_play_stat_types()
+  ps <- clean_play_stats(unnest_clock(mk_play_stats_raw()), types)
+  roster <- tibble::tibble(playerId = c("5327659", "5141629"))
+  expect_true(pointblank::all_passed(
+    contract_play_stats(
+      as_lazy(ps),
+      as_lazy(plays),
+      roster,
+      stop_on_fail = FALSE
+    )
+  ))
+  expect_false(pointblank::all_passed(
+    contract_play_stats(
+      as_lazy(ps),
+      as_lazy(plays[0, ]),
+      roster,
+      stop_on_fail = FALSE
+    )
+  ))
+})

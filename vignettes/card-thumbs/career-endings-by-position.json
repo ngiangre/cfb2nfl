@@ -1,0 +1,21 @@
+{
+  "id": "career-endings-by-position",
+  "release": "2026-11-25",
+  "code_hash": "b5610df16e89cc39d8a6f8dc1a8ef24d",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "career_endings": "4fa3d0c4500176cd13cd4e8d68487bed",
+    "ending_incidence": "0ff847f04597913c0df54952a0b6a33c",
+    "ending_labels": "d7e87df8d8263aa1b5193e5033cc1268",
+    "ending_palette": "85f0e7f0c9562b9bbc535350335a7253",
+    "fmt": "d4c89f195c447af907ba425a860522de",
+    "label_endings": "77f5c01e1f49f7936aa359e798e3d16a",
+    "pct": "3413c026fc8c907293b2fb1d96080440",
+    "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
+    "position_group_levels": "20e3516fb9bf8abbe12f3fd702d9d55f",
+    "route_incidence": "0868f8ef90bb49e8e4761b0951e11abd",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b",
+    "thin_position_groups": "49424be45ace6683f03b3e3e7f4e7332"
+  }
+}

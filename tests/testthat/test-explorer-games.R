@@ -430,3 +430,75 @@ test_that("contract_explorer_plays_files catches missing, extra and oversized sh
     stop_on_fail = FALSE
   )))
 })
+
+test_that("explorer plays build, write and contracts take lazy tables", {
+  skip_if_not_installed("arrow")
+  plays <- explorer_plays_fixture()
+  games <- explorer_games_fixture()
+  stats <- explorer_play_stats_fixture()
+  p <- build_explorer_plays(plays, games, explorer_teams_fixture(), stats)
+  expect_identical(
+    build_explorer_plays(
+      as_lazy(plays),
+      games,
+      explorer_teams_fixture(),
+      as_lazy(stats)
+    ),
+    p
+  )
+  expect_true(pointblank::all_passed(
+    contract_explorer_plays(p, plays, games, stop_on_fail = FALSE)
+  ))
+  expect_true(pointblank::all_passed(
+    contract_explorer_plays(
+      as_lazy(p),
+      as_lazy(plays),
+      games,
+      stop_on_fail = FALSE
+    )
+  ))
+  # One play lost on the way fails the no-loss check.
+  expect_false(pointblank::all_passed(
+    contract_explorer_plays(
+      as_lazy(p[-1, ]),
+      as_lazy(plays),
+      games,
+      stop_on_fail = FALSE
+    )
+  ))
+  eager <- write_explorer_plays(p, withr::local_tempdir())
+  lazy <- write_explorer_plays(as_lazy(p), withr::local_tempdir())
+  files <- list.files(eager, recursive = TRUE)
+  expect_identical(list.files(lazy, recursive = TRUE), files)
+  for (f in files) {
+    expect_identical(
+      arrow::read_parquet(file.path(lazy, f)),
+      arrow::read_parquet(file.path(eager, f))
+    )
+  }
+  expect_true(pointblank::all_passed(contract_explorer_plays_files(
+    lazy,
+    as_lazy(p),
+    stop_on_fail = FALSE
+  )))
+})
+
+test_that("json_rows gives each row exactly as toJSON() writes it", {
+  df <- data.frame(
+    id = c("1", "2", "3", "4"),
+    name = c("Ja'Marr \"Ja\" Chase", "Zoë Ñuñez", "back\\slash", "new\nline"),
+    stat = c("Rush, Fumble", NA, "Target", "Tackle"),
+    pos = c("WR", NA, NA, "LB"),
+    text = c(FALSE, TRUE, FALSE, TRUE)
+  )
+  groups <- list(1:2, 3L, 4L)
+  rows <- json_rows(df)
+  expect_length(rows, nrow(df))
+  for (g in groups) {
+    expect_identical(
+      paste0("[", paste(rows[g], collapse = ","), "]"),
+      as.character(jsonlite::toJSON(df[g, , drop = FALSE]))
+    )
+  }
+  expect_identical(json_rows(df[0, ]), character())
+})
