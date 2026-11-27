@@ -61,6 +61,7 @@ data_release_date <- function(dir = file.path(card_root(), "data")) {
 #' the package root) to keep thumbnails where they are committed.
 #'
 #' @param input The file being rendered.
+#' @param root The checkout root.
 #' @return `card_root()`: the checkout root. `card_source()`: the card's
 #'   path under `vignettes/`. `card_thumb_dir()`: the thumbnail directory.
 #' @export
@@ -71,14 +72,16 @@ card_root <- function() {
 
 #' @rdname card_root
 #' @export
-card_source <- function(input = knitr::current_input()) {
-  file.path(card_root(), "vignettes", basename(input))
+card_source <- function(input = knitr::current_input(), root = card_root()) {
+  # Quarto knits an intermediate `.rmarkdown` copy, so take the stem.
+  stem <- tools::file_path_sans_ext(basename(input))
+  file.path(root, "vignettes", paste0(stem, ".qmd"))
 }
 
 #' @rdname card_root
 #' @export
-card_thumb_dir <- function() {
-  file.path(card_root(), "vignettes", "card-thumbs")
+card_thumb_dir <- function(root = card_root()) {
+  file.path(root, "vignettes", "card-thumbs")
 }
 
 #' The R code of a card
@@ -108,48 +111,103 @@ card_code <- function(card) {
   lines[keep]
 }
 
-# Package functions named in a set of expressions or function bodies.
-pkg_names_in <- function(x, ns) {
-  intersect(all.names(x), ls(ns))
+# Every top-level function defined in R/, parsed from the files rather than
+# the loaded namespace so the style check needs no package load. Each entry
+# keeps the function expression (to trace what it calls) and a hash of its
+# source tokens without comments, so comment and layout edits do not stale a
+# thumbnail, and the hash is the same on every platform and R version.
+r_function_index <- function(root = card_root()) {
+  files <- list.files(file.path(root, "R"), "[.][Rr]$", full.names = TRUE)
+  index <- list()
+  for (f in files) {
+    exprs <- parse(f, keep.source = TRUE)
+    refs <- attr(exprs, "srcref")
+    for (i in seq_along(exprs)) {
+      e <- exprs[[i]]
+      is_fn_def <- is.call(e) &&
+        is.name(e[[1]]) &&
+        as.character(e[[1]]) %in% c("<-", "=") &&
+        is.name(e[[2]]) &&
+        is.call(e[[3]]) &&
+        identical(e[[3]][[1]], as.name("function"))
+      if (!is_fn_def) {
+        next
+      }
+      pd <- utils::getParseData(
+        parse(text = as.character(refs[[i]]), keep.source = TRUE)
+      )
+      tokens <- pd$text[pd$terminal & pd$token != "COMMENT"]
+      index[[as.character(e[[2]])]] <- list(
+        expr = e[[3]],
+        hash = rlang::hash(tokens)
+      )
+    }
+  }
+  index
 }
+
+# Card plumbing that saves, shows or checks a figure but does not shape it;
+# editing it should not stale every thumbnail.
+card_machinery <- c(
+  "card_thumbnail",
+  "card_interactive",
+  "card_footer",
+  "card_freshness",
+  "card_functions",
+  "card_hashes",
+  "card_code",
+  "card_root",
+  "card_source",
+  "card_thumb_dir",
+  "card_vocabulary",
+  "qmd_front_matter",
+  "r_function_index",
+  "data_release_date",
+  "record_release_date",
+  "write_release_stamp"
+)
 
 #' The cfb2nfl functions a card calls
 #'
-#' Every package function the card's code names, plus every package function
+#' Every function defined in `R/` that the card's code names, plus every one
 #' those call in turn, so a change to a helper deep in a builder still stales
-#' the thumbnail.
+#' the thumbnail. The card machinery (saving, showing and checking the
+#' figure) is left out: it does not change what the figure shows.
 #'
 #' @param card Path to a `card-<id>.qmd`.
+#' @param root The checkout root.
+#' @param index The parsed `R/` functions (built from `root` if not given).
 #' @return A sorted character vector of function names.
 #' @export
-card_functions <- function(card) {
-  ns <- asNamespace("cfb2nfl")
+card_functions <- function(
+  card,
+  root = card_root(),
+  index = r_function_index(root)
+) {
+  index <- index[setdiff(names(index), card_machinery)]
   exprs <- parse(text = card_code(card), keep.source = FALSE)
-  is_fn <- function(f) is.function(get(f, envir = ns))
-  found <- Filter(is_fn, pkg_names_in(exprs, ns))
+  found <- intersect(all.names(exprs), names(index))
   queue <- found
   while (length(queue) > 0) {
-    f <- get(queue[[1]], envir = ns)
-    queue <- queue[-1]
-    new <- setdiff(Filter(is_fn, pkg_names_in(body(f), ns)), found)
+    new <- setdiff(
+      intersect(all.names(index[[queue[[1]]]]$expr), names(index)),
+      found
+    )
+    queue <- c(queue[-1], new)
     found <- c(found, new)
-    queue <- c(queue, new)
   }
   sort(found)
 }
 
-# Hash of a function's code, ignoring comments and layout (the deparse does
-# not use the source reference).
-fn_hash <- function(name) {
-  f <- get(name, envir = asNamespace("cfb2nfl"))
-  rlang::hash(deparse(f, control = c("keepNA", "keepInteger", "niceNames")))
-}
-
-card_hashes <- function(card) {
-  fns <- card_functions(card)
+card_hashes <- function(
+  card,
+  root = card_root(),
+  index = r_function_index(root)
+) {
+  fns <- card_functions(card, index = index)
   list(
     code_hash = rlang::hash(card_code(card)),
-    functions = stats::setNames(lapply(fns, fn_hash), fns)
+    functions = stats::setNames(lapply(fns, \(f) index[[f]]$hash), fns)
   )
 }
 
@@ -166,6 +224,7 @@ card_hashes <- function(card) {
 #' @param card Path to the card file.
 #' @param release The data release date, or `NULL`.
 #' @param dir Thumbnail directory.
+#' @param root The checkout root (whose `R/` functions are hashed).
 #' @param width,height Size in inches.
 #' @param dpi Resolution.
 #' @return The PNG path, invisibly.
@@ -173,9 +232,10 @@ card_hashes <- function(card) {
 card_thumbnail <- function(
   p,
   id,
-  card = card_source(),
+  card = card_source(root = root),
   release = NULL,
-  dir = card_thumb_dir(),
+  dir = card_thumb_dir(root),
+  root = card_root(),
   width = 8,
   height = 5.5,
   dpi = 120
@@ -196,7 +256,7 @@ card_thumbnail <- function(
       id = id,
       release = if (is.null(release)) NULL else format(release, "%Y-%m-%d")
     ),
-    card_hashes(card)
+    card_hashes(card, root = root)
   )
   jsonlite::write_json(
     side,
@@ -218,6 +278,9 @@ card_thumbnail <- function(
 #' @param id The card id.
 #' @param dir Thumbnail directory.
 #' @param release The current data release date, or `NULL` to skip that check.
+#' @param root The checkout root.
+#' @param index The parsed `R/` functions (reused across cards by the style
+#'   check).
 #' @return A list: `status` (`"fresh"`, `"missing"`, `"stale_code"`,
 #'   `"stale_r"` or `"stale_data"`) and `changed` (the functions that
 #'   changed, for `"stale_r"`).
@@ -225,8 +288,10 @@ card_thumbnail <- function(
 card_freshness <- function(
   card,
   id,
-  dir = card_thumb_dir(),
-  release = NULL
+  dir = card_thumb_dir(root),
+  release = NULL,
+  root = card_root(),
+  index = r_function_index(root)
 ) {
   png <- file.path(dir, paste0(id, ".png"))
   json <- file.path(dir, paste0(id, ".json"))
@@ -234,7 +299,7 @@ card_freshness <- function(
     return(list(status = "missing", changed = character()))
   }
   side <- jsonlite::read_json(json)
-  now <- card_hashes(card)
+  now <- card_hashes(card, index = index)
   if (!identical(side$code_hash, now$code_hash)) {
     return(list(status = "stale_code", changed = character()))
   }

@@ -365,6 +365,18 @@ all of it. Years 2010–2026.
   apply it everywhere rather than re-theming per plot: `theme_cfb2nfl()`,
   `scale_fill_team()`/`scale_color_team()`, and for card thumbnails
   `theme_card()` with `card_caption()` (feature F25).
+- **Figure cards** (feature F25, replacing the dated posts; full rules land
+  with decision 0053, #134): one question, one figure, one file
+  `vignettes/card-<id>.qmd` (the id is the permanent URL). Start one with
+  `new_card("<id>", "<question>?")` from `vignettes/_card-template.qmd`; tag
+  it only from `inst/cards/tags.yml` and `inst/cards/questions.yml` (a new
+  tag is added there in the same PR). **Render the card locally and commit
+  its thumbnail** (`vignettes/card-thumbs/<id>.png` + `.json`): the sidecar
+  hashes the card's code and the `R/` functions that shape the figure, and
+  `check_card_style()` (CI `post-style.yaml`, `devtools::test()`, the edit
+  hook) fails a stale one. The Investigations page lists every card as a
+  filterable wall (`vignettes/card-wall.ejs`) above the posts table. Run the
+  `vignette-reviewer` agent in card mode before the PR.
 - **Blog posts** (decision 0015): dated files `vignettes/YYYY-MM-DD-slug.qmd`,
   each YAML carrying `description:` (one declarative sentence stating the
   finding, not the topic) and `followups:` (list of open questions / next

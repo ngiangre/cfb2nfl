@@ -1,5 +1,22 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Investigations (feature F25,
+  [#132](https://github.com/ngiangre/cfb2nfl/issues/132)): **the
+  Investigations page now opens with a wall of figure cards**, a grid of
+  tiles (question, thumbnail, status, tags) that a fan can search, including
+  each figure's description, or filter by clicking any tag; it is one column
+  on a phone, and the dated posts stay listed below until their cards are
+  up. A card is one `vignettes/card-<id>.qmd`, started with `new_card()`
+  from a template whose page shows the interactive figure, its code, the
+  data release and linked follow-ups (`card_footer()`). Tags come only from
+  the approved `inst/cards/tags.yml` and the project's questions in
+  `inst/cards/questions.yml`. `check_card_style()` runs in CI and the tests
+  and fails a card with an unapproved tag, a missing or stale thumbnail,
+  typed numbers or column names in figure text, narrative prose, or a
+  redefined shared helper. Thumbnail freshness now hashes the source of the
+  `R/` functions that shape the figure, so it matches on every platform and
+  ignores comments and the card machinery.
+
 - Investigations (feature F25, groundwork for the figure wall in
   [#127](https://github.com/ngiangre/cfb2nfl/issues/127)): **the number
   helpers every post copied inline are now shared, tested functions**

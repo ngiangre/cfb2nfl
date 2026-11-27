@@ -7,9 +7,10 @@
 card_thumbnail(
   p,
   id,
-  card = card_source(),
+  card = card_source(root = root),
   release = NULL,
-  dir = card_thumb_dir(),
+  dir = card_thumb_dir(root),
+  root = card_root(),
   width = 8,
   height = 5.5,
   dpi = 120
@@ -25,6 +26,8 @@ card_thumbnail(
 \item{release}{The data release date, or \code{NULL}.}
 
 \item{dir}{Thumbnail directory.}
+
+\item{root}{The checkout root (whose \verb{R/} functions are hashed).}
 
 \item{width, height}{Size in inches.}
 

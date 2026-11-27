@@ -4,7 +4,14 @@
 \alias{card_freshness}
 \title{Is a card's thumbnail still in step with its card?}
 \usage{
-card_freshness(card, id, dir = card_thumb_dir(), release = NULL)
+card_freshness(
+  card,
+  id,
+  dir = card_thumb_dir(root),
+  release = NULL,
+  root = card_root(),
+  index = r_function_index(root)
+)
 }
 \arguments{
 \item{card}{Path to the card file.}
@@ -14,6 +21,11 @@ card_freshness(card, id, dir = card_thumb_dir(), release = NULL)
 \item{dir}{Thumbnail directory.}
 
 \item{release}{The current data release date, or \code{NULL} to skip that check.}
+
+\item{root}{The checkout root.}
+
+\item{index}{The parsed \verb{R/} functions (reused across cards by the style
+check).}
 }
 \value{
 A list: \code{status} (\code{"fresh"}, \code{"missing"}, \code{"stale_code"},
