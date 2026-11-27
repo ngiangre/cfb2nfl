@@ -21,7 +21,9 @@
   the published parquet is referenced, not copied into `_targets/`, and each
   step reads only the columns it needs (`collect_cols()`). Contracts, the
   audit log and the DuckDB bundle check and carry exactly what they did
-  before. A non-interactive `tar_read()` of one of these tables now needs
+  before. The explorer's play table builds about five times faster (135 s
+  to 28 s), its player lists now written for all plays at once. A
+  non-interactive `tar_read()` of one of these tables now needs
   `TAR_ASK=false`
   ([decision 0053](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0053-lazy-arrow-pipeline-tables.md)).
 

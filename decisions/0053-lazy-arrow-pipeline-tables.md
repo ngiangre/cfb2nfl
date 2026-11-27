@@ -97,7 +97,7 @@ machine (macOS, Apple silicon), baseline `main` at 5bb8c61:
 | `duckdb_file` | 24.7 s | 10.2 s | |
 | `plays` stored | 139 MB | 145 B | |
 | `nfl_pbp` stored | 95 MB | 147 B | |
-| `explorer_plays` | 135.5 s | 134.7 s | |
+| `explorer_plays` | 135.5 s | 134.7 s | 27.9 s after the JSON change below |
 
 Outputs are identical: all 50 contract results, the audit log (schema
 hashes and NA profiles included), the derived targets, all 1,625 explorer
@@ -114,6 +114,12 @@ with the "changed since the target was built" error, as intended.
 
 Peak memory barely moved, so the build's peak is set somewhere other than
 holding these tables; finding where is not part of this change.
-`explorer_plays` is unchanged because 79% of its time is one
-`jsonlite::toJSON()` call per play inside `summarise()`, which is R-side
-logic, not reading; that is the next place to look.
+
+`explorer_plays` did not speed up from the format alone: 79% of its time
+was one `jsonlite::toJSON()` call per play inside `summarise()`. The player
+arrays are now built for all plays at once (`json_rows()`:
+`jsonlite::stream_out()` renders every row in one pass, and each play's rows
+are joined in order), which takes the target from 135.5 s to 27.9 s with
+the same table and the same 1,625 explorer files byte for byte. A test pins
+`json_rows()` to `toJSON()` on quotes, backslashes, newlines, non-ASCII
+names and missing fields.

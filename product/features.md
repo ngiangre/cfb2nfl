@@ -538,8 +538,7 @@ acceptance criteria.
     instead of returning the new data (a fixture test), and the pipeline
     docs tell a P2 reader to set `TAR_ASK=false` for a non-interactive
     `tar_read()` of one.
-- **Out of scope:** peak memory and the `explorer_plays` JSON cost
-  (decision 0053).
+- **Out of scope:** peak memory (decision 0053).
 - **Cost:** 0 CFBD calls, no new tables, decision 0053.
 - **Review:** feature-reviewer 2026-11-26: aligned after changes (applied).
 - **Tasks:**

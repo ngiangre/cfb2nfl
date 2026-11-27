@@ -482,3 +482,23 @@ test_that("explorer plays build, write and contracts take lazy tables", {
     stop_on_fail = FALSE
   )))
 })
+
+test_that("json_rows gives each row exactly as toJSON() writes it", {
+  df <- data.frame(
+    id = c("1", "2", "3", "4"),
+    name = c("Ja'Marr \"Ja\" Chase", "Zoë Ñuñez", "back\\slash", "new\nline"),
+    stat = c("Rush, Fumble", NA, "Target", "Tackle"),
+    pos = c("WR", NA, NA, "LB"),
+    text = c(FALSE, TRUE, FALSE, TRUE)
+  )
+  groups <- list(1:2, 3L, 4L)
+  rows <- json_rows(df)
+  expect_length(rows, nrow(df))
+  for (g in groups) {
+    expect_identical(
+      paste0("[", paste(rows[g], collapse = ","), "]"),
+      as.character(jsonlite::toJSON(df[g, , drop = FALSE]))
+    )
+  }
+  expect_identical(json_rows(df[0, ]), character())
+})

@@ -256,18 +256,27 @@ build_explorer_plays <- function(
     players$pos <- NA_character_
     players$position <- NA_character_
   }
-  players <- players |>
-    dplyr::summarise(
-      players = as.character(jsonlite::toJSON(data.frame(
-        id = .data$athleteId,
-        name = .data$athleteName,
-        stat = .data$stat,
-        pos = .data$pos,
-        position = .data$position,
-        text = .data$text
-      ))),
-      .by = "playId"
+  # The same string toJSON() gives each play's data frame, built for all
+  # plays at once: one JSON object per player row, joined per play in row
+  # order. A toJSON() call per play was most of this function's time.
+  rows <- json_rows(data.frame(
+    id = players$athleteId,
+    name = players$athleteName,
+    stat = players$stat,
+    pos = players$pos,
+    position = players$position,
+    text = players$text
+  ))
+  play_ids <- unique(players$playId)
+  by_play <- split(rows, match(players$playId, play_ids))
+  players <- tibble::tibble(
+    playId = play_ids,
+    players = paste0(
+      "[",
+      vapply(by_play, paste, character(1), collapse = ",", USE.NAMES = FALSE),
+      "]"
     )
+  )
   plays |>
     dplyr::left_join(homes, by = "gameId", relationship = "many-to-one") |>
     dplyr::left_join(
@@ -369,6 +378,22 @@ build_explorer_plays <- function(
       turnover = .data$playType %in% explorer_turnover_types(),
       players = .data$players
     )
+}
+
+# One JSON object per data frame row, exactly as jsonlite::toJSON() writes
+# each row inside its array (NA fields left out). stream_out() renders every
+# row in one vectorized pass and writes one object per line; JSON strings
+# escape newlines, so a line is a row.
+json_rows <- function(df) {
+  if (!nrow(df)) {
+    return(character())
+  }
+  con <- rawConnection(raw(0), "wb")
+  on.exit(close(con))
+  jsonlite::stream_out(df, con, pagesize = nrow(df), verbose = FALSE)
+  out <- strsplit(rawToChar(rawConnectionValue(con)), "\n", fixed = TRUE)[[1]]
+  Encoding(out) <- "UTF-8"
+  out
 }
 
 #' Write the per-season team-games JSON files
