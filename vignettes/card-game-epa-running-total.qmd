@@ -1,0 +1,131 @@
+---
+title: "Did Georgia's running EPA rise in every quarter while Missouri's stayed below zero until the third quarter?"
+aliases: [2026-11-18-game-flow-epa.html]
+image: card-thumbs/game-epa-running-total.png
+image-alt: "Step line chart of each team's running total of expected points added across the game's four quarters, one line per team in its colors; Georgia's line climbs in every quarter while Missouri's dips below zero in the first quarter and crosses zero only in the third."
+categories: ["Topic: Games", "Position: All positions", "Population: Games", "Figure: Line chart"]
+status: investigation
+graduated_to: null
+terms: [scrimmage-play, expected-points, epa-ppa, running-epa]
+followups:
+  - text: "Which players drove each team's EPA, and does the leaderboard change when credit is split by involvement?"
+    link: "F12"
+  - text: "Would a fixed-effects line-strength model explain the Missouri first-quarter deficit better than the raw running total?"
+    link: "F12"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+game_id <- 401856883
+teams <- collect(tbl(con, "teams"))
+```
+
+```{r}
+#| label: game-epa
+# The game's scrimmage plays, with each play's EPA from the expected points
+# curve fit on every 2026 scrimmage play, then the running total per offense.
+plays <- game_plays(con, game_id)
+home <- plays$home[1]
+away <- plays$away[1]
+season <- DBI::dbGetQuery(
+  con,
+  paste0(
+    "SELECT gameId, driveId, driveNumber, playNumber, period, offense, ",
+    "defense, home, away, offenseScore, defenseScore, yardline, yardsToGoal, ",
+    "down, distance, yardsGained, playType, playText, ppa ",
+    "FROM plays WHERE season = 2026"
+  )
+)
+fit <- game_ep_fit(season)
+epa <- game_epa_model(game_scrimmage(plays), fit)
+run <- game_running(epa)
+tot <- run |>
+  summarise(total = sum(ppa), plays = n(), per_play = mean(ppa), .by = offense)
+mz_low <- run |>
+  filter(offense == away) |>
+  slice_min(cum_ppa, n = 1, with_ties = FALSE)
+ga_end <- tot$total[tot$offense == home]
+mz_end <- tot$total[tot$offense == away]
+```
+
+```{r}
+#| label: figure
+p <- ggplot(run, aes(game_min, cum_ppa, color = offense)) +
+  geom_hline(yintercept = 0, linewidth = 0.3) +
+  geom_vline(xintercept = c(15, 30, 45), linetype = "dashed", linewidth = 0.5) +
+  geom_step(linewidth = 1.2) +
+  annotate(
+    "point",
+    x = mz_low$game_min,
+    y = mz_low$cum_ppa,
+    shape = 4,
+    size = 4,
+    stroke = 1.2
+  ) +
+  annotate(
+    "text",
+    x = mz_low$game_min + 1,
+    y = mz_low$cum_ppa - 4,
+    label = paste0(away, " low: ", round(mz_low$cum_ppa, 1)),
+    hjust = 0,
+    size = 6
+  ) +
+  scale_color_team(teams, name = "Offense") +
+  scale_x_continuous(breaks = c(0, 15, 30, 45, 60), limits = c(0, 60)) +
+  labs(
+    title = "Running total of EPA by offense",
+    subtitle = paste0(
+      "Scrimmage plays with an EPA, game minutes; dashed lines mark quarter breaks"
+    ),
+    x = "Game minutes elapsed",
+    y = "Cumulative EPA",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "game-epa-running-total", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: table
+tot |>
+  transmute(
+    Offense = offense,
+    Plays = plays,
+    `Total EPA` = round(total, 1),
+    `EPA per play` = round(per_play, 2)
+  ) |>
+  knitr::kable(
+    col.names = c("Offense", "Plays", "Total EPA", "EPA per play"),
+    caption = paste0(
+      "Total and per-play EPA by offense over the ",
+      sum(tot$plays),
+      " scrimmage plays of the game that carry an EPA."
+    )
+  )
+```
+
+```{r}
+#| label: footer
+cat(card_footer())
+```

@@ -238,3 +238,37 @@ sp-plus:
 transfer-in:
   label: Transfer-in
   definition: "An eligible player who was on a different school's roster in an earlier season before finishing at the school that gets the credit."
+# ---- batch games ----
+scrimmage-play:
+  label: Scrimmage play
+  definition: "A run or pass attempt. Kickoffs, punts, kicks, penalties without a play and period breaks carry no EPA and are left out."
+expected-points:
+  label: Expected points (EP)
+  definition: "The points an offense is expected to net over the rest of the half, from its down, distance and field position, read off a curve fit on every scrimmage play of the season."
+epa-ppa:
+  label: EPA (PPA)
+  definition: "Points a play added to the offense: the expected points after it minus those before it. Every EPA on these cards is the predicted points added (PPA) that CFBD publishes for the play, except where the expected-points curve is named."
+running-epa:
+  label: Running EPA
+  definition: "A team's EPA summed over its own plays in game order, so the line shows how far the offense has moved ahead or behind across the game."
+drive-epa-per-play:
+  label: Drive EPA per play
+  definition: "The average EPA of one drive's plays, one value per drive."
+drive:
+  label: Drive
+  definition: "One possession, from taking the ball to scoring, punting, turning it over or the half ending."
+explosive-play:
+  label: Explosive play
+  definition: "A play worth at least 1.5 EPA to its offense."
+involvement:
+  label: Involvement
+  definition: "A player named on a play: a passer, rusher, target, tackler, or a defender who broke up a pass, forced a fumble or intercepted it."
+epa-contributed:
+  label: EPA contributed
+  definition: "A play's EPA split evenly among the players named on each side, positive for the offense and reversed for the defense, then summed over the game."
+epa-per-involvement:
+  label: EPA per involvement
+  definition: "The average EPA, from the player's own side, of the plays the player was named on."
+typical-play:
+  label: Typical play
+  definition: "A position group's average EPA per involvement over both teams, the baseline each team's players in that group are measured against."

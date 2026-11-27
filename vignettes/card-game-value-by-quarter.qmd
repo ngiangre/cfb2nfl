@@ -1,0 +1,206 @@
+---
+title: "Did Missouri's first quarter run net negative with no explosive plays, while its fourth quarter leaned on them?"
+image: card-thumbs/game-value-by-quarter.png
+image-alt: "Bar chart of each team's EPA in each quarter of the game, split into three panels by play size: explosive plays, ordinary plays and negative plays; Missouri's first-quarter bar is deep and negative with no explosive bar, and its fourth quarter carries a large explosive bar."
+categories: ["Topic: Games", "Position: All positions", "Population: Games", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [scrimmage-play, epa-ppa, explosive-play, running-epa]
+followups:
+  - text: "Which players made the explosive plays in each quarter, and how much of each quarter's value they account for?"
+    link: "F12"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+game_id <- 401856883
+teams <- collect(tbl(con, "teams"))
+```
+
+```{r}
+#| label: game-epa
+# The game's rated scrimmage plays with each play's EPA (the same model as
+# the running-total card), then each rated play's band and quarter.
+plays <- game_plays(con, game_id)
+home <- plays$home[1]
+away <- plays$away[1]
+season <- DBI::dbGetQuery(
+  con,
+  paste0(
+    "SELECT gameId, driveId, driveNumber, playNumber, period, offense, ",
+    "defense, home, away, offenseScore, defenseScore, yardline, yardsToGoal, ",
+    "down, distance, yardsGained, playType, playText, ppa ",
+    "FROM plays WHERE season = 2026"
+  )
+)
+fit <- game_ep_fit(season)
+epa <- game_epa_model(game_scrimmage(plays), fit)
+bands <- game_bands(epa, threshold = 1.5)
+band_levels <- c(
+  "Negative play (EPA below 0)",
+  "Ordinary play (EPA 0 to 1.5)",
+  "Explosive play (EPA 1.5+)"
+)
+qtr <- bands |>
+  summarise(epa = sum(ppa), plays = n(), .by = c(offense, quarter, band)) |>
+  mutate(
+    band = factor(band, band_levels),
+    band_short = factor(
+      sub(" play.*", "", band),
+      c("Negative", "Ordinary", "Explosive")
+    )
+  )
+```
+
+```{r}
+#| label: figure
+p <- ggplot(qtr, aes(quarter, epa, fill = offense)) +
+  geom_col_interactive(
+    aes(
+      tooltip = paste0(
+        "<b>",
+        offense,
+        " ",
+        quarter,
+        "</b><br>",
+        band,
+        ": ",
+        round(epa, 1),
+        " EPA over ",
+        plays,
+        " plays"
+      ),
+      data_id = paste(offense, quarter, band)
+    ),
+    position = "dodge2",
+    width = 0.8
+  ) +
+  geom_hline(yintercept = 0, linewidth = 0.4) +
+  facet_wrap(~band_short) +
+  scale_fill_team(teams, name = NULL) +
+  labs(
+    title = "EPA by quarter, split by play size",
+    subtitle = "Each panel is one kind of play; teams sit side by side",
+    x = NULL,
+    y = "EPA in the quarter",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "game-value-by-quarter", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: explore
+# Each band's running EPA within each quarter, one panel per team and quarter.
+# Every line starts at 0 when the quarter opens and holds its total to the
+# final whistle, so a band with no plays stays flat at 0.
+band_steps <- bands |>
+  arrange(offense, period, seq) |>
+  mutate(band = factor(band, band_levels)) |>
+  mutate(cum = cumsum(ppa), .by = c(offense, quarter, band)) |>
+  mutate(
+    tip = paste0(
+      "<b>",
+      offense,
+      " ",
+      quarter,
+      ", ",
+      clock_minutes,
+      ":",
+      sprintf("%02d", clock_seconds),
+      " left</b><br>",
+      playText,
+      "<br>",
+      band,
+      ": ",
+      round(ppa, 2),
+      " EPA, running ",
+      round(cum, 2)
+    )
+  )
+band_ends <- band_steps |>
+  summarise(end = last(cum), .by = c(offense, quarter, band)) |>
+  tidyr::complete(
+    offense = c(home, away),
+    quarter = paste0("Q", 1:4),
+    band = factor(band_levels, band_levels),
+    fill = list(end = 0)
+  )
+band_lines <- bind_rows(
+  transmute(band_ends, offense, quarter, band, minute = 0, cum = 0),
+  select(band_steps, offense, quarter, band, minute = minute, cum),
+  transmute(band_ends, offense, quarter, band, minute = 15, cum = end)
+) |>
+  arrange(offense, quarter, band, minute)
+p_stack <- ggplot(band_lines, aes(minute, cum, color = band)) +
+  geom_hline(yintercept = 0, linewidth = 0.4) +
+  geom_step(linewidth = 0.9) +
+  geom_point_interactive(
+    data = band_steps,
+    aes(minute, cum, tooltip = tip),
+    size = 1.8
+  ) +
+  facet_grid(quarter ~ offense) +
+  scale_color_manual(
+    values = c(
+      "Negative play (EPA below 0)" = "#b91c1c",
+      "Ordinary play (EPA 0 to 1.5)" = "#6b7280",
+      "Explosive play (EPA 1.5+)" = "#15803d"
+    ),
+    name = NULL,
+    guide = guide_legend(nrow = 1)
+  ) +
+  scale_x_continuous(breaks = c(0, 5, 10, 15)) +
+  labs(
+    y = "Running EPA within the quarter",
+    x = "Minutes into the quarter",
+    title = "How each quarter's EPA built up, by play size"
+  ) +
+  theme_card()
+card_interactive(p_stack, width_svg = 11, height_svg = 9)
+```
+
+```{r}
+#| label: table
+bands |>
+  count(offense, quarter, band) |>
+  tidyr::pivot_wider(names_from = band, values_from = n, values_fill = 0) |>
+  arrange(match(offense, c(home, away)), quarter) |>
+  transmute(
+    Offense = offense,
+    Quarter = quarter,
+    Negative = `Negative play (EPA below 0)`,
+    Ordinary = `Ordinary play (EPA 0 to 1.5)`,
+    Explosive = `Explosive play (EPA 1.5+)`
+  ) |>
+  knitr::kable(
+    col.names = c("Offense", "Quarter", "Negative plays", "Ordinary plays", "Explosive plays"),
+    caption = "Scrimmage plays with an EPA in each quarter, by play size."
+  )
+```
+
+```{r}
+#| label: footer
+cat(card_footer())
+```
