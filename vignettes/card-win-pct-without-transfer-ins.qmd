@@ -1,0 +1,272 @@
+---
+title: "Does leaving out transfer-ins change how closely win % tracks draft rate?"
+image: card-thumbs/win-pct-without-transfer-ins.png
+image-alt: "Paired bars for each tier showing how closely school win % tracks draft rate, with all eligible players and with transfer-ins left out. The two bars in each tier are almost the same length, and the Power bars are the longer pair."
+categories: ["Topic: Programs and conferences", "Position: All positions", "Population: Draft-eligible players", "Unit: Schools", "Figure: Bar chart", "Question: What matters for going pro"]
+status: investigation
+graduated_to: null
+terms: [transfer-in, eligible-player, final-season, tier, power-tier, group-of-5-tier, draft-rate, win-pct, correlation, confidence-interval]
+followups:
+  - text: "Do transfer-ins draft at the same rate as players who stayed at one school, once position is held fixed?"
+    link: "F19"
+  - text: "Does recruited talent drive both winning and drafting? Add team recruiting ratings at entry as a common cause."
+    link: "F09"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+first_record <- 2010L # records cover every FBS season from 2010
+first_season <- 2013L
+last_season <- 2025L # the 2026 season is still being played
+fbs_seasons <- tbl(con, "team_season") |>
+  filter(
+    classification == "fbs",
+    season >= first_record,
+    season <= last_season
+  ) |>
+  collect()
+credited <- tbl(con, "team_draft") |>
+  filter(
+    season >= first_season,
+    season <= last_season,
+    tier_label != "FCS and below"
+  ) |>
+  collect()
+teams <- tbl(con, "teams") |> collect()
+roster <- tbl(con, "roster") |> collect()
+picks <- tbl(con, "picks") |> collect()
+# Athletes whose outcome is a signing as an undrafted free agent.
+udfa_ids <- tbl(con, "outcomes") |>
+  filter(outcome_signed_udfa_d) |>
+  distinct(playerId) |>
+  pull(playerId)
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
+
+```{r}
+#| label: compute
+#| output: false
+school <- school_record(fbs_seasons, credited)
+tier_levels <- levels(school$tier)
+# Each tier's correlation of a school measure with its draft rate, with the
+# plausible range (a 95% confidence interval) for each correlation.
+cor_tier <- function(d, x, y) {
+  d |>
+    filter(!is.na(.data[[x]]), !is.na(.data[[y]])) |>
+    group_by(tier) |>
+    group_modify(\(g, k) {
+      ct <- cor.test(g[[x]], g[[y]])
+      tibble::tibble(
+        schools = nrow(g),
+        r = unname(ct$estimate),
+        lo = ct$conf.int[1],
+        hi = ct$conf.int[2]
+      )
+    }) |>
+    ungroup()
+}
+# A transfer-in had an earlier roster season at a school other than the one
+# they finished at.
+exits <- exit_cohort(roster, picks, udfa_ids, reused_ids(roster))
+transfer_ids <- exits |>
+  select(playerId, final_team = team, last_season) |>
+  inner_join(distinct(roster, playerId, season, team), by = "playerId") |>
+  filter(season < last_season, team != final_team) |>
+  distinct(playerId) |>
+  pull(playerId)
+fbs_exits <- exits |>
+  filter(
+    eligible,
+    # exits carries its own first_season/last_season columns
+    last_season >= .env$first_season,
+    last_season <= .env$last_season
+  ) |>
+  left_join(
+    select(fbs_seasons, team, last_season = season, credit_tier = tier_label),
+    by = c("team", "last_season")
+  ) |>
+  filter(credit_tier %in% c("Power", "Group of 5")) |>
+  mutate(
+    transfer_in = playerId %in% transfer_ids,
+    credit_tier = factor(credit_tier, levels = c("Power", "Group of 5"))
+  )
+# Each school's draft rate with its transfer-ins left out.
+home <- fbs_exits |>
+  filter(!transfer_in) |>
+  group_by(team) |>
+  summarise(
+    eligible_home = n(),
+    drafted_home = sum(drafted),
+    .groups = "drop"
+  )
+school <- school |>
+  left_join(home, by = "team") |>
+  mutate(rate_home = drafted_home / eligible_home)
+win_cor <- cor_tier(school, "win_pct", "draft_rate")
+home_cor <- cor_tier(school, "win_pct", "rate_home")
+transfer_tier <- fbs_exits |>
+  group_by(credit_tier) |>
+  summarise(
+    eligible = n(),
+    eligible_tin = sum(transfer_in),
+    drafted = sum(drafted),
+    drafted_tin = sum(drafted & transfer_in),
+    .groups = "drop"
+  )
+by_class <- fbs_exits |>
+  filter(drafted) |>
+  group_by(draft_class, credit_tier) |>
+  summarise(
+    draftees = n(),
+    transfer_ins = sum(transfer_in),
+    .groups = "drop"
+  )
+r_bars <- bind_rows(
+  mutate(win_cor, version = "All eligible players"),
+  mutate(home_cor, version = "Without transfer-ins")
+) |>
+  mutate(
+    version = factor(version, levels = c("All eligible players", "Without transfer-ins")),
+    tier = factor(tier, levels = tier_levels)
+  )
+r_bars$tip <- paste0(
+  r_bars$tier,
+  ", ",
+  tolower(as.character(r_bars$version)),
+  ": r = ",
+  sprintf("%.2f", r_bars$r),
+  " (plausible range ",
+  sprintf("%.2f", r_bars$lo),
+  " to ",
+  sprintf("%.2f", r_bars$hi),
+  ")"
+)
+```
+
+```{r}
+#| label: figure
+p <- ggplot(r_bars, aes(r, tier, fill = version)) +
+  geom_col_interactive(
+    aes(tooltip = tip, data_id = paste(tier, version)),
+    position = position_dodge(width = 0.8, reverse = TRUE),
+    width = 0.75
+  ) +
+  geom_text(
+    aes(label = sprintf("%.2f", r)),
+    position = position_dodge(width = 0.8, reverse = TRUE),
+    hjust = -0.2,
+    size = 5.5,
+    fontface = "bold"
+  ) +
+  scale_fill_manual(
+    values = c("All eligible players" = "#1f2937", "Without transfer-ins" = "#9ca3af"),
+    name = NULL
+  ) +
+  scale_y_discrete(limits = rev(tier_levels)) +
+  scale_x_continuous(limits = c(0, 1.1), breaks = seq(0, 1, 0.25)) +
+  labs(
+    x = "Correlation of win % with draft rate (r)",
+    y = NULL,
+    title = "Dropping transfer-ins leaves both correlations almost where they were",
+    subtitle = "Dark bars: all eligible players; grey bars: transfer-ins left out",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "win-pct-without-transfer-ins", release = release)
+card_interactive(p, width_svg = 11, height_svg = 6)
+```
+
+```{r}
+#| label: explore
+p_explore <- by_class |>
+  mutate(
+    credit_tier = factor(credit_tier, levels = tier_levels),
+    tip = paste0(
+      credit_tier,
+      ", draft class ",
+      draft_class,
+      ": ",
+      transfer_ins,
+      " transfer-in draftees of ",
+      draftees,
+      " draftees"
+    )
+  ) |>
+  ggplot(aes(draft_class, transfer_ins, fill = credit_tier)) +
+  geom_col_interactive(
+    aes(tooltip = tip, data_id = paste(credit_tier, draft_class)),
+    width = 0.8
+  ) +
+  scale_fill_manual(values = tier_palette()[tier_levels], name = NULL) +
+  scale_x_continuous(breaks = seq(2010, 2026, 2)) +
+  labs(
+    x = "Draft class",
+    y = "Transfer-in draftees",
+    title = "Transfer-in draftees by draft class and tier",
+    subtitle = "Each bar is one draft class; hover for the transfer-in and total counts",
+    caption = card_caption(release)
+  ) +
+  theme_cfb2nfl()
+card_interactive(p_explore, width_svg = 13, height_svg = 7)
+```
+
+```{r}
+#| label: table
+transfer_tier |>
+  left_join(select(win_cor, credit_tier = tier, r_all = r), by = "credit_tier") |>
+  left_join(select(home_cor, credit_tier = tier, r_home = r), by = "credit_tier") |>
+  transmute(
+    Tier = credit_tier,
+    `Eligible players` = formatC(eligible, big.mark = ",", format = "d"),
+    `Transfer-ins among them` = paste0(
+      formatC(eligible_tin, big.mark = ",", format = "d"),
+      " (",
+      sprintf("%.0f%%", 100 * eligible_tin / eligible),
+      ")"
+    ),
+    Drafted = formatC(drafted, big.mark = ",", format = "d"),
+    `Transfer-ins among draftees` = paste0(
+      formatC(drafted_tin, big.mark = ",", format = "d"),
+      " (",
+      sprintf("%.0f%%", 100 * drafted_tin / drafted),
+      ")"
+    ),
+    `r, win % with draft rate` = sprintf("%.2f", r_all),
+    `r, without transfer-ins` = sprintf("%.2f", r_home)
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Tier", "Eligible players", "Transfer-ins among them", "Drafted",
+      "Transfer-ins among draftees", "r, win % with draft rate",
+      "r, without transfer-ins"
+    ),
+    caption = "Transfer-ins and the win % correlation with and without them, by tier, final seasons 2013 to 2025. Eligible players and draftees are counted in the tier of their final season; the correlations group schools by their school tier."
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+```

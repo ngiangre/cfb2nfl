@@ -1,0 +1,16 @@
+{
+  "id": "draft-rate-across-windows",
+  "release": "2026-11-25",
+  "code_hash": "e0e729a8b8bb9522cf15ace76b86513f",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "expected_draftees": "64d5914e1011d8d926ae1eec91744dd7",
+    "fit_tier_curves": "36cc3f978afa6fa6bf5acee3d6d4f4d8",
+    "scale_fill_team": "66b7b508d770d63fe22e556eefbdf323",
+    "school_record": "70e8382dbc7d050800c5dfbf8e83db70",
+    "team_color_values": "81a321483d63e897ef3195d95350a746",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b",
+    "tier_palette": "f3c0b15b51bf41d5a71c379c73b0c269"
+  }
+}

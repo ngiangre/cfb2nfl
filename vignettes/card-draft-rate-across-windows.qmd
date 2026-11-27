@@ -1,0 +1,233 @@
+---
+title: "Does a Power school's draft rate carry over from one five-year window to the next?"
+image: card-thumbs/draft-rate-across-windows.png
+image-alt: "Scatter plot with one dot per school, its draft rate in an early five-year window against its rate in a later window, with a dashed line marking no change. Power schools in blue sit close to the dashed line, with a few clear movers labelled; Group of 5 schools in amber spread much wider around it."
+categories: ["Topic: Programs and conferences", "Position: All positions", "Population: Draft-eligible players", "Unit: Schools", "Figure: Scatter plot", "Question: What matters for going pro"]
+status: investigation
+graduated_to: null
+terms: [tier, power-tier, group-of-5-tier, draft-rate, win-pct, correlation, confidence-interval, eligible-player, team-season]
+followups:
+  - text: "Does recruited talent drive both winning and drafting? Add team recruiting ratings at entry as a common cause."
+    link: "F09"
+  - text: "Do head coaches carry draft production with them when they change schools?"
+    link: "Question: Head coach effect"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+first_record <- 2010L
+first_season <- 2013L
+last_season <- 2025L # the 2026 season is still being played
+# The two five-year windows compared; 2018 falls between them and is left out.
+early <- c(2013L, 2017L)
+late <- c(2019L, 2023L)
+fbs_seasons <- tbl(con, "team_season") |>
+  filter(
+    classification == "fbs",
+    season >= first_record,
+    season <= last_season
+  ) |>
+  collect()
+credited <- tbl(con, "team_draft") |>
+  filter(
+    season >= first_season,
+    season <= last_season,
+    tier_label != "FCS and below"
+  ) |>
+  collect()
+teams <- tbl(con, "teams") |> collect()
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
+
+```{r}
+#| label: compute
+#| output: false
+school <- school_record(fbs_seasons, credited)
+tier_levels <- levels(school$tier)
+# A school's draft rate and win % within one window of seasons.
+rate_in <- function(w) {
+  credited |>
+    filter(season >= w[1], season <= w[2]) |>
+    group_by(team) |>
+    summarise(
+      eligible = sum(n_eligible),
+      rate = sum(n_drafted) / sum(n_eligible),
+      .groups = "drop"
+    )
+}
+win_in <- function(w) {
+  fbs_seasons |>
+    filter(season >= w[1], season <= w[2]) |>
+    group_by(team) |>
+    summarise(win = sum(wins) / sum(wins + losses), .groups = "drop")
+}
+# Schools with eligible players in both windows, with their two rates each.
+wide <- school |>
+  select(team, tier) |>
+  inner_join(
+    rate_in(early) |> rename(elig_early = eligible, rate_early = rate),
+    by = "team"
+  ) |>
+  inner_join(
+    rate_in(late) |> rename(elig_late = eligible, rate_late = rate),
+    by = "team"
+  ) |>
+  inner_join(win_in(early) |> rename(win_early = win), by = "team") |>
+  inner_join(win_in(late) |> rename(win_late = win), by = "team") |>
+  filter(elig_early > 0, elig_late > 0)
+# Correlation between windows for each tier, with its plausible range.
+cor_window <- function(d, x, y) {
+  ct <- cor.test(d[[x]], d[[y]])
+  tibble::tibble(
+    r = unname(ct$estimate),
+    lo = ct$conf.int[1],
+    hi = ct$conf.int[2]
+  )
+}
+rate_cor <- wide |>
+  group_by(tier) |>
+  group_modify(\(g, k) {
+    bind_cols(
+      tibble::tibble(schools = nrow(g)),
+      cor_window(g, "rate_early", "rate_late") |>
+        rename(r_rate = r, lo_rate = lo, hi_rate = hi),
+      cor_window(g, "win_early", "win_late") |>
+        rename(r_win = r, lo_win = lo, hi_win = hi)
+    )
+  }) |>
+  ungroup()
+# The schools that moved most within the Power tier, labelled on the figure.
+movers <- wide |>
+  filter(tier == "Power") |>
+  mutate(move = abs(rate_late - rate_early)) |>
+  slice_max(move, n = 3)
+wide$tip <- paste0(
+  wide$team,
+  " (",
+  wide$tier,
+  ")\nDraft rate in the early window: ",
+  sprintf("%.1f%%", 100 * wide$rate_early),
+  "\nDraft rate in the later window: ",
+  sprintf("%.1f%%", 100 * wide$rate_late)
+)
+long <- wide |>
+  tidyr::pivot_longer(
+    c(rate_early, rate_late),
+    names_to = "window",
+    values_to = "rate"
+  ) |>
+  mutate(
+    window = factor(
+      if_else(window == "rate_early", "Early window", "Later window"),
+      levels = c("Early window", "Later window")
+    )
+  )
+```
+
+```{r}
+#| label: figure
+p <- ggplot(wide, aes(rate_early, rate_late, color = tier)) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "#6b7280") +
+  geom_point_interactive(
+    aes(tooltip = tip, data_id = team),
+    size = 3.4,
+    alpha = 0.6
+  ) +
+  geom_text(
+    data = movers,
+    aes(label = team),
+    color = "#111827",
+    hjust = 0,
+    nudge_x = 0.01,
+    nudge_y = 0.02,
+    size = 4.5,
+    fontface = "bold",
+    check_overlap = TRUE,
+    show.legend = FALSE
+  ) +
+  scale_color_manual(values = tier_palette()[tier_levels], name = NULL) +
+  scale_x_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    x = "Draft rate, early window",
+    y = "Draft rate, later window",
+    title = "Power schools keep their place in the draft rate from one window to the next",
+    subtitle = "Each dot is a school; dots on the dashed line did not change",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "draft-rate-across-windows", release = release)
+card_interactive(p, width_svg = 11, height_svg = 6.5)
+```
+
+```{r}
+#| label: explore
+p_explore <- ggplot(long, aes(window, rate, group = team)) +
+  geom_line(color = "#9ca3af", linewidth = 0.8) +
+  geom_point_interactive(
+    aes(fill = team, tooltip = tip, data_id = team),
+    shape = 21,
+    size = 4,
+    color = "white",
+    stroke = 0.6
+  ) +
+  facet_wrap(~tier, scales = "free_y") +
+  scale_fill_team(teams, guide = "none") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    x = NULL,
+    y = "Draft rate",
+    title = "Every school's draft rate in the two windows",
+    subtitle = "Team colors; a line that slopes up gained draftees, one that slopes down lost them; hover a dot for the rates",
+    caption = card_caption(release)
+  ) +
+  theme_cfb2nfl()
+card_interactive(p_explore, width_svg = 13, height_svg = 8)
+```
+
+```{r}
+#| label: table
+rate_cor |>
+  transmute(
+    Tier = tier,
+    Schools = schools,
+    `r, draft rate` = sprintf("%.2f", r_rate),
+    `Plausible range, draft rate` = paste(sprintf("%.2f", lo_rate), "to", sprintf("%.2f", hi_rate)),
+    `r, win %` = sprintf("%.2f", r_win),
+    `Plausible range, win %` = paste(sprintf("%.2f", lo_win), "to", sprintf("%.2f", hi_win))
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Tier", "Schools", "r, draft rate", "Plausible range, draft rate",
+      "r, win %", "Plausible range, win %"
+    ),
+    caption = "Correlation between each school's early and later window, by tier, for its draft rate and its win %. Schools need eligible players in both windows (2013 to 2017 and 2019 to 2023; 2018 is left out). The plausible range is the span the true correlation likely falls in (a 95% confidence interval)."
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+```
