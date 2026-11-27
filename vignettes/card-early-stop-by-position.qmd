@@ -1,8 +1,8 @@
 ---
-title: "Does a stop with eligibility left end most stat-line careers at every position?"
+title: "Is an early stop the most common ending at every position?"
 aliases: [2026-11-07-absence-by-position.html]
 image: card-thumbs/early-stop-by-position.png
-image-alt: "Horizontal bar chart, one pair of bars per position group, of the share of finished stat-line careers that stopped with eligibility left against the next most common ending; the early-stop bar is the longer one in every position group, and offensive line is the group with the fewest careers."
+image-alt: "Horizontal bar chart, one pair of bars per position group, of the share of finished stat-line careers that stopped with eligibility left against the next most common ending; the early-stop bar is the longer one in most position groups, with offensive line nearly even, and offensive line is the group with the fewest careers."
 categories: ["Topic: Career shape", "Position: By position group", "Population: Stat-line seasons", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
@@ -44,7 +44,7 @@ release <- data_release_date()
 complete_through <- last_complete_cfb_season()
 store <- file.path(root, "_targets")
 outcomes <- targets::tar_read(outcomes, store = store)
-career_end <- career_end_status(
+ending_status <- career_end_status(
   targets::tar_read(career, store = store),
   outcomes,
   targets::tar_read(picks_nfl, store = store)
@@ -64,14 +64,14 @@ last_position <- roster |>
   slice_max(season, n = 1, with_ties = FALSE) |>
   ungroup() |>
   transmute(playerId, position_group = harmonize_position(position, "roster"))
-careers <- career_end |>
+ended_careers <- ending_status |>
   inner_join(last_position, by = "playerId") |>
   filter(position_group %in% pos_levels, last_season <= complete_through) |>
   mutate(position_group = factor(position_group, pos_levels))
-finished <- careers |>
+finished_careers <- ended_careers |>
   filter(career_end != "right_censored") |>
   mutate(with_line = playerId %in% stat_ids)
-statline <- finished |> filter(with_line)
+statline <- finished_careers |> filter(with_line)
 
 ending_labels <- c(
   early_stop = "Stopped with eligibility left",
@@ -87,7 +87,7 @@ endings_by_pos <- statline |>
   mutate(share = n / sum(n)) |>
   ungroup() |>
   mutate(ending = factor(ending_labels[career_end], ending_labels))
-statline_share <- finished |>
+statline_share <- finished_careers |>
   group_by(position_group) |>
   summarise(
     finished = n(),
@@ -122,13 +122,16 @@ p <- ggplot(comparison, aes(
   ) +
   scale_fill_manual(
     values = c(
-      `Stopped with eligibility left` = "#B45309",
+      `Stopped with eligibility left` = "#374151",
       `Next most common ending` = "#9CA3AF"
     ),
     breaks = c("Stopped with eligibility left", "Next most common ending"),
     labels = c("Early stop", "Next most common ending")
   ) +
-  scale_x_continuous(labels = scales::percent) +
+  scale_x_continuous(
+    labels = scales::percent,
+    expand = expansion(mult = c(0, 0.1))
+  ) +
   labs(
     title = "Is an early stop the most common ending at every position?",
     subtitle = "Share of finished stat-line careers, by how they ended",

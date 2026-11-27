@@ -1,7 +1,7 @@
 ---
 title: "Is a benching-shaped decline rarer than an injury-shaped absence at every position?"
 image: card-thumbs/benching-vs-injury-shape.png
-image-alt: "Paired horizontal bar chart, by position group, of the share of the seasons that can show each signal: a benching-shaped decline, in dark amber, against an injury-shaped absence, in grey; the grey injury bar is longer than the amber decline bar in every position group shown."
+image-alt: "Paired horizontal bar chart, by position group, of the share of the seasons that can show each signal: a benching-shaped decline, in dark grey, against an injury-shaped absence, in pale grey; the pale injury bar is longer than the dark decline bar in every position group shown."
 categories: ["Topic: Career shape", "Position: By position group", "Position: Quarterback", "Population: Roster seasons", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
@@ -115,15 +115,22 @@ p <- signals_by_pos |>
   ) +
   scale_fill_manual(
     values = c(
-      `Benching-shaped decline` = "#B45309",
+      `Benching-shaped decline` = "#374151",
       `Injury-shaped absence` = "#9CA3AF"
     ),
     labels = c("Benching-shaped", "Injury-shaped")
   ) +
-  scale_x_continuous(labels = scales::percent) +
+  scale_x_continuous(
+    labels = scales::percent,
+    expand = expansion(mult = c(0, 0.1))
+  ) +
   labs(
     title = "Is a benching-shaped decline rarer than an injury-shaped absence?",
-    subtitle = "Share of the seasons that can show each signal, by position group",
+    subtitle = paste0(
+      "Each signal's share is among the seasons that can show it; ",
+      paste(tolower(no_usage), collapse = " and "),
+      " are left out, having no usage count"
+    ),
     x = "Share of seasons that can show it",
     y = NULL,
     fill = NULL,
@@ -162,7 +169,7 @@ p_qb <- ggplot(qb, aes(first_half, second_half, colour = status)) +
     alpha = 0.7
   ) +
   scale_colour_manual(
-    values = c(`Benching-shaped decline` = "#B45309", `No decline` = "#6B7280")
+    values = c(`Benching-shaped decline` = "#374151", `No decline` = "#9CA3AF")
   ) +
   labs(
     title = "Which quarterback seasons show a benching-shaped decline?",

@@ -1,7 +1,7 @@
 {
   "id": "opponent-elo-bands",
   "release": "2026-11-25",
-  "code_hash": "93989eb16e0a0562ca5e298a6971b6f9",
+  "code_hash": "2779346b37d9ae2c6952780265dde1a5",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
     "fmt": "d4c89f195c447af907ba425a860522de",

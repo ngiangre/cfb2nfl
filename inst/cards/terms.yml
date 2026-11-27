@@ -332,3 +332,13 @@ full-time-season:
 redshirt-shaped-season:
   label: Redshirt-shaped season
   definition: "A season in which the player recorded a statistic in at most one of a team's covered regular-season games. The rule is strict by design: it can miss a redshirt whose appearances produced statistics in two games, and it can flag a quiet backup."
+# ---- batch career: ratings and spread ----
+elo:
+  label: Elo rating
+  definition: "A number that scores a team's strength from its results, where a higher rating means a stronger team; a game's opponent rating is the one it carried into that game."
+game-to-game-swing:
+  label: Game-to-game swing
+  definition: "How far one game's yards land from a typical player's yards in that band, summarised as a standard deviation and read against the group's average yards."
+standard-deviation:
+  label: Standard deviation
+  definition: "A typical distance of a value from the average; when values are roughly bell-shaped, about two thirds fall within one standard deviation either side of the mean."

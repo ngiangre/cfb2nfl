@@ -1,7 +1,7 @@
 ---
 title: "Can the box score show an injury-shaped absence at every position?"
 image: card-thumbs/absence-readable-by-position.png
-image-alt: "Horizontal bar chart of the share of each position group's rostered player-seasons in which a gap in the box score could be read, from 2016 on; most positions reach a readable share near the top of the scale, and offensive line, in dark amber, is the bar almost at zero."
+image-alt: "Horizontal bar chart of the share of each position group's rostered player-seasons in which a gap in the box score could be read, from 2016 on; running back is the longest bar at about 41 percent, most other positions sit between roughly 29 and 34 percent, and offensive line, in dark grey, is the bar almost at zero."
 categories: ["Topic: Career shape", "Position: By position group", "Population: Roster seasons", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
@@ -90,11 +90,14 @@ p <- absence_by_pos |>
     aes(tooltip = tip, data_id = as.character(position_group)),
     show.legend = FALSE
   ) +
-  scale_fill_manual(values = c(`FALSE` = "#9CA3AF", `TRUE` = "#B45309")) +
-  scale_x_continuous(labels = scales::percent, limits = c(0, 0.5)) +
+  scale_fill_manual(values = c(`FALSE` = "#9CA3AF", `TRUE` = "#374151")) +
+  scale_x_continuous(
+    labels = scales::percent,
+    expand = expansion(mult = c(0, 0.1))
+  ) +
   labs(
     title = "Can every position show an injury-shaped absence?",
-    subtitle = "Share of player-seasons with a regular run that a gap could interrupt",
+    subtitle = "Share of player-seasons with a steady box-score role, so a run of missed games would show",
     x = "Share of seasons that can show an absence",
     y = NULL,
     caption = card_caption(release)

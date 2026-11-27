@@ -2,7 +2,7 @@
 title: "Does a full-time player show up in nearly every covered game?"
 image: card-thumbs/covered-game-observability.png
 image-alt: "Horizontal bar chart of the median share of covered games in which a full-time player recorded a statistic, by position; quarterback, running back, receiver, linebacker and specialist bars are dark and long, near the top of the scale, while the defensive and tight end bars are light grey and shorter."
-categories: ["Topic: Career shape", "Position: By position group", "Population: Games", "Figure: Bar chart"]
+categories: ["Topic: Career shape", "Position: By position group", "Population: Stat-line seasons", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
 terms: [covered-game, full-time-season, position-group, redshirt-shaped-season]
@@ -34,19 +34,13 @@ con <- DBI::dbConnect(
   read_only = TRUE
 )
 release <- data_release_date()
-pos_label <- c(
-  QB = "Quarterback",
-  RB = "Running back",
-  WR = "Receiver",
-  TE = "Tight end",
-  OL = "Offensive line",
-  DL = "Defensive tackle",
-  DE = "Defensive end",
-  LB = "Linebacker",
-  DB = "Defensive back",
-  ST = "Specialist"
+# Labels are the shared position-group names; the codes group the roster
+# positions (defensive ends and tackles form one defensive line).
+pos_label <- setNames(
+  position_group(c("QB", "RB", "WR", "TE", "OL", "DL", "LB", "DB", "PK")),
+  c("QB", "RB", "WR", "TE", "OL", "DL", "LB", "DB", "ST")
 )
-# The positions whose redshirt flag the box score can read (section 2.2 rule).
+# The positions whose redshirt flag the box score can read.
 usable <- c("QB", "RB", "WR", "LB", "ST")
 ```
 
@@ -70,8 +64,7 @@ pos_of <- tbl(con, "roster") |>
       position == "WR" ~ "WR",
       position == "TE" ~ "TE",
       position %in% c("OL", "G", "OT", "C") ~ "OL",
-      position %in% c("DL", "DT", "NT") ~ "DL",
-      position %in% c("DE", "EDGE") ~ "DE",
+      position %in% c("DL", "DT", "NT", "DE", "EDGE") ~ "DL",
       position %in% c("LB", "OLB", "ILB") ~ "LB",
       position %in% c("DB", "S", "CB") ~ "DB",
       position %in% c("PK", "P", "LS") ~ "ST"
@@ -98,7 +91,7 @@ core_all <- gp_all |>
         category %in% c("rushing", "receiving") &
         statType %in% c("CAR", "REC")) |
       (pos %in%
-        c("DL", "DE", "LB", "DB") &
+        c("DL", "LB", "DB") &
         category == "defensive" &
         statType == "TOT") |
       (pos == "ST" &
@@ -142,7 +135,7 @@ p <- ggplot(obs, aes(rate, Position, fill = is_usable)) +
   scale_x_continuous(labels = scales::percent, limits = c(0, 1)) +
   labs(
     title = "Does a full-time player show up in nearly every covered game?",
-    subtitle = "Median share of covered games with a recorded statistic, full-time seasons",
+    subtitle = "Median share of covered games with a recorded statistic, full-time seasons; dark grey marks positions the redshirt flag can be read for",
     x = "Covered games with a statistic",
     y = NULL,
     caption = card_caption(release)
@@ -180,8 +173,8 @@ p_hist <- ggplot(obs_hist, aes(games_with_stat, n)) +
   ) +
   facet_wrap(~Position, scales = "free_y") +
   scale_fill_manual(
-    values = c(`TRUE` = "#B45309", `FALSE` = "#9CA3AF"),
-    labels = c(`TRUE` = "One game or none", `FALSE` = "Played"),
+    values = c(`TRUE` = "#374151", `FALSE` = "#9CA3AF"),
+    labels = c(`TRUE` = "One game or none", `FALSE` = "Two or more games"),
     name = NULL
   ) +
   labs(

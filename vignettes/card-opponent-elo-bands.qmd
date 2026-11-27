@@ -5,7 +5,7 @@ image-alt: "Histogram of player-game counts by opponent pregame Elo rating, with
 categories: ["Topic: Career shape", "Position: All positions", "Population: Stat-line seasons", "Figure: Distribution"]
 status: investigation
 graduated_to: null
-terms: [opponent-band, stat-line-season]
+terms: [opponent-band, elo, stat-line-season]
 followups:
   - text: "Do unrated opponents, mostly lower-division teams, change how a game reads against the rated bands?"
     link: "F17"
@@ -48,6 +48,7 @@ p <- ggplot(rated, aes(opponent_pregame_elo)) +
   geom_histogram(binwidth = 25, fill = "#374151") +
   geom_vline(xintercept = c(1400, 1600, 1800), linetype = "dashed", linewidth = 0.8) +
   scale_x_continuous(breaks = c(1000, 1400, 1600, 1800, 2200)) +
+  scale_y_continuous(labels = scales::comma) +
   labs(
     title = "How are opponents split by strength?",
     subtitle = "Player-games by the opponent's pregame Elo rating; dashed lines mark the band edges",

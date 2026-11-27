@@ -66,10 +66,25 @@ stat_seasons <- dbGetQuery(
     ids_sql
   )
 )
+# Drop the roster seasons listed before a player's recruiting class (issue
+# #114), as the pipeline's roster_enrolled does, before any flag is read.
+recruiting_rows <- dbGetQuery(
+  con,
+  sprintf(
+    "SELECT playerId, recruit_name, hs_class FROM recruiting WHERE playerId IN (%s)",
+    ids_sql
+  )
+)
+roster_rows <- drop_pre_enrollment(
+  roster_rows,
+  recruiting_rows,
+  stat_seasons,
+  reused_ids(roster_rows)
+)
 flags <- flag_redshirt(roster_rows, stat_seasons) |>
   select(playerId, season, team) |>
   mutate(playerId = as.character(playerId))
-attempts <- tbl(con, "player_stats") |>
+pass_attempts <- tbl(con, "player_stats") |>
   filter(
     playerId %in% !!ids,
     category == "passing",
@@ -87,16 +102,22 @@ covered <- tbl(con, "game_player_stats") |>
   distinct(season, team, gameId) |>
   count(season, team, name = "games_covered") |>
   collect()
-teams <- tbl(con, "teams") |>
+team_colours <- tbl(con, "teams") |>
   select(team, color) |>
   collect()
 
-spine <- redshirt_spine(flags, attempts, player_games, covered) |>
-  left_join(teams, by = "team") |>
+spine <- redshirt_spine(flags, pass_attempts, player_games, covered) |>
+  left_join(team_colours, by = "team") |>
   mutate(
     color = if_else(is.na(color), "#9CA3AF", color),
     who = subjects$who[match(playerId, subjects$cfb_athlete_id)],
     x = paste0("'", substr(season, 3, 4)),
+    # "x of y" answers how many covered games showed a statistic.
+    bar_label = if_else(
+      is.na(games_covered),
+      "no coverage",
+      sprintf("%d of %d", games_with_stat, games_covered)
+    ),
     tooltip = sprintf(
       "%s %d, %s: a statistic in %d of %s covered games; %s pass attempts",
       who,
@@ -120,16 +141,20 @@ p <- ggplot(spine, aes(x)) +
     width = 0.5
   ) +
   geom_text(
-    data = filter(spine, flag_label != "Played"),
     aes(
-      y = coalesce(games_covered, 0L) + 0.8,
-      label = if_else(flag_label == "Redshirt-shaped", "RS", "no coverage")
+      y = coalesce(games_covered, 0L) + 0.4,
+      label = bar_label
     ),
-    size = 3.4,
-    fontface = "bold"
+    vjust = 0,
+    size = 3.2,
+    fontface = "bold",
+    colour = "#111827"
   ) +
   scale_fill_identity() +
-  scale_y_continuous(breaks = NULL) +
+  scale_y_continuous(
+    breaks = NULL,
+    expand = expansion(mult = c(0, 0.22))
+  ) +
   facet_wrap(~who, ncol = 2, scales = "free_x") +
   labs(
     title = "In how many covered games does each quarterback's season show a statistic?",
@@ -141,8 +166,8 @@ p <- ggplot(spine, aes(x)) +
   theme_card() +
   theme(
     panel.grid.major.x = element_blank(),
-    axis.text.x = element_text(size = 7),
-    strip.text = element_text(size = 9, face = "bold")
+    axis.text.x = element_text(size = 9),
+    strip.text = element_text(size = 12, face = "bold")
   )
 
 card_thumbnail(p, "quarterback-game-coverage", release = release)

@@ -70,13 +70,28 @@ stat_seasons <- dbGetQuery(
     ids_sql
   )
 )
+# Drop the roster seasons listed before a player's recruiting class (issue
+# #114), as the pipeline's roster_enrolled does, before any flag is read.
+recruiting_rows <- dbGetQuery(
+  con,
+  sprintf(
+    "SELECT playerId, recruit_name, hs_class FROM recruiting WHERE playerId IN (%s)",
+    ids_sql
+  )
+)
+roster_rows <- drop_pre_enrollment(
+  roster_rows,
+  recruiting_rows,
+  stat_seasons,
+  reused_ids(roster_rows)
+)
 flags <- flag_redshirt(roster_rows, stat_seasons) |>
   select(playerId, season, team) |>
   mutate(
     playerId = as.character(playerId),
     who = subjects$who[match(playerId, subjects$cfb_athlete_id)]
   )
-attempts <- tbl(con, "player_stats") |>
+pass_attempts <- tbl(con, "player_stats") |>
   filter(
     playerId %in% !!ids,
     category == "passing",
@@ -94,12 +109,12 @@ covered <- tbl(con, "game_player_stats") |>
   distinct(season, team, gameId) |>
   count(season, team, name = "games_covered") |>
   collect()
-teams <- tbl(con, "teams") |>
+team_colours <- tbl(con, "teams") |>
   select(team, color) |>
   collect()
 
-spine <- redshirt_spine(flags, attempts, player_games, covered) |>
-  left_join(teams, by = "team") |>
+spine <- redshirt_spine(flags, pass_attempts, player_games, covered) |>
+  left_join(team_colours, by = "team") |>
   mutate(
     color = if_else(is.na(color), "#9CA3AF", color),
     text_col = label_text_colour(color),

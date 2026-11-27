@@ -3,7 +3,7 @@ title: "Which positions show up in the box score?"
 aliases: [2026-11-05-playing-time.html]
 image: card-thumbs/stat-line-share-by-position.png
 image-alt: "Horizontal bar chart of the share of rostered player-seasons with a stat line in at least one game, for each position group from 2019 through the last complete season; running backs, defensive backs and linebackers log one most often, tight ends and special teamers about half the time, and offensive linemen, in dark slate, least often by far."
-categories: ["Topic: Career shape", "Position: By position group", "Population: Stat-line seasons", "Figure: Bar chart"]
+categories: ["Topic: Career shape", "Position: By position group", "Population: Roster seasons", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
 terms: [position-group, stat-line-season, appearance-rate, player-season]
@@ -40,8 +40,10 @@ release <- data_release_date()
 # Rostered seasons from 2019 (the first class-year season) through the last
 # complete season; the season still being played is left out.
 complete_through <- last_complete_cfb_season()
+# The first season with a class year in the data.
+first_season <- 2019L
 usage <- targets::tar_read(player_usage, store = file.path(root, "_targets"))
-by_pos <- stat_line_share(usage, seasons = 2019:complete_through) |>
+by_pos <- stat_line_share(usage, seasons = first_season:complete_through) |>
   filter(position_group %in% names(position_palette()))
 
 p <- by_pos |>
@@ -61,7 +63,12 @@ p <- by_pos |>
   scale_x_continuous(labels = scales::percent) +
   labs(
     title = "Which positions show up in the box score?",
-    subtitle = "Share of rostered player-seasons with a stat line in at least one game",
+    subtitle = paste0(
+      "Share of rostered player-seasons with a stat line in at least one game, ",
+      first_season,
+      " to ",
+      complete_through
+    ),
     x = "Share with a stat line",
     y = NULL,
     caption = card_caption(release)
@@ -75,7 +82,7 @@ card_interactive(p)
 ```{r}
 #| label: by-season-figure
 # The same share season by season, to see whether a group moves or holds.
-by_season <- rostered_one_team(usage, seasons = 2019:complete_through) |>
+by_season <- rostered_one_team(usage, seasons = first_season:complete_through) |>
   filter(position_group %in% names(position_palette())) |>
   group_by(position_group, season) |>
   summarise(any_line = mean(games_appeared > 0), n = n(), .groups = "drop") |>
@@ -114,13 +121,13 @@ card_interactive(p_season)
 ```{r}
 #| label: position-table
 by_pos |>
+  arrange(desc(any_line)) |>
   transmute(
     `Position group` = as.character(position_group),
     `Player-seasons` = fmt(player_seasons),
     `Logged a stat line in any game` = scales::percent(any_line, accuracy = 0.1),
     `Median share of games, among those who logged one` = scales::percent(median_share_if_any, accuracy = 1)
   ) |>
-  arrange(desc(`Logged a stat line in any game`)) |>
   knitr::kable(
     col.names = c(
       "Position group",
@@ -130,7 +137,9 @@ by_pos |>
     ),
     align = "lrrr",
     caption = paste0(
-      "Rostered player-seasons from 2019 through the season ",
+      "Rostered player-seasons from ",
+      first_season,
+      " through the season ",
       complete_through,
       ". Athlete and unrecorded positions are left out of the comparison."
     )

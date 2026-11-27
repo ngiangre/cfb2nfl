@@ -1,7 +1,7 @@
 ---
 title: "Do early stops end in a season-ending absence more often than used-up careers?"
 image: card-thumbs/final-season-absence-by-ending.png
-image-alt: "Horizontal bar chart of the share of readable final seasons that end in a season-ending absence, for each way a stat-line career ended; the early-stop and used-up-eligibility bars are highlighted in dark amber, with early stops the longer of the two, and drafted careers show the largest share."
+image-alt: "Horizontal bar chart of the share of readable final seasons that end in a season-ending absence, for each way a stat-line career ended; the early-stop bar, in dark grey, is the longest at about 14 percent; changed-school and used-up endings follow at about 13 and 12 percent, and drafted careers sit near 6 percent."
 categories: ["Topic: Career shape", "Position: All positions", "Population: Stat-line seasons", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
@@ -46,7 +46,7 @@ store <- file.path(root, "_targets")
 player_game <- targets::tar_read(player_game, store = store)
 usage <- targets::tar_read(player_usage, store = store)
 outcomes <- targets::tar_read(outcomes, store = store)
-career_end <- career_end_status(
+ending_status <- career_end_status(
   targets::tar_read(career, store = store),
   outcomes,
   targets::tar_read(picks_nfl, store = store)
@@ -64,11 +64,11 @@ last_position <- roster |>
   slice_max(season, n = 1, with_ties = FALSE) |>
   ungroup() |>
   transmute(playerId, position_group = harmonize_position(position, "roster"))
-careers <- career_end |>
+ended_careers <- ending_status |>
   inner_join(last_position, by = "playerId") |>
   filter(position_group %in% pos_levels, last_season <= complete_through) |>
   mutate(position_group = factor(position_group, pos_levels))
-statline <- careers |>
+statline <- ended_careers |>
   filter(career_end != "right_censored", playerId %in% stat_ids)
 
 ending_labels <- c(
@@ -85,6 +85,16 @@ ending_codes <- c(
   "transferred_then_stopped",
   "signed_udfa",
   "drafted"
+)
+# Bar colours: the two endings the claim sets against each other are dark grey;
+# the NFL routes keep their career-endings colours, the rest stay pale grey.
+ending_fill <- c(
+  "Stopped with eligibility left" = "#374151",
+  "Used up eligibility" = "#374151",
+  "Changed schools, then stopped" = ending_palette()[["Eligibility ended, undrafted"]],
+  "Stopped, eligibility unknown" = ending_palette()[["Eligibility ended, undrafted"]],
+  "Signed undrafted" = ending_palette()[["Signed undrafted"]],
+  "Drafted" = ending_palette()[["Drafted"]]
 )
 
 pos_seasons <- usage |>
@@ -105,7 +115,6 @@ absence <- player_appearance_sequence(player_game, roster, games) |>
 final_by_ending <- final_endings(statline, absence, game_window, ending_codes) |>
   mutate(
     ending = factor(ending_labels[career_end], ending_labels[ending_codes]),
-    is_claim = career_end %in% c("early_stop", "eligibility_exhausted"),
     tip = sprintf(
       "%s: %s of %s readable final seasons end in an absence",
       ending,
@@ -118,14 +127,17 @@ p <- final_by_ending |>
   ggplot(aes(
     x = season_ending,
     y = forcats::fct_rev(ending),
-    fill = is_claim
+    fill = ending
   )) +
   geom_col_interactive(
     aes(tooltip = tip, data_id = career_end),
     show.legend = FALSE
   ) +
-  scale_fill_manual(values = c(`FALSE` = "#9CA3AF", `TRUE` = "#B45309")) +
-  scale_x_continuous(labels = scales::percent) +
+  scale_fill_manual(values = ending_fill, guide = "none") +
+  scale_x_continuous(
+    labels = scales::percent,
+    expand = expansion(mult = c(0, 0.1))
+  ) +
   labs(
     title = "Do early stops end in an absence more than used-up careers?",
     subtitle = "Share of readable final seasons that end in a season-ending absence, by how the career ended",
@@ -178,8 +190,8 @@ p_pos <- ggplot(
   ) +
   scale_colour_manual(
     values = c(
-      `Stopped with eligibility left` = "#B45309",
-      `Used up eligibility` = "#1D4ED8"
+      `Stopped with eligibility left` = "#374151",
+      `Used up eligibility` = "#9CA3AF"
     )
   ) +
   scale_size_area(max_size = 9, guide = "none") +

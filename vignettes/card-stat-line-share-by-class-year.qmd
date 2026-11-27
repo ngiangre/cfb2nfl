@@ -1,8 +1,8 @@
 ---
 title: "Do players show up in the box score more as they get older?"
 image: card-thumbs/stat-line-share-by-class-year.png
-image-alt: "Column chart of the share of rostered player-seasons with a stat line in at least one game, for each class year from one to five; the share rises from first-year players to fourth-year players, the fourth-year column is highlighted, and the fifth-year column is the tallest but rests on very few player-seasons."
-categories: ["Topic: Career shape", "Position: All positions", "Population: Stat-line seasons", "Figure: Bar chart"]
+image-alt: "Column chart of the share of rostered player-seasons with a stat line in at least one game, for each class year from one to five; the share is about 42 percent in the first two class years, about 50 percent in the third, about 70 percent in the fourth, and highest in the fifth, which rests on the fewest player-seasons."
+categories: ["Topic: Career shape", "Position: All positions", "Population: Roster seasons", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
 terms: [class-year, stat-line-season, player-season, appearance-rate]
@@ -39,12 +39,14 @@ release <- data_release_date()
 # Rostered player-seasons from 2019 through the last complete season, with a
 # class year; the season still being played is left out.
 complete_through <- last_complete_cfb_season()
+# The first season with a class year in the data.
+first_season <- 2019L
 usage <- targets::tar_read(player_usage, store = file.path(root, "_targets"))
 pop <- usage |>
   filter(
     on_roster,
     team_games > 0,
-    season >= 2019L,
+    season >= first_season,
     season <= complete_through,
     !is.na(class_year)
   )
@@ -68,13 +70,21 @@ by_class <- pop |>
   )
 
 p <- by_class |>
-  ggplot(aes(factor(class_year), any_line, fill = class_year == 4L)) +
-  geom_col_interactive(aes(tooltip = tip), width = 0.7, show.legend = FALSE) +
-  scale_fill_manual(values = c(`FALSE` = "#9CA3AF", `TRUE` = "#374151")) +
+  ggplot(aes(factor(class_year), any_line)) +
+  geom_col_interactive(
+    aes(tooltip = tip),
+    width = 0.7,
+    fill = "#374151"
+  ) +
   scale_y_continuous(labels = scales::percent) +
   labs(
     title = "Do players show up in the box score more as they get older?",
-    subtitle = "Share of rostered player-seasons with a stat line in at least one game, by class year",
+    subtitle = paste0(
+      "Share of rostered player-seasons with a stat line in at least one game, by class year, ",
+      first_season,
+      " to ",
+      complete_through
+    ),
     x = "Class year",
     y = "Share with a stat line",
     caption = card_caption(release)
@@ -139,7 +149,9 @@ by_class |>
     col.names = c("Class year", "Player-seasons", "Logged a stat line in any game"),
     align = "lrr",
     caption = paste0(
-      "Rostered player-seasons by class year, from 2019 through the season ",
+      "Rostered player-seasons by class year, from ",
+      first_season,
+      " through the season ",
       complete_through,
       ". Class year five is small."
     )

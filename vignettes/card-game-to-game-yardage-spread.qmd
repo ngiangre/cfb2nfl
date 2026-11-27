@@ -2,10 +2,10 @@
 title: "Which position's yardage swings most from game to game?"
 image: card-thumbs/game-to-game-yardage-spread.png
 image-alt: "Horizontal bar chart of each position group's game-to-game spread of yards against a typical player, as a share of that group's mean yards per game; the running back bar is the longest, then receivers, then quarterbacks, so running back yardage is the most erratic relative to its average."
-categories: ["Topic: Career shape", "Position: By position group", "Position: Quarterback", "Population: Stat-line seasons", "Figure: Distribution"]
+categories: ["Topic: Career shape", "Position: By position group", "Position: Quarterback", "Population: Stat-line seasons", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
-terms: [position-group, signature-stat, residual-yards, baseline-yards, opponent-band]
+terms: [position-group, signature-stat, game-to-game-swing, standard-deviation, residual-yards, opponent-band]
 followups:
   - text: "Does a position's game-to-game swing change the odds that a player is drafted, or only how his yards read?"
     link: "F17"
@@ -70,7 +70,7 @@ p <- spread |>
   labs(
     title = titles$title,
     subtitle = "Game-to-game spread as a share of each group's mean yards per game",
-    x = "Residual SD over mean yards per game",
+    x = "Typical game-to-game swing, as a share of average yards",
     y = NULL,
     caption = titles$caption
   ) +

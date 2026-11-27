@@ -1,7 +1,7 @@
 {
   "id": "game-to-game-yardage-spread",
   "release": "2026-11-25",
-  "code_hash": "43adc24a8a43ed48ab34fe2a20cc74f8",
+  "code_hash": "5539017981fcedf4546125de023be9ef",
   "functions": {
     "build_game_production": "922956fd5a81dedfa74d3d0c088eadc3",
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",

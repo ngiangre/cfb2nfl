@@ -1,11 +1,11 @@
 ---
 title: "Does a player's yardage fall against stronger opponents?"
 image: card-thumbs/yardage-by-opponent-strength.png
-image-alt: "Three bar charts, one per position group, of mean yards per game by opponent Elo band, from under 1400 to 1800 and up and unrated; the running back bars fall the most from the weakest to the strongest rated band, the receiver bars fall less and the quarterback bars hold steady until the strongest band, with a range of one standard deviation on each bar."
+image-alt: "Three bar charts, one per position group, of mean yards per game by opponent Elo band, from under 1400 to 1800 and up and unrated; the bars sit close to one another across the opponent bands within each position group, and each bar carries a range of one standard deviation that overlaps its neighbours."
 categories: ["Topic: Career shape", "Position: By position group", "Position: Quarterback", "Population: Stat-line seasons", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
-terms: [position-group, signature-stat, opponent-band, baseline-yards, confidence-interval]
+terms: [position-group, signature-stat, opponent-band, elo, standard-deviation]
 followups:
   - text: "Does the same drop against stronger opponents show up in the draft, or only in yards?"
     link: "F17"
@@ -60,10 +60,12 @@ p <- grad |>
       " games"
     )
   ) |>
-  ggplot(aes(band, mean_yds, fill = group)) +
+  # Reversed, so the weakest band sits at the top and unrated opponents last.
+  ggplot(aes(forcats::fct_rev(band), mean_yds, fill = group)) +
   geom_col_interactive(aes(tooltip = tooltip), width = 0.8) +
   geom_pointrange(aes(ymin = lo, ymax = hi), linewidth = 0.7, size = 0.4) +
   scale_fill_manual(values = position_palette(), guide = "none") +
+  scale_y_continuous(n.breaks = 3) +
   coord_flip() +
   facet_wrap(~group, ncol = 3, scales = "free_x") +
   labs(

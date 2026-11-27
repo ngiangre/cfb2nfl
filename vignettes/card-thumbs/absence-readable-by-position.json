@@ -1,7 +1,7 @@
 {
   "id": "absence-readable-by-position",
   "release": "2026-11-25",
-  "code_hash": "f28f2a6d6a52b0722f96b7a7b4472bcc",
+  "code_hash": "f51ec5eb3e3193d129aa10c5f7517338",
   "functions": {
     "absence_runs": "26b642a982be77f75dc5e5310e576549",
     "absence_summary": "2f6b32aa0d81f98d41d7cb4fc9dbafa4",
