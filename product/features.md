@@ -285,6 +285,7 @@ acceptance criteria.
 - [ ] [#132](https://github.com/ngiangre/cfb2nfl/issues/132) Card template, approved tags, questions registry, check_card_style() and the figure wall page (F25)
 - [ ] [#133](https://github.com/ngiangre/cfb2nfl/issues/133) Pilot: migrate the draft-outcomes posts to cards and graduate one card (F25)
 - [ ] [#134](https://github.com/ngiangre/cfb2nfl/issues/134) Decision 0053, goals.md signals and AGENTS.md for the figure wall (F25)
+- [ ] [PR #135](https://github.com/ngiangre/cfb2nfl/pull/135) docs(product): add the F25 figure wall card and sync task links (F25)
 <!-- /tasks -->
 
 ### F21 · Question status board

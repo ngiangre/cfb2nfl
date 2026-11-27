@@ -892,6 +892,7 @@ list(
       explorer = ok_explorer,
       explorer_team_games = ok_explorer_team_games,
       explorer_plays = ok_explorer_plays,
+      explorer_text_players = ok_explorer_text_players,
       explorer_players = ok_explorer_players,
       explorer_combine = ok_explorer_combine,
       explorer_careers = ok_explorer_careers
@@ -1059,6 +1060,23 @@ list(
       unique(plays$gameId)
     )
   ),
+  # Players the play text names that the play-stats log leaves out (mostly
+  # tacklers), on the games that have a log; the same matching the game-flow
+  # EPA post uses (R/play_involvement.R).
+  tar_target(
+    explorer_text_players,
+    {
+      logged <- dplyr::filter(plays, .data$gameId %in% play_stats$gameId)
+      play_text_players(
+        logged,
+        play_stats,
+        play_mention_directory(
+          roster_enrolled,
+          dplyr::filter(games, .data$id %in% logged$gameId)
+        )
+      )
+    }
+  ),
   tar_target(
     explorer_plays,
     build_explorer_plays(
@@ -1066,7 +1084,8 @@ list(
       games,
       teams,
       play_stats,
-      explorer_player_seasons
+      explorer_player_seasons,
+      explorer_text_players
     ),
     format = "parquet"
   ),
@@ -1075,6 +1094,15 @@ list(
     pointblank::all_passed(contract_explorer_team_games(
       explorer_team_games,
       explorer_team_season,
+      stop_on_fail = FALSE
+    ))
+  ),
+  tar_target(
+    ok_explorer_text_players,
+    pointblank::all_passed(contract_explorer_text_players(
+      explorer_text_players,
+      plays,
+      play_stats,
       stop_on_fail = FALSE
     ))
   ),

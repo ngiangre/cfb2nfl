@@ -4,7 +4,14 @@
 \alias{build_explorer_plays}
 \title{Explorer plays table}
 \usage{
-build_explorer_plays(plays, games, teams, play_stats, player_groups = NULL)
+build_explorer_plays(
+  plays,
+  games,
+  teams,
+  play_stats,
+  player_groups = NULL,
+  text_players = NULL
+)
 }
 \arguments{
 \item{plays}{Cleaned plays.}
@@ -20,6 +27,11 @@ build_explorer_plays(plays, games, teams, play_stats, player_groups = NULL)
 \code{\link[=build_explorer_player_seasons]{build_explorer_player_seasons()}}), so a player chip opens the Players
 tab at the right position and shows the player's position code. A player
 without one gets no \code{pos} or \code{position}.}
+
+\item{text_players}{Optional players named only in the play text, from
+\code{\link[=play_text_players]{play_text_players()}}. They follow the log's players in the play's
+array, with their text roles as \code{stat} and \code{text = TRUE} (the log's
+players carry \code{text = FALSE}), so the page can mark them.}
 }
 \value{
 A tibble keyed by \code{play_id}, one row per input play.

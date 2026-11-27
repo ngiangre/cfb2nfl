@@ -7,13 +7,13 @@
 # generational suffix, e.g. "#95 J.Marshall" or "#81 C.Dandridge Jr.".
 mention_pattern <- paste0(
   "#(\\d+) ([A-Z][A-Za-z']*\\.\\s?[A-Z][A-Za-z'\\-]+",
-  "(?: (?:Jr\\.|Sr\\.|II|III|IV|V)(?![A-Za-z]))?)"
+  "(?: (?:Jr\\.?|Sr\\.?|II|III|IV|V)(?![A-Za-z]))?)"
 )
 
 # Lowercase surname with any generational suffix removed.
 name_surname <- function(x) {
   x |>
-    stringr::str_remove(" (Jr\\.|Sr\\.|II|III|IV|V)$") |>
+    stringr::str_remove(" (Jr\\.?|Sr\\.?|II|III|IV|V)$") |>
     stringr::str_extract("[A-Za-z'\\-]+$") |>
     tolower()
 }
@@ -31,7 +31,8 @@ name_surname <- function(x) {
 #' @return One row per mention: `id`, `jersey` (integer), `text_name`,
 #'   `role` (`"Ball carrier or passer"`, `"Target"`, `"Tackle"`,
 #'   `"Pass breakup"`, `"Interception"`, `"Fumble"`, `"Fumble forced"`,
-#'   `"Fumble recovered"`, `"Penalty"` or `"Other"`).
+#'   `"Fumble recovered"`, `"Penalty"`, `"Kicker or punter"`, `"Holder"`,
+#'   `"Long snapper"`, `"Kick blocked"` or `"Other"`).
 #' @export
 play_text_mentions <- function(plays) {
   txt <- plays$playText |>
@@ -71,6 +72,14 @@ play_text_mentions <- function(plays) {
           "recovered by [A-Z]+ $"
         ) ~ "Fumble recovered",
         stringr::str_detect(.data$before, "intercepted by $") ~ "Interception",
+        stringr::str_detect(.data$before, "blocked by $") ~ "Kick blocked",
+        stringr::str_detect(.data$before, "H: $") ~ "Holder",
+        stringr::str_detect(.data$before, "LS: $") ~ "Long snapper",
+        stringr::str_detect(
+          .data$after,
+          "^ (kickoff|punt|field goal|on-side kick|onside kick)"
+        ) ~
+          "Kicker or punter",
         stringr::str_detect(.data$after, "^ return") ~ "Interception",
         stringr::str_detect(.data$after, "^ (rush|pass|sacked|scramble)") ~
           "Ball carrier or passer",
@@ -93,13 +102,18 @@ play_text_mentions <- function(plays) {
 #'
 #' @param mentions Output of [play_text_mentions()].
 #' @param directory Data frame with one row per player: `playerId`, `team`,
-#'   `jersey`, `player` (full name).
+#'   `jersey`, `player` (full name), plus any `by` columns.
+#' @param by Extra columns, in both `mentions` and `directory`, that narrow
+#'   the search, e.g. `"gameId"` with a directory of each game's two rosters
+#'   from [play_mention_directory()]. The default searches the whole
+#'   directory, so it should hold only the game's two teams.
 #' @return `mentions` with `playerId` and `team` added (both `NA` when the
 #'   mention does not resolve to exactly one player).
 #' @export
-match_play_mentions <- function(mentions, directory) {
+match_play_mentions <- function(mentions, directory, by = character()) {
   dir <- directory |>
     dplyr::transmute(
+      dplyr::across(dplyr::all_of(by)),
       .data$playerId,
       .data$team,
       jersey = as.integer(.data$jersey),
@@ -112,8 +126,12 @@ match_play_mentions <- function(mentions, directory) {
       surname = name_surname(.data$text_name)
     )
   hits <- keyed |>
-    dplyr::select(".row", "jersey", "surname") |>
-    dplyr::inner_join(dir, by = c("jersey", "surname")) |>
+    dplyr::select(".row", dplyr::all_of(by), "jersey", "surname") |>
+    dplyr::inner_join(
+      dir,
+      by = c(by, "jersey", "surname"),
+      relationship = "many-to-many"
+    ) |>
     dplyr::filter(dplyr::n() == 1L, .by = ".row")
   keyed |>
     dplyr::left_join(
@@ -121,6 +139,81 @@ match_play_mentions <- function(mentions, directory) {
       by = ".row"
     ) |>
     dplyr::select(-".row", -"surname")
+}
+
+#' Each game's two rosters, for matching play-text mentions
+#'
+#' The directory [match_play_mentions()] searches with `by = "gameId"`: every
+#' player on either team's roster in the game's season, named from the roster
+#' (so linemen and others with no stat line can still match).
+#'
+#' @param roster Cleaned roster (`playerId`, `season`, `team`, `jersey`,
+#'   `first_name`, `last_name`).
+#' @param games Games with `id`, `season`, `homeTeam` and `awayTeam`.
+#' @return One row per game and roster player: `gameId`, `playerId`, `team`,
+#'   `jersey`, `player`. Players with no jersey are left out.
+#' @export
+play_mention_directory <- function(roster, games) {
+  sides <- dplyr::bind_rows(
+    dplyr::select(games, gameId = "id", "season", team = "homeTeam"),
+    dplyr::select(games, gameId = "id", "season", team = "awayTeam")
+  )
+  roster |>
+    dplyr::filter(!is.na(.data$jersey)) |>
+    dplyr::transmute(
+      .data$season,
+      .data$team,
+      .data$playerId,
+      jersey = as.integer(.data$jersey),
+      player = stringr::str_squish(paste(
+        dplyr::coalesce(.data$first_name, ""),
+        dplyr::coalesce(.data$last_name, "")
+      ))
+    ) |>
+    dplyr::distinct() |>
+    dplyr::inner_join(
+      sides,
+      by = c("season", "team"),
+      relationship = "many-to-many"
+    ) |>
+    dplyr::select("gameId", "playerId", "team", "jersey", "player")
+}
+
+#' Players the play text names but the play-stats log leaves out
+#'
+#' Reads each play's text with [play_text_mentions()], resolves the mentions
+#' against the game's two rosters with [match_play_mentions()], and keeps the
+#' players the log does not already name on that play. Unresolved and
+#' ambiguous mentions are dropped rather than guessed.
+#'
+#' @param plays Data frame with `id`, `gameId` and `playText`.
+#' @param play_stats Play-stats log rows with `playId` and `athleteId`.
+#' @param directory Output of [play_mention_directory()].
+#' @return One row per `(id, playerId)`: `team`, `player` (the roster name)
+#'   and `roles` (comma-separated, in text order).
+#' @export
+play_text_players <- function(plays, play_stats, directory) {
+  logged <- dplyr::distinct(
+    play_stats,
+    id = .data$playId,
+    playerId = as.character(.data$athleteId)
+  )
+  who <- dplyr::distinct(directory, .data$playerId, .data$player) |>
+    dplyr::distinct(.data$playerId, .keep_all = TRUE)
+  mentions <- play_text_mentions(plays)
+  mentions$gameId <- plays$gameId[match(mentions$id, plays$id)]
+  mentions |>
+    match_play_mentions(directory, by = "gameId") |>
+    dplyr::filter(!is.na(.data$playerId)) |>
+    dplyr::mutate(playerId = as.character(.data$playerId)) |>
+    dplyr::anti_join(logged, by = c("id", "playerId")) |>
+    dplyr::summarise(
+      team = dplyr::first(.data$team),
+      roles = paste(unique(.data$role), collapse = ", "),
+      .by = c("id", "playerId")
+    ) |>
+    dplyr::left_join(who, by = "playerId", relationship = "many-to-one") |>
+    dplyr::select("id", "playerId", "team", "player", "roles")
 }
 
 # Log stat types -> the role labels the text mentions use.

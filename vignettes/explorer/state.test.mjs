@@ -1,6 +1,6 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {TABS, parseHash, toHash, resolveSeason, resolveTeam} from "./state.js";
+import {TABS, parseHash, toHash, resolveSeason, resolveTeam, tabUsesTeam} from "./state.js";
 
 const meta = {default_season: 2026, seasons: [2024, 2025, 2026], default_team: 251};
 
@@ -44,4 +44,16 @@ test("resolveSeason and resolveTeam", () => {
 
 test("tabs are the shell's four, Teams first", () => {
   assert.deepEqual(TABS.map(t => t.key), ["teams", "players", "combine", "careers"]);
+});
+
+test("tabUsesTeam hides the Team menu only on Players and Combine", () => {
+  assert.equal(tabUsesTeam("teams"), true);
+  assert.equal(tabUsesTeam("careers"), true);
+  assert.equal(tabUsesTeam("players"), false);
+  assert.equal(tabUsesTeam("combine"), false);
+});
+
+test("toHash keeps the team on a tab that hides the Team menu", () => {
+  const h = toHash({tab: "players", season: 2026, team: 251, game: null, pos: "QB", player: null});
+  assert.equal(parseHash(h, meta).team, 251);
 });

@@ -168,6 +168,10 @@ explorer_elapsed <- function(
 #'   [build_explorer_player_seasons()]), so a player chip opens the Players
 #'   tab at the right position and shows the player's position code. A player
 #'   without one gets no `pos` or `position`.
+#' @param text_players Optional players named only in the play text, from
+#'   [play_text_players()]. They follow the log's players in the play's
+#'   array, with their text roles as `stat` and `text = TRUE` (the log's
+#'   players carry `text = FALSE`), so the page can mark them.
 #' @return A tibble keyed by `play_id`, one row per input play.
 #' @export
 build_explorer_plays <- function(
@@ -175,7 +179,8 @@ build_explorer_plays <- function(
   games,
   teams,
   play_stats,
-  player_groups = NULL
+  player_groups = NULL,
+  text_players = NULL
 ) {
   homes <- dplyr::select(games, gameId = "id", home_team = "homeTeam")
   offense_ids <- dplyr::select(teams, offense = "team", offense_id = "team_id")
@@ -184,7 +189,26 @@ build_explorer_plays <- function(
     dplyr::summarise(
       stat = paste(unique(.data$statType), collapse = ", "),
       .by = c("playId", "athleteId", "athleteName")
+    ) |>
+    dplyr::mutate(text = FALSE)
+  if (!is.null(text_players)) {
+    players <- dplyr::bind_rows(
+      players,
+      dplyr::transmute(
+        text_players,
+        playId = .data$id,
+        athleteId = .data$playerId,
+        athleteName = .data$player,
+        # "Other" is a mention the text gives no role, e.g. "hurried by".
+        stat = stringr::str_replace(
+          .data$roles,
+          "\\bOther\\b",
+          "Named in play"
+        ),
+        text = TRUE
+      )
     )
+  }
   if (!is.null(player_groups)) {
     # A player-season with two teams has one group; keep the first.
     groups <- player_groups |>
@@ -212,7 +236,8 @@ build_explorer_plays <- function(
         name = .data$athleteName,
         stat = .data$stat,
         pos = .data$pos,
-        position = .data$position
+        position = .data$position,
+        text = .data$text
       ))),
       .by = "playId"
     )

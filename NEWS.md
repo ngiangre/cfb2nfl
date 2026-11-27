@@ -1,5 +1,17 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Explorer (feature F13): **the game view's play card names the players the
+  play text lists but the play-stats log leaves out**, mostly tacklers, plus
+  kickers, holders and penalized players. They are matched by jersey number
+  and surname to either team's roster (unmatched or ambiguous names are left
+  out), drawn as dashed chips marked "from play text", and link to the
+  Players tab when the player has a page. Text from an overturned play's
+  original call is ignored. The selected team's line in the conference chart
+  is now drawn thick, on top and over faded rivals. The Players and Combine
+  tabs hide the Team menu they do not use (the link keeps the team), and the
+  Combine 3D chart draws its points on a direct link and resizes with the
+  window.
+
 - Posts (feature F24): **the career endings post is finished**. It opens
   with the fan's question and its expectations; the terms and the flow chart
   from roster players to the study population now define the data in 2.1.
