@@ -1,0 +1,266 @@
+---
+title: "How did Kyle Allen and Shane Buechele reach the NFL undrafted?"
+aliases: [2026-08-27-buechele-allen.html]
+image: card-thumbs/allen-buechele-college-to-nfl.png
+image-alt: "Timeline of two quarterbacks, one row each, one tile per college or NFL roster season, coloured by team. Each row has two college schools, then an unbroken run of NFL seasons with no draft pick in between."
+categories: ["Topic: Movement", "Position: Quarterback", "Population: Draft picks", "Figure: Flow chart"]
+status: investigation
+graduated_to: null
+terms: [roster-season, nfl-draft-link, stat-line-season]
+followups:
+  - text: "Add more backup-quarterback career case studies to build a recurring cast for later cards."
+    link: "F19"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+# Keyed on the CFBD athlete id and the nflverse gsis id, never on name.
+subjects <- tibble::tribble(
+  ~who             , ~cfb_athlete_id , ~gsis_id     ,
+  "Shane Buechele" , "4039034"       , "00-0036679" ,
+  "Kyle Allen"     , "559681"        , "00-0034577"
+)
+# One row per player-season on the college roster or the NFL roster, with a
+# draft status checked against the draft records.
+spine <- player_trajectory(
+  subjects,
+  roster = tbl(con, "roster"),
+  nfl_rosters = tbl(con, "nfl_rosters"),
+  nfl_draft_picks = tbl(con, "nfl_draft_picks")
+)
+contract_player_trajectory(spine)
+# Team colours for display only (decision 0008); NFL clubs come from nflverse
+# because teams.parquet holds college programs only.
+college_meta <- tbl(con, "teams") |>
+  select(team, color) |>
+  collect() |>
+  transmute(team = team, name = team, color = color)
+nfl_meta <- nflreadr::load_teams(current = FALSE) |>
+  transmute(team = team_abbr, name = team_name, color = team_color)
+team_lookup <- bind_rows(college_meta, nfl_meta) |>
+  distinct(team, .keep_all = TRUE)
+spine <- spine |>
+  filter(season <= 2026) |>
+  left_join(team_lookup, by = "team") |>
+  mutate(
+    color = coalesce(color, "gray60"),
+    tooltip = paste0(name, " · ", season),
+    who = factor(who, levels = c("Kyle Allen", "Shane Buechele"))
+  )
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
+
+```{r}
+#| label: draft-records
+#| output: false
+# Draft status checked in both draft sources, each on its own id namespace:
+# CFBD picks on the college athlete id, nflverse picks on the NFL player id.
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+cfbd_draft_rows <- vapply(
+  as.integer(subjects$cfb_athlete_id),
+  \(id) {
+    tbl(con, "picks") |>
+      filter(collegeAthleteId == !!id) |>
+      count() |>
+      pull(n)
+  },
+  numeric(1)
+)
+nflverse_draft_rows <- vapply(
+  subjects$gsis_id,
+  \(id) {
+    tbl(con, "nfl_draft_picks") |>
+      filter(gsis_id == !!id) |>
+      count() |>
+      pull(n)
+  },
+  numeric(1)
+)
+DBI::dbDisconnect(con, shutdown = TRUE)
+path_summary <- spine |>
+  group_by(who) |>
+  summarise(
+    last_college = last(name[stage == "College"]),
+    nfl_seasons = n_distinct(season[stage == "NFL"]),
+    n_clubs = n_distinct(team[stage == "NFL"]),
+    club_2026 = name[stage == "NFL" & season == 2026][1],
+    .groups = "drop"
+  ) |>
+  mutate(
+    draft_rows = cfbd_draft_rows + nflverse_draft_rows
+  )
+```
+
+```{r}
+#| label: draft-table
+path_summary |>
+  transmute(
+    Player = as.character(who),
+    `Last college team` = last_college,
+    `Draft records found` = draft_rows,
+    `NFL roster seasons` = nfl_seasons,
+    `NFL clubs` = n_clubs,
+    `2026 club` = club_2026
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Player",
+      "Last college team",
+      "Draft records found",
+      "NFL roster seasons",
+      "NFL clubs",
+      "2026 club"
+    ),
+    caption = "NFL record through 2026. Draft records found counts matching rows in both the CFBD and nflverse draft-pick tables; both players have none."
+  )
+```
+
+```{r}
+#| label: figure
+# Each row is one player, each tile one roster season, coloured by team. A team
+# run (consecutive seasons at one school) is labelled once at its midpoint, so the
+# thumbnail names each school without a legend.
+runs <- spine |>
+  arrange(who, season) |>
+  group_by(who) |>
+  mutate(run = cumsum(team != lag(team, default = ""))) |>
+  group_by(who, run, team, color) |>
+  summarise(start = min(season), end = max(season), .groups = "drop") |>
+  mutate(mid = (start + end) / 2)
+p <- ggplot(spine, aes(season, who)) +
+  geom_tile(aes(fill = color), colour = "white", height = 0.7) +
+  geom_text(
+    data = runs,
+    aes(x = mid, label = team),
+    colour = "white",
+    size = 3.6,
+    fontface = "bold"
+  ) +
+  scale_fill_identity() +
+  scale_x_continuous(breaks = seq(min(spine$season), max(spine$season), 2)) +
+  labs(
+    title = "Two schools each, then the NFL without a draft pick",
+    subtitle = "Team by roster season, college then NFL",
+    x = NULL,
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card() +
+  theme(panel.grid = element_blank(), legend.position = "none")
+
+card_thumbnail(p, "allen-buechele-college-to-nfl", release = release)
+
+p_int <- ggplot(spine, aes(season, who)) +
+  geom_tile_interactive(
+    aes(fill = color, tooltip = tooltip, data_id = paste(who, season)),
+    colour = "white",
+    height = 0.7
+  ) +
+  geom_text(
+    data = runs,
+    aes(x = mid, label = team),
+    colour = "white",
+    size = 3.6,
+    fontface = "bold"
+  ) +
+  scale_fill_identity() +
+  scale_x_continuous(breaks = seq(min(spine$season), max(spine$season), 2)) +
+  labs(
+    title = "Team by roster season, college then NFL",
+    subtitle = "Hover any tile for the team and season",
+    x = NULL,
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card() +
+  theme(panel.grid = element_blank(), legend.position = "none")
+card_interactive(p_int)
+```
+
+```{r}
+#| label: nfl-stints
+# One bar segment per contiguous stint with a club, placed on the season axis so
+# the order of arrival reads left to right.
+stints <- spine |>
+  filter(stage == "NFL") |>
+  arrange(who, season) |>
+  group_by(who) |>
+  mutate(stint = cumsum(team != lag(team, default = ""))) |>
+  group_by(who, stint, team, name, color) |>
+  summarise(start = min(season), end = max(season), .groups = "drop") |>
+  mutate(seasons = end - start + 1)
+p_nfl <- ggplot(stints) +
+  geom_rect_interactive(
+    aes(
+      xmin = start - 0.5,
+      xmax = end + 0.5,
+      ymin = as.integer(who) - 0.3,
+      ymax = as.integer(who) + 0.3,
+      fill = color,
+      tooltip = sprintf(
+        "%s: %s, %d to %d (%d season%s)",
+        who,
+        name,
+        start,
+        end,
+        seasons,
+        if_else(seasons == 1, "", "s")
+      ),
+      data_id = paste(who, stint)
+    ),
+    colour = "white",
+    linewidth = 1
+  ) +
+  geom_text(
+    aes(x = (start + end) / 2, y = as.integer(who), label = team),
+    colour = "white",
+    size = 4.4,
+    fontface = "bold"
+  ) +
+  scale_fill_identity() +
+  scale_x_continuous(breaks = 2018:2026) +
+  scale_y_continuous(
+    breaks = seq_along(levels(spine$who)),
+    labels = levels(spine$who)
+  ) +
+  labs(
+    title = "An NFL roster every season without a draft pick",
+    subtitle = "NFL clubs by season, one segment per stint",
+    x = NULL,
+    y = NULL,
+    caption = "Hover a segment for the club and its seasons."
+  ) +
+  theme_card() +
+  theme(panel.grid = element_blank())
+card_interactive(p_nfl)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+```

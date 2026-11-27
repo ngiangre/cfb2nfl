@@ -146,3 +146,105 @@
   section: "5. Discussion"
   fate: dropped
   reason: "Prose; its open questions are follow-ups (F17, F22) on the cards."
+
+# ---- 2026-10-24-transfers ----
+- post: 2026-10-24-transfers
+  section: "1. Introduction"
+  fate: dropped
+  reason: "Prose; each question it raised is now a card's title, and its expectations are not carried onto cards."
+- post: 2026-10-24-transfers
+  section: "2.1 A transfer is a season played at a different school than the player's previous one"
+  fate: merged
+  card: transfer-share-by-season
+  reason: "The transfer definition is the transfer-event and stat-line-season glossary terms, shown on every transfer card."
+- post: 2026-10-24-transfers
+  section: "3.1 The share of players at a new school rose almost fourfold after the 2020 season"
+  fate: card
+  card: transfer-share-by-season
+  reason: "The season line chart is the card. Rates stop at the last complete season (2025); the in-progress 2026 season is excluded, so its share is not shown."
+- post: 2026-10-24-transfers
+  section: "3.2 Two transfers in five stay in the same tier, and more drop a tier than climb one"
+  fate: card
+  card: transfer-direction
+  reason: "Direction bars and the by-season direction chart. Number change: the same-tier share through 2025 is 40.6% (the post showed 42%) because 2026 is excluded."
+- post: 2026-10-24-transfers
+  section: "3.3 FCS players climb as often as they stay, but Group of Five players drop more than they climb"
+  fate: card
+  card: transfer-tier-moves
+  reason: "The origin-to-destination tier heatmap and the origin mix by season. Number changes through 2025: FCS players climb 1,342 times and stay 1,192; Group of Five players drop 1,412 times and climb 1,100 (the post's tier matrix table is dropped as restating the heatmap)."
+- post: 2026-10-24-transfers
+  section: "3.4 Quarterbacks and running backs drop a tier more often than any other position"
+  fate: card
+  card: transfer-direction-by-position
+  reason: "The direction mix by position group, with quarterbacks and running backs highlighted. The position table is dropped as restating the bars."
+- post: 2026-10-24-transfers
+  section: "4. Summary"
+  fate: dropped
+  reason: "The expectation summary served the post; cards carry no expectations."
+- post: 2026-10-24-transfers
+  section: "5. Discussion"
+  fate: dropped
+  reason: "Callouts restated the figures. Caveats survive on the cards: the transfer-count floor in the stat-line-season glossary term, and tier-not-program on the transfer-tier page. The depth-chart explanation is dropped as an unverified mechanism."
+
+# ---- 2026-11-05-position-stability ----
+- post: 2026-11-05-position-stability
+  section: "1. Introduction"
+  fate: dropped
+  reason: "Prose; the question is now the position-stability cards' titles."
+- post: 2026-11-05-position-stability
+  section: "2.1 Position groups agree with one another for most players, but the sources cover different players"
+  fate: card
+  card: position-linkage-funnel
+  reason: "The linkage stages are the funnel; the position-group definitions are the position-group and harmonized-position-group glossary terms."
+- post: 2026-11-05-position-stability
+  section: "3.1 Most high school recruits keep their position group through college"
+  fate: card
+  card: position-group-hs-to-college
+  reason: "The stay-share bars are the card; the flow grid moved to its page. The stay-share table is dropped as restating the bars."
+- post: 2026-11-05-position-stability
+  section: "3.2 Nearly every drafted player keeps his college position group in the NFL"
+  fate: card
+  card: position-group-college-to-nfl
+  reason: "The stay-share lollipop is the card (axis starts above zero, stated in its subtitle); the college-to-NFL flow grid moved to its page."
+- post: 2026-11-05-position-stability
+  section: "4. Summary"
+  fate: dropped
+  reason: "The expectation summary served the post; cards carry no expectations."
+- post: 2026-11-05-position-stability
+  section: "5. Discussion"
+  fate: dropped
+  reason: "Callouts restated the figures. The caveat that rosters list one position per athlete is in the position-group glossary term; the undrafted-players follow-up stays on the card."
+
+# ---- 2026-08-27-buechele-allen ----
+- post: 2026-08-27-buechele-allen
+  section: "1. Introduction"
+  fate: dropped
+  reason: "Prose; the question is now the card's title."
+- post: 2026-08-27-buechele-allen
+  section: "2. Data (2.1 Four records follow each player)"
+  fate: merged
+  card: allen-buechele-college-to-nfl
+  reason: "The record definitions are the roster-season and nfl-draft-link glossary terms; the records table is dropped."
+- post: 2026-08-27-buechele-allen
+  section: "3.1 Kyle Allen arrived as the far higher-rated recruit"
+  fate: card
+  card: allen-buechele-recruiting-rank
+  reason: "The rating dot plot is the card; the profile table moved to its page. The quarterback ranks are within each class."
+- post: 2026-08-27-buechele-allen
+  section: "3.2 Both quarterbacks left their first school and finished college at a second"
+  fate: card
+  card: allen-buechele-college-to-nfl
+  reason: "The college and NFL roster timeline is the card's thumbnail (team labels in place of logos, so it reads at thumbnail size). The college career table is dropped as restating the timeline."
+- post: 2026-08-27-buechele-allen
+  section: "3.3 Neither quarterback was drafted, and both stayed on NFL rosters into 2026 with the Bills"
+  fate: card
+  card: allen-buechele-college-to-nfl
+  reason: "The NFL stints chart and the draft-record table are the card's page."
+- post: 2026-08-27-buechele-allen
+  section: "4. Summary"
+  fate: dropped
+  reason: "The stage-by-stage table restates the cards."
+- post: 2026-08-27-buechele-allen
+  section: "5. Discussion"
+  fate: dropped
+  reason: "Callouts restated the cards. The caveat that a roster season is presence, not playing time, is the roster-season glossary term."

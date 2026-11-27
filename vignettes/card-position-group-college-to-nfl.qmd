@@ -105,7 +105,7 @@ p <- ggplot(nfl_stay, aes(100 * stay_share, college_modal_group)) +
   ) +
   labs(
     title = "Draftees who kept their college position",
-    subtitle = "Share keeping their group; axis starts at 88%",
+    subtitle = "Share keeping their group; the axis does not start at zero",
     x = "Share who kept their group (%)",
     y = NULL,
     caption = card_caption(release)
