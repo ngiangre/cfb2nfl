@@ -7,7 +7,7 @@ description: >-
   querychat companion app, or the altdoc site navigation — or when reviewing
   whether a fan can find answers to the project's questions and pose new ones.
   Actively makes fan-experience edits; it does not rewrite the technical pages
-  (data, pipeline, reference). Dated blog posts are reviewed by the
+  (data, pipeline, reference). Figure cards are reviewed by the
   vignette-reviewer agent, not this skill.
 ---
 
@@ -55,13 +55,14 @@ aren't *funneled* into them.
 Chart *correctness* and count/subset preservation belong to
 `architecture-improver`. Coordinate; don't rewrite the chart logic.
 
-## Blog posts
+## Figure cards
 
-Reviewing a dated post (`vignettes/YYYY-MM-DD-*.qmd`) is the
+Reviewing a figure card (`vignettes/card-*.qmd`, decision 0054) is the
 `vignette-reviewer` agent's job (`.claude/agents/vignette-reviewer.md`): a
-fresh-context cold read plus the `R/post_style.R` checker. Hand posts to it
-rather than reviewing them here; you edit a post only to apply its findings
-when asked.
+fresh-context read of the thumbnail and page plus the `R/card_style.R`
+checker. Hand cards to it rather than reviewing them here; you edit a card
+only to apply its findings when asked. The Investigations wall itself is a
+fan page and is yours.
 
 ## Rubric — check every fan page against these
 

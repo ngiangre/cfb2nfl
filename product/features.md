@@ -118,7 +118,9 @@ acceptance criteria.
 
 ### F16 · Post style rules, checker and cold-read reviewer
 
-- **Goals:** G1, C1 · **Personas:** P1, P2 · **Status:** shipped
+- **Goals:** G1, C1 · **Personas:** P1, P2 · **Status:** superseded by F25
+  (decision 0054, 2026-11-27: `check_post_style()` and the post rules
+  retired; cards use `check_card_style()` and the card-mode reviewer)
 - **Links:** decisions 0025, 0040; `R/post_style.R`; superseded by F25
   once decision 0054 lands
 - **Tasks:**

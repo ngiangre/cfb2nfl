@@ -1,6 +1,19 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
 - Investigations (feature F25,
+  [#134](https://github.com/ngiangre/cfb2nfl/issues/134)): **figure cards
+  replace dated posts**
+  ([decision 0054](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0054-figure-cards-replace-dated-posts.md),
+  superseding 0015 and 0025 and amending 0040). The three draft-outcome
+  posts are retired: their pages now redirect to their main cards, and
+  every section's fate is in `inst/cards/migration.yml`. The post rules,
+  template and `check_post_style()` are gone; `check_card_style()` runs in
+  their place in CI, the tests and the edit hook, and the
+  `vignette-reviewer` agent reviews cards only. AGENTS.md "Figure cards"
+  holds the rules, and the G1 and G3 goals now count cards. The 13
+  remaining posts stay listed under the wall until their migration.
+
+- Investigations (feature F25,
   [#133](https://github.com/ngiangre/cfb2nfl/issues/133)): **the first 14
   figure cards are up**, every figure from the three draft-outcome posts
   (outcome prevalence, drafted rate by position, how careers end), Data

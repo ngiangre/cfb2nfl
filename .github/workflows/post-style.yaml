@@ -1,8 +1,7 @@
-# Mechanical style gate for dated posts (R/post_style.R, AGENTS.md "Blog
-# style") and figure cards (R/card_style.R, feature F25). R CMD check cannot
-# run it: vignettes/ is .Rbuildignored, so the testthat cases over the real
-# posts and cards skip there. This job checks the checkout itself, sourcing
-# the checkers without loading the package.
+# Mechanical style gate for the figure cards (R/card_style.R, decision 0054).
+# R CMD check cannot run it: vignettes/ is .Rbuildignored, so the testthat
+# case over the real cards skips there. This job checks the checkout itself,
+# sourcing the checker without loading the package.
 
 on:
   push:
@@ -34,20 +33,6 @@ jobs:
             any::rlang
             any::tibble
             any::yaml
-
-      - name: Check posts
-        shell: Rscript {0}
-        run: |
-          source("R/post_style.R")
-          bad <- check_posts_style("vignettes")
-          if (nrow(bad) > 0) {
-            cat(
-              sprintf("%s:%s [%s] %s", bad$file, bad$line, bad$rule, bad$message),
-              sep = "\n"
-            )
-            quit(status = 1)
-          }
-          cat("All dated posts pass the mechanical style checks.\n")
 
       # Fails on errors (unapproved tags, a missing or stale thumbnail, ...);
       # a newer data release than a thumbnail's is printed as a note only.

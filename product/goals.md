@@ -22,13 +22,15 @@ GitHub issues carry one label per goal or constraint they serve:
 
 - **Serves:** P1 (P2 for method)
 - **Outcome:** each college-side question in VISION §1 (what matters for
-  going pro, does the head coach matter, per-position draft odds) has a dated
-  post that answers it, or says plainly what the data cannot answer.
-- **Signals:** every open question in a post's `followups:` is answered by a
-  later feature or tracked as a feature in [features.md](features.md); P1
-  can see each question's status.
-- **Not this goal:** a tour of everything the data contains (posts are
-  snapshots, AGENTS.md "Blog style").
+  going pro, does the head coach matter, per-position draft odds) has figure
+  cards or an Analysis entry that answer it, or its entry in
+  `inst/cards/questions.yml` says plainly what the data cannot answer
+  (decision 0054).
+- **Signals:** every open question in a card's `followups:` links to a
+  question or a feature in [features.md](features.md); P1 can see each
+  question's status.
+- **Not this goal:** a tour of everything the data contains (each card is
+  one question and one figure, AGENTS.md "Figure cards").
 
 ## G3 · Let fans go from a question to an answer to the next question
 
@@ -37,8 +39,9 @@ GitHub issues carry one label per goal or constraint they serve:
   probes it at finer grain (their team, player, season), and can pose a new
   question, on a phone as well as a desktop.
 - **Signals:** fan-facing pages pass the `site-personas` P1 walkthrough;
-  every Results section has an exploratory figure; the Explorer covers the
-  season in progress; jargon does not leak onto fan pages.
+  every card has an interactive figure on its page (decision 0054); the
+  Explorer covers the season in progress; jargon does not leak onto fan
+  pages.
 - **Not this goal:** rewriting the technical pages for fans (they serve P2);
   the querychat app (deferred, 2026-11-22).
 

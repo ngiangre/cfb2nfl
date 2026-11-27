@@ -1,6 +1,6 @@
 # 0015 — Blog post naming conventions and build robustness
 
-- **Status:** Accepted
+- **Status:** Superseded by 0054 (figure cards); freezing still applies
 - **Date:** 2026-08-27
 
 ## Context
