@@ -145,7 +145,7 @@ p <- ggplot(both, aes(r, tier)) +
   labs(
     x = "Correlation with draft rate (r)",
     y = NULL,
-    title = "SP+ tracks draft rate more closely than win % in both tiers",
+    title = "Correlation of draft rate with win % and average SP+, by tier",
     subtitle = "Each row is a tier; the dark dot is average SP+, the grey dot win %",
     caption = card_caption(release)
   ) +

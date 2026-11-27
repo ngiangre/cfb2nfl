@@ -1,7 +1,7 @@
 ---
 title: "Does the data record every school's players?"
 image: card-thumbs/stat-line-coverage.png
-image-alt: "Line chart of the share of teams in each division with at least one player stat line from 2010 to 2025: every FBS team has stat lines in every season; the FCS line, in teal, starts near four in ten teams and reaches every team in 2021; Division II and below stays near the bottom."
+image-alt: "Line chart of the share of teams in each division with at least one player stat line by season: the FBS line stays at the top throughout, the FCS line starts well below it and climbs to the top in the later seasons, and the Division II and below line stays near the bottom."
 categories: ["Topic: Programs and conferences", "Position: All positions", "Unit: Schools", "Figure: Line chart"]
 status: investigation
 graduated_to: null
@@ -39,7 +39,7 @@ played <- tbl(con, "team_season") |>
 coverage <- stat_coverage(played)
 division_colors <- c(
   "FBS" = "#374151",
-  "FCS" = "#0f766e",
+  "FCS" = "#6b7280",
   "Division II and below" = "#9ca3af"
 )
 cov_at <- function(s, d, col) {
@@ -72,7 +72,7 @@ p <- ggplot(coverage, aes(season, share, color = division)) +
   scale_color_manual(values = division_colors, name = NULL) +
   labs(
     title = "Share of teams with a player stat line",
-    subtitle = "Teams that played a recorded game, by division; hover a point for counts",
+    subtitle = "Share of teams with at least one player stat line, by division",
     x = "Season",
     y = "Teams with a stat line",
     caption = card_caption(release)
@@ -142,7 +142,7 @@ p_tiles <- ggplot(
     color = "white"
   ) +
   scale_fill_manual(
-    values = c("Has stat lines" = "#0f766e", "No stat lines" = "#e5e7eb"),
+    values = c("Has stat lines" = "#6b7280", "No stat lines" = "#e5e7eb"),
     name = NULL
   ) +
   scale_x_continuous(breaks = seq(2010, last_season, 3)) +
@@ -150,7 +150,7 @@ p_tiles <- ggplot(
     x = "Season",
     y = NULL,
     title = "Every FCS team-season, with or without stat lines",
-    subtitle = "Teams with the most stat-line seasons at the top; hover a tile for player and roster counts",
+    subtitle = "Teams with the most stat-line seasons at the top",
     caption = "Gaps are seasons a school played outside FCS or played no recorded game."
   ) +
   theme_cfb2nfl(base_size = 9)

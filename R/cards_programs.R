@@ -141,11 +141,38 @@ expected_draftees <- function(d, x) {
 #' @return A named character vector of hex colours, one per tier label.
 #' @export
 tier_palette <- function() {
+  # Neutral greys only: the hues of the drafted, undrafted and quarterback
+  # colours and of the team colours that read as highlights stay off tiers.
   c(
-    "Power" = "#1d4ed8",
-    "Group of 5" = "#f59e0b",
-    "FCS and below" = "#6b7280"
+    "Power" = "#374151",
+    "Group of 5" = "#9ca3af",
+    "FCS and below" = "#d1d5db"
   )
+}
+
+#' Team colours for highlights, with green and purple teams set to dark grey
+#'
+#' Green and purple are reserved for the drafted and undrafted colours and for
+#' quarterbacks, so a team whose brand colour falls in those hues is shown in
+#' dark grey instead. Greys (low saturation) keep their colour.
+#'
+#' @param cols Named character vector of hex colours, as [team_color_values()]
+#'   returns.
+#' @return The same vector with the green and purple entries replaced.
+#' @export
+highlight_colors <- function(cols) {
+  ok <- !is.na(cols) & grepl("^#[0-9a-fA-F]{6}$", cols)
+  if (!any(ok)) {
+    return(cols)
+  }
+  hsv <- grDevices::rgb2hsv(grDevices::col2rgb(cols[ok]))
+  hue <- hsv["h", ] * 360
+  sat <- hsv["s", ]
+  reserved <- sat >= 0.15 &
+    ((hue >= 75 & hue <= 170) | (hue >= 240 & hue <= 330))
+  idx <- which(ok)[reserved]
+  cols[idx] <- "#374151"
+  cols
 }
 
 #' One row per FBS school: record, draft rate and expected draftees

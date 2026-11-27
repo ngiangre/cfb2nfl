@@ -217,6 +217,9 @@ undrafted-rate:
 expected-draftees:
   label: Expected draftees
   definition: "How many draftees a school would have produced at the rates of its benchmark, times its eligible players at each position: the FBS-wide rates for the school ranking, or its own tier's rates for the within-tier version."
+expected-for-the-record:
+  label: Expected for the record
+  definition: "The draftees a school's tier win curve predicts from its win percentage over 2010 to 2025, times its eligible players. The same calculation as expected draftees; the name marks a benchmark that uses only the record."
 draftees-above-expected:
   label: Draftees above expected
   definition: "Drafted players minus expected draftees. A negative value means fewer draftees than the benchmark predicts."

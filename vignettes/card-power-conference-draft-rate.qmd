@@ -2,7 +2,7 @@
 title: "Are Power-conference players drafted more often?"
 aliases: [2026-10-31-who-produces-draftees.html]
 image: card-thumbs/power-conference-draft-rate.png
-image-alt: "Horizontal bar chart of the draft rate for each FBS conference, the share of eligible players drafted in their final college seasons: every Power conference's bar is longer than every Group of 5 conference's, and two dashed lines mark the tier totals, the Power total about five times the Group of 5 total."
+image-alt: "Horizontal bar chart of the draft rate for each FBS conference, the share of eligible players drafted in their final college seasons, with bars shaded by tier: every Power conference's bar is longer than every Group of 5 conference's, and two dashed lines, labelled Power and Group of 5, mark the tier totals."
 categories: ["Topic: Programs and conferences", "Position: All positions", "Population: Draft-eligible players", "Figure: Bar chart", "Question: What matters for going pro"]
 status: investigation
 graduated_to: null
@@ -86,13 +86,13 @@ p <- ggplot(
 ) +
   geom_col_interactive(
     aes(
+      fill = tier,
       tooltip = paste0(
         league, " (", tier, "): ", fmt(drafted), " drafted of ",
         fmt(eligible), " eligible (", pct(draft_rate), ")"
       ),
       data_id = league
     ),
-    fill = "#1B9E77",
     width = 0.75
   ) +
   geom_vline(
@@ -101,17 +101,30 @@ p <- ggplot(
     linetype = "dashed",
     linewidth = 0.9
   ) +
-  scale_x_continuous(labels = scales::percent) +
+  annotate(
+    "text",
+    x = c(power_line, g5_line),
+    y = nrow(conf_rates) + 1.5,
+    label = c("Power total", "Group of 5 total"),
+    hjust = c(0, 0),
+    color = "#374151",
+    size = 4.5,
+    fontface = "bold"
+  ) +
+  scale_y_discrete(expand = expansion(add = c(0.6, 2.4))) +
+  scale_fill_manual(values = tier_colors, name = NULL) +
+  scale_x_continuous(labels = scales::percent, expand = expansion(mult = c(0, 0.08))) +
   labs(
     title = "Draft rate by FBS conference",
-    subtitle = "Eligible players drafted; dashed lines are the Power and Group of Five totals",
+    subtitle = "Eligible players drafted, shaded by tier; dashed lines are the tier totals",
     x = "Draft rate",
     y = NULL,
     caption = card_caption(release)
   ) +
-  theme_card()
+  theme_card() +
+  theme(legend.position = "top")
 
-card_thumbnail(p, "power-conference-draft-rate", release = release)
+card_thumbnail(p, "power-conference-draft-rate", release = release, height = 7.5)
 card_interactive(p)
 ```
 
@@ -176,3 +189,4 @@ card_interactive(p_seasons)
 #| echo: false
 #| output: asis
 cat(card_footer())
+```

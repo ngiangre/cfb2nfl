@@ -1,11 +1,11 @@
 ---
 title: "Which schools produced the most draftees above or below what their record predicts?"
 image: card-thumbs/over-under-producers.png
-image-alt: "Diverging bar chart of the five Power and five Group of 5 schools furthest above and below their expected draftees. Florida and LSU lead the Power schools above expectation and Oklahoma State is furthest below; Cincinnati leads the Group of 5, and Army, Navy and Air Force sit among the furthest below."
+image-alt: "Diverging bar chart of the five Power and five Group of 5 schools furthest above and below what their record predicts for their draftees. Florida and LSU lead the Power schools above, Oklahoma State is furthest below among Power schools, and the highlighted schools are in dark grey."
 categories: ["Topic: Programs and conferences", "Position: All positions", "Population: Draft-eligible players", "Unit: Schools", "Figure: Bar chart", "Question: What matters for going pro"]
 status: investigation
 graduated_to: null
-terms: [win-pct, tier, power-tier, group-of-5-tier, eligible-player, expected-draftees, draftees-above-expected]
+terms: [win-pct, tier, power-tier, group-of-5-tier, eligible-player, expected-draftees, draftees-above-expected, expected-for-the-record]
 followups:
   - text: "Do draftees from programs that produce above expectation also last longer in the NFL?"
     link: "Question: NFL careers"
@@ -67,13 +67,12 @@ ranked <- school |>
   ungroup()
 over <- filter(ranked, rank_over <= 5L)
 under <- filter(ranked, rank_under <= 5L)
-# The schools the card names: the top two Power schools above and below,
-# the top Group of 5 school, and the three service academies.
-top_power <- filter(over, tier == "Power")$team[1:2]
-bottom_power <- filter(under, tier == "Power")$team[1:2]
-top_g5 <- filter(over, tier == "Group of 5")$team[1]
-academies <- c("Army", "Navy", "Air Force")
-named <- c(top_power, bottom_power, top_g5, academies)
+# The schools the card highlights: the two Power schools furthest above and
+# the two furthest below, and the top Group of 5 school above expectation.
+top_power <- filter(over, tier == "Power") |> slice_max(above, n = 2) |> pull(team)
+bottom_power <- filter(under, tier == "Power") |> slice_min(above, n = 2) |> pull(team)
+top_g5 <- filter(over, tier == "Group of 5") |> slice_max(above, n = 1) |> pull(team)
+named <- c(top_power, bottom_power, top_g5)
 school$tip <- paste0(
   school$team,
   " (",
@@ -96,7 +95,7 @@ bars <- bind_rows(over, under) |>
   left_join(select(school, team, tier, tip), by = c("team", "tier")) |>
   mutate(
     key = paste(tier, team, sep = "___"),
-    shade = if_else(team %in% named, team, "Other")
+    shade = if_else(team %in% named, "Highlighted", "Other")
   )
 p <- ggplot(bars, aes(above, reorder(key, above), fill = shade)) +
   geom_col_interactive(
@@ -108,14 +107,14 @@ p <- ggplot(bars, aes(above, reorder(key, above), fill = shade)) +
   scale_y_discrete(labels = function(x) sub(".*___", "", x)) +
   scale_x_continuous(expand = expansion(mult = c(0.08, 0.08))) +
   scale_fill_manual(
-    values = c(team_colors[intersect(named, names(team_colors))], Other = "#9ca3af"),
+    values = c(Highlighted = "#374151", Other = "#d1d5db"),
     guide = "none"
   ) +
   labs(
     x = "Drafted minus expected for the record",
     y = NULL,
-    title = "Florida and LSU lead the Power schools above expectation",
-    subtitle = "Five furthest over and under in each tier; the named schools in team colors",
+    title = "Drafted minus expected for the top five schools above and below in each tier",
+    subtitle = "Five furthest over and under in each tier; highlighted schools in dark grey",
     caption = card_caption(release)
   ) +
   theme_card()
@@ -136,7 +135,7 @@ p_explore <- ggplot(school, aes(expected, drafted)) +
     stroke = 0.6
   ) +
   facet_wrap(~tier, scales = "free") +
-  scale_fill_team(teams, guide = "none") +
+  scale_fill_manual(values = highlight_colors(team_colors), guide = "none") +
   labs(
     x = "Expected draftees for the record",
     y = "Drafted",

@@ -1,7 +1,7 @@
 ---
 title: "Do Power conferences dominate undrafted signings as much as the draft?"
 image: card-thumbs/undrafted-signings-by-conference.png
-image-alt: "Dumbbell chart for each FBS conference, with the draft rate in green and the undrafted rate in purple: the draft rates spread widely, with the Power conferences at the far right, while the undrafted rates sit much closer together, the Power conferences only about twice the Group of 5."
+image-alt: "Dumbbell chart for each FBS conference, with the draft rate in dark grey and the undrafted rate in mid grey: the draft rates spread widely, with the Power conferences at the far right, while the undrafted rates sit much closer together."
 categories: ["Topic: Programs and conferences", "Position: All positions", "Population: Draft-eligible players", "Figure: Scatter plot", "Question: What matters for going pro"]
 status: investigation
 graduated_to: null
@@ -117,20 +117,20 @@ p <- ggplot(dumb, aes(rate, league)) +
     size = 3.5
   ) +
   scale_color_manual(
-    values = c("Drafted" = "#1B9E77", "Undrafted free agent" = "#7570B3"),
+    values = c("Drafted" = "#374151", "Undrafted free agent" = "#9ca3af"),
     name = NULL
   ) +
   scale_x_continuous(labels = scales::percent) +
   labs(
     title = "Draft and undrafted rates by conference",
-    subtitle = "Eligible players drafted (green) and signed undrafted (purple)",
+    subtitle = "Eligible players drafted (dark grey) and signed undrafted (mid grey)",
     x = "Share of eligible players",
     y = NULL,
     caption = card_caption(release)
   ) +
   theme_card()
 
-card_thumbnail(p, "undrafted-signings-by-conference", release = release)
+card_thumbnail(p, "undrafted-signings-by-conference", release = release, height = 8)
 card_interactive(p)
 ```
 
@@ -181,7 +181,7 @@ p_schools <- ggplot(school_rates, aes(draft_rate, udfa_rate)) +
     color = "white",
     alpha = 0.9
   ) +
-  scale_fill_manual(values = team_colors, na.value = "#6b7280", guide = "none") +
+  scale_fill_manual(values = highlight_colors(team_colors), na.value = "#6b7280", guide = "none") +
   scale_size_area(max_size = 7, guide = "none") +
   scale_x_continuous(labels = scales::percent) +
   scale_y_continuous(labels = scales::percent) +
@@ -201,3 +201,4 @@ card_interactive(p_schools)
 #| echo: false
 #| output: asis
 cat(card_footer())
+```

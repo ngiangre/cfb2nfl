@@ -1,7 +1,7 @@
 ---
-title: "Do offensive linemen show up in the stat records?"
+title: "Do offensive linemen appear in the stat records?"
 image: card-thumbs/offensive-line-stat-lines.png
-image-alt: "Bar chart of the share of roster player-seasons that carry a stat line, by position group: the offensive line, in dark grey, is lowest at 6 percent, while running backs are highest at 69 percent and most other groups sit between half and six in ten."
+image-alt: "Bar chart of the share of roster player-seasons that carry a stat line, by position group: the offensive line, in dark grey, is the shortest bar by a wide margin, while running backs are the longest."
 categories: ["Topic: Programs and conferences", "Position: By position group", "Population: Roster seasons", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
@@ -101,11 +101,8 @@ p <- ggplot(
   ) +
   scale_x_continuous(labels = scales::percent, limits = c(0, 0.8)) +
   labs(
-    title = "Share of roster seasons with a stat line",
-    subtitle = paste0(
-      "The offensive line, in dark, is ", pct(ol$pick_share, 0),
-      " of credited draft picks; hover a bar for counts"
-    ),
+    title = "Stat-line share by position group",
+    subtitle = "The offensive line is in dark grey; hover a bar for counts",
     x = "Roster seasons with a stat line",
     y = NULL,
     caption = card_caption(release)
@@ -132,7 +129,7 @@ ol_cov |>
       "Position group", "Roster player-seasons", "With a stat line",
       "Share with a stat line", "Credited draft picks", "Share of picks"
     ),
-    caption = "Roster player-seasons and how many carry a stat line, with credited draft picks for the classes of 2014 to 2026, by position group."
+    caption = "Roster player-seasons and how many carry a stat line, with credited draft picks for the classes of 2014 to 2026, by position group. The share of picks shows how much of the draft each group supplies."
   )
 ```
 
@@ -168,7 +165,7 @@ p_codes <- ggplot(by_code, aes(share, reorder(position, share), color = is_ol)) 
     x = "Roster player-seasons with a stat line",
     y = "Roster position code",
     title = "Share with a stat line, by roster position code",
-    subtitle = "Offensive-line codes in dark; dot size is roster seasons; hover for counts",
+    subtitle = "Offensive-line codes in dark grey; dot size is roster seasons",
     caption = card_caption(release)
   ) +
   theme_cfb2nfl(base_size = 13)

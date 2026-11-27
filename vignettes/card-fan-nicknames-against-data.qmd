@@ -1,8 +1,8 @@
 ---
 title: "Do fan nicknames for position schools match the schools that produce the most draftees?"
 image: card-thumbs/fan-nicknames-against-data.png
-image-alt: "Horizontal bar chart of six fan nicknames, each showing the rank of the school that claims it among FBS schools at that position by draftees above expected. WRU ranks first, Tight End U and DBU fifth, shown in dark as the top five; Tailback U and Linebacker U rank 22nd and QBU 36th."
-categories: ["Topic: Programs and conferences", "Position: By position group", "Population: Draft-eligible players", "Unit: Schools", "Figure: Bar chart", "Question: Draft chance by position"]
+image-alt: "Horizontal bar chart of six fan nicknames, each labelled with the school that claims it and showing that school's rank among FBS schools at the position by draftees above expected. The nicknames in the top five ranks are in dark grey and the rest in pale grey, with the longest bar for the quarterback nickname."
+categories: ["Topic: Programs and conferences", "Position: By position group", "Population: Draft-eligible players", "Unit: Schools", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
 terms: [position-group, eligible-player, draft-rate, expected-draftees, draftees-above-expected, draft-day-school]
@@ -97,7 +97,11 @@ n_bama_leads <- sum(pos_top$team == "Alabama")
 
 ```{r}
 #| label: figure
-p <- ggplot(nicknames, aes(rank, reorder(nickname, -rank), fill = top5)) +
+nicknames$bar_label <- paste0(nicknames$nickname, " (", nicknames$claimant, ")")
+p <- ggplot(
+  nicknames,
+  aes(rank, reorder(bar_label, -rank), fill = top5)
+) +
   geom_col_interactive(
     aes(
       tooltip = paste0(
@@ -120,15 +124,25 @@ p <- ggplot(nicknames, aes(rank, reorder(nickname, -rank), fill = top5)) +
     ),
     width = 0.7
   ) +
+  geom_text(
+    aes(label = paste0("#", rank)),
+    hjust = -0.15,
+    size = 5,
+    fontface = "bold"
+  ) +
   geom_vline(xintercept = 5.5, linetype = "dashed", color = "grey40") +
   scale_fill_manual(
-    values = c(`TRUE` = "#374151", `FALSE` = "grey65"),
+    values = c(`TRUE` = "#374151", `FALSE` = "#d1d5db"),
     guide = "none"
   ) +
-  scale_x_continuous(breaks = c(1, 5, 10, 15, 20), expand = expansion(mult = c(0, 0.05))) +
+  scale_x_continuous(
+    breaks = seq(0, max(nicknames$rank), by = 5),
+    limits = c(0, max(nicknames$rank) * 1.12),
+    expand = expansion(mult = c(0, 0))
+  ) +
   labs(
     title = "Fan nicknames against the producing schools",
-    subtitle = "Rank of the claiming school at its position; dark bars are the top five",
+    subtitle = "Rank of each nickname's claiming school at its position, by draftees above expected; dark bars are the top five",
     x = "Rank at the position (1 is the most)",
     y = NULL,
     caption = card_caption(release)
@@ -207,14 +221,14 @@ p_pos <- ggplot(
   facet_wrap(~position_group, scales = "free_y", ncol = 3) +
   scale_y_discrete(labels = function(x) sub(".*___", "", x)) +
   scale_fill_manual(
-    values = c(team_colors, Other = "#9ca3af"),
+    values = c(highlight_colors(team_colors), Other = "#d1d5db"),
     guide = "none"
   ) +
   labs(
     x = "Draftees above expected",
     y = NULL,
     title = "The top five schools at each position",
-    subtitle = "Ties included; in team colors, the school that claims the position's nickname",
+    subtitle = "Ties included; the school that claims the position's nickname is in its team color",
     caption = card_caption(release)
   ) +
   theme_cfb2nfl(base_size = 13)

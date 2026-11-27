@@ -1,7 +1,7 @@
 ---
 title: "When did FBS schools change conference?"
 image: card-thumbs/fbs-realignment-waves.png
-image-alt: "Column chart of FBS conference changes in each season from 2011 to 2025, with the two waves in dark grey: the 2011 to 2014 wave peaks at 23 changes in 2013, and the 2023 to 2024 wave at 14 in 2024. Most seasons between the waves show one to three changes."
+image-alt: "Column chart of FBS conference changes in each season, with the two waves in dark grey: the first wave, from the early 2010s, is the taller, peaking in the middle of its run, and the second, in the most recent seasons, is shorter. Most seasons between the waves show only a few changes."
 categories: ["Topic: Programs and conferences", "Position: All positions", "Unit: Team-seasons", "Figure: Bar chart"]
 status: investigation
 graduated_to: null

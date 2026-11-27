@@ -120,3 +120,26 @@ test_that("school_record builds one row per school with record, tier and expecte
   fcs$tier_label[fcs$team == "S1"] <- "FCS and below"
   expect_false("S1" %in% school_record(fcs, credited)$team)
 })
+
+test_that("highlight_colors sets green and purple teams to dark grey and keeps the rest", {
+  cols <- c(
+    Oregon = "#154733",
+    Washington = "#4b2e83",
+    Alabama = "#9e1b32",
+    Grey = "#808080",
+    Missing = NA
+  )
+  out <- highlight_colors(cols)
+  expect_equal(unname(out[["Oregon"]]), "#374151")
+  expect_equal(unname(out[["Washington"]]), "#374151")
+  expect_equal(unname(out[["Alabama"]]), "#9e1b32")
+  expect_equal(unname(out[["Grey"]]), "#808080")
+  expect_true(is.na(out[["Missing"]]))
+})
+
+test_that("tier_palette avoids the reserved drafted, undrafted and quarterback hues", {
+  pal <- tier_palette()
+  expect_false(any(
+    toupper(pal) %in% c("#F59E0B", "#1B9E77", "#7570B3", "#D95F02")
+  ))
+})

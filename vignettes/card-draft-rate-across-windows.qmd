@@ -1,7 +1,7 @@
 ---
 title: "Does a Power school's draft rate carry over from one five-year window to the next?"
 image: card-thumbs/draft-rate-across-windows.png
-image-alt: "Scatter plot with one dot per school, its draft rate in an early five-year window against its rate in a later window, with a dashed line marking no change. Power schools in blue sit close to the dashed line, with a few clear movers labelled; Group of 5 schools in amber spread much wider around it."
+image-alt: "Scatter plot with one dot per school, its draft rate in an early five-year window against its rate in a later window, with a dashed line marking no change. Power schools in dark grey sit close to the dashed line, with the three biggest Power movers labelled; Group of 5 schools in mid grey spread much wider around it."
 categories: ["Topic: Programs and conferences", "Position: All positions", "Population: Draft-eligible players", "Unit: Schools", "Figure: Scatter plot", "Question: What matters for going pro"]
 status: investigation
 graduated_to: null
@@ -119,7 +119,12 @@ rate_cor <- wide |>
 movers <- wide |>
   filter(tier == "Power") |>
   mutate(move = abs(rate_late - rate_early)) |>
-  slice_max(move, n = 3)
+  slice_max(move, n = 3) |>
+  # Labels are staggered vertically so the three names do not overlap.
+  mutate(
+    lab_x = rate_early + 0.01,
+    lab_y = rate_late + c(0.05, 0.0, -0.05)[row_number()]
+  )
 wide$tip <- paste0(
   wide$team,
   " (",
@@ -145,6 +150,8 @@ long <- wide |>
 
 ```{r}
 #| label: figure
+early_lab <- paste(early, collapse = " to ")
+late_lab <- paste(late, collapse = " to ")
 p <- ggplot(wide, aes(rate_early, rate_late, color = tier)) +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "#6b7280") +
   geom_point_interactive(
@@ -154,23 +161,20 @@ p <- ggplot(wide, aes(rate_early, rate_late, color = tier)) +
   ) +
   geom_text(
     data = movers,
-    aes(label = team),
+    aes(x = lab_x, y = lab_y, label = team),
     color = "#111827",
     hjust = 0,
-    nudge_x = 0.01,
-    nudge_y = 0.02,
     size = 4.5,
     fontface = "bold",
-    check_overlap = TRUE,
     show.legend = FALSE
   ) +
   scale_color_manual(values = tier_palette()[tier_levels], name = NULL) +
   scale_x_continuous(labels = scales::percent) +
-  scale_y_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = scales::percent, expand = expansion(mult = c(0.05, 0.1))) +
   labs(
-    x = "Draft rate, early window",
-    y = "Draft rate, later window",
-    title = "Power schools keep their place in the draft rate from one window to the next",
+    x = paste0("Draft rate, ", early_lab),
+    y = paste0("Draft rate, ", late_lab),
+    title = "Each school's draft rate in two windows, by tier",
     subtitle = "Each dot is a school; dots on the dashed line did not change",
     caption = card_caption(release)
   ) +
@@ -192,7 +196,7 @@ p_explore <- ggplot(long, aes(window, rate, group = team)) +
     stroke = 0.6
   ) +
   facet_wrap(~tier, scales = "free_y") +
-  scale_fill_team(teams, guide = "none") +
+  scale_fill_manual(values = highlight_colors(team_color_values(teams)), guide = "none") +
   scale_y_continuous(labels = scales::percent) +
   labs(
     x = NULL,

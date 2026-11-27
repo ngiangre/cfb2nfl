@@ -1,11 +1,12 @@
 {
   "id": "schools-above-expected-draftees",
   "release": "2026-11-25",
-  "code_hash": "d520119a8136b67dbe2f3fa2fd83b2cc",
+  "code_hash": "b86bf5585d58e420a2a23c874c1d4880",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
     "draft_rates": "bc770817a67e1e7635702a29636c50dd",
     "fmt": "d4c89f195c447af907ba425a860522de",
+    "highlight_colors": "2a2e8e5b77af0f054c65e60e72a84c3c",
     "pct": "3413c026fc8c907293b2fb1d96080440",
     "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
     "shrink_rate": "17467ac913b226931ef9dfbc5f0cdf96",

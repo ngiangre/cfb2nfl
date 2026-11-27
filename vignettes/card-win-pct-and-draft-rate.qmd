@@ -2,7 +2,7 @@
 title: "Do schools that win more produce more draftees?"
 aliases: [2026-10-31-winning-and-draftees.html]
 image: card-thumbs/win-pct-and-draft-rate.png
-image-alt: "Scatter plot of FBS schools, with win percentage across the horizontal axis and draft rate up the vertical axis. Power schools in blue and Group of 5 schools in amber each rise along their own curve; the Power curve sits well above the Group of 5 curve, and both slope upward."
+image-alt: "Scatter plot of FBS schools, with win percentage across the horizontal axis and draft rate up the vertical axis. Power schools in dark grey and Group of 5 schools in mid grey each rise along their own curve; the Power curve sits well above the Group of 5 curve, and both slope upward."
 categories: ["Topic: Programs and conferences", "Position: All positions", "Population: Draft-eligible players", "Unit: Schools", "Figure: Scatter plot", "Question: What matters for going pro"]
 status: investigation
 graduated_to: null
@@ -135,7 +135,7 @@ p <- ggplot(school, aes(win_pct, draft_rate, color = tier)) +
     color = "#111827"
   ) +
   scale_color_manual(values = tier_palette()[tier_levels], name = NULL) +
-  scale_x_continuous(labels = scales::percent) +
+  scale_x_continuous(labels = scales::percent, expand = expansion(mult = c(0.03, 0.08))) +
   scale_y_continuous(labels = scales::percent) +
   labs(
     x = "Win % (FBS seasons 2010 to 2025)",
@@ -162,7 +162,7 @@ p_explore <- ggplot(school, aes(win_pct, draft_rate)) +
     stroke = 0.6
   ) +
   facet_wrap(~tier, scales = "free_y") +
-  scale_fill_team(teams, guide = "none") +
+  scale_fill_manual(values = highlight_colors(team_color_values(teams)), guide = "none") +
   scale_x_continuous(labels = scales::percent) +
   scale_y_continuous(labels = scales::percent) +
   labs(

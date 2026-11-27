@@ -1,7 +1,7 @@
 ---
 title: "Do schools outside FBS send players to the draft?"
 image: card-thumbs/fcs-school-draft-picks.png
-image-alt: "Stacked bar chart of NFL draft picks from schools that played FCS or below, for the eight schools with the most picks: North Dakota State leads with 15, its traced picks in dark grey and the rest in pale grey; some schools have every pick traced to a roster and others none."
+image-alt: "Stacked bar chart of NFL draft picks from schools that played FCS or below, for the eight schools with the most picks, North Dakota State leading: each bar starts with its picks the rosters trace, in dark grey, and the rest of the bar is pale grey."
 categories: ["Topic: Programs and conferences", "Position: All positions", "Unit: Schools", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
@@ -105,7 +105,7 @@ bars <- bind_rows(
   transmute(top_small, collegeTeam, picks, part = "Traced to a roster", n = traced),
   transmute(top_small, collegeTeam, picks, part = "Not on any roster", n = picks - traced)
 ) |>
-  mutate(part = factor(part, levels = c("Not on any roster", "Traced to a roster")))
+  mutate(part = factor(part, levels = c("Traced to a roster", "Not on any roster")))
 p <- ggplot(
   bars,
   aes(n, reorder(collegeTeam, picks), fill = part)
@@ -120,12 +120,13 @@ p <- ggplot(
     width = 0.75
   ) +
   scale_fill_manual(
-    values = c("Traced to a roster" = "#374151", "Not on any roster" = "grey80"),
-    guide = "none"
+    values = c("Traced to a roster" = "#374151", "Not on any roster" = "#d1d5db"),
+    name = NULL
   ) +
+  theme(legend.position = "top") +
   labs(
     title = "FCS-and-below draft picks by school",
-    subtitle = "Schools with the most picks; dark is traced to a roster",
+    subtitle = "Schools with the most picks; dark is the part the rosters trace to a college roster, pale is the rest",
     x = "Draft picks",
     y = NULL,
     caption = card_caption(release)
@@ -183,7 +184,7 @@ p_all <- ggplot(small, aes(year, overall, color = traced)) +
   ) +
   scale_y_reverse() +
   scale_color_manual(
-    values = c(`TRUE` = "#374151", `FALSE` = "#f59e0b"),
+    values = c(`TRUE` = "#374151", `FALSE` = "#d1d5db"),
     labels = c(`TRUE` = "Traced to a roster", `FALSE` = "Not on any roster"),
     name = NULL
   ) +

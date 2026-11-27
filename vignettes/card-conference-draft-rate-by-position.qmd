@@ -1,7 +1,7 @@
 ---
-title: "Which conferences draft the most players at each position?"
+title: "Which conference has the highest draft rate at each position?"
 image: card-thumbs/conference-draft-rate-by-position.png
-image-alt: "Horizontal bar chart of the highest conference draft rate at each position group, each bar named with its conference: the SEC leads eight of the nine groups, with bars from about 6 percent for special teams to 25 percent for defensive line, and the Big Ten leads tight end at 16 percent."
+image-alt: "Horizontal bar chart of the highest conference draft rate at each position group, each bar named with its conference: the SEC leads most of the position groups, and the Big Ten leads tight end, with bars running from short special-teams bars to the longest defensive-line bar."
 categories: ["Topic: Programs and conferences", "Position: By position group", "Population: Draft-eligible players", "Figure: Bar chart", "Question: Draft chance by position"]
 status: investigation
 graduated_to: null
@@ -86,7 +86,7 @@ p <- ggplot(leaders, aes(draft_rate, position_group)) +
       ),
       data_id = position_group
     ),
-    fill = "#1B9E77",
+    fill = "#374151",
     width = 0.75
   ) +
   geom_text(
@@ -95,7 +95,11 @@ p <- ggplot(leaders, aes(draft_rate, position_group)) +
     size = 5,
     fontface = "bold"
   ) +
-  scale_x_continuous(labels = scales::percent, limits = c(0, 0.5)) +
+  scale_x_continuous(
+    labels = scales::percent,
+    limits = c(0, max(leaders$draft_rate) * 1.5),
+    expand = expansion(mult = c(0, 0))
+  ) +
   labs(
     title = "Highest conference draft rate at each position",
     subtitle = "Each bar is the leading conference's draft rate, named beside it",
@@ -131,7 +135,7 @@ p_heat <- ggplot(conf_pos, aes(position_group, league, fill = draft_rate)) +
   ) +
   scale_fill_gradient(
     low = "#f8fafc",
-    high = "#1B9E77",
+    high = "#374151",
     labels = scales::percent,
     name = "Draft rate"
   ) +
@@ -217,3 +221,4 @@ card_interactive(p_seasons)
 #| echo: false
 #| output: asis
 cat(card_footer())
+```

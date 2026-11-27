@@ -2,7 +2,7 @@
 title: "How many schools produce half of the draft picks?"
 aliases: [2026-10-31-conferences-landscape.html]
 image: card-thumbs/school-draft-concentration.png
-image-alt: "Step curve of the cumulative share of NFL draft picks against schools ranked from most to fewest picks, for the classes of 2014 to 2026: the curve climbs steeply, and the highlighted top 27 schools reach half of all picks, and the long tail of schools flattens near the top."
+image-alt: "Step curve of the cumulative share of NFL draft picks against schools ranked from most to fewest picks, for the classes of 2014 to 2026: the curve climbs steeply through a highlighted group of leading schools, which reaches half of all picks, and the long tail of schools flattens near the top."
 categories: ["Topic: Programs and conferences", "Position: All positions", "Unit: Schools", "Figure: Line chart"]
 status: investigation
 graduated_to: null
@@ -105,7 +105,9 @@ p <- ggplot(school_picks, aes(rank, cum_share)) +
   scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
   labs(
     title = "Share of draft picks by school",
-    subtitle = "Schools ranked by picks; dark points reach half",
+    subtitle = paste0(
+      half_n, " schools reach half of all picks; dark points mark them"
+    ),
     x = "Draft-day schools, ranked by draft picks",
     y = "Share of picks",
     caption = card_caption(release)
@@ -168,12 +170,12 @@ p_top <- ggplot(top, aes(picks, reorder(label, picks), fill = team)) +
     ),
     width = 0.8
   ) +
-  scale_fill_team(teams, guide = "none") +
+  scale_fill_manual(values = highlight_colors(team_color_values(teams)), guide = "none") +
   labs(
     x = "Draft picks, classes of 2014 to 2026",
     y = NULL,
     title = "Draft picks by school, leaders and Wyoming",
-    subtitle = "Team colors; the leaders plus Wyoming, where Josh Allen played; hover for the conference",
+    subtitle = "Team colors, with green and purple teams in dark grey; the leaders plus Wyoming, where Josh Allen played",
     caption = card_caption(release)
   ) +
   theme_cfb2nfl(base_size = 12)

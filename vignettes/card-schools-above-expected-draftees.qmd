@@ -1,8 +1,8 @@
 ---
 title: "Which schools produce more draftees than their players predict?"
 image: card-thumbs/schools-above-expected-draftees.png
-image-alt: "Horizontal bar chart of the FBS schools with the most draftees above what their eligible players, weighted by position, predict: Alabama leads, highlighted in its team color, with a margin of more than ninety draftees, and the schools below it trail off to about forty."
-categories: ["Topic: Programs and conferences", "Position: By position group", "Population: Draft-eligible players", "Unit: Schools", "Figure: Bar chart", "Question: Draft chance by position"]
+image-alt: "Horizontal bar chart of the FBS schools with the most draftees above what their eligible players, weighted by position, predict: Alabama leads, highlighted in its team color, and the schools below it trail off in pale grey."
+categories: ["Topic: Programs and conferences", "Position: By position group", "Population: Draft-eligible players", "Unit: Schools", "Figure: Bar chart"]
 status: investigation
 graduated_to: null
 terms: [eligible-player, draft-rate, expected-draftees, draftees-above-expected, adjusted-rate, position-group, tier, conference, draft-day-school]
@@ -130,13 +130,13 @@ p <- ggplot(top_fbs, aes(above, reorder(team, above), fill = highlight)) +
     width = 0.75
   ) +
   scale_fill_manual(
-    values = c("Alabama" = team_colors[["Alabama"]], "Other" = "grey65"),
+    values = c("Alabama" = highlight_colors(team_colors)[["Alabama"]], "Other" = "#d1d5db"),
     guide = "none"
   ) +
   scale_x_continuous(expand = expansion(mult = c(0, 0.12))) +
   labs(
     title = "Draftees above expected, by FBS school",
-    subtitle = "Schools furthest above the FBS-wide expectation; Alabama in its team color",
+    subtitle = "Schools furthest above the FBS draft rate at each position predicts for their players; Alabama in its team color",
     x = "Draftees above expected",
     y = NULL,
     caption = card_caption(release)
@@ -219,3 +219,4 @@ card_interactive(p_dots)
 #| echo: false
 #| output: asis
 cat(card_footer())
+```
