@@ -289,9 +289,6 @@ signature-stat:
 career-season:
   label: Career season
   definition: "A player's n-th season with a stat line in the data, counted from his first, so the first point of every arc is his first season on the field, not his first season on a roster."
-stat-line-season:
-  label: Stat-line season
-  definition: "A season in which the box score records at least one statistic for the player. A rostered player with no statistic in a season has no stat line that season."
 opponent-band:
   label: Opponent band
   definition: "The opponent's pregame Elo rating grouped into even 200-point steps: under 1400, 1400 to 1599, 1600 to 1799, 1800 and up, or unrated when CFBD does not rate the opponent."
@@ -335,4 +332,3 @@ full-time-season:
 redshirt-shaped-season:
   label: Redshirt-shaped season
   definition: "A season in which the player recorded a statistic in at most one of a team's covered regular-season games. The rule is strict by design: it can miss a redshirt whose appearances produced statistics in two games, and it can flag a quiet backup."
->

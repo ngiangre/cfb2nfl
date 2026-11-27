@@ -176,7 +176,7 @@ p_season <- ggplot(
   ) +
   scale_y_continuous(labels = scales::percent) +
   scale_x_continuous(breaks = game_window) +
-  scale_colour_viridis_d(option = "D", end = 0.9) +
+  scale_colour_position() +
   labs(
     title = "Is the early-stop share steady across the last seasons?",
     subtitle = paste0(

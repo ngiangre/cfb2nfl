@@ -1,7 +1,7 @@
 {
   "id": "early-stop-by-position",
   "release": "2026-11-25",
-  "code_hash": "e6d4a6d6791052c9a504548d07006c21",
+  "code_hash": "cf93a434368a9ab90f3450922b2681f5",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
     "career_end_status": "f7c578ecda2732b85d2230a8d73a9d79",
@@ -14,7 +14,9 @@
     "pct": "3413c026fc8c907293b2fb1d96080440",
     "position_code_map": "23e4bba7fd7da54066373fb8a9761c45",
     "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
+    "position_palette": "11141b2b531ab5b7f31d6c196fcc46be",
     "position_sources": "9adac2d8c4dfebfd2fbb956dee1f3a42",
+    "scale_colour_position": "4cafb87d0ef9e51cdf13934043361fe6",
     "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
     "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
   }
