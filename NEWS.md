@@ -1,5 +1,11 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Investigations (feature F25): **the undrafted-signings card now splits
+  by position group**. A scatter shows every school's draft and undrafted
+  rates within each group, and two beeswarms show which schools stand out
+  in each group: one for undrafted minus drafted, one for players who did
+  not enter the NFL minus those who did. The Investigations intro is reworded.
+
 - Investigations (feature F25): **the card wall's tag buttons render as
   buttons again** instead of lines of code. The wall template indented them
   four spaces, which Quarto's markdown pass read as code blocks; a test now

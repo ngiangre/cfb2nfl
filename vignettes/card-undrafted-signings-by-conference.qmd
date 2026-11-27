@@ -1,11 +1,11 @@
 ---
 title: "Do Power conferences dominate undrafted signings as much as the draft?"
 image: card-thumbs/undrafted-signings-by-conference.png
-image-alt: "Dumbbell chart for each FBS conference, with the draft rate in dark grey and the undrafted rate in mid grey: the draft rates spread widely, with the Power conferences at the far right, while the undrafted rates sit much closer together."
-categories: ["Topic: Programs and conferences", "Position: All positions", "Population: Draft-eligible players", "Figure: Scatter plot", "Question: What matters for going pro"]
+image-alt: "Dumbbell chart for each FBS conference, with the draft rate in dark grey and the undrafted rate in mid grey: the draft rates spread widely, with the Power conferences at the far right, while the undrafted rates sit much closer together. Further figures show every school's draft and undrafted rates within each position group, and beeswarms of each school's undrafted-minus-drafted and NFL entry gaps by position group."
+categories: ["Topic: Programs and conferences", "Position: All positions", "Position: By position group", "Population: Draft-eligible players", "Figure: Scatter plot", "Figure: Distribution", "Question: What matters for going pro"]
 status: investigation
 graduated_to: null
-terms: [eligible-player, draft-rate, undrafted-rate, signed-undrafted, tier, power-tier, group-of-5-tier, conference]
+terms: [eligible-player, draft-rate, undrafted-rate, signed-undrafted, nfl-entry, position-group, tier, power-tier, group-of-5-tier, conference]
 followups:
   - text: "Which schools produce draftees above expectation, by position, once each school is credited to its conference?"
     link: "F09"
@@ -19,7 +19,9 @@ followups:
 # Load the project's functions from the checkout (decision 0042) and read the
 # published data bundle, so this code reproduces the figure (decision 0040).
 root <- Sys.getenv("CFB2NFL_ROOT")
-if (!nzchar(root)) root <- pkgload::pkg_path()
+if (!nzchar(root)) {
+  root <- pkgload::pkg_path()
+}
 knitr::opts_knit$set(root.dir = root)
 pkgload::load_all(root, quiet = TRUE)
 library(dplyr)
@@ -75,7 +77,14 @@ conf_now <- team_season |>
   group_by(team) |>
   slice_max(season, n = 1, with_ties = FALSE) |>
   ungroup() |>
-  transmute(team, conf_now = if_else(conference == "FBS Independents", "FBS independents", conference))
+  transmute(
+    team,
+    conf_now = if_else(
+      conference == "FBS Independents",
+      "FBS independents",
+      conference
+    )
+  )
 school_tier <- fbs_cr |>
   count(team, tier_label, wt = n_eligible) |>
   group_by(team) |>
@@ -100,7 +109,11 @@ dumb <- conf_rates |>
     values_to = "rate"
   ) |>
   mutate(
-    outcome = if_else(outcome == "draft_rate", "Drafted", "Undrafted free agent"),
+    outcome = if_else(
+      outcome == "draft_rate",
+      "Drafted",
+      "Undrafted free agent"
+    ),
     league = factor(league, levels = conf_rates$league)
   )
 p <- ggplot(dumb, aes(rate, league)) +
@@ -109,7 +122,12 @@ p <- ggplot(dumb, aes(rate, league)) +
     aes(
       color = outcome,
       tooltip = paste0(
-        league, ": ", pct(rate), " of ", fmt(eligible), " eligible players ",
+        league,
+        ": ",
+        pct(rate),
+        " of ",
+        fmt(eligible),
+        " eligible players ",
         tolower(outcome)
       ),
       data_id = paste(league, outcome)
@@ -130,7 +148,12 @@ p <- ggplot(dumb, aes(rate, league)) +
   ) +
   theme_card()
 
-card_thumbnail(p, "undrafted-signings-by-conference", release = release, height = 8)
+card_thumbnail(
+  p,
+  "undrafted-signings-by-conference",
+  release = release,
+  height = 8
+)
 card_interactive(p)
 ```
 
@@ -139,7 +162,14 @@ card_interactive(p)
 bind_rows(
   tier_rates |>
     filter(tier_label != "FCS and below") |>
-    transmute(Group = paste("All", tier_label), eligible, drafted, udfa, draft_rate, udfa_rate),
+    transmute(
+      Group = paste("All", tier_label),
+      eligible,
+      drafted,
+      udfa,
+      draft_rate,
+      udfa_rate
+    ),
   conf_rates |>
     transmute(Group = league, eligible, drafted, udfa, draft_rate, udfa_rate)
 ) |>
@@ -152,7 +182,14 @@ bind_rows(
     `Undrafted rate` = pct(udfa_rate)
   ) |>
   knitr::kable(
-    col.names = c("Group", "Eligible players", "Drafted", "Draft rate", "Undrafted free agents", "Undrafted rate"),
+    col.names = c(
+      "Group",
+      "Eligible players",
+      "Drafted",
+      "Draft rate",
+      "Undrafted free agents",
+      "Undrafted rate"
+    ),
     caption = sprintf(
       "Draft and undrafted rates by FBS tier and conference, final seasons %s to %s. Power players were drafted at %.1f times the Group of 5 rate but signed undrafted at %.1f times it.",
       first_season,
@@ -166,14 +203,27 @@ bind_rows(
 ```{r}
 #| label: schools
 p_schools <- ggplot(school_rates, aes(draft_rate, udfa_rate)) +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "#6b7280") +
+  geom_abline(
+    slope = 1,
+    intercept = 0,
+    linetype = "dashed",
+    color = "#6b7280"
+  ) +
   geom_point_interactive(
     aes(
       fill = team,
       size = eligible,
       tooltip = paste0(
-        team, " (", conf_now, ")\n", drafted, " drafted, ", udfa,
-        " undrafted free agents, of ", eligible, " eligible"
+        team,
+        " (",
+        conf_now,
+        ")\n",
+        drafted,
+        " drafted, ",
+        udfa,
+        " undrafted free agents, of ",
+        eligible,
+        " eligible"
       ),
       data_id = team
     ),
@@ -181,7 +231,11 @@ p_schools <- ggplot(school_rates, aes(draft_rate, udfa_rate)) +
     color = "white",
     alpha = 0.9
   ) +
-  scale_fill_manual(values = highlight_colors(team_colors), na.value = "#6b7280", guide = "none") +
+  scale_fill_manual(
+    values = highlight_colors(team_colors),
+    na.value = "#6b7280",
+    guide = "none"
+  ) +
   scale_size_area(max_size = 7, guide = "none") +
   scale_x_continuous(labels = scales::percent) +
   scale_y_continuous(labels = scales::percent) +
@@ -194,6 +248,212 @@ p_schools <- ggplot(school_rates, aes(draft_rate, udfa_rate)) +
   ) +
   theme_cfb2nfl()
 card_interactive(p_schools)
+```
+
+```{r}
+#| label: schools-by-position
+# One row per school and position group; groups without a recorded position
+# have no colour and drop out.
+# School position groups with few eligible players swing on one or two
+# signings, so they drop out of every figure split by position.
+min_eligible <- 10L
+school_pos_all <- fbs_cr |>
+  filter(position_group %in% position_group_levels()) |>
+  group_by(team, position_group) |>
+  draft_rates() |>
+  left_join(conf_now, by = "team") |>
+  mutate(
+    position_group = factor(position_group, levels = position_group_levels())
+  )
+school_pos <- filter(school_pos_all, eligible >= min_eligible)
+n_small <- nrow(filter(school_pos_all, eligible > 0)) - nrow(school_pos)
+p_school_pos <- ggplot(school_pos, aes(draft_rate, udfa_rate)) +
+  geom_abline(
+    slope = 1,
+    intercept = 0,
+    linetype = "dashed",
+    color = "#6b7280"
+  ) +
+  geom_point_interactive(
+    aes(
+      fill = team,
+      size = eligible,
+      tooltip = paste0(
+        team,
+        " (",
+        conf_now,
+        "), ",
+        tolower(position_group),
+        "\n",
+        drafted,
+        " drafted, ",
+        udfa,
+        " undrafted free agents, of ",
+        eligible,
+        " eligible"
+      ),
+      data_id = team
+    ),
+    shape = 21,
+    color = "white",
+    alpha = 0.85
+  ) +
+  facet_wrap(~position_group, ncol = 3) +
+  scale_fill_manual(
+    values = highlight_colors(team_colors),
+    na.value = "#6b7280",
+    guide = "none"
+  ) +
+  scale_size_area(max_size = 5, guide = "none") +
+  scale_x_continuous(labels = scales::percent) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    x = "Draft rate",
+    y = "Undrafted rate",
+    title = "Every FBS school's draft and undrafted rates, by position group",
+    subtitle = sprintf(
+      "One dot per school in each group; on the dashed line, as many drafted as signed undrafted\n%s school position groups with fewer than %s eligible players left out; hover a dot to find its school in every group",
+      fmt(n_small),
+      min_eligible
+    ),
+    caption = card_caption(release)
+  ) +
+  theme_cfb2nfl() +
+  theme(plot.subtitle = element_text(size = rel(0.8)))
+card_interactive(p_school_pos, height_svg = 10)
+```
+
+```{r}
+#| label: position-gaps
+# A school's gap in a position group is one rate minus the other, in
+# percentage points.
+gaps <- school_pos |>
+  mutate(
+    entered = drafted + udfa,
+    udfa_gap = 100 * (udfa_rate - draft_rate),
+    entry_gap = 100 * (1 - 2 * entered / eligible),
+    position_group = forcats::fct_rev(position_group)
+  )
+gap_swarm <- function(
+  d,
+  gap,
+  side,
+  side_colors,
+  title,
+  reading,
+  x_label,
+  tooltip
+) {
+  ggplot(d, aes({{ gap }}, position_group)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "#6b7280") +
+    geom_point_interactive(
+      aes(color = {{ side }}, tooltip = {{ tooltip }}, data_id = team),
+      position = ggbeeswarm::position_quasirandom(
+        orientation = "y",
+        width = 0.4
+      ),
+      size = 2.2,
+      alpha = 0.85
+    ) +
+    scale_color_manual(
+      values = side_colors,
+      breaks = names(side_colors),
+      name = NULL
+    ) +
+    labs(
+      title = title,
+      subtitle = sprintf(
+        "Each dot is an FBS school in one position group, final seasons %s to %s; %s\n%s school position groups with fewer than %s eligible players left out; hover a dot to find its school in every group",
+        first_season,
+        last_season,
+        reading,
+        fmt(n_small),
+        min_eligible
+      ),
+      x = x_label,
+      y = NULL,
+      caption = card_caption(release)
+    ) +
+    theme_cfb2nfl() +
+    theme(plot.subtitle = element_text(size = rel(0.8)))
+}
+```
+
+```{r}
+#| label: udfa-gap
+p_udfa_gap <- gaps |>
+  mutate(
+    side = case_when(
+      udfa > drafted ~ "More signed undrafted",
+      drafted > udfa ~ "More drafted",
+      .default = "As many of each"
+    )
+  ) |>
+  gap_swarm(
+    udfa_gap,
+    side,
+    c(
+      "More drafted" = "#1B9E77",
+      "More signed undrafted" = "#7570B3",
+      "As many of each" = "#374151"
+    ),
+    "Undrafted rate minus draft rate, by school and position group",
+    "right of zero, more signed undrafted than drafted",
+    "Undrafted rate minus draft rate (percentage points)",
+    paste0(
+      team,
+      ", ",
+      tolower(position_group),
+      "\n",
+      drafted,
+      " drafted, ",
+      udfa,
+      " undrafted free agents, of ",
+      eligible,
+      " eligible"
+    )
+  )
+card_interactive(p_udfa_gap, height_svg = 8)
+```
+
+```{r}
+#| label: entry-gap
+p_entry_gap <- gaps |>
+  mutate(
+    side = if_else(
+      2 * entered > eligible,
+      "Most eligible players entered the NFL",
+      "Most did not"
+    )
+  ) |>
+  gap_swarm(
+    entry_gap,
+    side,
+    c(
+      "Most eligible players entered the NFL" = "#374151",
+      "Most did not" = "#D1D5DB"
+    ),
+    "Rate not entering the NFL minus rate entering, by school and position group",
+    "left of zero, most eligible players entered the NFL",
+    "Rate not entering the NFL minus rate entering (percentage points)",
+    paste0(
+      team,
+      ", ",
+      tolower(position_group),
+      "\n",
+      entered,
+      " entered the NFL (",
+      drafted,
+      " drafted, ",
+      udfa,
+      " undrafted), ",
+      eligible - entered,
+      " did not, of ",
+      eligible,
+      " eligible"
+    )
+  )
+card_interactive(p_entry_gap, height_svg = 8)
 ```
 
 ```{r}
