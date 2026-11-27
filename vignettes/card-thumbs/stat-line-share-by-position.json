@@ -1,0 +1,17 @@
+{
+  "id": "stat-line-share-by-position",
+  "release": "2026-11-25",
+  "code_hash": "8bfc90a58e00190ed30580c18a18c153",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "fmt": "d4c89f195c447af907ba425a860522de",
+    "last_complete_cfb_season": "f279fba0ac2a12d60dd7965db5dd1f30",
+    "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
+    "position_palette": "11141b2b531ab5b7f31d6c196fcc46be",
+    "rostered_one_team": "5d1cac61b4dced132fd5c17a06d8ad99",
+    "scale_colour_position": "4cafb87d0ef9e51cdf13934043361fe6",
+    "stat_line_share": "d9738cdbd2de6219fa6fa79ae565bb13",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

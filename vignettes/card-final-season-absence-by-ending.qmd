@@ -1,0 +1,232 @@
+---
+title: "Do early stops end in a season-ending absence more often than used-up careers?"
+image: card-thumbs/final-season-absence-by-ending.png
+image-alt: "Horizontal bar chart of the share of readable final seasons that end in a season-ending absence, for each way a stat-line career ended; the early-stop and used-up-eligibility bars are highlighted in dark amber, with early stops the longer of the two, and drafted careers show the largest share."
+categories: ["Topic: Career shape", "Position: All positions", "Population: Stat-line seasons", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [finished-career, stat-line-career, early-stop, injury-shaped-absence, eligible-season]
+followups:
+  - text: "Does a season-ending absence in a career's final season look different when the player was drafted, once his role is held constant?"
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(DBI)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+library(knitr)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+```
+
+```{r}
+#| label: figure
+# Finished stat-line careers whose last season is in a completed season. The
+# final season is read through the box-score absence signal.
+complete_through <- last_complete_cfb_season()
+game_window <- 2016:complete_through
+store <- file.path(root, "_targets")
+player_game <- targets::tar_read(player_game, store = store)
+usage <- targets::tar_read(player_usage, store = store)
+outcomes <- targets::tar_read(outcomes, store = store)
+career_end <- career_end_status(
+  targets::tar_read(career, store = store),
+  outcomes,
+  targets::tar_read(picks_nfl, store = store)
+)
+stat_ids <- unique(outcomes$playerId[outcomes$has_stat_line])
+roster <- dbReadTable(con, "roster")
+games <- dbReadTable(con, "games")
+pos_levels <- setdiff(
+  harmonized_position_levels(),
+  c("Athlete", "Position not recorded")
+)
+last_position <- roster |>
+  mutate(playerId = as.character(playerId)) |>
+  group_by(playerId) |>
+  slice_max(season, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  transmute(playerId, position_group = harmonize_position(position, "roster"))
+careers <- career_end |>
+  inner_join(last_position, by = "playerId") |>
+  filter(position_group %in% pos_levels, last_season <= complete_through) |>
+  mutate(position_group = factor(position_group, pos_levels))
+statline <- careers |>
+  filter(career_end != "right_censored", playerId %in% stat_ids)
+
+ending_labels <- c(
+  early_stop = "Stopped with eligibility left",
+  eligibility_exhausted = "Used up eligibility",
+  eligibility_unknown = "Stopped, eligibility unknown",
+  transferred_then_stopped = "Changed schools, then stopped",
+  signed_udfa = "Signed undrafted",
+  drafted = "Drafted"
+)
+ending_codes <- c(
+  "early_stop",
+  "eligibility_exhausted",
+  "transferred_then_stopped",
+  "signed_udfa",
+  "drafted"
+)
+
+pos_seasons <- usage |>
+  filter(on_roster, team_games > 0, season %in% game_window) |>
+  group_by(playerId, season) |>
+  filter(n() == 1L) |>
+  ungroup() |>
+  filter(position_group %in% pos_levels) |>
+  select(playerId, season, team, position_group)
+absence <- player_appearance_sequence(player_game, roster, games) |>
+  filter(season %in% game_window) |>
+  absence_runs(
+    streak = formals(absence_runs)$streak,
+    min_gap = formals(absence_runs)$min_gap
+  ) |>
+  inner_join(pos_seasons, by = c("playerId", "season", "team"))
+
+final_by_ending <- final_endings(statline, absence, game_window, ending_codes) |>
+  mutate(
+    ending = factor(ending_labels[career_end], ending_labels[ending_codes]),
+    is_claim = career_end %in% c("early_stop", "eligibility_exhausted"),
+    tip = sprintf(
+      "%s: %s of %s readable final seasons end in an absence",
+      ending,
+      pct(season_ending),
+      fmt(round(careers * readable))
+    )
+  )
+
+p <- final_by_ending |>
+  ggplot(aes(
+    x = season_ending,
+    y = forcats::fct_rev(ending),
+    fill = is_claim
+  )) +
+  geom_col_interactive(
+    aes(tooltip = tip, data_id = career_end),
+    show.legend = FALSE
+  ) +
+  scale_fill_manual(values = c(`FALSE` = "#9CA3AF", `TRUE` = "#B45309")) +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    title = "Do early stops end in an absence more than used-up careers?",
+    subtitle = "Share of readable final seasons that end in a season-ending absence, by how the career ended",
+    x = "Share ending in a season-ending absence",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "final-season-absence-by-ending", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: by-position-figure
+# The same comparison by position, for the two endings the claim sets against
+# each other; point size is the number of readable final seasons.
+final <- statline |>
+  filter(last_season %in% game_window, career_end %in% ending_codes) |>
+  left_join(
+    select(absence, playerId, season, observable, absence_shape),
+    by = c("playerId", "last_season" = "season")
+  ) |>
+  mutate(observable = observable %in% TRUE)
+by_pos_final <- final |>
+  filter(observable, career_end %in% c("early_stop", "eligibility_exhausted")) |>
+  group_by(position_group, career_end) |>
+  summarise(
+    n = n(),
+    season_ending = mean(absence_shape == "season_ending"),
+    .groups = "drop"
+  ) |>
+  mutate(
+    ending = ending_labels[career_end],
+    tip = sprintf(
+      "%s, %s: %s of %s readable final seasons end in an absence",
+      position_group,
+      ending,
+      pct(season_ending),
+      fmt(n)
+    )
+  )
+p_pos <- ggplot(
+  by_pos_final,
+  aes(season_ending, forcats::fct_rev(position_group), colour = ending)
+) +
+  geom_point_interactive(
+    aes(tooltip = tip, data_id = paste(position_group, career_end), size = n),
+    alpha = 0.85
+  ) +
+  scale_colour_manual(
+    values = c(
+      `Stopped with eligibility left` = "#B45309",
+      `Used up eligibility` = "#1D4ED8"
+    )
+  ) +
+  scale_size_area(max_size = 9, guide = "none") +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    title = "Does the gap between the two endings hold at each position?",
+    subtitle = "Point size is the number of readable final seasons",
+    x = "Share of readable final seasons ending in a season-ending absence",
+    y = NULL,
+    colour = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+card_interactive(p_pos)
+```
+
+```{r}
+#| label: ending-table
+final_by_ending |>
+  transmute(
+    Ending = as.character(ending),
+    Careers = fmt(careers),
+    `Final season can be read` = pct(readable),
+    `Final season ends in an absence` = pct(season_ending)
+  ) |>
+  kable(
+    col.names = c(
+      "Ending",
+      "Careers",
+      "Final season can be read",
+      "Final season ends in an absence"
+    ),
+    align = "lrrr",
+    caption = paste0(
+      "Finished stat-line careers whose last season is ",
+      min(game_window),
+      " to ",
+      max(game_window),
+      ". Careers whose eligibility is unknown are left out. The absence share is among the final seasons that can be read."
+    )
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

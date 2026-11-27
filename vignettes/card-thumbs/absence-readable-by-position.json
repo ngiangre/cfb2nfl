@@ -1,0 +1,23 @@
+{
+  "id": "absence-readable-by-position",
+  "release": "2026-11-25",
+  "code_hash": "f28f2a6d6a52b0722f96b7a7b4472bcc",
+  "functions": {
+    "absence_runs": "26b642a982be77f75dc5e5310e576549",
+    "absence_summary": "2f6b32aa0d81f98d41d7cb4fc9dbafa4",
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "classify_absence": "851dbc8e2c914a1754748b9854bc697f",
+    "fmt": "d4c89f195c447af907ba425a860522de",
+    "harmonized_position_levels": "aefe6b78c6d8766f44b35e70824df851",
+    "last_complete_cfb_season": "f279fba0ac2a12d60dd7965db5dd1f30",
+    "pct": "3413c026fc8c907293b2fb1d96080440",
+    "player_appearance_sequence": "99e525442d3ee8eb7546ae0d0525cdb4",
+    "player_season_universe": "20aa0b7c1de22730fb6581dd5fe977ae",
+    "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
+    "position_palette": "11141b2b531ab5b7f31d6c196fcc46be",
+    "scale_colour_position": "4cafb87d0ef9e51cdf13934043361fe6",
+    "team_game_schedule": "8ce6a6078873f3d1ee4255bef1a402b7",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

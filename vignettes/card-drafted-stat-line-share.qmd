@@ -1,0 +1,136 @@
+---
+title: "Do drafted players show up in the box score more often than their teammates?"
+image: card-thumbs/drafted-stat-line-share.png
+image-alt: "Paired bar chart, by position group, of the average share of a team's games in which drafted and not-drafted rostered player-seasons logged a stat line; the green drafted bar is longer than the purple not-drafted bar in every position group except offensive line, where both bars are near zero."
+categories: ["Topic: Career shape", "Position: By position group", "Population: Draft-eligible seasons", "Figure: Bar chart", "Question: What matters for going pro"]
+status: investigation
+graduated_to: null
+terms: [drafted, eligible-season, appearance-rate, stat-line-season, position-group]
+followups:
+  - text: "Does a drafted player's box-score usage separate him from teammates who were not drafted once team quality is held constant?"
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+```
+
+```{r}
+#| label: figure
+# Draft-eligible seasons from 2019 through the last complete season, one team
+# per player-season. The draft label is an outcome, joined on, never a column of
+# the playing-time table.
+complete_through <- last_complete_cfb_season()
+usage <- targets::tar_read(player_usage, store = file.path(root, "_targets"))
+outcomes <- collect(tbl(con, "outcomes"))
+labelled <- drafted_stat_line(usage, outcomes, seasons = 2019:complete_through) |>
+  filter(position_group %in% names(position_palette()))
+
+by_pos <- labelled |>
+  group_by(position_group, drafted) |>
+  summarise(
+    player_seasons = n(),
+    mean_share = mean(appearance_rate),
+    .groups = "drop"
+  ) |>
+  mutate(
+    grp = if_else(drafted, "Drafted", "Not drafted"),
+    tip = paste0(
+      position_group,
+      ", ",
+      grp,
+      ": a line in ",
+      scales::percent(mean_share, accuracy = 1),
+      " of team games, over ",
+      fmt(player_seasons),
+      " player-seasons"
+    )
+  )
+
+p <- by_pos |>
+  ggplot(aes(
+    mean_share,
+    reorder(as.character(position_group), mean_share),
+    fill = grp
+  )) +
+  geom_col_interactive(
+    aes(tooltip = tip),
+    position = position_dodge(width = 0.8),
+    width = 0.7
+  ) +
+  scale_fill_manual(values = c(Drafted = "#1B9E77", `Not drafted` = "#7570B3")) +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    title = "Do drafted players show up in the box score more often?",
+    subtitle = "Average share of a team's games with a stat line, drafted against not drafted",
+    x = "Average share of team games with a stat line",
+    y = NULL,
+    fill = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "drafted-stat-line-share", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: group-table
+# The overall comparison the bars cannot show: how many player-seasons there
+# are and how many logged a line in any game.
+labelled |>
+  group_by(drafted) |>
+  summarise(
+    player_seasons = n(),
+    any_line = mean(games_appeared > 0),
+    mean_share = mean(appearance_rate),
+    .groups = "drop"
+  ) |>
+  transmute(
+    Group = if_else(drafted, "Drafted", "Not drafted"),
+    `Player-seasons` = fmt(player_seasons),
+    `Logged a stat line in any game` = scales::percent(any_line, accuracy = 0.1),
+    `Average share of team games with a line` = scales::percent(mean_share, accuracy = 0.1)
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Group",
+      "Player-seasons",
+      "Logged a stat line in any game",
+      "Average share of team games with a line"
+    ),
+    align = "lrrr",
+    caption = paste0(
+      "Draft-eligible rostered player-seasons from 2019 through the season ",
+      complete_through,
+      ", one team per player-season."
+    )
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

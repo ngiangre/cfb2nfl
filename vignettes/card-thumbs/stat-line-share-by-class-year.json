@@ -1,0 +1,12 @@
+{
+  "id": "stat-line-share-by-class-year",
+  "release": "2026-11-25",
+  "code_hash": "4e8f39cd1fe8d33a0e1d942ebe516def",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "fmt": "d4c89f195c447af907ba425a860522de",
+    "last_complete_cfb_season": "f279fba0ac2a12d60dd7965db5dd1f30",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

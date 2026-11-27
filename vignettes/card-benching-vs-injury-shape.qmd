@@ -1,0 +1,221 @@
+---
+title: "Is a benching-shaped decline rarer than an injury-shaped absence at every position?"
+image: card-thumbs/benching-vs-injury-shape.png
+image-alt: "Paired horizontal bar chart, by position group, of the share of the seasons that can show each signal: a benching-shaped decline, in dark amber, against an injury-shaped absence, in grey; the grey injury bar is longer than the amber decline bar in every position group shown."
+categories: ["Topic: Career shape", "Position: By position group", "Position: Quarterback", "Population: Roster seasons", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [position-group, regular-player, injury-shaped-absence, benching-shaped-decline]
+followups:
+  - text: "Does a benching-shaped decline before the draft separate a player from teammates with the same role, once team quality is held constant?"
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(DBI)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+library(knitr)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+```
+
+```{r}
+#| label: figure
+# Rostered player-seasons on one team, 2016 through the last complete season,
+# the same window as the absence signal so the two shares share a base.
+complete_through <- last_complete_cfb_season()
+game_window <- 2016:complete_through
+store <- file.path(root, "_targets")
+player_game <- targets::tar_read(player_game, store = store)
+usage <- targets::tar_read(player_usage, store = store)
+roster <- dbReadTable(con, "roster")
+games <- dbReadTable(con, "games")
+names_by_id <- dbGetQuery(
+  con,
+  "SELECT playerId, any_value(player) AS player
+   FROM game_player_stats GROUP BY playerId"
+)
+pos_levels <- setdiff(
+  harmonized_position_levels(),
+  c("Athlete", "Position not recorded")
+)
+no_usage <- setdiff(pos_levels, usage_signal_map()$position_group)
+pos_seasons <- usage |>
+  filter(on_roster, team_games > 0, season %in% game_window) |>
+  group_by(playerId, season) |>
+  filter(n() == 1L) |>
+  ungroup() |>
+  filter(position_group %in% pos_levels) |>
+  select(playerId, season, team, position_group)
+absence <- player_appearance_sequence(player_game, roster, games) |>
+  filter(season %in% game_window) |>
+  absence_runs(
+    streak = formals(absence_runs)$streak,
+    min_gap = formals(absence_runs)$min_gap
+  ) |>
+  inner_join(pos_seasons, by = c("playerId", "season", "team")) |>
+  mutate(position_group = factor(position_group, pos_levels))
+absence_by_pos <- absence_summary(absence)
+decline <- player_game |>
+  filter(season %in% game_window) |>
+  usage_decline(
+    pos_seasons,
+    min_games = formals(usage_decline)$min_games,
+    ratio = formals(usage_decline)$ratio
+  ) |>
+  mutate(position_group = factor(position_group, pos_levels))
+decline_by_pos <- decline_summary(decline, absence_by_pos)
+signals_by_pos <- absence_by_pos |>
+  select(position_group, injury_shaped) |>
+  inner_join(
+    select(decline_by_pos, position_group, declined),
+    by = "position_group"
+  )
+
+p <- signals_by_pos |>
+  tidyr::pivot_longer(
+    c(declined, injury_shaped),
+    names_to = "signal",
+    values_to = "share"
+  ) |>
+  mutate(
+    signal = if_else(
+      signal == "declined",
+      "Benching-shaped decline",
+      "Injury-shaped absence"
+    ),
+    tip = sprintf("%s, %s: %s", position_group, signal, pct(share))
+  ) |>
+  ggplot(aes(
+    x = share,
+    y = forcats::fct_rev(position_group),
+    fill = signal
+  )) +
+  geom_col_interactive(
+    aes(tooltip = tip, data_id = paste(position_group, signal)),
+    position = position_dodge(width = 0.8),
+    width = 0.7
+  ) +
+  scale_fill_manual(
+    values = c(
+      `Benching-shaped decline` = "#B45309",
+      `Injury-shaped absence` = "#9CA3AF"
+    ),
+    labels = c("Benching-shaped", "Injury-shaped")
+  ) +
+  scale_x_continuous(labels = scales::percent) +
+  labs(
+    title = "Is a benching-shaped decline rarer than an injury-shaped absence?",
+    subtitle = "Share of the seasons that can show each signal, by position group",
+    x = "Share of seasons that can show it",
+    y = NULL,
+    fill = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "benching-vs-injury-shape", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: quarterback-figure
+# Every quarterback season that can show a decline, plotted by its pass
+# attempts per game in the two halves of the season it appeared in.
+qb <- decline |>
+  filter(observable, position_group == "Quarterback") |>
+  left_join(names_by_id, by = "playerId") |>
+  mutate(
+    status = if_else(declined, "Benching-shaped decline", "No decline"),
+    tip = sprintf(
+      "%s, %s %s: %.1f pass attempts a game in the first half, %.1f in the second (%s games)",
+      coalesce(player, playerId),
+      team,
+      season,
+      first_half,
+      second_half,
+      games_appeared
+    )
+  )
+p_qb <- ggplot(qb, aes(first_half, second_half, colour = status)) +
+  geom_abline(slope = 0.5, intercept = 0, linetype = "dashed", colour = "grey40") +
+  geom_point_interactive(
+    aes(tooltip = tip, data_id = paste(playerId, season, team)),
+    size = 2.2,
+    alpha = 0.7
+  ) +
+  scale_colour_manual(
+    values = c(`Benching-shaped decline` = "#B45309", `No decline` = "#6B7280")
+  ) +
+  labs(
+    title = "Which quarterback seasons show a benching-shaped decline?",
+    subtitle = "Every quarterback season that can show a decline; below the dashed line, usage halved",
+    x = "Pass attempts per game, first half of games appeared",
+    y = "Pass attempts per game, second half",
+    colour = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+card_interactive(p_qb)
+```
+
+```{r}
+#| label: signals-table
+decline_by_pos |>
+  left_join(
+    select(absence_by_pos, position_group, injury_shaped),
+    by = "position_group"
+  ) |>
+  arrange(position_group) |>
+  transmute(
+    `Position group` = as.character(position_group),
+    `Usage count` = usage_label,
+    `Decline can be read` = pct(readable),
+    `Benching-shaped decline` = pct(declined),
+    `Injury-shaped absence` = pct(injury_shaped)
+  ) |>
+  kable(
+    col.names = c(
+      "Position group",
+      "Usage count",
+      "Decline can be read",
+      "Benching-shaped decline",
+      "Injury-shaped absence"
+    ),
+    align = "llrrr",
+    caption = paste0(
+      "Rostered player-seasons, ",
+      min(game_window),
+      " to ",
+      max(game_window),
+      ". ",
+      paste(tolower(no_usage), collapse = " and "),
+      " have no usage count, so a decline cannot be read for them. Each share is among the seasons that can show that signal."
+    )
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

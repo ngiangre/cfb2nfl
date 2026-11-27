@@ -1,0 +1,166 @@
+---
+title: "Which position's yardage swings most from game to game?"
+image: card-thumbs/game-to-game-yardage-spread.png
+image-alt: "Horizontal bar chart of each position group's game-to-game spread of yards against a typical player, as a share of that group's mean yards per game; the running back bar is the longest, then receivers, then quarterbacks, so running back yardage is the most erratic relative to its average."
+categories: ["Topic: Career shape", "Position: By position group", "Position: Quarterback", "Population: Stat-line seasons", "Figure: Distribution"]
+status: investigation
+graduated_to: null
+terms: [position-group, signature-stat, residual-yards, baseline-yards, opponent-band]
+followups:
+  - text: "Does a position's game-to-game swing change the odds that a player is drafted, or only how his yards read?"
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+```
+
+```{r}
+#| label: figure
+# Game lines only from the complete seasons, so the season still being played
+# does not change the spread.
+complete_through <- last_complete_cfb_season()
+pos <- signature_positions(collect(tbl(con, "roster")))
+pg <- collect(tbl(con, "player_game")) |>
+  filter(season <= complete_through)
+game_values <- signature_game_values(build_game_production(pg), pos)
+
+titles <- list(
+  title = "Which position's yardage swings most from game to game?",
+  subtitle = "Each game's yards against a typical player's, by opponent Elo band; boxes hold the middle half of games",
+  x = "Opponent band",
+  y = "Yards against a typical player",
+  caption = card_caption(release)
+)
+
+spread <- residual_spread(game_values)
+p <- spread |>
+  mutate(
+    tooltip = paste0(
+      group,
+      ": game residual SD ",
+      fmt(sd, 1),
+      " yards, ",
+      fmt(rel_sd, 2),
+      " of the group's mean yards per game"
+    )
+  ) |>
+  ggplot(aes(rel_sd, reorder(group, rel_sd), fill = group)) +
+  geom_col_interactive(aes(tooltip = tooltip), width = 0.6) +
+  scale_fill_manual(values = position_palette(), guide = "none") +
+  labs(
+    title = titles$title,
+    subtitle = "Game-to-game spread as a share of each group's mean yards per game",
+    x = "Residual SD over mean yards per game",
+    y = NULL,
+    caption = titles$caption
+  ) +
+  theme_card()
+
+# The hover summary for each box: its median and middle half, in yards.
+box_tips <- game_values |>
+  group_by(group, band) |>
+  summarise(
+    med = median(residual),
+    q1 = quantile(residual, 0.25),
+    q3 = quantile(residual, 0.75),
+    games = n(),
+    .groups = "drop"
+  ) |>
+  mutate(
+    tip = paste0(
+      group,
+      ", ",
+      band,
+      ": median ",
+      fmt(med, 1),
+      ", middle half ",
+      fmt(q1, 1),
+      " to ",
+      fmt(q3, 1),
+      " over ",
+      fmt(games),
+      " games"
+    )
+  )
+
+p_interactive <- game_values |>
+  left_join(box_tips |> select(group, band, tip), by = c("group", "band")) |>
+  ggplot(aes(band, residual, fill = group)) +
+  geom_hline(yintercept = 0, linewidth = 0.4) +
+  geom_boxplot_interactive(
+    aes(tooltip = tip, data_id = interaction(group, band)),
+    outlier.shape = NA,
+    width = 0.6
+  ) +
+  scale_fill_manual(values = position_palette(), guide = "none") +
+  facet_wrap(~group, scales = "free_y") +
+  labs(
+    title = titles$title,
+    subtitle = titles$subtitle,
+    x = titles$x,
+    y = titles$y,
+    caption = titles$caption
+  ) +
+  theme_card() +
+  theme(axis.text.x = element_text(angle = 35, hjust = 1))
+
+card_thumbnail(p, "game-to-game-yardage-spread", release = release)
+card_interactive(p)
+card_interactive(p_interactive)
+```
+
+```{r}
+#| label: spread-table
+# The spread on the yardage scale of each group, which the boxes cannot show:
+# the standard deviation as a share of a typical game's yards.
+residual_spread(game_values) |>
+  transmute(
+    `Position group` = group,
+    Games = fmt(games),
+    `Residual SD` = fmt(sd, 1),
+    `90th percentile` = fmt(p90, 1),
+    `SD over mean yards` = fmt(rel_sd, 2)
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Position group",
+      "Games",
+      "Residual SD",
+      "90th percentile",
+      "SD over mean yards"
+    ),
+    caption = paste0(
+      "Spread of each group's game residuals in yards, over the seasons through ",
+      complete_through,
+      ". The last column divides the standard deviation by the group's mean yards per game, so groups on different yardage scales compare."
+    )
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

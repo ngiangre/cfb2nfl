@@ -1,0 +1,187 @@
+---
+title: "Can the box score show an injury-shaped absence at every position?"
+image: card-thumbs/absence-readable-by-position.png
+image-alt: "Horizontal bar chart of the share of each position group's rostered player-seasons in which a gap in the box score could be read, from 2016 on; most positions reach a readable share near the top of the scale, and offensive line, in dark amber, is the bar almost at zero."
+categories: ["Topic: Career shape", "Position: By position group", "Population: Roster seasons", "Figure: Bar chart"]
+status: investigation
+graduated_to: null
+terms: [position-group, player-season, regular-player, injury-shaped-absence, stat-line-season]
+followups:
+  - text: "Follow offensive linemen through play-by-play participation or snap counts, the only route to an absence signal for the position."
+    link: "F17"
+  - text: "Does an injury-shaped absence in a draft-eligible season lower the chance of being drafted, holding position and production fixed?"
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(DBI)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+library(knitr)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+```
+
+```{r}
+#| label: figure
+# Rostered player-seasons on one team, from 2016 (the first season with
+# defensive box-score lines) through the last complete season. A season still
+# being played would add seasons without changing the shape of the signal.
+complete_through <- last_complete_cfb_season()
+game_window <- 2016:complete_through
+store <- file.path(root, "_targets")
+player_game <- targets::tar_read(player_game, store = store)
+usage <- targets::tar_read(player_usage, store = store)
+roster <- dbReadTable(con, "roster")
+games <- dbReadTable(con, "games")
+pos_levels <- setdiff(
+  harmonized_position_levels(),
+  c("Athlete", "Position not recorded")
+)
+pos_seasons <- usage |>
+  filter(on_roster, team_games > 0, season %in% game_window) |>
+  group_by(playerId, season) |>
+  filter(n() == 1L) |>
+  ungroup() |>
+  filter(position_group %in% pos_levels) |>
+  select(playerId, season, team, position_group)
+absence <- player_appearance_sequence(player_game, roster, games) |>
+  filter(season %in% game_window) |>
+  absence_runs(
+    streak = formals(absence_runs)$streak,
+    min_gap = formals(absence_runs)$min_gap
+  ) |>
+  inner_join(pos_seasons, by = c("playerId", "season", "team")) |>
+  mutate(position_group = factor(position_group, pos_levels))
+absence_by_pos <- absence_summary(absence)
+
+p <- absence_by_pos |>
+  mutate(
+    is_claim = position_group == "Offensive line",
+    tip = sprintf(
+      "%s: %s of %s seasons can be read",
+      position_group,
+      pct(readable),
+      fmt(seasons)
+    )
+  ) |>
+  ggplot(aes(
+    x = readable,
+    y = reorder(as.character(position_group), readable),
+    fill = is_claim
+  )) +
+  geom_col_interactive(
+    aes(tooltip = tip, data_id = as.character(position_group)),
+    show.legend = FALSE
+  ) +
+  scale_fill_manual(values = c(`FALSE` = "#9CA3AF", `TRUE` = "#B45309")) +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 0.5)) +
+  labs(
+    title = "Can every position show an injury-shaped absence?",
+    subtitle = "Share of player-seasons with a regular run that a gap could interrupt",
+    x = "Share of seasons that can show an absence",
+    y = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "absence-readable-by-position", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: by-season-figure
+# The readable share season by season, so one season does not set the position.
+by_season <- absence |>
+  group_by(position_group, season) |>
+  summarise(
+    n = n(),
+    readable = mean(observable),
+    .groups = "drop"
+  ) |>
+  mutate(
+    tip = sprintf(
+      "%s, %s: %s of %s seasons can be read",
+      position_group,
+      season,
+      pct(readable),
+      fmt(n)
+    )
+  )
+p_season <- ggplot(
+  by_season,
+  aes(season, readable, colour = position_group, group = position_group)
+) +
+  geom_line(linewidth = 0.9) +
+  geom_point_interactive(
+    aes(tooltip = tip, data_id = paste(position_group, season)),
+    size = 3
+  ) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_continuous(breaks = game_window) +
+  scale_colour_position(guide = "none") +
+  labs(
+    title = "Does the readable share hold across the seasons?",
+    subtitle = "Seasons that can show an absence, by position group",
+    x = "Season",
+    y = "Seasons that can be read",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+card_interactive(p_season)
+```
+
+```{r}
+#| label: absence-table
+absence_by_pos |>
+  transmute(
+    `Position group` = as.character(position_group),
+    `Player-seasons` = fmt(seasons),
+    `Can be read` = pct(readable),
+    `Seasons that can be read` = fmt(readable_n),
+    `Absence, then returned` = pct(returned),
+    `Season-ending absence` = pct(season_ending)
+  ) |>
+  kable(
+    col.names = c(
+      "Position group",
+      "Player-seasons",
+      "Can be read",
+      "Seasons that can be read",
+      "Absence, then returned",
+      "Season-ending absence"
+    ),
+    align = "lrrrrr",
+    caption = paste0(
+      "Rostered player-seasons on one team, ",
+      min(game_window),
+      " to ",
+      max(game_window),
+      ". The absence shares are among the seasons that can be read; the offensive line shares rest on very few seasons."
+    )
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

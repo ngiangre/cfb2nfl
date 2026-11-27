@@ -1,0 +1,14 @@
+{
+  "id": "redshirt-shaped-seasons",
+  "release": "2026-11-25",
+  "code_hash": "23f75d42fcd212d2c454d960a3459750",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "flag_redshirt": "e69dd705c96486e8c786251290a00ac8",
+    "label_text_colour": "a4915d80239ab11ef3d5c1a011ae242f",
+    "last_complete_cfb_season": "f279fba0ac2a12d60dd7965db5dd1f30",
+    "redshirt_spine": "0e6f0dbed6e52c7cfecc5bf0bd14158a",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

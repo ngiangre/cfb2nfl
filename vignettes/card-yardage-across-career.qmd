@@ -1,0 +1,123 @@
+---
+title: "Does a player's yardage grow over his college career?"
+aliases: [2026-11-05-performance-arcs.html]
+image: card-thumbs/yardage-across-career.png
+image-alt: "Three line charts, one per position group, of the median signature yards by career season for quarterbacks, running backs and receivers; the quarterback passing line rises steadily across the career, the running back rushing line peaks mid-career and the receiving line rises slowly, with shaded middle-half ranges."
+categories: ["Topic: Career shape", "Position: By position group", "Position: Quarterback", "Population: Stat-line seasons", "Figure: Line chart"]
+status: investigation
+graduated_to: null
+terms: [position-group, signature-stat, career-season, stat-line-season]
+followups:
+  - text: "Does a player's yardage trajectory before the draft separate those drafted from those who are not?"
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) root <- pkgload::pkg_path()
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+```
+
+```{r}
+#| label: figure
+# Only seasons the data has finished count, so the season still being played
+# does not pull a group's median down.
+complete_through <- last_complete_cfb_season()
+pos <- signature_positions(collect(tbl(con, "roster")))
+sa <- collect(tbl(con, "player_stats")) |>
+  build_season_arcs()
+values <- sa |>
+  filter(season <= complete_through) |>
+  signature_season_values(pos)
+arcs <- median_arcs(values, min_players = 50L)
+
+p <- ggplot(arcs, aes(season_index, med, colour = group, fill = group)) +
+  geom_ribbon(aes(ymin = q1, ymax = q3), alpha = 0.12, colour = NA) +
+  geom_line(linewidth = 1.2) +
+  geom_point_interactive(
+    aes(
+      tooltip = paste0(
+        group,
+        ", career season ",
+        season_index,
+        ": median ",
+        fmt(med),
+        " yards across ",
+        fmt(players),
+        " players"
+      )
+    ),
+    size = 3
+  ) +
+  scale_colour_position(guide = "none") +
+  scale_fill_manual(values = position_palette(), guide = "none") +
+  facet_wrap(~group, scales = "free_y") +
+  labs(
+    title = "Does yardage grow over a career?",
+    subtitle = "Median signature yards by career season, in seasons where every group has at least fifty players",
+    x = "Career season",
+    y = "Median signature yards",
+    caption = card_caption(release)
+  ) +
+  theme_card()
+
+card_thumbnail(p, "yardage-across-career", release = release)
+card_interactive(p)
+```
+
+```{r}
+#| label: population-table
+# Who the arcs are built from: players and their seasons and games in the
+# complete seasons only.
+pg <- collect(tbl(con, "player_game")) |>
+  filter(season <= complete_through)
+games <- signature_game_values(build_game_production(pg), pos)
+values |>
+  count(group, name = "season_lines") |>
+  left_join(
+    values |>
+      group_by(group) |>
+      summarise(players = n_distinct(playerId), .groups = "drop"),
+    by = "group"
+  ) |>
+  left_join(count(games, group, name = "game_lines"), by = "group") |>
+  transmute(
+    `Position group` = group,
+    Players = fmt(players),
+    `Season lines` = fmt(season_lines),
+    `Game lines` = fmt(game_lines)
+  ) |>
+  knitr::kable(
+    col.names = c("Position group", "Players", "Season lines", "Game lines"),
+    caption = paste0(
+      "Players, season lines and game lines behind each position group, over the seasons through ",
+      complete_through,
+      "."
+    )
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

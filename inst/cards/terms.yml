@@ -281,3 +281,58 @@ play-text:
 play-stats-log:
   label: Play-stats log
   definition: "The stat records CFBD keeps for each play, naming the players who passed, rushed, caught, made a tackle or were credited with another stat on it."
+
+# ---- batch career ----
+signature-stat:
+  label: Signature stat
+  definition: "The yardage that defines a position group: passing yards for quarterbacks, rushing yards for running backs, receiving yards for receivers."
+career-season:
+  label: Career season
+  definition: "A player's n-th season with a stat line in the data, counted from his first, so the first point of every arc is his first season on the field, not his first season on a roster."
+stat-line-season:
+  label: Stat-line season
+  definition: "A season in which the box score records at least one statistic for the player. A rostered player with no statistic in a season has no stat line that season."
+opponent-band:
+  label: Opponent band
+  definition: "The opponent's pregame Elo rating grouped into even 200-point steps: under 1400, 1400 to 1599, 1600 to 1799, 1800 and up, or unrated when CFBD does not rate the opponent."
+baseline-yards:
+  label: Baseline yards
+  definition: "The mean yards for a season, opponent band and stat across every player with a line in that category, used as the yardage a typical player would be expected to post."
+residual-yards:
+  label: Residual yards
+  definition: "A game's yards minus its baseline yards, so a positive residual means the player beat what a typical player posted against that opponent in that season."
+appearance-rate:
+  label: Appearance rate
+  definition: "The games in which a player logged a stat line, divided by the games his team played that season, postseason included."
+class-year:
+  label: Class year
+  definition: "The player's eligibility class as CFBD records it, from 1 for a first-year player to 5, so class 4 is a fourth-year player. Some player-seasons have no class and are left out."
+# ---- batch career: absence and redshirt cards ----
+finished-career:
+  label: Finished career
+  definition: "A career whose end is observed: its last season is in a completed season, and the draft after it has happened. Careers still running are left out."
+stat-line-career:
+  label: Stat-line career
+  definition: "A finished career with at least one season stat line in the box score. Endings are compared for these careers, since only a career with a stat line can show a box-score signal."
+early-stop:
+  label: Early stop
+  definition: "A stat-line career at one school that ended with eligibility remaining and no draft pick or undrafted signing. The early-stop label is a proxy: a stop can still reflect an injury, a transfer that is not recorded, or a medical waiver."
+regular-player:
+  label: Regular
+  definition: "A player with a stat line in several straight team games that have a box score, so his usual role in the box score is visible."
+injury-shaped-absence:
+  label: Injury-shaped absence
+  definition: "A regular who then has no stat line for several straight games. It is returned when the player logs a line again that season, and season-ending when not. The shape does not record a cause."
+benching-shaped-decline:
+  label: Benching-shaped decline
+  definition: "A player who started a game in the first half of his appearances at a starter's usage, whose usage in the second half fell to half of that or less. The shape does not record a cause."
+covered-game:
+  label: Covered game
+  definition: "A regular-season game that the game-statistics table holds for the team. A team-season with fewer than five covered games cannot be read for a usage flag."
+full-time-season:
+  label: Full-time season
+  definition: "A player-season in the top quarter of its position by season volume (attempts, carries, receptions, tackles or kicks)."
+redshirt-shaped-season:
+  label: Redshirt-shaped season
+  definition: "A season in which the player recorded a statistic in at most one of a team's covered regular-season games. The rule is strict by design: it can miss a redshirt whose appearances produced statistics in two games, and it can flag a quiet backup."
+>
