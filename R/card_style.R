@@ -436,9 +436,14 @@ check_card_style <- function(
   footer_ok <- FALSE
   for (st in starts) {
     end <- st + which(grepl("^\\s*```+\\s*$", lines[-seq_len(st)]))[1]
+    # An unclosed chunk runs to the end of the file; it can't be a footer.
+    unclosed <- is.na(end)
+    if (unclosed) {
+      end <- length(lines)
+    }
     chunk <- lines[st:end]
     if (any(grepl("card_footer(", chunk, fixed = TRUE))) {
-      footer_ok <- any(grepl("^#\\|\\s*output:\\s*asis", chunk))
+      footer_ok <- !unclosed && any(grepl("^#\\|\\s*output:\\s*asis", chunk))
     }
   }
   if (!footer_ok) {
