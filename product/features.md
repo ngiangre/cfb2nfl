@@ -22,7 +22,7 @@ Statuses: `idea` → `accepted` (passed the `feature-reviewer` agent) →
 shipped before 2026-11-22 were backfilled from the repo history and have no
 acceptance criteria.
 
-<!-- Next free ID: F25 -->
+<!-- Next free ID: F26 -->
 
 ## G1 · Answer the project's questions with evidence
 
@@ -119,7 +119,8 @@ acceptance criteria.
 ### F16 · Post style rules, checker and cold-read reviewer
 
 - **Goals:** G1, C1 · **Personas:** P1, P2 · **Status:** shipped
-- **Links:** decisions 0025, 0040; `R/post_style.R`
+- **Links:** decisions 0025, 0040; `R/post_style.R`; superseded by F25
+  once decision 0053 lands
 - **Tasks:**
 <!-- tasks F16 -->
 <!-- /tasks -->
@@ -200,6 +201,93 @@ acceptance criteria.
 - [x] [PR #125](https://github.com/ngiangre/cfb2nfl/pull/125) docs(product): sync feature task links after F24 ships (F24)
 <!-- /tasks -->
 
+### F25 · Investigations as a figure wall of cards that graduate to the rest of the site
+
+- **Goals:** G1, G3, C1 · **Personas:** P1 (P2 via each card's code) ·
+  **Status:** accepted
+- **Links:** issue #127; supersedes F16 once decision 0053 lands (F16 →
+  superseded by F25); replaces F14's Blog index page and its navbar entry;
+  lays the ground for F21
+- **Why:** after 16 dated posts the figures are what readers come back to,
+  but the prose still reads as AI-written despite rounds of rules, the
+  one-sentence titles cannot be scanned, about 113 helpers are redefined
+  inline, and a flat date-ordered index cannot answer "every QB figure" or
+  "everything about transfers". P1 wants to scroll and filter every figure
+  the project has made, open one to probe it, and see which ideas became
+  standing parts of the site. Most of what it delivers is G3 (a click or
+  two to a figure, probing at finer grain, phones); it sits under G1
+  because it changes how G1's questions are answered and tracked, and
+  rewrites G1's "has a dated post" signal.
+- **Acceptance criteria:**
+  - [ ] A fan can scroll the Investigations page as a grid of cards, each
+    showing its question, a static thumbnail, a status pill (sketch /
+    investigation / graduated) and its tags, with images loading as they
+    scroll and a single column at a 390 px viewport.
+  - [ ] A fan can narrow the grid with a search box (matching the question
+    and the figure's alt text) and by clicking any tag, and open any card to
+    its own page with the interactive version of the figure and its code.
+  - [ ] Every card has a figure (a table only sits under one) whose title
+    and subtitle say what is shown, so the thumbnail passes the card
+    reviewer on the thumbnail alone; the card page carries no narrative
+    prose beyond the question and its follow-ups.
+  - [ ] Every term and method a card uses is defined on the card (in the
+    figure's subtitle or caption, or a definitions table under it), with
+    reader-facing labels and no column names, and every card page passes
+    the `site-personas` P1 walkthrough.
+  - [ ] Every number in a card's title, subtitle, annotation or table is
+    computed from the data, not typed in; the style check flags numeric
+    literals in title and subtitle strings.
+  - [ ] Each card page shows the `data-latest` release date it was rendered
+    from, its card id and URL never change once published, and its visible
+    code fold reproduces the figure from `cfb2nfl.duckdb` (decision 0040).
+  - [ ] A card's thumbnail and its page always show the same data vintage.
+    The style check fails a card with an unapproved tag, missing alt text,
+    no figure, or a missing thumbnail or one older than the card's code or
+    the `R/` functions it calls; a newer data release only reports the card
+    as stale (it does not fail the build).
+  - [ ] Tags come only from an approved vocabulary. Every question tag has an
+    entry in `questions.yml` with its status (a question marked not
+    answerable carries a one-line reason, shown on its cards), and
+    filtering the wall by a question tag shows every card behind it.
+  - [ ] Every card follow-up links to a question tag in `questions.yml` or
+    to a feature in `features.md`.
+  - [ ] A migration ledger maps every section of the 16 dated posts (Data
+    and Results alike) to a card, a merge or a drop with a reason; the
+    population and outcome definitions from dropped Data tables stay
+    reachable from every card that uses them; each old post URL redirects.
+  - [ ] At least one card has graduated to Explorer, Analysis or another
+    page, which renders the figure from a tested `R/` builder and links back
+    to the card, and the card shows where it went.
+  - [ ] No card redefines a shared helper (`fmt`, `pct`, `wilson`, team
+    colors, the card theme); they live in `R/` with tests.
+- **Out of scope:** displaying or filtering by question status on the wall,
+  and the standalone question board (F21); new analyses (new cards belong
+  to the feature their question serves) and any change to analyses or the
+  data model during migration (figures move and are retitled, not
+  recomputed into new results; decision 0041 still applies to a builder
+  promoted at graduation); Explorer or Analysis redesign beyond the one
+  graduated card; multi-tag (AND) filtering beyond Quarto's listing;
+  interactive thumbnails.
+- **Order:** the pilot posts stay up until decision 0053 is accepted;
+  redirects land with or after it.
+- **Cost:** 0 CFBD calls; no new data tables; new registries
+  `inst/cards/tags.yml`, `questions.yml` and the migration ledger;
+  `site.yaml` render time for about 70 cards (measured early). Decision
+  record 0053 (supersedes or amends 0015 and 0025, and 0040 where it
+  applies) and a `goals.md` signal change for G1 ("has a dated post") and
+  G3 ("every Results section"), written after the pilot.
+- **Review:** feature-reviewer 2026-11-26: aligned after changes (7
+  findings, all applied)
+- **Tasks:**
+<!-- tasks F25 -->
+- [ ] [#127](https://github.com/ngiangre/cfb2nfl/issues/127) Rework Investigations into a figure wall of cards that graduates ideas to the rest of the site
+- [ ] [#131](https://github.com/ngiangre/cfb2nfl/issues/131) Shared post helpers, the card theme, card_thumbnail() and new_card() in R/ (F25)
+- [ ] [#132](https://github.com/ngiangre/cfb2nfl/issues/132) Card template, approved tags, questions registry, check_card_style() and the figure wall page (F25)
+- [ ] [#133](https://github.com/ngiangre/cfb2nfl/issues/133) Pilot: migrate the draft-outcomes posts to cards and graduate one card (F25)
+- [ ] [#134](https://github.com/ngiangre/cfb2nfl/issues/134) Decision 0053, goals.md signals and AGENTS.md for the figure wall (F25)
+- [ ] [PR #135](https://github.com/ngiangre/cfb2nfl/pull/135) docs(product): add the F25 figure wall card and sync task links (F25)
+<!-- /tasks -->
+
 ### F21 · Question status board
 
 - **Goals:** G1, G3 · **Personas:** P1 · **Status:** idea
@@ -236,6 +324,7 @@ acceptance criteria.
 - [x] [PR #118](https://github.com/ngiangre/cfb2nfl/pull/118) docs(posts): revise outcome posts for the roster population; Explorer lists NFL entrants without a stat line
 - [x] [#128](https://github.com/ngiangre/cfb2nfl/issues/128) Explorer revisions: bolder team line, play-text players in game view, drop Team dropdown on Players/Combine, fix Combine 3D plot
 - [x] [PR #129](https://github.com/ngiangre/cfb2nfl/pull/129) feat(explorer): play-text players, bolder team line, hide Team on Players/Combine, size the Combine 3D plot (F13)
+- [x] [PR #130](https://github.com/ngiangre/cfb2nfl/pull/130) docs(product): mark F13 shipped after the #128 Explorer revisions (F13)
 <!-- /tasks -->
 
 ### F06 · Team and conference geography
