@@ -52,6 +52,7 @@ jobs:
       - name: Download data assets
         run: |
           Rscript -e 'dir.create("data", showWarnings = FALSE); piggyback::pb_download(repo = Sys.getenv("GITHUB_REPOSITORY"), tag = "data-latest", dest = "data")'
+          Rscript -e 'pkgload::load_all(quiet = TRUE); record_release_date("data", repo = Sys.getenv("GITHUB_REPOSITORY"))'
 
       - name: Run pipeline
         run: Rscript -e 'targets::tar_make()'

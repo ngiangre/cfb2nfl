@@ -350,8 +350,9 @@ all of it. Years 2010–2026.
   DISPLAY only, decision 0008 — via a shared team → color mapping, not
   hard-coded hexes). All figures use **large, accessible fonts/text**. Save a
   **reusable ggplot2 theme object** (plus the team color scale) in `R/viz.R` and
-  apply it everywhere rather than re-theming per plot. TODO: create that theme
-  helper.
+  apply it everywhere rather than re-theming per plot: `theme_cfb2nfl()`,
+  `scale_fill_team()`/`scale_color_team()`, and for card thumbnails
+  `theme_card()` with `card_caption()` (feature F25).
 - **Blog posts** (decision 0015): dated files `vignettes/YYYY-MM-DD-slug.qmd`,
   each YAML carrying `description:` (one declarative sentence stating the
   finding, not the topic) and `followups:` (list of open questions / next
