@@ -332,6 +332,46 @@ test_that("typed numbers and column names are caught inside paste(), ggtitle() a
   expect_false("column_name" %in% card_rules(root, p))
 })
 
+test_that("the footer chunk prints the card footer as markdown", {
+  skip_if_not_installed("ggplot2")
+  root <- local_card_root()
+  lines <- good_card_lines()
+  p <- write_good_card(root, lines[lines != "#| output: asis"])
+  expect_true("footer" %in% card_rules(root, p))
+  p <- write_good_card(root, lines[lines != "card_footer()"])
+  expect_true("footer" %in% card_rules(root, p))
+})
+
+test_that("stock palettes that reuse the outcome colours are flagged; sequential ones are not", {
+  skip_if_not_installed("ggplot2")
+  root <- local_card_root()
+  lines <- good_card_lines()
+  fig <- which(lines == "card_interactive(p)")
+  p <- write_good_card(
+    root,
+    append(lines, "p <- p + ggplot2::scale_fill_viridis_c()", after = fig - 1)
+  )
+  expect_true("palette" %in% card_rules(root, p))
+  p <- write_good_card(
+    root,
+    append(
+      lines,
+      'p <- p + ggplot2::scale_colour_brewer(palette = "Dark2")',
+      after = fig - 1
+    )
+  )
+  expect_true("palette" %in% card_rules(root, p))
+  p <- write_good_card(
+    root,
+    append(
+      lines,
+      'p <- p + ggplot2::scale_fill_brewer(palette = "YlGnBu")',
+      after = fig - 1
+    )
+  )
+  expect_false("palette" %in% card_rules(root, p))
+})
+
 test_that("a card carries no narrative prose", {
   skip_if_not_installed("ggplot2")
   root <- local_card_root()
