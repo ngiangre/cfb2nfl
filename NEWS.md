@@ -1,5 +1,14 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Investigations (feature F25,
+  [#146](https://github.com/ngiangre/cfb2nfl/issues/146)): **the career-shape
+  posts are now figure cards**: yardage across a career, by opponent strength
+  and game to game; stat-line share by position, class year and draft outcome;
+  the early-stop and absence cards; and redshirt-shaped seasons, covered-game
+  observability and quarterback game coverage
+  ([decision 0054](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0054-figure-cards-replace-dated-posts.md)).
+  The four posts are retired and redirect to their cards, and every section's
+  fate is in `inst/cards/migration.yml`. Rates stop at the last complete season.
 - Investigations (feature F25): **the card check catches two more slips**:
   a footer chunk that would print the glossary as raw text instead of
   markdown, and stock palettes (viridis, the qualitative ColorBrewer sets)

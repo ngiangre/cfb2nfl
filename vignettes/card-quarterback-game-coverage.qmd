@@ -129,7 +129,8 @@ p <- ggplot(spine, aes(x)) +
     fontface = "bold"
   ) +
   scale_fill_identity() +
-  facet_wrap(~who, scales = "free_x") +
+  scale_y_continuous(breaks = NULL) +
+  facet_wrap(~who, ncol = 2, scales = "free_x") +
   labs(
     title = "In how many covered games does each quarterback's season show a statistic?",
     subtitle = "Games with a recorded statistic (team color) out of the team's covered games (gray)",

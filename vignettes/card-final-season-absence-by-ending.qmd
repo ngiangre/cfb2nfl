@@ -129,7 +129,7 @@ p <- final_by_ending |>
   labs(
     title = "Do early stops end in an absence more than used-up careers?",
     subtitle = "Share of readable final seasons that end in a season-ending absence, by how the career ended",
-    x = "Share ending in a season-ending absence",
+    x = "Share ending in an absence",
     y = NULL,
     caption = card_caption(release)
   ) +
