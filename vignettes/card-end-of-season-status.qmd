@@ -122,7 +122,16 @@ p_idx <- ggplot(
     ),
     width = 0.75
   ) +
-  scale_fill_brewer(palette = "Dark2") +
+  # The tile's colours: drafted green, signed purple, the rest in greys.
+  scale_fill_manual(
+    values = c(
+      "Drafted" = "#1B9E77",
+      "Signed as an undrafted free agent" = "#7570B3",
+      "Still playing next season" = "#D1D5DB",
+      "Exhausted eligibility undrafted" = "#6B7280",
+      "Gone the next season, reason unknown" = "#111827"
+    )
+  ) +
   labs(
     title = "How eligible seasons end, by eligible season number",
     subtitle = "Share of eligible seasons by end-of-season status",

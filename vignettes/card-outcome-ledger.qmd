@@ -102,18 +102,18 @@ rounds <- tibble(
     sum(risk$outcome_drafted_d & risk$outcome_draft_round_d >= 4L)
   )
 )
-n_risk <- nrow(risk)
+n_seasons <- nrow(risk)
 bind_rows(
   ledger[1, c("outcome", "events")],
   rounds,
   ledger[2:3, c("outcome", "events")]
 ) |>
   mutate(
-    lo = vapply(events, \(x) wilson(x, n_risk)[["lo"]], numeric(1)),
-    hi = vapply(events, \(x) wilson(x, n_risk)[["hi"]], numeric(1)),
+    lo = vapply(events, \(x) wilson(x, n_seasons)[["lo"]], numeric(1)),
+    hi = vapply(events, \(x) wilson(x, n_seasons)[["hi"]], numeric(1)),
     interval = paste(pct(lo), "to", pct(hi)),
-    share = pct(events / n_risk),
-    at_risk = fmt(n_risk),
+    share = pct(events / n_seasons),
+    at_risk = fmt(n_seasons),
     events = fmt(events)
   ) |>
   select(outcome, events, at_risk, share, interval) |>
@@ -121,7 +121,7 @@ bind_rows(
     col.names = c("Outcome", "Seasons", "Eligible seasons", "Share", "95% interval"),
     caption = paste0(
       "Each outcome over the ",
-      fmt(n_risk),
+      fmt(n_seasons),
       " eligible seasons of ",
       fmt(n_distinct(risk$playerId)),
       " players, with the draft split by round. A player usually has several eligible seasons, and his NFL entry, if any, falls on exactly one of them."

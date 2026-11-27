@@ -1,13 +1,13 @@
 {
   "id": "career-endings-by-position",
   "release": "2026-11-25",
-  "code_hash": "e87fc88573fa4854e7ca2c8b4067dcb8",
+  "code_hash": "b5610df16e89cc39d8a6f8dc1a8ef24d",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
     "career_endings": "4fa3d0c4500176cd13cd4e8d68487bed",
     "ending_incidence": "0ff847f04597913c0df54952a0b6a33c",
     "ending_labels": "d7e87df8d8263aa1b5193e5033cc1268",
-    "ending_palette": "c6697acb09f37f361be6cfac538b33cb",
+    "ending_palette": "85f0e7f0c9562b9bbc535350335a7253",
     "fmt": "d4c89f195c447af907ba425a860522de",
     "label_endings": "77f5c01e1f49f7936aa359e798e3d16a",
     "pct": "3413c026fc8c907293b2fb1d96080440",

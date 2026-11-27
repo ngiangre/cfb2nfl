@@ -77,7 +77,7 @@ p <- ggplot(qb_steps, aes(factor(time), 100 * chance)) +
       min_solid
     ),
     x = "Eligible season",
-    y = NULL,
+    y = "Chance that season",
     caption = card_caption(release)
   ) +
   theme_card()

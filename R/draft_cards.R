@@ -53,7 +53,7 @@ outcome_ledger <- function(risk) {
 #' Figure: the outcome ledger
 #'
 #' One bar per outcome with its 95% interval and its share labelled past the
-#' whisker, the draft highlighted.
+#' whisker, drafted in green and undrafted in purple as on every card.
 #'
 #' @param ledger [outcome_ledger()] output.
 #' @return A ggplot with `ggiraph` tooltips.
@@ -63,7 +63,11 @@ plot_outcome_ledger <- function(ledger) {
   d <- ledger |>
     dplyr::mutate(
       outcome = stats::reorder(.data$outcome, .data$share),
-      drafted = .data$outcome == "Drafted, any round",
+      route = dplyr::case_when(
+        .data$outcome == "Drafted, any round" ~ "drafted",
+        .data$outcome == "Signed as an undrafted free agent" ~ "undrafted",
+        TRUE ~ "entry"
+      ),
       tip = sprintf(
         "%s: %s of %s eligible seasons (%.1f%%, 95%% CI %.1f%% to %.1f%%)",
         .data$outcome,
@@ -78,7 +82,7 @@ plot_outcome_ledger <- function(ledger) {
   ggplot2::ggplot(d, ggplot2::aes(100 * .data$share, .data$outcome)) +
     ggiraph::geom_col_interactive(
       ggplot2::aes(
-        fill = .data$drafted,
+        fill = .data$route,
         tooltip = .data$tip,
         data_id = .data$outcome
       ),
@@ -94,7 +98,7 @@ plot_outcome_ledger <- function(ledger) {
       size = 6
     ) +
     ggplot2::scale_fill_manual(
-      values = c(`TRUE` = "#1B9E77", `FALSE` = "grey65"),
+      values = c(drafted = "#1B9E77", undrafted = "#7570B3", entry = "grey65"),
       guide = "none"
     ) +
     # Whole-percent breaks, so every tick label is the value it marks.

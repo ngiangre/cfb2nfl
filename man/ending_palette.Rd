@@ -11,5 +11,5 @@ A named character vector, ending label to hex colour.
 }
 \description{
 One colour per ending, shared by every career-endings figure: the two NFL
-routes carry the colour, the endings without the NFL stay grey.
+routes carry the colour, the endings without the NFL stay pale grey.
 }

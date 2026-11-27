@@ -2,7 +2,7 @@
 title: "By their third eligible season, how have college careers ended at each position?"
 image: card-thumbs/career-endings-by-position.png
 image-alt: "Stacked bar chart for each position group of the percent of eligible players drafted, signed undrafted, with eligibility ended undrafted, or still playing by their third eligible season, each row labelled with its NFL total; no group's NFL share reaches one in five, and eligibility ended undrafted is the largest segment everywhere."
-categories: ["Topic: Draft outcomes", "Topic: Career shape", "Position: By position group", "Position: Quarterback", "Population: Draft-eligible players", "Figure: Bar chart", "Question: Draft chance by position"]
+categories: ["Topic: Draft outcomes", "Topic: Career shape", "Position: By position group", "Population: Draft-eligible players", "Figure: Bar chart", "Question: Draft chance by position"]
 status: investigation
 graduated_to: null
 terms: [career-eligible-season, study-population, first-eligible-position, cumulative-percent, at-risk, career-drafted, career-signed-undrafted, eligibility-ended, career-still-playing, confidence-interval, seasons-and-players]
@@ -82,16 +82,8 @@ p <- at_horizon |>
     fontface = "bold",
     colour = "#111827"
   ) +
-  # The two NFL routes keep their colours; the other endings go pale.
-  scale_fill_manual(
-    values = c(
-      state_fill[c("Drafted", "Signed undrafted")],
-      "Eligibility ended, undrafted" = "#D1D5DB",
-      "Left the data" = "#E5E7EB",
-      "Still playing" = "#F3F4F6"
-    )
-  ) +
-  scale_x_continuous(labels = \(x) paste0(x, "%"), breaks = seq(0, 100, 25), expand = expansion(mult = c(0, 0.01))) +
+  scale_fill_manual(values = state_fill) +
+  scale_x_continuous(labels = \(x) paste0(x, "%"), breaks = seq(0, 100, 25), expand = expansion(mult = c(0, 0.04))) +
   labs(
     title = sprintf("How careers had ended by the %s eligible season", ordinal(horizon)),
     subtitle = "Percent of each position's eligible players by how their career had ended; label: drafted plus signed",

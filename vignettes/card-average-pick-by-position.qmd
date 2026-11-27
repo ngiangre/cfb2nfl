@@ -2,7 +2,7 @@
 title: "Are quarterbacks picked earliest in every draft class?"
 image: card-thumbs/average-pick-by-position.png
 image-alt: "Line chart by draft class of the average overall pick for each position group, with quarterbacks in orange and the other groups in grey; filled orange points mark the classes where quarterbacks had the earliest average, and the quarterback line swings by dozens of picks from class to class."
-categories: ["Topic: Draft outcomes", "Position: By position group", "Position: Quarterback", "Population: Draft picks", "Figure: Line chart", "Question: Draft chance by position"]
+categories: ["Topic: Draft outcomes", "Position: By position group", "Position: Quarterback", "Population: Draft picks", "Figure: Line chart"]
 status: investigation
 graduated_to: null
 terms: [eligible-season, position-group, drafted, overall-pick, draft-class]

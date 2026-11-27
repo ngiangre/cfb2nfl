@@ -13,6 +13,6 @@ plot_outcome_ledger(ledger)
 A ggplot with \code{ggiraph} tooltips.
 }
 \description{
-One bar per outcome with its 95\% interval, the draft highlighted, and a
-dashed reference line at five percent.
+One bar per outcome with its 95\% interval and its share labelled past the
+whisker, drafted in green and undrafted in purple as on every card.
 }

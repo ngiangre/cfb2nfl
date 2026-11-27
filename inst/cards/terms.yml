@@ -43,7 +43,7 @@ confidence-interval:
   definition: "The range the true rate plausibly occupies given how many seasons it rests on (Wilson's method)."
 rookie-games:
   label: Rookie games
-  definition: "Regular-season NFL games played in the season the player entered the league."
+  definition: "Regular-season NFL games played in the season the player entered the league. Draft classes whose rookie season is still being played are left out."
 position-group:
   label: Position group
   definition: "The roster position listed for the player that season, grouped by role: quarterback (QB); running back (RB, FB); receiver (WR); tight end (TE); offensive line (T, G, C, OL, OT); defensive line (DL, DE, DT, NT, EDGE); linebacker (LB, ILB, OLB); defensive back (DB, S, CB); special teams (PK, P, LS, PR, KR). Seasons with a placeholder, the catch-all athlete code (ATH) or no roster row are left out as position not recorded."

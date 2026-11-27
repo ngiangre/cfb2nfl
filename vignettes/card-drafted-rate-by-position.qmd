@@ -1,7 +1,7 @@
 ---
 title: "Which positions are drafted most often?"
 image: card-thumbs/drafted-rate-by-position.png
-image-alt: "Bar chart of the share of draft-eligible college seasons ending in a draft pick for each of nine position groups, with confidence intervals; the three leading groups are highlighted green and quarterbacks orange in the middle of the table, and the leaders' intervals overlap."
+image-alt: "Bar chart of the share of draft-eligible college seasons ending in a draft pick for each of nine position groups, with confidence intervals; the three leading groups are highlighted dark grey and quarterbacks orange in the middle of the table, and the leaders' intervals overlap."
 categories: ["Topic: Draft outcomes", "Position: By position group", "Position: Quarterback", "Population: Draft-eligible seasons", "Figure: Bar chart", "Question: Draft chance by position"]
 status: investigation
 graduated_to: null
@@ -109,7 +109,7 @@ p_class <- ggplot(rate_class, aes(draft_year, 100 * drafted, colour = group)) +
     ),
     size = 2.2
   ) +
-  scale_colour_brewer(palette = "Paired") +
+  scale_colour_position() +
   scale_x_continuous(breaks = seq(min(risk$draft_year), max(risk$draft_year), 2)) +
   labs(
     title = "Drafted rate by position group and draft class",

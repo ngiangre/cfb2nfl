@@ -28,7 +28,7 @@ label_endings <- function(endings) {
 #' Colours of the career endings
 #'
 #' One colour per ending, shared by every career-endings figure: the two NFL
-#' routes carry the colour, the endings without the NFL stay grey.
+#' routes carry the colour, the endings without the NFL stay pale grey.
 #'
 #' @return A named character vector, ending label to hex colour.
 #' @export
@@ -36,9 +36,9 @@ ending_palette <- function() {
   c(
     "Drafted" = "#1B9E77",
     "Signed undrafted" = "#7570B3",
-    "Eligibility ended, undrafted" = "#6B7280",
-    "Left the data" = "#D1D5DB",
-    "Still playing" = "#E5E7EB"
+    "Eligibility ended, undrafted" = "#D1D5DB",
+    "Left the data" = "#E5E7EB",
+    "Still playing" = "#F3F4F6"
   )
 }
 

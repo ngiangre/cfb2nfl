@@ -134,10 +134,10 @@ hazard_era <- risk |>
   mutate(
     era = cut(
       draft_year,
-      breaks = c(y0 - 1, 2016, 2021, y1),
+      breaks = c(y0 - 1, 2015, 2021, y1),
       labels = c(
-        sprintf("%d to 2016 classes", y0),
-        "2017 to 2021 classes",
+        sprintf("%d to 2015 classes", y0),
+        "2016 to 2021 classes",
         sprintf("2022 to %d classes", y1)
       )
     )
@@ -162,14 +162,14 @@ p_era <- ggplot(hazard_era, aes(eligible_season_index, p, colour = era)) +
   ) +
   scale_y_continuous(labels = \(x) sprintf("%.0f%%", 100 * x), limits = c(0, NA)) +
   scale_x_continuous(breaks = unique(hazard_era$eligible_season_index)) +
-  scale_colour_brewer(palette = "Set2") +
+  scale_colour_manual(values = c("#9CA3AF", "#4B5563", "#111827")) +
   labs(
     title = "Per-season chance of NFL entry, by era of draft classes",
     subtitle = "Drafted or signed undrafted, by eligible season number",
     x = "Eligible season number",
     y = "Chance that season",
     colour = NULL,
-    caption = "Counts eligible seasons rather than players. Era and season cells with fewer than 100 seasons omitted. Hover a line to isolate an era."
+    caption = "Undrafted signings are recorded from the 2016 class on, so the first era counts drafted entries only. Counts eligible seasons rather than players; cells with fewer than 100 seasons omitted."
   ) +
   theme_cfb2nfl()
 card_interactive(p_era)

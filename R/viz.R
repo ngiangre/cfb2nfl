@@ -143,3 +143,37 @@ theme_card <- function(base_size = 20) {
       )
     )
 }
+
+#' One colour per position group
+#'
+#' Shared by every figure split by position group so a group keeps its colour
+#' from card to card. Quarterbacks are orange, the highlight the cards use for
+#' them; no group takes drafted green or undrafted purple, which belong to the
+#' outcomes.
+#'
+#' @return A named character vector, group to hex colour, in
+#'   [position_group_levels()] order.
+#' @export
+position_palette <- function() {
+  c(
+    "Quarterback" = "#D95F02",
+    "Running back" = "#1F77B4",
+    "Receiver" = "#8C564B",
+    "Tight end" = "#17BECF",
+    "Offensive line" = "#4B5563",
+    "Defensive line" = "#B8A000",
+    "Linebacker" = "#E377C2",
+    "Defensive back" = "#0B3C6E",
+    "Special teams" = "#9CA3AF"
+  )
+}
+
+#' Position-group colour scale
+#'
+#' @param ... Passed to [ggplot2::scale_colour_manual()].
+#' @return A ggplot2 scale using [position_palette()].
+#' @export
+scale_colour_position <- function(...) {
+  rlang::check_installed("ggplot2")
+  ggplot2::scale_colour_manual(values = position_palette(), ...)
+}

@@ -90,7 +90,7 @@ flow_end <- study_pop |>
   mutate(
     x = seq(-3.6, 3.6, length.out = n()),
     box = sprintf("%s\n%s (%s)", sub(", ", ",\n", label), fmt(n), pct(share)),
-    text_colour = if_else(state %in% c("left_data", "playing"), "#111827", "#FFFFFF")
+    text_colour = if_else(state %in% c("drafted", "signed_udfa"), "#FFFFFF", "#111827")
   )
 h <- 0.5
 bar_y <- min(flow_main$y) - 1.1
@@ -173,7 +173,6 @@ season_counts <- study_pop |>
   filter(state == "playing" | time > 0) |>
   mutate(label = factor(state_lab[state], names(state_fill)), share = n / sum(n), .by = "group") |>
   filter(sum(n) > 0, .by = "state")
-position_colour <- c("#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD", "#8C564B", "#E377C2", "#17BECF", "#BCBD22")
 p_when <- season_counts |>
   mutate(
     tooltip = sprintf(
@@ -193,7 +192,7 @@ p_when <- season_counts |>
   geom_line_interactive(aes(data_id = group), linewidth = 1.1) +
   geom_point_interactive(aes(tooltip = tooltip, data_id = group), size = 2.2) +
   facet_wrap(~label, nrow = 1, scales = "free_y", labeller = label_wrap_gen(18)) +
-  scale_colour_manual(values = position_colour) +
+  scale_colour_position() +
   scale_x_continuous(breaks = 0:max(season_counts$time)) +
   scale_y_continuous(labels = scales::label_comma()) +
   labs(

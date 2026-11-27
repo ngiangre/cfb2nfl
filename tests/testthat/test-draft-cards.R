@@ -43,7 +43,8 @@ test_that("plot_outcome_ledger draws one bar per outcome and highlights the draf
   expect_s3_class(p, "ggplot")
   built <- ggplot2::ggplot_build(p)
   expect_equal(nrow(built$data[[1]]), 3L)
-  expect_equal(sort(unique(built$data[[1]]$fill)), sort(c("#1B9E77", "grey65")))
+  # Drafted green, undrafted purple, as on every card; entry stays grey.
+  expect_setequal(built$data[[1]]$fill, c("#1B9E77", "#7570B3", "grey65"))
 })
 
 test_that("plot_outcome_ledger labels every axis tick with its true percent", {

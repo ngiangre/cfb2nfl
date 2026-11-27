@@ -15,7 +15,12 @@
   `add_position_group()`, `outcome_ledger()`, `running_cast()`,
   `label_endings()`, `ending_palette()`, `route_incidence()`,
   `thin_position_groups()`; `card_thumbnail()` now wraps long figure titles
-  to the tile.
+  to the tile, and `position_palette()` / `scale_colour_position()` give
+  every position group one colour across cards (drafted green, undrafted
+  purple and quarterback orange are reserved). Two cards correct their
+  post: rookie games count only completed rookie seasons, and the era
+  split of the NFL-entry chance separates the classes before undrafted
+  signings were recorded.
 
 - Investigations (feature F25,
   [#132](https://github.com/ngiangre/cfb2nfl/issues/132)): **the

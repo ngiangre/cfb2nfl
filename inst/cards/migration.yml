@@ -39,7 +39,7 @@
   section: "3.4 The chance of entry climbs steeply through the third eligible season, then levels off"
   fate: merged
   card: nfl-route-chance-by-season
-  reason: "Its per-season curves repeated the career-endings card's (counting seasons rather than players), so the two cards merged: the era split moved to that card's page. The per-season table and the arrows to Ward's and Travis's draft seasons were dropped."
+  reason: "Its per-season curves repeated the career-endings card's (counting seasons rather than players), so the two cards merged: the era split moved to that card's page, its first era now ending with the 2015 class because undrafted signings are recorded from 2016 on. The per-season table and the arrows to Ward's and Travis's draft seasons were dropped."
 - post: 2026-10-24-outcome-prevalence
   section: "3.5 The drafted share of eligible seasons has fallen across draft classes"
   fate: card
@@ -49,7 +49,7 @@
   section: "3.6 About half of NFL entrants play no games in their rookie season"
   fate: card
   card: rookie-games
-  reason: "Figures moved; the games table restated the figure and was dropped."
+  reason: "Figures moved; the games table restated the figure and was dropped. The card counts only draft classes whose rookie season is complete; the post also counted the class still playing its rookie season, which overstated the no-games share."
 - post: 2026-10-24-outcome-prevalence
   section: "4. Summary"
   fate: dropped

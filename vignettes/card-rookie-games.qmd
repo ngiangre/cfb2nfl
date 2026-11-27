@@ -32,6 +32,8 @@ con <- DBI::dbConnect(
   read_only = TRUE
 )
 release <- data_release_date()
+# A rookie season still being played would undercount games.
+last_rookie_class <- DBI::dbGetQuery(con, "SELECT last_complete_cfb_season FROM _meta")[[1]]
 risk <- eligible_risk_set(collect(tbl(con, "outcomes")))
 ```
 
@@ -41,7 +43,7 @@ cast <- running_cast()
 bin_breaks <- c(-1, 0, 4, 8, 12, 17)
 bin_names <- c("None", "1 to 4", "5 to 8", "9 to 12", "13 to 17")
 ex_games <- risk |>
-  filter(playerId %in% cast, outcome_nfl_entry_d) |>
+  filter(playerId %in% cast, outcome_nfl_entry_d, draft_year <= .env$last_rookie_class) |>
   transmute(
     short = names(cast)[match(playerId, cast)],
     games = outcome_rookie_games_entry_year,
@@ -56,7 +58,7 @@ bin_labels <- vapply(
   character(1)
 )
 entrants <- risk |>
-  filter(outcome_nfl_entry_d) |>
+  filter(outcome_nfl_entry_d, draft_year <= .env$last_rookie_class) |>
   mutate(
     games = outcome_rookie_games_entry_year,
     bin = cut(games, breaks = bin_breaks, labels = bin_labels)
@@ -84,9 +86,12 @@ p <- ggplot(games_tab, aes(x = 100 * share, y = bin)) +
   scale_x_continuous(labels = \(x) sprintf("%.0f%%", x)) +
   labs(
     title = "Rookie-season games played by NFL entrants",
-    subtitle = "Share of entrants by regular-season games in their entry year; running examples in parentheses",
+    subtitle = sprintf(
+      "Share of entrants by regular-season games in their entry year, draft classes through %d; running examples in parentheses",
+      last_rookie_class
+    ),
     x = "Share of NFL entrants",
-    y = "Rookie games played",
+    y = NULL,
     caption = card_caption(release)
   ) +
   theme_card()
