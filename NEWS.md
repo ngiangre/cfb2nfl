@@ -1,5 +1,9 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Site: **the site builds again**. Eight cards use `forcats`, which was not
+  declared, so the site build could not install it; it is now in Suggests,
+  and a test fails when a card calls a package DESCRIPTION does not declare.
+
 - Investigations (feature F25,
   [#146](https://github.com/ngiangre/cfb2nfl/issues/146)): **the career-shape
   posts are now figure cards**: yardage across a career, by opponent strength

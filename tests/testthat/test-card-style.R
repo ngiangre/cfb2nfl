@@ -537,3 +537,46 @@ test_that("every card in vignettes/ follows the style", {
     )
   )
 })
+
+test_that("every package a card calls is declared in DESCRIPTION", {
+  # The site build installs only DESCRIPTION's packages, so an undeclared one
+  # breaks the deploy (forcats did).
+  root <- test_path("..", "..")
+  skip_if_not(
+    dir.exists(file.path(root, "vignettes")),
+    "vignettes/ not in this build"
+  )
+  d <- read.dcf(
+    file.path(root, "DESCRIPTION"),
+    fields = c("Imports", "Suggests")
+  )
+  declared <- trimws(sub(
+    "[(].*",
+    "",
+    unlist(strsplit(paste(d, collapse = ","), ","))
+  ))
+  base_pkgs <- rownames(installed.packages(priority = "base"))
+  cards <- list.files(
+    file.path(root, "vignettes"),
+    "^card-.*[.]qmd$",
+    full.names = TRUE
+  )
+  code <- unlist(lapply(cards, card_code))
+  code <- sub("#.*$", "", code)
+  used <- c(
+    unlist(regmatches(
+      code,
+      gregexpr("[A-Za-z][A-Za-z0-9.]*(?=::)", code, perl = TRUE)
+    )),
+    sub(
+      ".*library[(]([A-Za-z0-9.]+)[)].*",
+      "\\1",
+      grep("library[(]", code, value = TRUE)
+    )
+  )
+  missing <- setdiff(unique(trimws(used)), c(declared, base_pkgs, "cfb2nfl"))
+  expect(
+    length(missing) == 0L,
+    paste("Undeclared packages:", paste(missing, collapse = ", "))
+  )
+})
