@@ -342,6 +342,32 @@ test_that("the footer chunk prints the card footer as markdown", {
   expect_true("footer" %in% card_rules(root, p))
 })
 
+test_that("amber highlights, which read as quarterbacks, are flagged", {
+  skip_if_not_installed("ggplot2")
+  root <- local_card_root()
+  lines <- good_card_lines()
+  fig <- which(lines == "card_interactive(p)")
+  p <- write_good_card(
+    root,
+    append(lines, 'claim_fill <- "#B45309"', after = fig - 1)
+  )
+  expect_true("palette" %in% card_rules(root, p))
+  p <- write_good_card(
+    root,
+    append(lines, 'tier <- c(g5 = "#f59e0b")', after = fig - 1)
+  )
+  expect_true("palette" %in% card_rules(root, p))
+})
+
+test_that("an unclosed code chunk is reported, not a crash", {
+  skip_if_not_installed("ggplot2")
+  root <- local_card_root()
+  lines <- good_card_lines()
+  p <- write_good_card(root, lines[-length(lines)])
+  rules <- card_rules(root, p)
+  expect_true("footer" %in% rules)
+})
+
 test_that("stock palettes that reuse the outcome colours are flagged; sequential ones are not", {
   skip_if_not_installed("ggplot2")
   root <- local_card_root()

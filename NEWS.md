@@ -9,6 +9,12 @@
   ([decision 0054](https://github.com/ngiangre/cfb2nfl/blob/main/decisions/0054-figure-cards-replace-dated-posts.md)).
   The four posts are retired and redirect to their cards, and every section's
   fate is in `inst/cards/migration.yml`. Rates stop at the last complete season.
+
+- Investigations (feature F25): **the Investigations page is the figure wall
+  alone**, now that every dated post is a card; the posts table is gone. The
+  card check reports an unclosed code chunk instead of crashing on it,
+  and flags amber highlights, which read as the quarterback orange.
+
 - Investigations (feature F25): **the card check catches two more slips**:
   a footer chunk that would print the glossary as raw text instead of
   markdown, and stock palettes (viridis, the qualitative ColorBrewer sets)

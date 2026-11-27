@@ -386,7 +386,9 @@ check_card_style <- function(
     # Viridis and the qualitative ColorBrewer sets reuse drafted green,
     # undrafted purple or quarterback orange; sequential sets are fine.
     stock <- "viridis|scale_(colour|color|fill)_brewer\\([^)]*(Dark2|Paired|Set1|Set2|Set3|Accent|Pastel1|Pastel2)"
-    if (grepl(stock, code[k])) {
+    # Amber reads as the quarterback orange on every card.
+    amber <- "(?i)#(b45309|f59e0b|d97706|fbbf24|f97316)\\b"
+    if (grepl(stock, code[k]) || grepl(amber, code[k], perl = TRUE)) {
       flag(
         "palette",
         "Stock palette that reuses the outcome colours; use position_palette(), the team scales or greys.",
@@ -436,9 +438,14 @@ check_card_style <- function(
   footer_ok <- FALSE
   for (st in starts) {
     end <- st + which(grepl("^\\s*```+\\s*$", lines[-seq_len(st)]))[1]
+    # An unclosed chunk runs to the end of the file; it can't be a footer.
+    unclosed <- is.na(end)
+    if (unclosed) {
+      end <- length(lines)
+    }
     chunk <- lines[st:end]
     if (any(grepl("card_footer(", chunk, fixed = TRUE))) {
-      footer_ok <- any(grepl("^#\\|\\s*output:\\s*asis", chunk))
+      footer_ok <- !unclosed && any(grepl("^#\\|\\s*output:\\s*asis", chunk))
     }
   }
   if (!footer_ok) {

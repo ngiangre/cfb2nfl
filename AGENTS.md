@@ -206,8 +206,9 @@ all of it. Years 2010–2026.
   `decisions/` is for ratified choices only.
 - **Figure cards (decision 0054; supersedes the dated-post rules of 0015
   and 0025):** Investigations are cards, one question answered by one
-  figure, one file `vignettes/card-<id>.qmd`. No new dated posts; the
-  remaining ones are migrated in batches (`inst/cards/migration.yml`).
+  figure, one file `vignettes/card-<id>.qmd`. Every dated post has been
+  migrated (`inst/cards/migration.yml` records where each section went);
+  no new ones are written.
   - **Start** with `new_card("<id>", "<question>?")` from
     `vignettes/_card-template.qmd`. The id is the permanent URL: renaming a
     published card needs an `aliases:` entry on its replacement.
@@ -345,11 +346,10 @@ all of it. Years 2010–2026.
 - **Investigations page** (decision 0054): a Quarto listing over
   `vignettes/card-*.qmd` with the tile template `vignettes/card-wall.ejs`
   (tile styles in `altdoc/custom.scss`), search and tag filter
-  (`#category=<tag>` URLs open it filtered); the remaining dated posts are
-  listed in a table below it, built from their YAML at knit time. Pages use
-  `freeze: auto` + committed `_freeze/`; the `investigations` and
-  `reference` freeze caches are deleted in `site.yaml` because their
-  knit-time reads of other files' YAML are invisible to Quarto's cache check.
+  (`#category=<tag>` URLs open it filtered); it runs no R code. Pages use
+  `freeze: auto` + committed `_freeze/`; the `reference` and `pipeline`
+  freeze caches are deleted in `site.yaml` because their knit-time reads of
+  other files are invisible to Quarto's cache check.
   A retired post's URL redirects with `aliases:` on its main card.
 - **CI** (`.github/workflows/`): `check.yaml` (R CMD check + testthat + contract
   fixtures), `post-style.yaml` (`check_cards_style()` over the figure cards), `site.yaml` (pull data release asset → `tar_make()` → render →
