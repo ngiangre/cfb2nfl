@@ -2,22 +2,18 @@
   Investigations figure wall (feature F25): one tile per card, read from each
   card's front matter. Quarto's search box matches the text of elements whose
   class is in the listing's searchColumns, so the alt text and status are
-  also rendered as visually hidden text, not only as attributes.
+  also rendered as visually hidden text, not only as attributes. The tag loop
+  stays on one line: Pandoc reads the output as markdown, and a tag indented
+  four spaces after a blank line would render as a code block.
 -->
 <div class="card-wall list">
 <% for (const item of items) { %>
 <div <%= metadataAttrs(item) %> class="card-wall-tile">
-  <a href="<%- item.path %>" class="card-wall-image">
-    <img src="<%- item.image %>" alt="<%- item['image-alt'] %>" loading="lazy" decoding="async">
-  </a>
+  <a href="<%- item.path %>" class="card-wall-image"><img src="<%- item.image %>" alt="<%- item['image-alt'] %>" loading="lazy" decoding="async"></a>
   <span class="card-wall-status card-wall-status-<%- item.status %> listing-status"><%- item.status %></span>
   <h3 class="card-wall-title listing-title"><a href="<%- item.path %>"><%- item.title %></a></h3>
   <span class="visually-hidden listing-image-alt"><%- item['image-alt'] %></span>
-  <div class="card-wall-tags listing-categories">
-  <% for (const tag of (item.categories || [])) { %>
-    <button type="button" class="card-wall-tag listing-category" onclick="window.quartoListingCategory('<%- utils.b64encode(tag) %>'); return false;"><%- tag %></button>
-  <% } %>
-  </div>
+  <div class="card-wall-tags listing-categories"><% for (const tag of (item.categories || [])) { %><button type="button" class="card-wall-tag listing-category" onclick="window.quartoListingCategory('<%- utils.b64encode(tag) %>'); return false;"><%- tag %></button><% } %></div>
 </div>
 <% } %>
 </div>

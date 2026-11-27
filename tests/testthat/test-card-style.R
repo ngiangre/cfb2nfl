@@ -538,6 +538,16 @@ test_that("every card in vignettes/ follows the style", {
   )
 })
 
+test_that("the card wall template indents no markup four spaces", {
+  # Pandoc reads the template's output as markdown, so a line indented four
+  # spaces after a blank one renders as a code block (the tag buttons did).
+  path <- test_path("..", "..", "vignettes", "card-wall.ejs")
+  skip_if_not(file.exists(path), "vignettes/ not in this build")
+  lines <- readLines(path)
+  body <- lines[seq(grep("-->", lines, fixed = TRUE)[1] + 1L, length(lines))]
+  expect_equal(grep("^ {4,}<", body, value = TRUE), character())
+})
+
 test_that("every package a card calls is declared in DESCRIPTION", {
   # The site build installs only DESCRIPTION's packages, so an undeclared one
   # breaks the deploy (forcats did).
