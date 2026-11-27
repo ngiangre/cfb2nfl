@@ -242,3 +242,24 @@ test_that("contract_nfl_bridge fails when entrants or snaps stop linking", {
     stop_on_fail = FALSE
   )))
 })
+
+test_that("NFL play contracts gate a lazy table like an in-memory one", {
+  skip_if_not_installed("arrow")
+  expect_true(pointblank::all_passed(
+    contract_nfl_pbp(as_lazy(pbp_fixture()), stop_on_fail = FALSE)
+  ))
+  dup <- pbp_fixture()[c(1, 1), ]
+  expect_false(pointblank::all_passed(
+    contract_nfl_pbp(as_lazy(dup), stop_on_fail = FALSE)
+  ))
+  part <- suppressMessages(clean_nfl_participation(tibble::tibble(
+    nflverse_game_id = c("2024_01_BUF_LA", "2024_01_BUF_LA"),
+    play_id = c(40L, 55L)
+  )))
+  expect_true(pointblank::all_passed(
+    contract_nfl_participation(as_lazy(part), stop_on_fail = FALSE)
+  ))
+  expect_false(pointblank::all_passed(
+    contract_nfl_participation(as_lazy(part[c(1, 1), ]), stop_on_fail = FALSE)
+  ))
+})

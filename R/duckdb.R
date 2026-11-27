@@ -101,12 +101,7 @@ build_duckdb <- function(
   on.exit(if (open) DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
 
   for (name in names(tables)) {
-    DBI::dbWriteTable(
-      con,
-      name,
-      as.data.frame(tables[[name]]),
-      overwrite = TRUE
-    )
+    write_duckdb_table(con, name, tables[[name]])
   }
 
   # Materialize first: dbWriteTable takes its value argument lazily, and its
@@ -131,6 +126,44 @@ build_duckdb <- function(
     "Built DuckDB {.path {db_path}} with {length(tables)} table{?s}: {.val {names(tables)}}."
   )
   invisible(db_path)
+}
+
+# A lazy parquet dataset (format_arrow_lazy()) is copied by DuckDB straight
+# from its files, never through R. The table is created from a zero-row R
+# copy first, so its column types are the ones the R route gives (DuckDB
+# would read a tz-aware timestamp as TIMESTAMPTZ, R writes TIMESTAMP), and
+# the session is held in UTC so that cast keeps the instant R would store.
+# Anything else goes through a data frame.
+write_duckdb_table <- function(con, name, x) {
+  if (
+    inherits(x, "FileSystemDataset") &&
+      inherits(x$format, "ParquetFileFormat")
+  ) {
+    proto <- as.data.frame(dplyr::collect(utils::head(x, 0L)))
+    DBI::dbWriteTable(con, name, proto, overwrite = TRUE)
+    tz <- DBI::dbGetQuery(con, "SELECT current_setting('TimeZone') AS tz")$tz
+    DBI::dbExecute(con, "SET TimeZone = 'UTC'")
+    on.exit(DBI::dbExecute(con, paste0("SET TimeZone = '", tz, "'")))
+    files <- paste0("'", gsub("'", "''", x$files), "'", collapse = ", ")
+    DBI::dbExecute(
+      con,
+      paste0(
+        "INSERT INTO ",
+        DBI::dbQuoteIdentifier(con, name),
+        " BY NAME SELECT * FROM read_parquet([",
+        files,
+        "])"
+      )
+    )
+  } else {
+    DBI::dbWriteTable(
+      con,
+      name,
+      as.data.frame(collect_cols(x)),
+      overwrite = TRUE
+    )
+  }
+  invisible(name)
 }
 
 #' Build the schema manifest for the DuckDB bundle

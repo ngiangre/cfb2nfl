@@ -154,7 +154,10 @@ list(
   # The games to pull come from the plays, so only games CFBD has
   # play-by-play for are queried, minus those already published (read from
   # the downloaded play_stats.parquet, decision 0045).
-  tar_target(plays_games, dplyr::distinct(plays, season, gameId)),
+  tar_target(
+    plays_games,
+    dplyr::distinct(collect_cols(plays, c("season", "gameId")))
+  ),
   tar_target(
     raw_play_stats_chunk,
     if (refresh_enabled()) {
@@ -238,6 +241,10 @@ list(
   # freshly ingested raw and WRITES the parquet; in track mode it tracks the
   # existing committed/downloaded file (no key, no re-clean). Each `<table>`
   # target then reads the cleaned parquet, so it is the single source of truth.
+  # The largest tables (plays, play_stats, game_player_stats, nfl_pbp,
+  # nfl_participation) are lazy Arrow datasets instead (format_arrow_lazy(),
+  # decision 0053): a reference to the parquet, not a second copy in the
+  # store, and each consumer reads only the columns it needs (collect_cols()).
   tar_target(
     picks_file,
     parquet_asset("data/picks.parquet", function() clean_picks(raw_picks)),
@@ -342,7 +349,11 @@ list(
     }),
     format = "file"
   ),
-  tar_target(game_player_stats, arrow::read_parquet(game_player_stats_file)),
+  tar_target(
+    game_player_stats,
+    arrow::open_dataset(game_player_stats_file),
+    format = format_arrow_lazy()
+  ),
   tar_target(
     play_types_file,
     parquet_asset("data/play_types.parquet", function() {
@@ -359,7 +370,6 @@ list(
     format = "file"
   ),
   tar_target(play_stat_types, arrow::read_parquet(play_stat_types_file)),
-  # plays is millions of rows, so the in-store copies are parquet, not rds.
   tar_target(
     plays_file,
     parquet_asset("data/plays.parquet", function() {
@@ -373,7 +383,11 @@ list(
     }),
     format = "file"
   ),
-  tar_target(plays, arrow::read_parquet(plays_file), format = "parquet"),
+  tar_target(
+    plays,
+    arrow::open_dataset(plays_file),
+    format = format_arrow_lazy()
+  ),
   # The pulled games replace their own rows; every other game is kept.
   tar_target(
     play_stats_file,
@@ -388,8 +402,8 @@ list(
   ),
   tar_target(
     play_stats,
-    arrow::read_parquet(play_stats_file),
-    format = "parquet"
+    arrow::open_dataset(play_stats_file),
+    format = format_arrow_lazy()
   ),
   tar_target(
     nfl_draft_picks_file,
@@ -418,8 +432,7 @@ list(
     format = "file"
   ),
   tar_target(nfl_player_stats, arrow::read_parquet(nfl_player_stats_file)),
-  # Play-level NFL tables (feature F23), spliced by season. Large, so the
-  # in-store copies are parquet, not rds.
+  # Play-level NFL tables (feature F23), spliced by season.
   tar_target(
     nfl_pbp_file,
     parquet_asset("data/nfl_pbp.parquet", function() {
@@ -432,7 +445,11 @@ list(
     }),
     format = "file"
   ),
-  tar_target(nfl_pbp, arrow::read_parquet(nfl_pbp_file), format = "parquet"),
+  tar_target(
+    nfl_pbp,
+    arrow::open_dataset(nfl_pbp_file),
+    format = format_arrow_lazy()
+  ),
   tar_target(
     nfl_participation_file,
     parquet_asset("data/nfl_participation.parquet", function() {
@@ -447,8 +464,8 @@ list(
   ),
   tar_target(
     nfl_participation,
-    arrow::read_parquet(nfl_participation_file),
-    format = "parquet"
+    arrow::open_dataset(nfl_participation_file),
+    format = format_arrow_lazy()
   ),
   tar_target(
     nfl_snap_counts_file,
@@ -567,12 +584,12 @@ list(
           recruiting = recruiting$hs_class,
           games = games$season,
           game_team_stats = game_team_stats$season,
-          game_player_stats = game_player_stats$season,
-          plays = plays$season,
-          nfl_pbp = nfl_pbp$season,
+          game_player_stats = distinct_values(game_player_stats, "season"),
+          plays = distinct_values(plays, "season"),
+          nfl_pbp = distinct_values(nfl_pbp, "season"),
           nfl_snap_counts = nfl_snap_counts$season,
           nfl_rosters_weekly = nfl_rosters_weekly$season,
-          nfl_participation = nfl_participation$season
+          nfl_participation = distinct_values(nfl_participation, "season")
         ),
         required = c(
           required_seasons(c(
@@ -1051,13 +1068,13 @@ list(
   ),
   # Teams tab (plans/explorer.md step 3): each team's side of each game, and
   # the plays the game timeline draws. explorer_plays is ~3M rows, so it is
-  # stored as parquet rather than rds.
+  # stored as parquet and read back lazily (format_arrow_lazy()).
   tar_target(
     explorer_team_games,
     build_explorer_team_games(
       games,
       explorer_team_season,
-      unique(plays$gameId)
+      distinct_values(plays, "gameId")
     )
   ),
   # Players the play text names that the play-stats log leaves out (mostly
@@ -1066,10 +1083,17 @@ list(
   tar_target(
     explorer_text_players,
     {
-      logged <- dplyr::filter(plays, .data$gameId %in% play_stats$gameId)
+      logged_stats <- collect_cols(
+        play_stats,
+        c("gameId", "playId", "athleteId")
+      )
+      logged <- dplyr::filter(
+        collect_cols(plays, c("id", "gameId", "playText")),
+        .data$gameId %in% logged_stats$gameId
+      )
       play_text_players(
         logged,
-        play_stats,
+        logged_stats,
         play_mention_directory(
           roster_enrolled,
           dplyr::filter(games, .data$id %in% logged$gameId)
@@ -1087,7 +1111,7 @@ list(
       explorer_player_seasons,
       explorer_text_players
     ),
-    format = "parquet"
+    format = format_arrow_lazy()
   ),
   tar_target(
     ok_explorer_team_games,

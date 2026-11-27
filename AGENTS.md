@@ -304,6 +304,18 @@ all of it. Years 2010–2026.
   re-clean); `<table>` then reads that cleaned parquet. So **parquet == DuckDB ==
   dict schema** (decision 0018). `conference_tiers` derives from the cleaned
   `player_stats` via `build_conference_tiers()` (`R/conference_tiers.R`).
+- **Lazy large tables** (decision 0053): `plays`, `play_stats`,
+  `game_player_stats`, `nfl_pbp`, `nfl_participation` and `explorer_plays`
+  use `format_arrow_lazy()` (`R/lazy.R`): the target is an
+  `arrow::open_dataset()` handle, stored as a hashed reference to the
+  published parquet (no copy in `_targets/`). **`x$col` on a dataset is
+  `NULL`, not an error**: consumers read through `collect_cols(x, cols)`
+  (file order kept), `distinct_values()` and `n_rows()`, and each new
+  consumer needs a test with a lazy input (`as_lazy()` in
+  `tests/testthat/helper-lazy.R`). Don't push row filters into Arrow where
+  order matters (dataset query order is not guaranteed). Keep the lazy
+  format off any target a post `tar_read()`s; a non-interactive `tar_read()`
+  of a lazy target needs `TAR_ASK=false`.
 - **Lineage/audit** (decision 0005): `audit_step()` emits a uniform per-step
   record (row/col counts, rows dropped, key coverage, NA cells, schema hash,
   contract pass/fail, git SHA) → the `audit_log` target. Data dictionaries in

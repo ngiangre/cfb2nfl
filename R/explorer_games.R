@@ -182,6 +182,33 @@ build_explorer_plays <- function(
   player_groups = NULL,
   text_players = NULL
 ) {
+  plays <- collect_cols(
+    plays,
+    c(
+      "id",
+      "gameId",
+      "season",
+      "offense",
+      "period",
+      "driveNumber",
+      "playNumber",
+      "offenseScore",
+      "defenseScore",
+      "ppa",
+      "clock_minutes",
+      "clock_seconds",
+      "down",
+      "distance",
+      "yardsToGoal",
+      "playType",
+      "playText",
+      "scoring"
+    )
+  )
+  play_stats <- collect_cols(
+    play_stats,
+    c("playId", "athleteId", "athleteName", "statType")
+  )
   homes <- dplyr::select(games, gameId = "id", home_team = "homeTeam")
   offense_ids <- dplyr::select(teams, offense = "team", offense_id = "team_id")
   # One entry per athlete per play: a punter carries several stat types.
@@ -401,6 +428,7 @@ write_explorer_plays <- function(
   dir.create(dir, showWarnings = FALSE, recursive = TRUE)
   unlink(root, recursive = TRUE)
   unlink(list.files(dir, "^plays_[0-9]+\\.parquet$", full.names = TRUE))
+  explorer_plays <- collect_cols(explorer_plays)
   # split() keeps each shard's rows in input (game, play) order.
   key <- list(
     season = explorer_plays$season,

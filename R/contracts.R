@@ -1050,6 +1050,10 @@ gsis_pattern <- "^00-00[0-9]{5}$"
 contract_nfl_pbp <- function(nfl_pbp, stop_on_fail = TRUE) {
   rlang::check_installed("pointblank")
   id_cols <- grep("_player_id$", names(nfl_pbp), value = TRUE)
+  nfl_pbp <- collect_cols(
+    nfl_pbp,
+    c("game_id", "play_id", "season", "season_type", "epa", id_cols)
+  )
   agent <- pointblank::create_agent(nfl_pbp, label = "nfl_pbp") |>
     pointblank::col_vals_not_null(pointblank::vars(game_id, play_id, season)) |>
     pointblank::rows_distinct(pointblank::vars(game_id, play_id)) |>
@@ -1081,6 +1085,10 @@ contract_nfl_pbp <- function(nfl_pbp, stop_on_fail = TRUE) {
 #' @export
 contract_nfl_participation <- function(nfl_participation, stop_on_fail = TRUE) {
   rlang::check_installed("pointblank")
+  nfl_participation <- collect_cols(
+    nfl_participation,
+    c("nflverse_game_id", "play_id", "season")
+  )
   agent <- pointblank::create_agent(
     nfl_participation,
     label = "nfl_participation"
@@ -1617,21 +1625,23 @@ contract_game_player_stats <- function(
   stop_on_fail = TRUE
 ) {
   rlang::check_installed("pointblank")
+  cols <- c(
+    "gameId",
+    "season",
+    "week",
+    "seasonType",
+    "team",
+    "category",
+    "statType",
+    "playerId",
+    "stat"
+  )
+  game_player_stats <- collect_cols(game_player_stats, cols)
   agent <- pointblank::create_agent(
     game_player_stats,
     label = "game_player_stats"
   ) |>
-    pointblank::col_exists(c(
-      "gameId",
-      "season",
-      "week",
-      "seasonType",
-      "team",
-      "category",
-      "statType",
-      "playerId",
-      "stat"
-    )) |>
+    pointblank::col_exists(dplyr::all_of(cols)) |>
     pointblank::col_vals_not_null(
       pointblank::vars(gameId, playerId, category, statType)
     ) |>
@@ -1708,24 +1718,26 @@ contract_play_dimension <- function(
 #' @export
 contract_plays <- function(plays, games, stop_on_fail = TRUE) {
   rlang::check_installed("pointblank")
+  cols <- c(
+    "id",
+    "gameId",
+    "driveId",
+    "season",
+    "week",
+    "seasonType",
+    "offense",
+    "defense",
+    "period",
+    "down",
+    "distance",
+    "yardsToGoal",
+    "playTypeId",
+    "playType",
+    "ppa"
+  )
+  plays <- collect_cols(plays, cols)
   agent <- pointblank::create_agent(plays, label = "plays") |>
-    pointblank::col_exists(c(
-      "id",
-      "gameId",
-      "driveId",
-      "season",
-      "week",
-      "seasonType",
-      "offense",
-      "defense",
-      "period",
-      "down",
-      "distance",
-      "yardsToGoal",
-      "playTypeId",
-      "playType",
-      "ppa"
-    )) |>
+    pointblank::col_exists(dplyr::all_of(cols)) |>
     pointblank::col_vals_not_null(
       pointblank::vars(id, gameId, season, week, seasonType)
     ) |>
@@ -1796,16 +1808,19 @@ contract_play_stats <- function(
   stop_on_fail = TRUE
 ) {
   rlang::check_installed("pointblank")
+  cols <- c(
+    "gameId",
+    "season",
+    "playId",
+    "athleteId",
+    "statTypeId",
+    "statType",
+    "stat"
+  )
+  play_stats <- collect_cols(play_stats, cols)
+  play_ids <- collect_cols(plays, "id")$id
   agent <- pointblank::create_agent(play_stats, label = "play_stats") |>
-    pointblank::col_exists(c(
-      "gameId",
-      "season",
-      "playId",
-      "athleteId",
-      "statTypeId",
-      "statType",
-      "stat"
-    )) |>
+    pointblank::col_exists(dplyr::all_of(cols)) |>
     pointblank::col_vals_not_null(
       pointblank::vars(gameId, season, playId, athleteId, statTypeId)
     ) |>
@@ -1817,7 +1832,7 @@ contract_play_stats <- function(
       label = "no game hits the 2,000-row cap"
     ) |>
     pointblank::specially(
-      fn = function(x) all(unique(x$playId) %in% plays$id),
+      fn = function(x) all(unique(x$playId) %in% play_ids),
       label = "every playId is in plays"
     ) |>
     pointblank::specially(
@@ -1853,7 +1868,12 @@ contract_player_game <- function(
   stop_on_fail = TRUE
 ) {
   rlang::check_installed("pointblank")
-  n_expected <- dplyr::n_distinct(game_player_stats[c("playerId", "gameId")])
+  n_expected <- dplyr::n_distinct(
+    collect_cols(game_player_stats, c("playerId", "gameId"))[c(
+      "playerId",
+      "gameId"
+    )]
+  )
   # Yardage is signed (sacks and rushing losses are negative), so it gets a
   # range check instead of the non-negative count check.
   yard_stat_cols <- c("pass_yds", "rush_yds", "rec_yds")
@@ -2794,6 +2814,18 @@ contract_explorer_plays <- function(
       preconditions = function(x) tibble::tibble(ok = ok)
     )
   }
+  explorer_plays <- collect_cols(
+    explorer_plays,
+    c(
+      "game_id",
+      "play_id",
+      "home_cum_ppa",
+      "home_margin",
+      "home_score",
+      "away_score",
+      "elapsed"
+    )
+  )
   agent <- pointblank::create_agent(explorer_plays, label = "explorer_plays") |>
     pointblank::col_vals_not_null(pointblank::vars(
       game_id,
@@ -2805,7 +2837,7 @@ contract_explorer_plays <- function(
       home_margin == home_score - away_score
     )) |>
     pointblank::col_vals_gte("elapsed", 0L, na_pass = TRUE) |>
-    check(nrow(explorer_plays) == nrow(plays)) |>
+    check(nrow(explorer_plays) == n_rows(plays)) |>
     check(all(explorer_plays$game_id %in% games$id)) |>
     check(mean(!is.na(explorer_plays$elapsed)) >= 0.999) |>
     check(
@@ -2850,7 +2882,9 @@ contract_explorer_text_players <- function(
       preconditions = function(x) tibble::tibble(ok = ok)
     )
   }
+  play_stats <- collect_cols(play_stats, c("playId", "athleteId"))
   logged <- paste(play_stats$playId, play_stats$athleteId)
+  play_ids <- distinct_values(plays, "id")
   agent <- pointblank::create_agent(
     text_players,
     label = "explorer_text_players"
@@ -2862,7 +2896,7 @@ contract_explorer_text_players <- function(
       roles
     )) |>
     pointblank::rows_distinct(pointblank::vars(id, playerId)) |>
-    check(all(text_players$id %in% plays$id)) |>
+    check(all(text_players$id %in% play_ids)) |>
     check(!any(paste(text_players$id, text_players$playerId) %in% logged)) |>
     pointblank::interrogate()
   enforce_contract(agent, "explorer_text_players", stop_on_fail)
@@ -2889,6 +2923,7 @@ contract_explorer_plays_files <- function(
   stop_on_fail = TRUE
 ) {
   rlang::check_installed("pointblank")
+  explorer_plays <- collect_cols(explorer_plays, c("season", "game_id"))
   shards <- dplyr::distinct(
     tibble::tibble(
       season = explorer_plays$season,

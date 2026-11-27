@@ -8,11 +8,15 @@
 #' A stable digest of column names and types, used to detect schema drift across
 #' data refreshes (decision 0005).
 #'
-#' @param data A data frame.
+#' @param data A data frame, or a lazy Arrow table (hashed on the R classes
+#'   its columns collect to, so both give the same hash).
 #'
 #' @return A short character hash.
 #' @export
 schema_hash <- function(data) {
+  if (is_lazy_arrow(data)) {
+    data <- dplyr::collect(utils::head(data, 0L))
+  }
   spec <- paste(
     names(data),
     vapply(data, \(x) class(x)[1], character(1)),
@@ -51,8 +55,8 @@ current_git_sha <- function() {
 #' @name audit_metrics
 #' @keywords internal
 key_coverage <- function(input, output, keys) {
-  in_keys <- dplyr::distinct(dplyr::select(input, dplyr::all_of(keys)))
-  out_keys <- dplyr::distinct(dplyr::select(output, dplyr::all_of(keys)))
+  in_keys <- dplyr::distinct(collect_cols(input, keys)[keys])
+  out_keys <- dplyr::distinct(collect_cols(output, keys)[keys])
   matched <- nrow(dplyr::semi_join(in_keys, out_keys, by = keys))
   list(
     pct_keys_matched = if (nrow(in_keys) > 0) {
@@ -66,15 +70,29 @@ key_coverage <- function(input, output, keys) {
 }
 
 na_profile <- function(data) {
-  n <- nrow(data)
+  n <- n_rows(data)
   prof <- tibble::tibble(
     col = names(data),
-    n_na = unname(vapply(data, \(x) sum(is.na(x)), integer(1)))
+    n_na = na_counts(data)
   ) |>
     dplyr::mutate(na_rate = n_na / n) |>
     dplyr::filter(n_na > 0) |>
     dplyr::arrange(dplyr::desc(n_na))
   prof
+}
+
+# NA cells per column. A lazy table is read one column at a time, so the
+# count is R's is.na() (NaN included) without holding the table in memory.
+na_counts <- function(data) {
+  count <- function(x) sum(is.na(x))
+  if (!is_lazy_arrow(data)) {
+    return(unname(vapply(data, count, integer(1))))
+  }
+  unname(vapply(
+    names(data),
+    function(col) count(collect_cols(data, col)[[col]]),
+    integer(1)
+  ))
 }
 
 #' Record an audit row for one pipeline step
@@ -110,7 +128,7 @@ audit_step <- function(
   linked = NULL
 ) {
   n_keys_out <- if (!is.null(keys) && all(keys %in% names(output))) {
-    dplyr::n_distinct(dplyr::select(output, dplyr::all_of(keys)))
+    dplyr::n_distinct(collect_cols(output, keys)[keys])
   } else {
     NA_integer_
   }
@@ -126,23 +144,25 @@ audit_step <- function(
     list(pct_keys_matched = NA_real_, keys_dropped = NA_integer_)
   }
   na_by_col <- na_profile(output)
+  n_out <- n_rows(output)
   tibble::tibble(
     step = step,
     stage = stage,
-    n_rows_in = if (is.null(input)) NA_integer_ else nrow(input),
-    n_rows_out = nrow(output),
+    n_rows_in = if (is.null(input)) NA_integer_ else n_rows(input),
+    n_rows_out = n_out,
     rows_delta = if (is.null(input)) {
       NA_integer_
     } else {
-      nrow(output) - nrow(input)
+      n_out - n_rows(input)
     },
     # key combos from the input that no longer appear (0 = pure fan-out/addition)
     keys_dropped = coverage$keys_dropped,
     pct_keys_matched = coverage$pct_keys_matched,
-    n_cols_out = ncol(output),
+    n_cols_out = length(names(output)),
     n_keys_out = n_keys_out,
     pct_linked = if (is.null(linked)) NA_real_ else mean(linked),
-    n_na_cells = sum(vapply(output, \(x) sum(is.na(x)), integer(1))),
+    # na_by_col keeps only columns with an NA, so its sum is every NA cell.
+    n_na_cells = sum(na_by_col$n_na),
     n_cols_with_na = nrow(na_by_col),
     na_by_col = list(na_by_col),
     schema_hash = schema_hash(output),
