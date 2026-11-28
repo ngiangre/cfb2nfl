@@ -76,3 +76,62 @@ test_that("thin_position_groups names the groups with too few players at risk", 
     "Special teams"
   )
 })
+
+test_that("population_leaves puts every roster player on one leaf of the flow chart", {
+  # P never eligible; Q ruled out (drafted before eligible); R eligible with
+  # no position; S drafted in round 2; T still playing.
+  outcomes <- tibble::tibble(
+    playerId = c("P", "Q", "R", "S", "S", "T"),
+    player = c("P", "Q", "R", "S", "S", "T"),
+    season = c(2014L, 2015L, 2016L, 2017L, 2018L, 2026L),
+    draft_eligible = c(FALSE, FALSE, TRUE, TRUE, TRUE, TRUE),
+    eligible_season_index = c(NA, NA, 1L, 1L, 2L, 1L),
+    hs_year_imputed = FALSE,
+    status_end_of_season = c(
+      "left_data",
+      "drafted",
+      "exhausted_undrafted",
+      "continuing",
+      "drafted",
+      "censored"
+    ),
+    outcome_observed_d = c(TRUE, TRUE, TRUE, TRUE, TRUE, FALSE),
+    outcome_draft_round_d = c(NA, 1L, NA, NA, 2L, NA),
+    outcome_nfl_entry_d = c(FALSE, TRUE, FALSE, FALSE, TRUE, FALSE),
+    outcome_drafted_d = c(FALSE, TRUE, FALSE, FALSE, TRUE, FALSE)
+  )
+  roster_pos <- tibble::tibble(
+    playerId = c("P", "Q", "R", "S", "S", "T"),
+    season = c(2014L, 2015L, 2016L, 2017L, 2018L, 2026L),
+    position = c("LB", "QB", "?", "RB", "RB", "WR")
+  )
+  out <- population_leaves(outcomes, roster_pos)
+  expect_equal(nrow(out), 5L)
+  at <- function(id, col) out[[col]][out$playerId == id]
+  expect_equal(
+    as.character(out$leaf[order(out$playerId)]),
+    c(
+      "Never draft-eligible",
+      "Ruled out",
+      "Position not recorded",
+      "Drafted, round 2",
+      "Still playing"
+    )
+  )
+  expect_equal(at("P", "group"), factor("Linebacker", levels(out$group)))
+  expect_equal(as.character(at("Q", "group")), "Quarterback")
+  expect_equal(at("S", "final_season"), 2018L)
+  expect_true(all(levels(out$leaf) %in% names(leaf_palette())))
+})
+
+test_that("leaf_palette shades the draft rounds of drafted green", {
+  pal <- leaf_palette()
+  rounds <- pal[grepl("^Drafted, round", names(pal))]
+  expect_length(rounds, 7L)
+  expect_equal(unname(rounds[["Drafted, round 4"]]), "#1B9E77")
+  expect_equal(unname(pal[["Signed undrafted"]]), "#7570B3")
+  expect_true(all(grepl("^#[0-9A-F]{6}$", pal)))
+  # Round 1 is the darkest.
+  lum <- colSums(grDevices::col2rgb(rounds))
+  expect_equal(order(lum), seq_along(rounds))
+})

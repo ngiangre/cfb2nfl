@@ -1,0 +1,22 @@
+{
+  "id": "roster-player-leaves-by-season",
+  "release": "2026-11-25",
+  "code_hash": "a1be3fa1b5c76ce540e17ccf841e4120",
+  "functions": {
+    "and_join": "dc55c6fdab7332bc4a191891c4e6c3e5",
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "career_endings": "4fa3d0c4500176cd13cd4e8d68487bed",
+    "ending_labels": "d7e87df8d8263aa1b5193e5033cc1268",
+    "ending_palette": "85f0e7f0c9562b9bbc535350335a7253",
+    "fmt": "d4c89f195c447af907ba425a860522de",
+    "leaf_palette": "2adc4f2a0da24bc21e44f854199fa635",
+    "never_eligible_entrants": "9a7ba74d333d466a35b43bd15b39e24f",
+    "pct": "3413c026fc8c907293b2fb1d96080440",
+    "population_leaves": "3bc7409ec4993195a417bc30f9aa9749",
+    "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
+    "position_group_levels": "20e3516fb9bf8abbe12f3fd702d9d55f",
+    "position_palette": "11141b2b531ab5b7f31d6c196fcc46be",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

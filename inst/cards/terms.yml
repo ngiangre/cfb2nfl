@@ -271,7 +271,10 @@ epa-per-involvement:
   definition: "The average EPA, from the player's own side, of the plays the player was named on."
 typical-play:
   label: Typical play
-  definition: "A position group's average EPA per involvement over both teams, the baseline each team's players in that group are measured against."
+  definition: "A position group's average EPA over every involvement in the group (both teams' players on a game card, every team's on a season card), the baseline the group's players are measured against."
+involvement-regular:
+  label: Involvement regular
+  definition: "A player in the most-involved tenth of their position group over the season (within their competition tier when a card splits by tier), so a player named on a handful of plays cannot top the group by luck. The cut-off is a number of involvements, set per group."
 drive-total-epa:
   label: Total EPA on the drive
   definition: "The sum of the EPA of a drive's rated plays, so it totals what the drive added to its offense, whatever the drive's outcome."
@@ -342,3 +345,13 @@ game-to-game-swing:
 standard-deviation:
   label: Standard deviation
   definition: "A typical distance of a value from the average; when values are roughly bell-shaped, about two thirds fall within one standard deviation either side of the mean."
+# ---- population leaves by season ----
+never-draft-eligible:
+  label: Never draft-eligible
+  definition: "On a college roster in the data, but never in a season after which the NFL draft could select the player: an underclassman still playing, or a player who left college or the data before then. Grouped by the position of the final college season."
+final-college-season:
+  label: Final college season
+  definition: "The last season a player is on a college roster in the data; for a player still playing, the season under way. Each player counts once, in that season."
+draft-round:
+  label: Draft round
+  definition: "The round of the NFL draft a player was selected in, from round 1 (the earliest picks) to round 7."

@@ -1,0 +1,262 @@
+---
+title: "Where does every college roster player end up, season by season?"
+image: card-thumbs/roster-player-leaves-by-season.png
+image-alt: "Stacked percent bar chart, one bar per final college season from 2010 on plus one for all seasons, splitting every college roster player into never draft-eligible, ruled out, position not recorded, still playing, eligibility ended undrafted, signed undrafted and drafted, with drafted shaded by round from dark green for round 1 to light green for round 7; the never draft-eligible and eligibility ended segments fill most of every bar, and the drafted rounds are thin slivers at the bottom."
+categories: ["Topic: Draft outcomes", "Topic: Career shape", "Position: All positions", "Position: By position group", "Population: College athletes", "Figure: Bar chart"]
+status: sketch
+graduated_to: null
+terms: [final-college-season, never-draft-eligible, ruled-out, study-population, first-eligible-position, career-drafted, draft-round, career-signed-undrafted, eligibility-ended, career-still-playing]
+followups:
+  - text: "Find the earlier college years of the NFL entrants ruled out, so their clocks start on time."
+    link: "F22"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) {
+  root <- pkgload::pkg_path()
+}
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+outcomes <- DBI::dbReadTable(con, "outcomes")
+# One position per player-season (a handful of ids repeat).
+roster_pos <- DBI::dbGetQuery(
+  con,
+  "SELECT playerId, season, any_value(position) AS position
+   FROM roster GROUP BY playerId, season"
+)
+leaves <- population_leaves(outcomes, roster_pos)
+leaf_fill <- leaf_palette()
+leaf_fill <- leaf_fill[names(leaf_fill) %in% levels(droplevels(leaves$leaf))]
+seasons <- sort(unique(leaves$final_season))
+all_x <- max(seasons) + 3
+# The data's first seasons hold players whose earlier seasons it never saw,
+# so few of them could reach an eligible season in it.
+early <- leaves |>
+  summarise(
+    set_aside = mean(leaf %in% c("Never draft-eligible", "Ruled out")),
+    .by = "final_season"
+  ) |>
+  arrange(final_season) |>
+  filter(cumall(set_aside > 0.9)) |>
+  pull(final_season)
+# Seasons in which the data adds a quarter or more players over the season
+# before: new programs and deeper rosters bring many one-season players.
+coverage_jumps <- roster_pos |>
+  count(season) |>
+  arrange(season) |>
+  filter(n / lag(n) >= 1.25) |>
+  pull(season)
+current <- max(seasons)
+
+# Share of each leaf in each final season, plus one bar for every season.
+leaf_shares <- function(d, by = NULL) {
+  bind_rows(
+    count(d, across(all_of(by)), final_season, leaf),
+    count(d, across(all_of(by)), leaf) |> mutate(final_season = NA_integer_)
+  ) |>
+    mutate(
+      share = n / sum(n),
+      total = sum(n),
+      .by = all_of(c(by, "final_season"))
+    ) |>
+    mutate(
+      x = coalesce(final_season, all_x),
+      when = if_else(
+        is.na(final_season),
+        "All seasons",
+        paste("Final college season", final_season)
+      )
+    )
+}
+leaf_bars <- function(d) {
+  # Only the two palest leaves are outlined: an outline on every segment
+  # would hide the thin draft-round slivers. group = leaf keeps the stack in
+  # palette order (the tooltip would otherwise set the groups).
+  ggplot(d, aes(x, 100 * share, fill = leaf)) +
+    geom_col_interactive(
+      aes(
+        tooltip = tooltip,
+        data_id = leaf,
+        group = leaf,
+        colour = leaf %in% c("Still playing", "Position not recorded")
+      ),
+      width = 0.85,
+      linewidth = 0.3,
+      position = position_stack(reverse = TRUE)
+    ) +
+    scale_colour_manual(
+      values = c(`TRUE` = "#9CA3AF", `FALSE` = NA),
+      guide = "none"
+    ) +
+    scale_fill_manual(
+      values = leaf_fill,
+      breaks = names(leaf_fill),
+      drop = TRUE
+    ) +
+    scale_x_continuous(
+      breaks = c(seq(min(seasons), max(seasons), by = 4), all_x),
+      labels = c(seq(min(seasons), max(seasons), by = 4), "All"),
+      expand = expansion(add = 0.6)
+    ) +
+    scale_y_continuous(
+      labels = \(y) paste0(y, "%"),
+      expand = expansion(mult = c(0, 0.01))
+    ) +
+    guides(
+      fill = guide_legend(
+        ncol = 1,
+        reverse = TRUE,
+        override.aes = list(colour = "#9CA3AF")
+      )
+    )
+}
+```
+
+```{r}
+#| label: figure
+overall <- leaf_shares(leaves) |>
+  mutate(
+    tooltip = sprintf(
+      "%s, %s: %s players, %s of the %s",
+      when,
+      tolower(leaf),
+      fmt(n),
+      pct(share),
+      fmt(total)
+    )
+  )
+drafted_all <- sum(overall$share[
+  is.na(overall$final_season) & grepl("^Drafted", overall$leaf)
+])
+
+p <- leaf_bars(overall) +
+  labs(
+    title = "Every college roster player, by how the path ended",
+    subtitle = paste0(
+      "By final college season; ",
+      pct(drafted_all),
+      " were drafted, darker green for an earlier round"
+    ),
+    x = "Final college season",
+    y = "Players",
+    fill = NULL,
+    caption = paste0(
+      "Final season ",
+      paste(early, collapse = " or "),
+      ": too few seasons in the data to become eligible.\n",
+      current,
+      ", under way: never draft-eligible here is mostly not eligible yet.\n",
+      and_join(coverage_jumps),
+      ": a quarter or more players in the data than the season before.\n",
+      card_caption(release)
+    )
+  ) +
+  theme_card() +
+  theme(
+    legend.position = "right",
+    legend.text = element_text(size = rel(0.6)),
+    legend.key.size = unit(0.45, "cm")
+  )
+
+card_thumbnail(
+  p,
+  "roster-player-leaves-by-season",
+  release = release,
+  height = 6.5
+)
+card_interactive(p, width_svg = 12, height_svg = 7)
+```
+
+```{r}
+#| label: by-path
+# One panel per path, drafted rounds together; each bar splits that path's
+# players in that final season by position group.
+# The position-not-recorded path is that one group by definition, so it gets
+# no panel.
+path_levels <- unique(sub("Drafted, round [0-9]", "Drafted", names(leaf_fill)))
+path_levels <- setdiff(path_levels, "Position not recorded")
+n_no_pos <- sum(leaves$leaf == "Position not recorded")
+group_fill <- c(position_palette(), "Position not recorded" = "#E5E7EB")
+paths <- leaves |>
+  filter(leaf != "Position not recorded") |>
+  mutate(
+    path = factor(sub("Drafted, round [0-9]", "Drafted", leaf), path_levels)
+  )
+by_path <- bind_rows(
+  mutate(paths, x = final_season),
+  mutate(paths, x = all_x)
+) |>
+  count(path, x, group) |>
+  mutate(share = n / sum(n), total = sum(n), .by = c("path", "x")) |>
+  mutate(
+    when = if_else(x == all_x, "All seasons", paste("Final college season", x)),
+    tooltip = sprintf(
+      "%s, %s: %s %s players, %s of the %s",
+      path,
+      when,
+      fmt(n),
+      tolower(group),
+      pct(share),
+      fmt(total)
+    )
+  )
+p_path <- ggplot(by_path, aes(x, 100 * share, fill = group)) +
+  geom_col_interactive(
+    aes(tooltip = tooltip, data_id = group, group = group),
+    width = 0.85,
+    position = position_stack(reverse = TRUE)
+  ) +
+  facet_wrap(~path, ncol = 2) +
+  scale_fill_manual(values = group_fill, breaks = names(group_fill)) +
+  scale_x_continuous(
+    breaks = c(seq(min(seasons), max(seasons), by = 4), all_x),
+    labels = c(seq(min(seasons), max(seasons), by = 4), "All"),
+    expand = expansion(add = 0.6)
+  ) +
+  scale_y_continuous(
+    labels = \(y) paste0(y, "%"),
+    expand = expansion(mult = c(0, 0.01))
+  ) +
+  guides(fill = guide_legend(ncol = 1, reverse = TRUE)) +
+  labs(
+    title = "Who takes each path, by position group",
+    subtitle = "Each bar splits one path's players in a final college season by position group",
+    x = "Final college season",
+    y = "Players on the path",
+    fill = NULL,
+    caption = paste0(
+      "Eligible players are grouped by their first eligible season's position, the rest by their final season's.\n",
+      "The ",
+      fmt(n_no_pos),
+      " eligible players with no recorded position have no panel. A path with no players in a season has no bar."
+    )
+  ) +
+  theme_cfb2nfl() +
+  theme(legend.position = "right")
+card_interactive(p_path, width_svg = 13, height_svg = 14)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

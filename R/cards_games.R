@@ -568,6 +568,195 @@ game_players <- function(inv) {
     dplyr::arrange(dplyr::desc(.data$epa))
 }
 
+#' Every player named on a season's scrimmage plays
+#'
+#' [game_involvement()] for every game of a season at once: the season's
+#' rated scrimmage plays, the play-stats log, and the play text's mentions
+#' resolved against each game's two rosters (named from `player_stats`, as
+#' the game cards do). Each play's EPA is split evenly among the players named
+#' on each side ([build_play_involvement()]). Each row carries the tier of
+#' the player's conference in that game, from the season-aware
+#' `conference_tiers` lookup; a conference the lookup does not hold (Division
+#' II and III) counts as FCS and below, the lookup's default tier, and Notre
+#' Dame is Power (decision 0003).
+#'
+#' @param con A DuckDB connection to `cfb2nfl.duckdb`.
+#' @param season The season.
+#' @return A list: `involvement` (one row per player per play, with
+#'   `gameId`, `player`, `position`, `group` (position group), `label`
+#'   (`"Name (Team)"`), `conference`, `tier_label` (`"Power"`,
+#'   `"Group of 5"` or `"FCS and below"`) and `share`) and `unresolved` (the
+#'   number of text mentions that matched no roster player).
+#' @export
+season_involvement <- function(con, season) {
+  yr <- as.integer(season)
+  rated <- DBI::dbGetQuery(
+    con,
+    paste0(
+      "SELECT id, gameId, offense, ppa, playType, playText, period, ",
+      "yardsGained FROM plays WHERE season = ? AND ppa IS NOT NULL"
+    ),
+    params = list(yr)
+  ) |>
+    dplyr::filter(!.data$playType %in% game_kick_types())
+  season_log <- DBI::dbGetQuery(
+    con,
+    paste0(
+      "SELECT playId, athleteId, athleteName, team, statType ",
+      "FROM play_stats WHERE season = ?"
+    ),
+    params = list(yr)
+  )
+  directory <- DBI::dbGetQuery(
+    con,
+    "SELECT g.gameId, r.playerId, r.team, r.jersey, r.position, s.player
+     FROM roster r
+     JOIN (SELECT DISTINCT playerId, team, player FROM player_stats
+           WHERE season = ?) s
+       ON s.playerId = r.playerId AND s.team = r.team
+     JOIN (SELECT id AS gameId, homeTeam AS team FROM games WHERE season = ?
+           UNION ALL
+           SELECT id AS gameId, awayTeam AS team FROM games WHERE season = ?) g
+       ON g.team = r.team
+     WHERE r.season = ?",
+    params = list(yr, yr, yr, yr)
+  )
+  sides <- DBI::dbGetQuery(
+    con,
+    "SELECT g.gameId, g.team, g.conference, t.tier_label
+     FROM (SELECT id AS gameId, homeTeam AS team, homeConference AS conference
+           FROM games WHERE season = ?
+           UNION ALL
+           SELECT id AS gameId, awayTeam AS team, awayConference AS conference
+           FROM games WHERE season = ?) g
+     LEFT JOIN conference_tiers t
+       ON t.conference = g.conference AND t.season = ?",
+    params = list(yr, yr, yr)
+  ) |>
+    dplyr::mutate(
+      tier_label = dplyr::case_when(
+        # Notre Dame is the one independent tiered Power (decision 0003).
+        .data$team == "Notre Dame" &
+          .data$conference %in% "FBS Independents" ~ "Power",
+        .default = dplyr::coalesce(.data$tier_label, "FCS and below")
+      )
+    )
+  mentions <- play_text_mentions(rated)
+  mentions$gameId <- rated$gameId[match(mentions$id, rated$id)]
+  mentions <- match_play_mentions(mentions, directory, by = "gameId")
+  # One name and position per athlete, even if listed by two teams.
+  who <- directory |>
+    dplyr::distinct(.data$playerId, .data$player, .data$position) |>
+    dplyr::distinct(.data$playerId, .keep_all = TRUE)
+  log_names <- dplyr::distinct(
+    season_log,
+    playerId = .data$athleteId,
+    log_name = .data$athleteName
+  ) |>
+    dplyr::distinct(.data$playerId, .keep_all = TRUE)
+  inv <- build_play_involvement(rated, season_log, mentions) |>
+    dplyr::left_join(who, by = "playerId", relationship = "many-to-one") |>
+    dplyr::left_join(
+      log_names,
+      by = "playerId",
+      relationship = "many-to-one"
+    ) |>
+    dplyr::left_join(
+      dplyr::select(rated, "id", "gameId", "period", "playText"),
+      by = "id",
+      relationship = "many-to-one"
+    ) |>
+    dplyr::left_join(
+      sides,
+      by = c("gameId", "team"),
+      relationship = "many-to-one"
+    ) |>
+    dplyr::mutate(
+      player = dplyr::coalesce(.data$player, .data$log_name),
+      group = harmonize_position(.data$position, "roster"),
+      label = paste0(.data$player, " (", .data$team, ")")
+    ) |>
+    dplyr::select(-"log_name")
+  list(involvement = inv, unresolved = sum(is.na(mentions$playerId)))
+}
+
+#' The players with the highest EPA per involvement in each position group
+#'
+#' Ranks a season's regulars, so a player named on a handful of plays cannot
+#' top a group by luck: only players with at least the group's `regular`
+#' quantile of involvements are ranked. With `by`, each group is split (for
+#' example by conference tier) and the cut-off, the typical play and the
+#' ranking are all taken within each split.
+#'
+#' @param inv Involvements with `playerId`, `player`, `team`, `label`,
+#'   `group` and `epa_side` ([season_involvement()]).
+#' @param n Players kept per group.
+#' @param regular The quantile of involvements a player must reach.
+#' @param groups The position groups ranked, in display order.
+#' @param by Columns of `inv` that split each group, e.g. `"tier_label"`.
+#' @return One row per ranked player: `playerId`, `player`, `team`, `label`,
+#'   `group` (factor in `groups` order), `involvements`, `per_inv`, the box
+#'   of their plays' `epa_side` (`median`, `q1`, `q3`, and the whiskers
+#'   `lower` and `upper`, the furthest plays within 1.5 interquartile ranges),
+#'   `typical` (the group's average EPA over all its involvements, as in
+#'   [game_group_typical()]), `min_inv` (the group's involvement cut-off,
+#'   rounded up), `rank` (1 is the highest `per_inv`) and the `by` columns.
+#' @export
+top_group_players <- function(
+  inv,
+  n = 20L,
+  regular = 0.9,
+  groups = c(
+    "Quarterback",
+    "Running back",
+    "Receiver",
+    "Tight end",
+    "Defensive line",
+    "Linebacker",
+    "Defensive back"
+  ),
+  by = character()
+) {
+  split_by <- c("group", by)
+  inv |>
+    dplyr::filter(.data$group %in% groups) |>
+    dplyr::mutate(
+      typical = mean(.data$epa_side),
+      .by = dplyr::all_of(split_by)
+    ) |>
+    dplyr::summarise(
+      involvements = dplyr::n(),
+      per_inv = mean(.data$epa_side),
+      median = stats::median(.data$epa_side),
+      # Tukey box: quartiles, whiskers at the furthest play within 1.5 IQR.
+      q1 = stats::quantile(.data$epa_side, 0.25, names = FALSE),
+      q3 = stats::quantile(.data$epa_side, 0.75, names = FALSE),
+      lower = min(.data$epa_side[
+        .data$epa_side >= .data$q1 - 1.5 * (.data$q3 - .data$q1)
+      ]),
+      upper = max(.data$epa_side[
+        .data$epa_side <= .data$q3 + 1.5 * (.data$q3 - .data$q1)
+      ]),
+      typical = dplyr::first(.data$typical),
+      .by = dplyr::all_of(c("playerId", "player", "team", "label", split_by))
+    ) |>
+    dplyr::mutate(
+      group = factor(as.character(.data$group), levels = groups),
+      min_inv = ceiling(
+        stats::quantile(.data$involvements, regular, names = FALSE)
+      ),
+      .by = dplyr::all_of(split_by)
+    ) |>
+    dplyr::filter(.data$involvements >= .data$min_inv) |>
+    dplyr::arrange(
+      dplyr::desc(.data$per_inv),
+      dplyr::desc(.data$involvements)
+    ) |>
+    dplyr::mutate(rank = dplyr::row_number(), .by = dplyr::all_of(split_by)) |>
+    dplyr::filter(.data$rank <= n) |>
+    dplyr::arrange(dplyr::across(dplyr::all_of(by)), .data$group, .data$rank)
+}
+
 #' Each position group's typical play
 #'
 #' Compares every involvement with its group's typical play: the average EPA

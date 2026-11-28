@@ -1,0 +1,294 @@
+---
+title: "Which 2026 regulars averaged the most EPA per involvement in each position group and competition tier?"
+image: card-thumbs/season-player-epa-by-position-group.png
+image-alt: "Dot plot in three panels, Power, Group of 5, and FCS and below, with one row per position group, quarterback through defensive back, of the 2026 season so far: twenty dots per row are the tier's involvement regulars with the highest EPA per involvement, the leader coloured and named, over a grey bar for a typical regular's middle half of plays and a tick at the group's typical play in that tier. In every tier the top regulars sit right of the tick, receivers and defensive linemen furthest."
+categories: ["Topic: Games", "Position: By position group", "Population: Games", "Figure: Distribution"]
+status: sketch
+graduated_to: null
+terms: [involvement, epa-per-involvement, typical-play, involvement-regular, competition-tier, epa-ppa]
+followups:
+  - text: "Does a player's EPA per involvement hold from the first half of a season to the second, or do the leaders change?"
+    link: "F12"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) {
+  root <- pkgload::pkg_path()
+}
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+card_year <- 2026L
+n_top <- 20L
+```
+
+```{r}
+#| label: involvement
+# The game cards' method over every 2026 game: each player named on a rated
+# scrimmage play, with the play's EPA from the player's side. Each tier gets
+# its own regular cut-off (the most-involved tenth of a group), typical play
+# and ranking, so FCS regulars are compared with FCS regulars.
+inv_season <- season_involvement(con, card_year)
+tier_order <- c("Power", "Group of 5", "FCS and below")
+top <- top_group_players(
+  inv_season$involvement,
+  n = n_top,
+  regular = 0.9,
+  by = "tier_label"
+) |>
+  mutate(tier_label = factor(tier_label, tier_order))
+n_games <- n_distinct(inv_season$involvement$gameId)
+# The season is still being played, so the figures say how far it runs.
+through <- DBI::dbGetQuery(
+  con,
+  paste0(
+    "SELECT max(startDate) AS last FROM games WHERE season = ? AND id IN ",
+    "(SELECT DISTINCT gameId FROM plays WHERE season = ?)"
+  ),
+  params = list(card_year, card_year)
+)$last |>
+  substr(1, 10) |>
+  as.Date() |>
+  format("%B %d")
+season_span <- paste0(
+  card_year,
+  " season through ",
+  through,
+  ", ",
+  fmt(n_games),
+  " games"
+)
+group_rows <- rev(levels(top$group))
+# One row per player, ranked top to bottom inside each group and tier's panel.
+top <- top |>
+  arrange(group, tier_label, rank) |>
+  mutate(
+    panel = paste0(
+      group,
+      ", ",
+      tier_label,
+      "\n",
+      fmt(min_inv),
+      "+ involvements"
+    ),
+    panel = factor(panel, unique(panel)),
+    row_key = paste(group, tier_label, sprintf("%02d", rank)),
+    row_key = factor(row_key, rev(row_key)),
+    # "Darian Mensah" -> "D. Mensah", to fit three panels on the tile.
+    short_name = sub("^(\\S)\\S* ", "\\1. ", player),
+    tip = paste0(
+      "<b>",
+      rank,
+      ". ",
+      label,
+      "</b><br>",
+      group,
+      ", ",
+      tier_label,
+      ", ",
+      fmt(involvements),
+      " involvements<br>EPA per involvement: ",
+      round(per_inv, 2),
+      "<br>Middle half of plays: ",
+      round(q1, 2),
+      " to ",
+      round(q3, 2),
+      "<br>Typical play in the group and tier: ",
+      round(typical, 2)
+    )
+  )
+leaders <- filter(top, rank == 1L)
+row_names <- setNames(paste0(top$rank, ". ", top$label), top$row_key)
+groups_typical <- distinct(top, group, tier_label, panel, typical)
+# A typical top regular's middle half of plays, one bar per group and tier.
+groups_box <- summarise(
+  top,
+  q1 = median(q1),
+  q3 = median(q3),
+  .by = c(group, tier_label)
+)
+```
+
+```{r}
+#| label: figure
+# Each group's top regulars share a row in their tier's panel: the bar shows
+# how wide a regular's plays run next to how tightly the averages (dots) sit
+# right of the typical play; the leader is coloured and named.
+p <- ggplot(top, aes(y = factor(group, group_rows))) +
+  geom_vline(xintercept = 0, linewidth = 0.3) +
+  geom_linerange(
+    data = groups_box,
+    aes(xmin = q1, xmax = q3, y = factor(group, group_rows)),
+    colour = "grey85",
+    linewidth = 6
+  ) +
+  geom_point(
+    data = filter(top, rank > 1L),
+    aes(per_inv),
+    colour = "grey55",
+    size = 2
+  ) +
+  geom_point(
+    data = groups_typical,
+    aes(typical, factor(group, group_rows)),
+    shape = "|",
+    size = 8,
+    colour = "black"
+  ) +
+  geom_point(
+    data = leaders,
+    aes(per_inv, factor(group, group_rows), colour = group),
+    size = 3.5
+  ) +
+  geom_text(
+    data = leaders,
+    aes(per_inv, factor(group, group_rows), label = short_name),
+    hjust = 0,
+    nudge_x = 0.08,
+    size = 3.6,
+    fontface = "bold"
+  ) +
+  facet_wrap(~tier_label, nrow = 1) +
+  scale_colour_position(guide = "none") +
+  # Room on the right for the leaders' names.
+  scale_x_continuous(
+    breaks = c(0, 1),
+    expand = expansion(mult = c(0.05, 0.9))
+  ) +
+  labs(
+    title = paste("The top", n_top, "regulars by EPA per involvement"),
+    subtitle = paste0(
+      season_span,
+      "; dots are players (leader named), bars a typical regular's middle half of plays, ticks the typical play"
+    ),
+    x = "Play EPA for the player's side",
+    y = NULL,
+    caption = card_caption(release, source = "CFBD")
+  ) +
+  theme_card() +
+  theme(
+    panel.spacing.x = unit(1, "lines"),
+    strip.text = element_text(size = rel(0.8))
+  )
+
+card_thumbnail(
+  p,
+  "season-player-epa-by-position-group",
+  release = release
+)
+card_interactive(
+  (ggplot(top, aes(y = row_key)) +
+    geom_vline(xintercept = 0, linewidth = 0.3) +
+    geom_vline(
+      data = groups_typical,
+      aes(xintercept = typical),
+      linetype = "dashed",
+      linewidth = 0.6
+    ) +
+    geom_boxplot_interactive(
+      aes(
+        xmin = lower,
+        xlower = q1,
+        xmiddle = median,
+        xupper = q3,
+        xmax = upper,
+        fill = group,
+        tooltip = tip,
+        data_id = playerId
+      ),
+      stat = "identity",
+      orientation = "y",
+      colour = "grey30",
+      alpha = 0.55,
+      linewidth = 0.3,
+      width = 0.75
+    ) +
+    geom_point_interactive(
+      aes(per_inv, tooltip = tip, data_id = playerId),
+      colour = "black",
+      size = 2.2
+    ) +
+    facet_wrap(~panel, ncol = 3, scales = "free_y", axes = "all_x") +
+    scale_y_discrete(labels = row_names) +
+    scale_fill_manual(values = position_palette(), guide = "none") +
+    labs(
+      title = paste0(
+        "Each regular's plays, top ",
+        n_top,
+        " per position group and competition tier"
+      ),
+      subtitle = paste0(
+        season_span,
+        "; dot is EPA per involvement, box the middle half of the player's plays and the line in it the median, whiskers the rest, outliers left off, dashed line the typical play in the group and tier"
+      ),
+      x = "Play EPA for the player's side",
+      y = NULL
+    ) +
+    theme_card(base_size = 14) +
+    theme(strip.text = element_text(hjust = 0))) |>
+    card_label_wrap(title_width = 110, subtitle_width = 150),
+  width_svg = 20,
+  height_svg = 30
+)
+```
+
+```{r}
+#| label: table
+regulars <- inv_season$involvement |>
+  filter(group %in% levels(top$group)) |>
+  count(group, tier_label, playerId, name = "plays") |>
+  inner_join(
+    distinct(
+      top,
+      group = as.character(group),
+      tier_label = as.character(tier_label),
+      min_inv
+    ),
+    by = c("group", "tier_label")
+  ) |>
+  summarise(n_regular = sum(plays >= min_inv), .by = c(group, tier_label))
+leaders |>
+  mutate(group = as.character(group), tier_label = as.character(tier_label)) |>
+  left_join(regulars, by = c("group", "tier_label")) |>
+  transmute(
+    group,
+    tier_label,
+    cutoff = fmt(min_inv),
+    n_regular = fmt(n_regular),
+    typical = round(typical, 2)
+  ) |>
+  knitr::kable(
+    col.names = c(
+      "Position group",
+      "Competition tier",
+      "Involvements to be a regular",
+      "Regulars",
+      "Typical play"
+    ),
+    caption = "How many involvements make a regular in each group and tier and how many players reached it; the typical play is the average EPA over every involvement in the group and tier."
+  )
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
