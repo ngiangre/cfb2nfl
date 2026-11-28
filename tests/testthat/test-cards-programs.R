@@ -143,3 +143,89 @@ test_that("tier_palette avoids the reserved drafted, undrafted and quarterback h
     toupper(pal) %in% c("#F59E0B", "#1B9E77", "#7570B3", "#D95F02")
   ))
 })
+
+test_that("school_position_rates keeps recorded groups with eligible players and takes the gaps", {
+  credited <- tibble::tibble(
+    team = c("A", "A", "A", "B"),
+    position_group = c(
+      "Quarterback",
+      "Quarterback",
+      "Position not recorded",
+      "Receiver"
+    ),
+    n_eligible = c(6L, 4L, 3L, 0L),
+    n_drafted = c(1L, 1L, 1L, 0L),
+    n_udfa = c(3L, 0L, 0L, 0L)
+  )
+  out <- school_position_rates(credited)
+  expect_equal(nrow(out), 1L)
+  expect_equal(as.character(out$position_group), "Quarterback")
+  expect_equal(levels(out$position_group), position_group_levels())
+  expect_equal(out$entered, 5L)
+  expect_equal(out$udfa_gap, 100 * (0.3 - 0.2))
+  expect_equal(out$entry_gap, 0)
+})
+
+test_that("school_division takes each school's latest division and FBS conference", {
+  ts <- tibble::tibble(
+    team = c("JMU", "JMU", "Ohio State", "Navy", "Ferris State", "Ghost"),
+    season = c(2021L, 2023L, 2025L, 2025L, 2025L, 2025L),
+    classification = c("fcs", "fbs", "fbs", "fbs", "ii", NA),
+    conference = c(
+      "CAA",
+      "Sun Belt",
+      "Big Ten",
+      "FBS Independents",
+      "GLIAC",
+      NA
+    )
+  )
+  out <- school_division(ts, last_season = 2025L)
+  expect_equal(nrow(out), 4L)
+  get <- \(t, col) as.character(out[[col]][out$team == t])
+  expect_equal(get("JMU", "division"), "FBS")
+  expect_equal(get("JMU", "conference_group"), "Sun Belt")
+  expect_equal(get("Navy", "conference_group"), "FBS independents")
+  expect_equal(get("Ferris State", "conference_group"), "Not in FBS")
+  expect_equal(
+    levels(out$division),
+    c("FBS", "FCS", "Division II", "Division III")
+  )
+  expect_true(all(out$conference_group %in% names(conference_palette())))
+})
+
+test_that("conference_palette gives each group a distinct colour off the reserved hues", {
+  pal <- conference_palette()
+  expect_equal(anyDuplicated(unname(pal)), 0L)
+  expect_equal(highlight_colors(pal), pal)
+  expect_false(any(toupper(pal) %in% c("#1B9E77", "#7570B3", "#D95F02")))
+  sat <- grDevices::rgb2hsv(grDevices::col2rgb(pal))["s", ]
+  expect_true(all(sat[names(pal) != "Not in FBS"] >= 0.15))
+})
+
+test_that("gap_beeswarm builds one row per position group", {
+  d <- school_position_rates(tibble::tibble(
+    team = c("A", "B"),
+    position_group = c("Quarterback", "Receiver"),
+    n_eligible = c(10L, 10L),
+    n_drafted = c(1L, 3L),
+    n_udfa = c(2L, 1L)
+  )) |>
+    dplyr::mutate(side = c("x", "y"), division = c("FBS", "FCS"))
+  p <- gap_beeswarm(
+    d,
+    udfa_gap,
+    side,
+    c(x = "#111827", y = "#9CA3AF"),
+    team,
+    "Title",
+    "Subtitle",
+    "Gap",
+    "Caption",
+    shape = division,
+    shapes = division_shapes()
+  )
+  built <- ggplot2::ggplot_build(p)
+  expect_equal(nrow(built$data[[2]]), 2L)
+  expect_equal(levels(p$data$position_group)[1], "Special teams")
+})

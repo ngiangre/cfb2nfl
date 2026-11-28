@@ -171,7 +171,7 @@ no-college-id:
 # ---- batch programs ----
 division:
   label: Division
-  definition: "The NCAA level a school plays at: FBS (the top level), FCS (the level below it), Division II and Division III. Division II, Division III and schools with no recorded division are grouped as Division II and below."
+  definition: "The NCAA level a school plays at: FBS (the top level), FCS (the level below it), Division II and Division III. Where a figure does not show them separately, Division II, Division III and schools with no recorded division are grouped as Division II and below."
 conference:
   label: Conference
   definition: "A league of schools that schedule each other and share a championship, such as the SEC or the Big Sky. A few FBS schools are independents and belong to no football conference."

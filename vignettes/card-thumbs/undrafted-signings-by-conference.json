@@ -1,16 +1,19 @@
 {
   "id": "undrafted-signings-by-conference",
   "release": "2026-11-25",
-  "code_hash": "39cbb561c8461faf894f1ea4f43aa40b",
+  "code_hash": "bd171693107ed0dabc3a6c174ccc4a7b",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "conference_palette": "207f5d42112800c80f18eb84bd705c7b",
+    "division_shapes": "4231d9c33ac7438fa239cbe1bbddc11a",
     "draft_rates": "bc770817a67e1e7635702a29636c50dd",
     "fmt": "d4c89f195c447af907ba425a860522de",
-    "highlight_colors": "e6a6b964e0ab4b50554810d8bd6b76ca",
+    "gap_beeswarm": "2001b9be0550ea216ca9e7e923077457",
     "pct": "3413c026fc8c907293b2fb1d96080440",
     "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
     "position_group_levels": "20e3516fb9bf8abbe12f3fd702d9d55f",
-    "team_color_values": "81a321483d63e897ef3195d95350a746",
+    "school_division": "80a60d93cb2dbccfdf514088c6b6a226",
+    "school_position_rates": "5499bb9da6d4e891e6cfb2351223982f",
     "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
     "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
   }

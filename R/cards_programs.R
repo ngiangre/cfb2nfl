@@ -227,3 +227,176 @@ school_record <- function(
     dplyr::mutate(tier = factor(.data$tier, levels = tier_levels))
   expected_draftees(d, "win_pct")
 }
+
+#' Draft, undrafted and NFL entry rates by school and position group
+#'
+#' One row per school and recorded position group, with the gaps the
+#' school-by-position beeswarms plot.
+#'
+#' @param credited Credited draft rows (`team_draft`) with `team`,
+#'   `position_group`, `n_eligible`, `n_drafted` and `n_udfa`.
+#' @return The [draft_rates()] columns per `team` and `position_group` (a
+#'   factor in [position_group_levels()] order), for groups with any eligible
+#'   player, plus `entered` (drafted or signed undrafted), `entry_rate`,
+#'   `udfa_gap` (undrafted rate minus draft rate) and `entry_gap` (rate not
+#'   entering the NFL minus rate entering), the gaps in percentage points.
+#' @export
+school_position_rates <- function(credited) {
+  credited |>
+    dplyr::filter(.data$position_group %in% position_group_levels()) |>
+    dplyr::group_by(.data$team, .data$position_group) |>
+    draft_rates() |>
+    dplyr::filter(.data$eligible > 0) |>
+    dplyr::mutate(
+      position_group = factor(
+        .data$position_group,
+        levels = position_group_levels()
+      ),
+      entered = .data$drafted + .data$udfa,
+      entry_rate = .data$entered / .data$eligible,
+      udfa_gap = 100 * (.data$udfa_rate - .data$draft_rate),
+      entry_gap = 100 * (1 - 2 * .data$entry_rate)
+    )
+}
+
+#' Each school's division and conference in its latest season
+#'
+#' @param team_season Team-seasons with `team`, `season`, `classification`
+#'   (`fbs`, `fcs`, `ii`, `iii`) and `conference`.
+#' @param last_season The latest season to look at.
+#' @return One row per school with a recorded division: `division` (a factor:
+#'   FBS, FCS, Division II, Division III) and `conference_group`, its FBS
+#'   conference or "Not in FBS" (FBS independents share one group).
+#' @export
+school_division <- function(team_season, last_season) {
+  labels <- c(
+    fbs = "FBS",
+    fcs = "FCS",
+    ii = "Division II",
+    iii = "Division III"
+  )
+  team_season |>
+    dplyr::filter(
+      .data$season <= last_season,
+      .data$classification %in% names(labels)
+    ) |>
+    dplyr::group_by(.data$team) |>
+    dplyr::slice_max(.data$season, n = 1, with_ties = FALSE) |>
+    dplyr::ungroup() |>
+    dplyr::transmute(
+      .data$team,
+      division = factor(unname(labels[.data$classification]), levels = labels),
+      conference_group = dplyr::case_when(
+        .data$classification != "fbs" ~ "Not in FBS",
+        .data$conference == "FBS Independents" ~ "FBS independents",
+        .default = .data$conference
+      )
+    )
+}
+
+#' One colour per FBS conference
+#'
+#' For figures coloured by a school's conference. No conference takes drafted
+#' green, undrafted purple or quarterback orange, and none is a grey (dark
+#' grey is the cards' highlight); schools outside FBS share the pale grey.
+#'
+#' @return A named character vector, conference group to hex colour, Power
+#'   conferences first, as [school_division()] names them.
+#' @export
+conference_palette <- function() {
+  c(
+    "SEC" = "#C8102E",
+    "Big Ten" = "#0B3C6E",
+    "ACC" = "#5DA5DA",
+    "Big 12" = "#E6B800",
+    "Pac-12" = "#17BECF",
+    "American Athletic" = "#8C564B",
+    "Mountain West" = "#2F6F73",
+    "Sun Belt" = "#C9A27E",
+    "Mid-American" = "#8C8C00",
+    "Conference USA" = "#F4A6A6",
+    "FBS independents" = "#D6336C",
+    "Not in FBS" = "#D1D5DB"
+  )
+}
+
+#' One point shape per division
+#'
+#' @return A named integer vector of filled point shapes, FBS to Division III.
+#' @export
+division_shapes <- function() {
+  c("FBS" = 16L, "FCS" = 17L, "Division II" = 15L, "Division III" = 18L)
+}
+
+#' A horizontal beeswarm of a gap per school, one row per position group
+#'
+#' @param d School position rows ([school_position_rates()]) with `team`,
+#'   `position_group` and the columns named below.
+#' @param gap,colour,tooltip Columns (unquoted) for the x position, the colour
+#'   and the hover text.
+#' @param values Named colours for `colour`; the legend follows their order.
+#' @param shape Optional column (unquoted) for the point shape, with `shapes`
+#'   its named shapes.
+#' @param shapes Named point shapes for `shape`.
+#' @param title,subtitle,x_label,caption Figure text.
+#' @return A ggplot; hovering a dot highlights its school in every row.
+#' @export
+gap_beeswarm <- function(
+  d,
+  gap,
+  colour,
+  values,
+  tooltip,
+  title,
+  subtitle,
+  x_label,
+  caption,
+  shape = NULL,
+  shapes = NULL
+) {
+  rlang::check_installed(c("ggplot2", "ggiraph", "ggbeeswarm"))
+  d <- dplyr::mutate(d, position_group = forcats::fct_rev(.data$position_group))
+  p <- ggplot2::ggplot(d, ggplot2::aes({{ gap }}, .data$position_group)) +
+    ggplot2::geom_vline(
+      xintercept = 0,
+      linetype = "dashed",
+      colour = "#6b7280"
+    ) +
+    ggiraph::geom_point_interactive(
+      ggplot2::aes(
+        colour = {{ colour }},
+        shape = {{ shape }},
+        tooltip = {{ tooltip }},
+        data_id = .data$team
+      ),
+      position = ggbeeswarm::position_quasirandom(
+        orientation = "y",
+        width = 0.4
+      ),
+      size = 2.2,
+      alpha = 0.85
+    ) +
+    ggplot2::scale_colour_manual(
+      values = values,
+      breaks = intersect(
+        names(values),
+        unique(as.character(dplyr::pull(d, {{ colour }})))
+      ),
+      name = NULL
+    ) +
+    ggplot2::labs(
+      title = title,
+      subtitle = subtitle,
+      x = x_label,
+      y = NULL,
+      caption = caption
+    ) +
+    theme_cfb2nfl() +
+    ggplot2::theme(
+      plot.subtitle = ggplot2::element_text(size = ggplot2::rel(0.8))
+    )
+  if (!is.null(shapes)) {
+    p <- p + ggplot2::scale_shape_manual(values = shapes, name = NULL)
+  }
+  p
+}

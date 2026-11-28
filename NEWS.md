@@ -1,5 +1,15 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Investigations (feature F25): **two new school-by-position cards**,
+  "Which schools send more players to the NFL undrafted than drafted, at
+  each position?" and "Which schools send the most players to the NFL, at
+  each position?", moved from the undrafted-signings card in team colours.
+  On the undrafted-signings card the school figures now cover every
+  division, coloured by FBS conference and shaped by division. The new
+  helpers `school_position_rates()`, `school_division()`,
+  `conference_palette()`, `division_shapes()` and `gap_beeswarm()` are
+  shared and tested.
+
 - Investigations (feature F25): **the undrafted-signings card now splits
   by position group**. A scatter shows every school's draft and undrafted
   rates within each group, and two beeswarms show which schools stand out
