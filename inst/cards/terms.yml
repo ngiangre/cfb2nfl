@@ -86,6 +86,12 @@ cumulative-percent:
 at-risk:
   label: At risk
   definition: "Players still playing going into a season, the denominator for that season's chance."
+season-ending-chances:
+  label: Season-by-season chances
+  definition: "Of the players still playing going into an eligible season, the share whose career ends each way in it and the share who play on, so the four add to 100%. It is the simplest competing-risks model: no player traits, only one set of chances per eligible season (a multinomial model with one term per eligible season, y ~ season, on player-seasons)."
+same-every-season:
+  label: One rate across seasons
+  definition: "The same model with no eligible-season term (y ~ 1): each ending gets one chance, pooled over every player-season, that applies in every season."
 matched-recruiting-record:
   label: Matched recruiting record
   definition: "A high-school recruiting record safely matched to the player by name. Without one his high-school year is estimated, which is not the same as being unrecruited."

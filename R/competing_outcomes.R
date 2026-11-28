@@ -270,6 +270,107 @@ ending_hazards <- function(endings, by = "group") {
     dplyr::relocate(dplyr::all_of(by_cols), "time", "ending")
 }
 
+#' Discrete-time competing-risks model of the career endings
+#'
+#' Expands [career_endings()] into one row per player per eligible season
+#' still playing, whose outcome is the ending in that season or `"playing"`
+#' (played on, or censored after it), and fits a multinomial logit
+#' ([nnet::multinom()]) with `"playing"` as the reference. With one term per
+#' eligible season and no covariate the fitted chances are the per-season
+#' hazards of [ending_hazards()] and they compound into the Aalen-Johansen
+#' shares of [ending_incidence()]; with a single intercept each ending has one
+#' chance for every season. A `by` covariate adds one main effect per group,
+#' the same shift in each ending's log odds in every season.
+#'
+#' @inheritParams ending_incidence
+#' @param season_terms Fit one term per eligible season (`TRUE`) or a single
+#'   intercept per ending (`FALSE`).
+#' @param by Covariate column added as a main effect, or `NULL` for none.
+#' @return A tibble: the `by` column, `time`, `state` (an ending code or
+#'   `"playing"`), `chance` (fitted share of players still playing going into
+#'   `time` who end that way in it), `cumulative` (share of all players whose
+#'   career has ended that way by `time`; for `"playing"`, still playing after
+#'   it) and `n_risk`. The fit is attached as the `"fit"` attribute.
+#' @export
+ending_multinom <- function(endings, season_terms = TRUE, by = NULL) {
+  rlang::check_installed("nnet", reason = "for the multinomial model.")
+  endings <- dplyr::filter(endings, .data$time > 0L)
+  if (!is.null(by)) {
+    endings[[by]] <- droplevels(as.factor(endings[[by]]))
+  }
+  times <- seq_len(max(endings$time))
+  present <- intersect(names(ending_labels()), unique(endings$ending))
+  # Person-period rows, aggregated to counts per season, group and outcome.
+  pp <- purrr::map(times, \(t) {
+    endings |>
+      dplyr::filter(.data$time >= t) |>
+      dplyr::mutate(
+        y = dplyr::if_else(
+          .data$time == t & .data$ending != "censored",
+          .data$ending,
+          "playing"
+        )
+      ) |>
+      dplyr::count(dplyr::across(dplyr::all_of(c(by, "y")))) |>
+      dplyr::mutate(time = t)
+  }) |>
+    purrr::list_rbind() |>
+    dplyr::mutate(
+      y = factor(.data$y, c("playing", present)),
+      season = factor(.data$time, levels = times)
+    )
+  terms <- c(if (season_terms) "season", by)
+  form <- stats::reformulate(if (length(terms)) terms else "1", response = "y")
+  fit <- nnet::multinom(
+    form,
+    data = pp,
+    weights = n,
+    trace = FALSE,
+    maxit = 1000,
+    reltol = 1e-12
+  )
+  groups <- if (is.null(by)) list(NULL) else as.list(levels(endings[[by]]))
+  out <- purrr::map(groups, function(g) {
+    newdata <- data.frame(season = factor(times, levels = times))
+    d <- endings
+    if (!is.null(by)) {
+      newdata[[by]] <- factor(g, levels = levels(endings[[by]]))
+      d <- endings[endings[[by]] == g, ]
+    }
+    p <- stats::predict(fit, newdata = newdata, type = "probs")
+    p <- matrix(p, nrow = length(times), dimnames = list(NULL, levels(pp$y)))
+    # Each season's endings apply to the share still playing going into it.
+    surv_before <- c(1, cumprod(p[, "playing"]))[times]
+    cumulative <- apply(p[, present, drop = FALSE] * surv_before, 2, cumsum)
+    cumulative <- matrix(cumulative, nrow = length(times))
+    cumulative <- cbind(cumulative, cumprod(p[, "playing"]))
+    colnames(cumulative) <- c(present, "playing")
+    n_risk <- vapply(times, \(t) sum(d$time >= t), integer(1))
+    long <- function(m, nm) {
+      tibble::as_tibble(m[, c(present, "playing"), drop = FALSE]) |>
+        dplyr::mutate(time = times) |>
+        tidyr::pivot_longer(-"time", names_to = "state", values_to = nm)
+    }
+    res <- long(p, "chance") |>
+      dplyr::left_join(
+        long(cumulative, "cumulative"),
+        by = c("time", "state")
+      ) |>
+      dplyr::left_join(
+        tibble::tibble(time = times, n_risk = n_risk),
+        by = "time"
+      )
+    if (!is.null(by)) {
+      res[[by]] <- g
+      res <- dplyr::relocate(res, dplyr::all_of(by))
+    }
+    res
+  }) |>
+    purrr::list_rbind()
+  attr(out, "fit") <- fit
+  out
+}
+
 #' Link to a player's page on the site's Explorer
 #'
 #' The Players tab loads one position group at a time, so the link carries

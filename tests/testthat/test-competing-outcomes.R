@@ -116,3 +116,87 @@ test_that("explorer_player_url links stat groups and skips the offensive line", 
   expect_equal(url[1], "explorer.html#tab=players&pos=RB&player=1")
   expect_true(is.na(url[2]))
 })
+
+test_that("ending_multinom with season terms reproduces the hazards and Aalen-Johansen", {
+  skip_if_not_installed("nnet")
+  skip_if_not_installed("survival")
+  e <- endings_fixture()
+  m <- ending_multinom(e)
+  h <- ending_hazards(e, by = NULL)
+  ci <- ending_incidence(e, by = NULL)
+  at <- function(d, t, s, col) d[[col]][d$time == t & d$state == s]
+  # Season 1: 5 at risk, 1 drafted, 1 ended, 3 play on (C censored after it).
+  expect_equal(at(m, 1, "drafted", "chance"), 0.2, tolerance = 1e-3)
+  expect_equal(at(m, 1, "playing", "chance"), 0.6, tolerance = 1e-3)
+  expect_equal(at(m, 2, "drafted", "chance"), 0.5, tolerance = 1e-3)
+  expect_equal(
+    at(m, 2, "drafted", "chance"),
+    h$hazard[h$time == 2 & h$ending == "drafted"],
+    tolerance = 1e-3
+  )
+  # The chances compound into the Aalen-Johansen cumulative shares.
+  expect_equal(
+    at(m, 2, "drafted", "cumulative"),
+    at(ci, 2, "drafted", "estimate"),
+    tolerance = 1e-3
+  )
+  expect_equal(at(m, 2, "playing", "cumulative"), 0, tolerance = 1e-3)
+  expect_equal(at(m, 1, "drafted", "n_risk"), 5L)
+  # Each season's chances, and each season's cumulative shares, sum to one.
+  expect_equal(as.vector(tapply(m$chance, m$time, sum)), c(1, 1))
+  expect_equal(as.vector(tapply(m$cumulative, m$time, sum)), c(1, 1))
+})
+
+test_that("ending_multinom without season terms pools one chance per ending", {
+  skip_if_not_installed("nnet")
+  m <- ending_multinom(endings_fixture(), season_terms = FALSE)
+  # 7 player-seasons: 2 drafted, 2 ended, 3 played on, the same each season.
+  expect_equal(
+    unique(round(m$chance[m$state == "drafted"], 3)),
+    round(2 / 7, 3)
+  )
+  expect_equal(
+    m$cumulative[m$time == 2 & m$state == "playing"],
+    (3 / 7)^2,
+    tolerance = 1e-3
+  )
+})
+
+test_that("ending_multinom with a group term matches each group's ending totals", {
+  skip_if_not_installed("nnet")
+  e <- dplyr::bind_rows(
+    endings_fixture(),
+    dplyr::mutate(
+      endings_fixture(),
+      playerId = paste0(playerId, "2"),
+      group = "Linebacker",
+      ending = c(
+        "censored",
+        "exhausted_undrafted",
+        "censored",
+        "drafted",
+        "exhausted_undrafted"
+      )
+    )
+  )
+  m <- ending_multinom(e, by = "group")
+  expect_setequal(unique(m$group), c("Linebacker", "Receiver"))
+  expect_equal(m$n_risk[m$group == "Linebacker" & m$time == 2][1], 2L)
+  # A main effect's score equations: fitted drafted endings in a group,
+  # summed over its seasons at risk, equal its observed drafted endings.
+  fitted_drafted <- m |>
+    dplyr::filter(state == "drafted") |>
+    dplyr::summarise(n = sum(chance * n_risk), .by = "group")
+  expect_equal(
+    fitted_drafted$n[fitted_drafted$group == "Linebacker"],
+    1,
+    tolerance = 1e-3
+  )
+  expect_equal(
+    fitted_drafted$n[fitted_drafted$group == "Receiver"],
+    2,
+    tolerance = 1e-3
+  )
+  sums <- m |> dplyr::summarise(s = sum(chance), .by = c("group", "time"))
+  expect_equal(sums$s, rep(1, nrow(sums)), tolerance = 1e-8)
+})

@@ -1,5 +1,18 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Investigations (feature F25): **new card, "Of the players still playing
+  each season, how many are drafted, sign, stop or play on?"**, the first
+  model card. It draws the simplest discrete-time competing-risks model of
+  the career endings: each eligible season split into drafted, signed
+  undrafted, eligibility ended and played on, then the cumulative NFL
+  percent from a rate at each season (which reproduces the observed
+  Aalen-Johansen curves) against one rate across seasons, and observed
+  against a model with a position-group term. The new `ending_multinom()`
+  fits the multinomial model on player-seasons, with optional season terms
+  and a covariate, and is tested against `ending_hazards()` and
+  `ending_incidence()`; the glossary gains season-by-season chances and
+  same chances every season.
+
 - Investigations (feature F25): **the study-population flow chart splits
   drafted by round**. "How many college players ever get a shot at the
   draft?" now ends the drafted branch in seven round boxes, each with its
