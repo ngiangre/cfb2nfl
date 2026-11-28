@@ -1,0 +1,16 @@
+{
+  "id": "nfl-entry-by-school-position",
+  "release": "2026-11-25",
+  "code_hash": "9a0f716a1c87f7f257f197057e4d3b3e",
+  "functions": {
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "draft_rates": "bc770817a67e1e7635702a29636c50dd",
+    "fmt": "d4c89f195c447af907ba425a860522de",
+    "gap_beeswarm": "2001b9be0550ea216ca9e7e923077457",
+    "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
+    "position_group_levels": "20e3516fb9bf8abbe12f3fd702d9d55f",
+    "school_position_rates": "5499bb9da6d4e891e6cfb2351223982f",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b"
+  }
+}

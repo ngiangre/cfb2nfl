@@ -1,0 +1,130 @@
+---
+title: "Which schools send the most players to the NFL, at each position?"
+image: card-thumbs/nfl-entry-by-school-position.png
+image-alt: "Horizontal beeswarm with one row per position group and one dot per FBS school, placed at its rate of eligible players not entering the NFL minus its rate entering: nearly every dot sits right of zero in pale grey, and only a few schools, mostly at defensive line, tight end and running back, fall left of zero in dark grey, where most eligible players entered the NFL."
+categories: ["Topic: Programs and conferences", "Position: By position group", "Population: Draft-eligible players", "Unit: Schools", "Figure: Distribution", "Question: What matters for going pro"]
+status: sketch
+graduated_to: null
+terms: [eligible-player, nfl-entry, drafted, signed-undrafted, position-group]
+followups:
+  - text: "Which schools send more players to the NFL undrafted than drafted, at each position?"
+    link: "Question: What matters for going pro"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) {
+  root <- pkgload::pkg_path()
+}
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+first_season <- 2013L
+last_season <- 2025L # the 2026 season is still being played
+fbs_cr <- tbl(con, "team_draft") |>
+  filter(
+    season >= first_season,
+    season <= last_season,
+    tier_label != "FCS and below"
+  ) |>
+  collect()
+DBI::dbDisconnect(con, shutdown = TRUE)
+```
+
+```{r}
+#| label: figure
+# School position groups with few eligible players swing on one or two
+# signings, so they drop out.
+min_eligible <- 10L
+school_pos_all <- school_position_rates(fbs_cr)
+gaps <- school_pos_all |>
+  filter(eligible >= min_eligible) |>
+  mutate(
+    side = if_else(
+      2 * entered > eligible,
+      "Most eligible players entered the NFL",
+      "Half or fewer entered"
+    ),
+    tip = paste0(
+      team,
+      ", ",
+      tolower(position_group),
+      "\n",
+      entered,
+      " entered the NFL (",
+      drafted,
+      " drafted, ",
+      udfa,
+      " undrafted), ",
+      eligible - entered,
+      " did not, of ",
+      eligible,
+      " eligible"
+    )
+  )
+n_small <- nrow(school_pos_all) - nrow(gaps)
+p <- gap_beeswarm(
+  gaps,
+  entry_gap,
+  side,
+  c(
+    "Most eligible players entered the NFL" = "#374151",
+    "Half or fewer entered" = "#D1D5DB"
+  ),
+  tip,
+  title = "Rate not entering the NFL minus rate entering, by school and position group",
+  subtitle = sprintf(
+    "Each dot is an FBS school in one position group, final seasons %s to %s; left of zero, most eligible players entered the NFL\n%s school position groups with fewer than %s eligible players left out; hover a dot to find its school in every group",
+    first_season,
+    last_season,
+    fmt(n_small),
+    min_eligible
+  ),
+  x_label = "Rate not entering the NFL minus rate entering (percentage points)",
+  caption = card_caption(release)
+) +
+  # Name the school furthest to the entering side in each group.
+  geom_text(
+    data = slice_min(gaps, entry_gap, n = 1, by = position_group, with_ties = FALSE) |>
+      mutate(position_group = forcats::fct_rev(position_group)),
+    aes(label = team),
+    nudge_y = 0.4,
+    hjust = 0,
+    size = 4,
+    colour = "#374151",
+    fontface = "bold"
+  )
+card_thumbnail(
+  # The tile is small: a shorter subtitle and axis title, the legend in two rows.
+  p +
+    theme_card() +
+    labs(subtitle = sprintf("Each dot is an FBS school in one position group, final seasons %s to %s; left of zero, most eligible players entered the NFL", first_season, last_season), x = "Not entering minus entering (points)") +
+    guides(colour = guide_legend(nrow = 2)),
+  "nfl-entry-by-school-position",
+  release = release,
+  height = 8
+)
+card_interactive(p, height_svg = 8)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+```
