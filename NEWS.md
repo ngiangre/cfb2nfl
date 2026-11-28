@@ -1,5 +1,19 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Investigations (feature F25): **new card, "Where does every college roster
+  player end up, season by season?"**. Stacked percent bars by final college
+  season (plus all seasons) split every roster player into the leaves of the
+  study-population flow chart, with drafted shaded by round; a second figure
+  shows, for each path, the position groups that take it. The new helpers
+  `population_leaves()` and `leaf_palette()` are shared and tested, and the
+  glossary gains final college season, never draft-eligible and draft round.
+
+- Investigations (feature F25): **new card, "Which 2026 regulars averaged
+  the most EPA per involvement in each position group and competition
+  tier?"**, built on the new `season_involvement()` and
+  `top_group_players()` helpers, with the involvement regular term in the
+  glossary.
+
 - Investigations (feature F25): **two new school-by-position cards**,
   "Which schools send more players to the NFL undrafted than drafted, at
   each position?" and "Which schools send the most players to the NFL, at

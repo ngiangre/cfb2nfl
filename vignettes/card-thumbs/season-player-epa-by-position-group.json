@@ -1,0 +1,25 @@
+{
+  "id": "season-player-epa-by-position-group",
+  "release": "2026-11-25",
+  "code_hash": "4a0983df52c2c5e2d268b1ea7be7da0d",
+  "functions": {
+    "build_play_involvement": "d09387e1430e13c5018ce4e0be4e56b6",
+    "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
+    "card_label_wrap": "13a4cba5d9b892f808cec3c5d4e496a4",
+    "fmt": "d4c89f195c447af907ba425a860522de",
+    "game_kick_types": "a20f17cac9e4ae865e69ca4ced7ae266",
+    "harmonize_position": "931d9b7daa25b80c9cd17abd32e7b3fd",
+    "log_role": "62b7388ecbed5c1764f6b9268ad53a73",
+    "match_play_mentions": "fa71a61f49fff925d29abd9679e13f6d",
+    "name_surname": "3d8228ef9f3a848df080add8d7433c26",
+    "play_text_mentions": "e55518f1e895be6ae046f97e701af7e2",
+    "position_code_map": "23e4bba7fd7da54066373fb8a9761c45",
+    "position_palette": "11141b2b531ab5b7f31d6c196fcc46be",
+    "position_sources": "9adac2d8c4dfebfd2fbb956dee1f3a42",
+    "scale_colour_position": "4cafb87d0ef9e51cdf13934043361fe6",
+    "season_involvement": "2f9a15691ae21eae3e9626ae7ec1e2b6",
+    "theme_card": "4d41eeb6e1d3aebab8f23e5d6817b442",
+    "theme_cfb2nfl": "19c0f499f3a328fde1e3221056065e4b",
+    "top_group_players": "6e7ddb74b16718612ce799b1e40e06bd"
+  }
+}
