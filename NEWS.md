@@ -1,5 +1,11 @@
 # cfb2nfl 0.0.0.9000 (development version)
 
+- Investigations (feature F25): **the study-population flow chart splits
+  drafted by round**. "How many college players ever get a shot at the
+  draft?" now ends the drafted branch in seven round boxes, each with its
+  count and share of the drafted players, in the same round greens as the
+  roster-paths card.
+
 - Investigations (feature F25): **new card, "Where does every college roster
   player end up, season by season?"**. Stacked percent bars by final college
   season (plus all seasons) split every roster player into the leaves of the

@@ -1,7 +1,7 @@
 {
   "id": "career-study-population",
   "release": "2026-11-25",
-  "code_hash": "c20cf9cde4631498bf6433aa3d70feaf",
+  "code_hash": "17175bcb980f5c4b9431eb7286587379",
   "functions": {
     "card_caption": "90453dc3eddd8cfbb0058e614b9c664f",
     "career_endings": "4fa3d0c4500176cd13cd4e8d68487bed",
@@ -10,6 +10,7 @@
     "explorer_player_url": "7935223eec310d0a1f5d2a037eb3aeab",
     "fmt": "d4c89f195c447af907ba425a860522de",
     "label_endings": "77f5c01e1f49f7936aa359e798e3d16a",
+    "leaf_palette": "2adc4f2a0da24bc21e44f854199fa635",
     "never_eligible_entrants": "9a7ba74d333d466a35b43bd15b39e24f",
     "pct": "3413c026fc8c907293b2fb1d96080440",
     "position_group": "de1b9b6a91b68be633ab4e56c4f6597e",
