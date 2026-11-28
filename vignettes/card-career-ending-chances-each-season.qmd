@@ -1,0 +1,381 @@
+---
+title: "Of the players still playing each season, how many are drafted, sign, stop or play on?"
+image: card-thumbs/career-ending-chances-each-season.png
+image-alt: "Stacked bar chart, all positions, one bar per eligible season, splitting the players still playing going into that season into drafted, signed undrafted, eligibility ended undrafted and played on; the played-on share shrinks each season while eligibility ended grows to most of the bar, and each bar is labelled with its percent reaching the NFL; a second chart compares the cumulative NFL percent with a model that gives every season the same chance, which overstates the first season; a third chart compares each position group's observed cumulative NFL percent with a model adding a position-group term, the two close together in every group."
+categories: ["Topic: Draft outcomes", "Topic: Career shape", "Position: All positions", "Position: By position group", "Population: Draft-eligible players", "Figure: Bar chart", "Figure: Line chart"]
+status: sketch
+graduated_to: null
+terms: [season-ending-chances, same-every-season, career-eligible-season, at-risk, study-population, career-drafted, career-signed-undrafted, eligibility-ended, cumulative-percent, first-eligible-position]
+followups:
+  - text: "Add conference tier and recruiting rating as terms alongside position group, as the baseline for the draft forecast."
+    link: "F17"
+  - text: "Check whether the fit generalizes with cross-validation or Monte Carlo cross-validation, and how wide that range is under different covariates."
+    link: "F17"
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| message: false
+#| warning: false
+# Load the project's functions from the checkout (decision 0042) and read the
+# published data bundle, so this code reproduces the figure (decision 0040).
+root <- Sys.getenv("CFB2NFL_ROOT")
+if (!nzchar(root)) {
+  root <- pkgload::pkg_path()
+}
+knitr::opts_knit$set(root.dir = root)
+pkgload::load_all(root, quiet = TRUE)
+library(dplyr)
+library(ggplot2)
+library(ggiraph)
+
+con <- DBI::dbConnect(
+  duckdb::duckdb(),
+  file.path(root, "data", "cfb2nfl.duckdb"),
+  read_only = TRUE
+)
+release <- data_release_date()
+outcomes <- DBI::dbReadTable(con, "outcomes")
+roster_pos <- DBI::dbGetQuery(
+  con,
+  "SELECT playerId, season, any_value(position) AS position FROM roster GROUP BY playerId, season"
+)
+study_pop <- career_endings(outcomes, roster_pos) |>
+  label_endings() |>
+  filter(group != "Position not recorded")
+state_fill <- ending_palette()
+state_lab <- c(ending_labels(), playing = "Played on")
+# Here the still-playing colour marks players who came back the next season.
+names(state_fill)[names(state_fill) == "Still playing"] <- "Played on"
+min_risk <- 30
+
+# One set of chances per eligible season, and one set for every season.
+by_season <- ending_multinom(study_pop)
+pooled <- ending_multinom(study_pop, season_terms = FALSE)
+# With a term per season the model is the Aalen-Johansen estimate.
+aj <- ending_incidence(study_pop, by = NULL) |>
+  inner_join(by_season, by = c("time", "state"))
+stopifnot(max(abs(aj$estimate - aj$cumulative)) < 1e-3)
+```
+
+```{r}
+#| label: figure
+shown <- by_season |>
+  filter(n_risk >= min_risk) |>
+  mutate(
+    label = factor(state_lab[state], names(state_fill)),
+    season = factor(
+      sprintf("Eligible season %d\n%s at risk", time, fmt(n_risk)),
+      rev(unique(sprintf("Eligible season %d\n%s at risk", time, fmt(n_risk))))
+    )
+  )
+nfl <- shown |>
+  filter(state %in% c("drafted", "signed_udfa")) |>
+  summarise(nfl = sum(chance), .by = c("season", "time"))
+
+p <- shown |>
+  mutate(
+    tooltip = sprintf(
+      "Eligible season %d: %s of the %s players still playing going into it %s",
+      time,
+      pct(chance),
+      fmt(n_risk),
+      if_else(
+        state == "playing",
+        "played on",
+        paste("ended:", tolower(label))
+      )
+    )
+  ) |>
+  ggplot(aes(100 * chance, season, fill = label)) +
+  geom_col_interactive(
+    aes(tooltip = tooltip, data_id = paste(time, state), group = label),
+    width = 0.75,
+    colour = "#9CA3AF",
+    linewidth = 0.3,
+    position = position_stack(reverse = TRUE)
+  ) +
+  geom_text(
+    data = nfl,
+    aes(x = 101, y = season, label = paste0(pct(nfl, 0), " NFL")),
+    inherit.aes = FALSE,
+    hjust = 0,
+    size = 5,
+    fontface = "bold",
+    colour = "#111827"
+  ) +
+  scale_fill_manual(values = state_fill, drop = TRUE) +
+  scale_x_continuous(
+    labels = \(x) paste0(x, "%"),
+    breaks = seq(0, 100, 25),
+    limits = c(0, 124),
+    expand = expansion(mult = c(0, 0))
+  ) +
+  labs(
+    title = "How each eligible season ends for the players still playing",
+    subtitle = "Players still playing; label: NFL share",
+    x = "Percent of players still playing",
+    y = NULL,
+    fill = NULL,
+    caption = card_caption(release)
+  ) +
+  theme_card() +
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = rel(0.75)),
+    legend.key.size = unit(0.9, "lines")
+  ) +
+  guides(fill = guide_legend(nrow = 2))
+
+card_thumbnail(
+  p,
+  "career-ending-chances-each-season",
+  release = release,
+  height = 7.5
+)
+card_interactive(p, height_svg = 8)
+```
+
+```{r}
+#| label: same-every-season
+model_lab <- c(
+  by_season = "Estimated at each season",
+  pooled = "Estimated across seasons"
+)
+compare <- bind_rows(
+  mutate(by_season, model = "by_season"),
+  mutate(pooled, model = "pooled")
+) |>
+  filter(state %in% c("drafted", "signed_udfa"), n_risk >= min_risk) |>
+  mutate(
+    label = factor(state_lab[state], names(state_fill)),
+    model = factor(model_lab[model], model_lab)
+  )
+# Name each line at its right end, so the legend is not needed to tell them apart.
+line_ends <- compare |>
+  filter(time == max(time)) |>
+  mutate(
+    each_season = model == model_lab[["by_season"]],
+    end_label = if_else(each_season, "At each season", "Across seasons"),
+    # Pull the two labels apart where the lines end close together.
+    label_y = 100 * cumulative + if_else(each_season, 0.3, -0.3)
+  )
+p_compare <- compare |>
+  mutate(
+    tooltip = sprintf(
+      "%s, by eligible season %d: %s %s in total; each season %s of the players still playing are %s",
+      model,
+      time,
+      pct(cumulative),
+      tolower(label),
+      pct(chance),
+      if_else(state == "drafted", "drafted", "signed undrafted")
+    ),
+    tooltip = if_else(
+      model == model_lab[["by_season"]],
+      sprintf(
+        "Estimated rate at each season (matches the observed), by eligible season %d: %s %s in total; in season %d, %s of the players still playing were %s",
+        time,
+        pct(cumulative),
+        tolower(label),
+        time,
+        pct(chance),
+        if_else(state == "drafted", "drafted", "signed undrafted")
+      ),
+      tooltip
+    )
+  ) |>
+  ggplot(aes(time, 100 * cumulative, colour = label, linetype = model)) +
+  geom_line(linewidth = 1.1) +
+  geom_point_interactive(
+    aes(tooltip = tooltip, data_id = paste(model, state)),
+    size = 2.4
+  ) +
+  geom_text(
+    data = line_ends,
+    aes(y = label_y, label = end_label),
+    hjust = 0,
+    nudge_x = 0.12,
+    size = 4.5,
+    fontface = "bold",
+    show.legend = FALSE
+  ) +
+  scale_colour_manual(values = state_fill, guide = "none") +
+  # Each model's formula: the log odds of ending k rather than playing on.
+  scale_linetype_manual(
+    values = c("solid", "22"),
+    labels = c(
+      expression(
+        "Estimated rate at each season (y ~ season):" ~
+          log ~ (p[k * "," * t] / p[0 * "," * t]) == alpha[k * "," * t]
+      ),
+      expression(
+        "Estimated rate across seasons (y ~ 1):" ~
+          log ~ (p[k * "," * t] / p[0 * "," * t]) == alpha[k]
+      )
+    )
+  ) +
+  facet_wrap(~label) +
+  scale_x_continuous(
+    breaks = unique(compare$time),
+    expand = expansion(mult = c(0.05, 0.42))
+  ) +
+  scale_y_continuous(labels = \(x) paste0(x, "%"), limits = c(0, NA)) +
+  labs(
+    title = "Cumulative percent reaching the NFL each way, under each model",
+    x = "Eligible season",
+    y = "Cumulative percent of eligible players",
+    linetype = NULL,
+    caption = paste0(
+      "The rate at each season has one term per season, so it reproduces the observed percents exactly.\n",
+      "Why they differ: the rate across seasons pools every season into one, but few players are drafted or signed\n",
+      "in their first eligible season and most in the middle ones, so it runs high early and low later.\n",
+      "p(k,t): chance of ending k in eligible season t; p(0,t): chance of playing on. ",
+      "Seasons with fewer than ",
+      min_risk,
+      " players at risk are omitted."
+    )
+  ) +
+  theme_cfb2nfl() +
+  theme(
+    legend.position = "bottom",
+    legend.key.width = unit(2.5, "lines"),
+    plot.caption = element_text(hjust = 0)
+  ) +
+  guides(linetype = guide_legend(nrow = 2))
+card_interactive(p_compare, width_svg = 12, height_svg = 7)
+```
+
+```{r}
+#| label: by-position
+obs_group <- ending_incidence(mutate(study_pop, group = droplevels(group))) |>
+  mutate(group = as.character(group))
+est_group <- ending_multinom(study_pop, by = "group")
+thin <- thin_position_groups(obs_group, horizon = 3L, min_risk = min_risk)
+fit_lab <- c(
+  observed = "Observed",
+  estimated = "Estimated"
+)
+by_group <- bind_rows(
+  transmute(
+    obs_group,
+    group,
+    time,
+    state,
+    cumulative = estimate,
+    n_risk,
+    model = "observed"
+  ),
+  transmute(
+    est_group,
+    group,
+    time,
+    state,
+    cumulative,
+    n_risk,
+    model = "estimated"
+  )
+) |>
+  filter(
+    state %in% c("drafted", "signed_udfa"),
+    time > 0,
+    n_risk >= min_risk,
+    !group %in% thin
+  ) |>
+  mutate(
+    label = factor(state_lab[state], names(state_fill)),
+    model = factor(fit_lab[model], fit_lab),
+    group = factor(group, position_group_levels())
+  )
+worst <- by_group |>
+  select(group, time, label, model, cumulative) |>
+  tidyr::pivot_wider(names_from = model, values_from = cumulative) |>
+  filter(!is.na(Observed), !is.na(Estimated)) |>
+  slice_max(abs(Estimated - Observed), n = 1, with_ties = FALSE)
+p_group <- by_group |>
+  mutate(
+    tooltip = sprintf(
+      "%s, %s by eligible season %d: %s %s (%s players at risk)",
+      group,
+      tolower(model),
+      time,
+      pct(cumulative),
+      tolower(label),
+      fmt(n_risk)
+    )
+  ) |>
+  ggplot(aes(
+    time,
+    100 * cumulative,
+    colour = label,
+    linetype = model,
+    group = interaction(label, model)
+  )) +
+  geom_line(linewidth = 1) +
+  geom_point_interactive(
+    aes(tooltip = tooltip, data_id = paste(group, model, state)),
+    size = 2
+  ) +
+  facet_wrap(~group, ncol = 3) +
+  scale_colour_manual(values = state_fill) +
+  # The observed curve, and the model with a term per season plus a shift
+  # per position group that is the same in every season.
+  scale_linetype_manual(
+    values = c("solid", "22"),
+    labels = c(
+      "Observed",
+      expression(
+        "Estimated (y ~ season + position group):" ~
+          log ~ (p[k * "," * t * "," * g] / p[0 * "," * t * "," * g]) ==
+          alpha[k * "," * t] + beta[k * "," * g]
+      )
+    )
+  ) +
+  scale_x_continuous(breaks = unique(by_group$time)) +
+  scale_y_continuous(labels = \(x) paste0(x, "%"), limits = c(0, NA)) +
+  labs(
+    title = "Cumulative percent reaching the NFL by position group, observed and estimated",
+    subtitle = sprintf(
+      "Largest gap: %s points, %s %s by eligible season %d",
+      fmt(100 * abs(worst$Estimated - worst$Observed), 1),
+      tolower(worst$group),
+      tolower(worst$label),
+      worst$time
+    ),
+    x = "Eligible season",
+    y = "Cumulative percent of eligible players",
+    colour = NULL,
+    linetype = NULL,
+    caption = paste0(
+      "Why they differ: the position term shifts a group's odds of each ending by the same amount in every season,\n",
+      "so the estimate follows the pooled timing, and a group whose endings come earlier or later than the rest drifts from it.\n",
+      "p(k,t,g): chance of ending k in eligible season t for position group g; p(0,t,g): chance of playing on.\n",
+      "Seasons with fewer than ",
+      min_risk,
+      " players at risk are omitted",
+      if (length(thin)) {
+        paste0(", as are ", paste(tolower(thin), collapse = ", "))
+      } else {
+        ""
+      },
+      "."
+    )
+  ) +
+  theme_cfb2nfl() +
+  theme(
+    legend.position = "bottom",
+    legend.box = "vertical",
+    legend.key.width = unit(2.5, "lines"),
+    plot.caption = element_text(hjust = 0)
+  )
+card_interactive(p_group, width_svg = 13, height_svg = 11)
+```
+
+```{r}
+#| label: card-footer
+#| echo: false
+#| output: asis
+cat(card_footer())
+DBI::dbDisconnect(con, shutdown = TRUE)
+```

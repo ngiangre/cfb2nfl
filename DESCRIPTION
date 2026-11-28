@@ -52,6 +52,7 @@ Suggests:
     httr2,
     knitr,
     nflreadr,
+    nnet,
     patchwork,
     pkgload,
     plotly,
